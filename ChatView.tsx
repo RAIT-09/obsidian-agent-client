@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView, WorkspaceLeaf, MarkdownRenderer } from "obsidian";
 import React, { useState, useRef, useEffect } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { setIcon } from "obsidian";
@@ -14,6 +14,10 @@ type MessageRole = "user" | "assistant";
 type MessageContent =
 	| {
 			type: "text";
+			text: string;
+	  }
+	| {
+			type: "agent_thought";
 			text: string;
 	  }
 	| {
@@ -58,11 +62,90 @@ interface ChatMessage {
 
 export const VIEW_TYPE_CHAT = "chat-view";
 
+// Collapsible thought component
+function CollapsibleThought({
+	text,
+	plugin,
+}: {
+	text: string;
+	plugin: AgentClientPlugin;
+}) {
+	const [isExpanded, setIsExpanded] = useState(false);
+
+	return (
+		<div
+			style={{
+				fontStyle: "italic",
+				color: "var(--text-muted)",
+				backgroundColor: "transparent",
+				fontSize: "0.9em",
+				cursor: "pointer",
+			}}
+			onClick={() => setIsExpanded(!isExpanded)}
+		>
+			<div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+				💡Thinking
+				<span
+					style={{
+						fontSize: "0.8em",
+						opacity: 0.7,
+						marginLeft: "auto",
+					}}
+				>
+					{isExpanded ? "▼" : "▶"}
+				</span>
+			</div>
+			{isExpanded && (
+				<div style={{ marginTop: "8px", paddingLeft: "16px" }}>
+					<MarkdownTextRenderer text={text} plugin={plugin} />
+				</div>
+			)}
+		</div>
+	);
+}
+
+// Markdown text component
+function MarkdownTextRenderer({
+	text,
+	plugin,
+}: {
+	text: string;
+	plugin: AgentClientPlugin;
+}) {
+	const containerRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (containerRef.current && text) {
+			// Clear previous content
+			containerRef.current.innerHTML = "";
+
+			// Render markdown
+			MarkdownRenderer.renderMarkdown(
+				text,
+				containerRef.current,
+				"", // sourcePath - empty for dynamic content
+				plugin, // Component for context
+			);
+		}
+	}, [text, plugin]);
+
+	return <div ref={containerRef} />;
+}
+
 // Message content rendering components
-function MessageContentRenderer({ content }: { content: MessageContent }) {
+function MessageContentRenderer({
+	content,
+	plugin,
+}: {
+	content: MessageContent;
+	plugin: AgentClientPlugin;
+}) {
 	switch (content.type) {
 		case "text":
-			return <span>{content.text}</span>;
+			return <MarkdownTextRenderer text={content.text} plugin={plugin} />;
+
+		case "agent_thought":
+			return <CollapsibleThought text={content.text} plugin={plugin} />;
 
 		case "tool_call":
 			return (
@@ -70,7 +153,8 @@ function MessageContentRenderer({ content }: { content: MessageContent }) {
 					style={{
 						padding: "8px",
 						marginTop: "4px",
-						backgroundColor: "var(--background-modifier-border)",
+						backgroundColor: "transparent",
+						border: "1px solid var(--background-modifier-border)",
 						borderRadius: "4px",
 						fontSize: "12px",
 					}}
@@ -78,6 +162,29 @@ function MessageContentRenderer({ content }: { content: MessageContent }) {
 					<div style={{ fontWeight: "bold", marginBottom: "4px" }}>
 						🔧 {content.title}
 					</div>
+					{content.content && content.content.length > 0 && (
+						<div style={{ marginTop: "2px" }}>
+							{content.content.map((item, idx) => {
+								if (
+									item.type === "content" &&
+									item.content?.type === "text"
+								) {
+									return (
+										<div
+											key={idx}
+											style={{ marginBottom: "1px" }}
+										>
+											<MarkdownTextRenderer
+												text={item.content.text}
+												plugin={plugin}
+											/>
+										</div>
+									);
+								}
+								return null;
+							})}
+						</div>
+					)}
 					<div style={{ color: "var(--text-muted)" }}>
 						Status: {content.status}
 						{content.kind && ` | Kind: ${content.kind}`}
@@ -135,7 +242,13 @@ function MessageContentRenderer({ content }: { content: MessageContent }) {
 	}
 }
 
-function MessageRenderer({ message }: { message: ChatMessage }) {
+function MessageRenderer({
+	message,
+	plugin,
+}: {
+	message: ChatMessage;
+	plugin: AgentClientPlugin;
+}) {
 	return (
 		<div
 			style={{
@@ -143,7 +256,7 @@ function MessageRenderer({ message }: { message: ChatMessage }) {
 					message.role === "user"
 						? "var(--background-primary)"
 						: "transparent",
-				padding: "12px 16px",
+				padding: "0px 16px",
 				borderRadius: message.role === "user" ? "8px" : "0px",
 				width: "100%",
 				border:
@@ -155,7 +268,7 @@ function MessageRenderer({ message }: { message: ChatMessage }) {
 		>
 			{message.content.map((content, idx) => (
 				<div key={idx}>
-					<MessageContentRenderer content={content} />
+					<MessageContentRenderer content={content} plugin={plugin} />
 				</div>
 			))}
 		</div>
@@ -177,6 +290,7 @@ class AcpClient implements acp.Client {
 
 	async sessionUpdate(params: acp.SessionNotification): Promise<void> {
 		const update = params.update;
+		console.log(update);
 		switch (update.sessionUpdate) {
 			case "agent_message_chunk":
 				if (update.content.type === "text") {
@@ -200,6 +314,23 @@ class AcpClient implements acp.Client {
 					}
 				}
 				break;
+			case "agent_thought_chunk":
+				if (update.content.type === "text") {
+					// Always create new thought message
+					this.addMessage({
+						id: crypto.randomUUID(),
+						role: "assistant",
+						content: [
+							{
+								type: "agent_thought",
+								text: update.content.text,
+							},
+						],
+						timestamp: new Date(),
+					});
+					// Don't set currentMessageId for thoughts as they are standalone
+				}
+				break;
 			case "tool_call":
 				this.updateLastMessage({
 					type: "tool_call",
@@ -214,7 +345,7 @@ class AcpClient implements acp.Client {
 				this.updateLastMessage({
 					type: "tool_call",
 					toolCallId: update.toolCallId,
-					title: update.title || "",
+					title: update.title, // Don't provide empty string fallback
 					status: update.status || "pending",
 					kind: update.kind,
 					content: update.content,
@@ -242,6 +373,71 @@ class AcpClient implements acp.Client {
 	async writeTextFile(params: acp.WriteTextFileRequest) {
 		return {};
 	}
+}
+
+// Header button component with Lucide icons
+function HeaderButton({
+	iconName,
+	tooltip,
+	onClick,
+}: {
+	iconName: string;
+	tooltip: string;
+	onClick: () => void;
+}) {
+	const buttonRef = useRef<HTMLButtonElement>(null);
+
+	useEffect(() => {
+		if (buttonRef.current) {
+			setIcon(buttonRef.current, iconName);
+			const svg = buttonRef.current.querySelector("svg");
+			if (svg) {
+				svg.style.color = "var(--text-muted)";
+			}
+		}
+	}, [iconName]);
+
+	return (
+		<button
+			ref={buttonRef}
+			title={tooltip}
+			onClick={onClick}
+			style={{
+				width: "20px",
+				height: "20px",
+				border: "none",
+				borderRadius: "0",
+				backgroundColor: "transparent",
+				color: "var(--text-muted)",
+				cursor: "pointer",
+				display: "flex",
+				alignItems: "center",
+				justifyContent: "center",
+				fontSize: "16px",
+				transition: "all 0.2s ease",
+				padding: "0",
+				margin: "0",
+				outline: "none",
+				appearance: "none",
+				boxShadow: "none",
+			}}
+			onMouseEnter={(e) => {
+				e.currentTarget.style.backgroundColor =
+					"var(--background-modifier-hover)";
+				const svg = e.currentTarget.querySelector("svg");
+				if (svg) {
+					svg.style.color = "var(--interactive-accent)";
+				}
+			}}
+			onMouseLeave={(e) => {
+				e.currentTarget.style.backgroundColor = "transparent";
+				const svg = e.currentTarget.querySelector("svg");
+				if (svg) {
+					svg.style.color = "var(--text-muted)";
+				}
+			}}
+		/>
+	);
 }
 
 function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
@@ -301,7 +497,32 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				);
 
 				if (existingIndex >= 0) {
-					updatedMessage.content[existingIndex] = content;
+					if (content.type === "tool_call") {
+						// For tool_call updates, preserve existing values if new ones are empty
+						const existing = updatedMessage.content[
+							existingIndex
+						] as any;
+						const updated = content as any;
+						updatedMessage.content[existingIndex] = {
+							...existing,
+							...updated,
+							// Preserve existing title if update doesn't have one
+							title:
+								updated.title !== undefined
+									? updated.title
+									: existing.title,
+							// Merge content arrays if update has content
+							content:
+								updated.content !== undefined
+									? [
+											...(existing.content || []),
+											...(updated.content || []),
+										]
+									: existing.content,
+						};
+					} else {
+						updatedMessage.content[existingIndex] = content;
+					}
 				} else {
 					updatedMessage.content.push(content);
 				}
@@ -522,6 +743,26 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		}
 	};
 
+	const createNewSession = async () => {
+		if (!connectionRef.current) return;
+
+		try {
+			console.log("[Debug] Creating new session...");
+			const sessionResult = await connectionRef.current.newSession({
+				cwd: process.cwd(),
+				mcpServers: [],
+			});
+			console.log(`📝 Created new session: ${sessionResult.sessionId}`);
+
+			setSessionId(sessionResult.sessionId);
+			setMessages([]);
+			setInputValue("");
+			acpClientRef.current?.resetCurrentMessage();
+		} catch (error) {
+			console.error("[Client] New Session Error:", error);
+		}
+	};
+
 	const handleSendMessage = async () => {
 		if (!connectionRef.current || !inputValue.trim() || isSending) return;
 
@@ -624,9 +865,38 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					padding: "16px",
 					borderBottom: "1px solid var(--background-modifier-border)",
 					flexShrink: 0,
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
 				}}
 			>
 				<h3 style={{ margin: "0" }}>Agent Chat</h3>
+				<div style={{ display: "flex", gap: "8px" }}>
+					<HeaderButton
+						iconName="plus"
+						tooltip="新しいチャット"
+						onClick={createNewSession}
+					/>
+					<HeaderButton
+						iconName="list"
+						tooltip="チャット履歴"
+						onClick={() => {
+							// TODO: チャット履歴を表示
+							console.log("Chat history clicked");
+						}}
+					/>
+					<HeaderButton
+						iconName="settings"
+						tooltip="設定"
+						onClick={() => {
+							// プラグイン設定を開く
+							(plugin.app as any).setting.open();
+							(plugin.app as any).setting.openTabById(
+								plugin.manifest.id,
+							);
+						}}
+					/>
+				</div>
 			</div>
 
 			<div
@@ -636,7 +906,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					overflowY: "auto",
 					display: "flex",
 					flexDirection: "column",
-					gap: "8px",
+					gap: "2px",
 				}}
 			>
 				{showAuthSelection ? (
@@ -722,7 +992,11 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					</div>
 				) : (
 					messages.map((message) => (
-						<MessageRenderer key={message.id} message={message} />
+						<MessageRenderer
+							key={message.id}
+							message={message}
+							plugin={plugin}
+						/>
 					))
 				)}
 			</div>
