@@ -52,6 +52,18 @@ type MessageContent =
 				status: "pending" | "in_progress" | "completed";
 				priority: "high" | "medium" | "low";
 			}[];
+	  }
+	| {
+			type: "permission_request";
+			toolCall: {
+				toolCallId: string;
+			};
+			options: {
+				optionId: string;
+				name: string;
+				kind?: "allow_always" | "allow_once" | "reject_once";
+			}[];
+			selectedOptionId?: string;
 	  };
 
 interface ChatMessage {
@@ -167,9 +179,18 @@ function MarkdownTextRenderer({
 function MessageContentRenderer({
 	content,
 	plugin,
+	messageId,
+	acpClient,
+	updateMessageContent,
 }: {
 	content: MessageContent;
 	plugin: AgentClientPlugin;
+	messageId?: string;
+	acpClient?: AcpClient;
+	updateMessageContent?: (
+		messageId: string,
+		updatedContent: MessageContent,
+	) => void;
 }) {
 	switch (content.type) {
 		case "text":
@@ -193,29 +214,6 @@ function MessageContentRenderer({
 					<div style={{ fontWeight: "bold", marginBottom: "4px" }}>
 						🔧 {content.title}
 					</div>
-					{content.content && content.content.length > 0 && (
-						<div style={{ marginTop: "2px" }}>
-							{content.content.map((item, idx) => {
-								if (
-									item.type === "content" &&
-									item.content?.type === "text"
-								) {
-									return (
-										<div
-											key={idx}
-											style={{ marginBottom: "1px" }}
-										>
-											<MarkdownTextRenderer
-												text={item.content.text}
-												plugin={plugin}
-											/>
-										</div>
-									);
-								}
-								return null;
-							})}
-						</div>
-					)}
 					<div style={{ color: "var(--text-muted)" }}>
 						Status: {content.status}
 						{content.kind && ` | Kind: ${content.kind}`}
@@ -267,6 +265,171 @@ function MessageContentRenderer({
 					))}
 				</div>
 			);
+		case "permission_request":
+			const isSelected = content.selectedOptionId !== undefined;
+			const selectedOption = content.options.find(
+				(opt) => opt.optionId === content.selectedOptionId,
+			);
+
+			return (
+				<div
+					style={{
+						padding: "12px",
+						marginTop: "4px",
+						backgroundColor: "var(--background-secondary)",
+						border: "1px solid var(--background-modifier-border)",
+						borderRadius: "8px",
+						fontSize: "14px",
+					}}
+				>
+					<div
+						style={{
+							fontWeight: "bold",
+							marginBottom: "8px",
+							display: "flex",
+							alignItems: "center",
+							gap: "8px",
+						}}
+					>
+						🔐 Permission Request
+					</div>
+					<div
+						style={{
+							marginBottom: "12px",
+							color: "var(--text-normal)",
+						}}
+					>
+						The agent is requesting permission to perform an action.
+						Please choose how to proceed:
+					</div>
+					<div
+						style={{
+							display: "flex",
+							flexWrap: "wrap",
+							gap: "8px",
+						}}
+					>
+						{content.options.map((option) => {
+							const isThisSelected =
+								content.selectedOptionId === option.optionId;
+							return (
+								<button
+									key={option.optionId}
+									disabled={isSelected}
+									onClick={() => {
+										if (
+											acpClient &&
+											messageId &&
+											updateMessageContent
+										) {
+											// Update UI immediately
+											const updatedContent = {
+												...content,
+												selectedOptionId:
+													option.optionId,
+											};
+											updateMessageContent(
+												messageId,
+												updatedContent,
+											);
+
+											// Send response to agent
+											acpClient.handlePermissionResponse(
+												messageId,
+												option.optionId,
+											);
+										} else {
+											console.warn(
+												"Cannot handle permission response: missing acpClient, messageId, or updateMessageContent",
+											);
+										}
+									}}
+									style={{
+										padding: "8px 16px",
+										border: "1px solid var(--background-modifier-border)",
+										borderRadius: "6px",
+										backgroundColor: isThisSelected
+											? "var(--interactive-accent)"
+											: isSelected
+												? "var(--background-modifier-border)"
+												: "var(--background-primary)",
+										color: isThisSelected
+											? "white"
+											: isSelected
+												? "var(--text-muted)"
+												: "var(--text-normal)",
+										cursor: isSelected
+											? "not-allowed"
+											: "pointer",
+										fontSize: "13px",
+										fontWeight: isThisSelected
+											? "600"
+											: "500",
+										transition: "all 0.2s ease",
+										minWidth: "80px",
+										textAlign: "center",
+										opacity:
+											isSelected && !isThisSelected
+												? 0.5
+												: 1,
+										...(option.kind === "allow_always" &&
+											!isSelected && {
+												backgroundColor:
+													"var(--color-green)",
+												color: "white",
+												borderColor:
+													"var(--color-green)",
+											}),
+										...(option.kind === "reject_once" &&
+											!isSelected && {
+												backgroundColor:
+													"var(--color-red)",
+												color: "white",
+												borderColor: "var(--color-red)",
+											}),
+										...(option.kind === "allow_once" &&
+											!isSelected && {
+												backgroundColor:
+													"var(--color-orange)",
+												color: "white",
+												borderColor:
+													"var(--color-orange)",
+											}),
+									}}
+									onMouseEnter={(e) => {
+										if (!option.kind && !isSelected) {
+											e.currentTarget.style.backgroundColor =
+												"var(--background-modifier-hover)";
+										}
+									}}
+									onMouseLeave={(e) => {
+										if (!option.kind && !isSelected) {
+											e.currentTarget.style.backgroundColor =
+												"var(--background-primary)";
+										}
+									}}
+								>
+									{option.name}
+								</button>
+							);
+						})}
+					</div>
+					{isSelected && selectedOption && (
+						<div
+							style={{
+								marginTop: "12px",
+								padding: "8px",
+								backgroundColor: "var(--background-primary)",
+								borderRadius: "4px",
+								fontSize: "13px",
+								color: "var(--text-accent)",
+							}}
+						>
+							✓ Selected: {selectedOption.name}
+						</div>
+					)}
+				</div>
+			);
 
 		default:
 			return <span>Unsupported content type</span>;
@@ -276,9 +439,16 @@ function MessageContentRenderer({
 function MessageRenderer({
 	message,
 	plugin,
+	acpClient,
+	updateMessageContent,
 }: {
 	message: ChatMessage;
 	plugin: AgentClientPlugin;
+	acpClient?: AcpClient;
+	updateMessageContent?: (
+		messageId: string,
+		updatedContent: MessageContent,
+	) => void;
 }) {
 	return (
 		<div
@@ -299,7 +469,13 @@ function MessageRenderer({
 		>
 			{message.content.map((content, idx) => (
 				<div key={idx}>
-					<MessageContentRenderer content={content} plugin={plugin} />
+					<MessageContentRenderer
+						content={content}
+						plugin={plugin}
+						messageId={message.id}
+						acpClient={acpClient}
+						updateMessageContent={updateMessageContent}
+					/>
 				</div>
 			))}
 		</div>
@@ -310,6 +486,10 @@ class AcpClient implements acp.Client {
 	private addMessage: (message: ChatMessage) => void;
 	private updateLastMessage: (content: MessageContent) => void;
 	private currentMessageId: string | null = null;
+	private pendingPermissionRequests = new Map<
+		string,
+		(response: acp.RequestPermissionResponse) => void
+	>();
 
 	constructor(
 		addMessage: (message: ChatMessage) => void,
@@ -398,7 +578,45 @@ class AcpClient implements acp.Client {
 	async requestPermission(
 		params: acp.RequestPermissionRequest,
 	): Promise<acp.RequestPermissionResponse> {
-		return { outcome: { outcome: "cancelled" as const } };
+		console.log("Permission request received:", params);
+
+		// Generate unique ID for this permission request
+		const requestId = crypto.randomUUID();
+
+		// Add permission request message to chat
+		this.addMessage({
+			id: requestId,
+			role: "assistant",
+			content: [
+				{
+					type: "permission_request",
+					toolCall: {
+						toolCallId: params.toolCallId,
+					},
+					options: params.options,
+				},
+			],
+			timestamp: new Date(),
+		});
+
+		// Return a Promise that will be resolved when user clicks a button
+		return new Promise((resolve) => {
+			this.pendingPermissionRequests.set(requestId, resolve);
+		});
+	}
+
+	// Method to handle user's permission response
+	handlePermissionResponse(requestId: string, optionId: string) {
+		const resolve = this.pendingPermissionRequests.get(requestId);
+		if (resolve) {
+			resolve({
+				outcome: {
+					outcome: "selected",
+					optionId: optionId,
+				},
+			});
+			this.pendingPermissionRequests.delete(requestId);
+		}
 	}
 	async readTextFile(params: acp.ReadTextFileRequest) {
 		return { content: "" };
@@ -523,6 +741,31 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 	const addMessage = (message: ChatMessage) => {
 		setMessages((prev) => [...prev, message]);
+	};
+
+	const updateMessageContent = (
+		messageId: string,
+		updatedContent: MessageContent,
+	) => {
+		setMessages((prev) =>
+			prev.map((message) => {
+				if (message.id === messageId) {
+					return {
+						...message,
+						content: message.content.map((content, index) =>
+							content.type === updatedContent.type &&
+							(updatedContent.type !== "tool_call" ||
+								(content as any).toolCall?.toolCallId ===
+									(updatedContent as any).toolCall
+										?.toolCallId)
+								? updatedContent
+								: content,
+						),
+					};
+				}
+				return message;
+			}),
+		);
 	};
 
 	const updateLastMessage = (content: MessageContent) => {
@@ -1166,6 +1409,8 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 							key={message.id}
 							message={message}
 							plugin={plugin}
+							acpClient={acpClientRef.current}
+							updateMessageContent={updateMessageContent}
 						/>
 					))
 				)}
