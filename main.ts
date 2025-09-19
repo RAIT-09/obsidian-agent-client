@@ -14,11 +14,15 @@ import { ChatView, VIEW_TYPE_CHAT } from "./ChatView";
 interface AgentClientPluginSettings {
 	geminiApiKey: string;
 	geminiCommandPath: string;
+	anthropicApiKey: string;
+	claudeCodeAcpCommandPath: string;
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	geminiApiKey: "",
 	geminiCommandPath: "gemini", // Default to system PATH
+	anthropicApiKey: "",
+	claudeCodeAcpCommandPath: "claude-code-acp",
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -196,6 +200,36 @@ class SampleSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.geminiCommandPath =
 							value || "gemini";
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Anthropic API Key")
+			.setDesc("Enter your Anthropic API key for AI agent authentication")
+			.addText(
+				(text) =>
+					(text
+						.setPlaceholder("Enter your Anthropic API key")
+						.setValue(this.plugin.settings.anthropicApiKey)
+						.onChange(async (value) => {
+							this.plugin.settings.anthropicApiKey = value;
+							await this.plugin.saveSettings();
+						}).inputEl.type = "password"),
+			);
+
+		new Setting(containerEl)
+			.setName("Claude Code ACP Command Path")
+			.setDesc(
+				"Path to the claude-code-acp command. Use 'which claude-code-acp' in terminal to find the correct path. Default: 'claude-code-acp' (assumes it's in your PATH)",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("claude-code-acp")
+					.setValue(this.plugin.settings.claudeCodeAcpCommandPath)
+					.onChange(async (value) => {
+						this.plugin.settings.claudeCodeAcpCommandPath =
+							value || "claude-code-acp";
 						await this.plugin.saveSettings();
 					}),
 			);
