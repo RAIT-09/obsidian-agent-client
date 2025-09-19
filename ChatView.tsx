@@ -1,5 +1,6 @@
 import { ItemView, WorkspaceLeaf, MarkdownRenderer } from "obsidian";
-import React, { useState, useRef, useEffect } from "react";
+import * as React from "react";
+const { useState, useRef, useEffect } = React;
 import { createRoot, Root } from "react-dom/client";
 import { setIcon } from "obsidian";
 
@@ -61,6 +62,36 @@ interface ChatMessage {
 }
 
 export const VIEW_TYPE_CHAT = "chat-view";
+
+// Convert environment variable definitions from settings into a simple record
+const envVarsToRecord = (vars?: { key: string; value: string }[]) => {
+	const record: Record<string, string> = {};
+	if (!Array.isArray(vars)) {
+		return record;
+	}
+	for (const entry of vars) {
+		if (!entry || typeof entry.key !== "string") {
+			continue;
+		}
+		record[entry.key] = typeof entry.value === "string" ? entry.value : "";
+	}
+	return record;
+};
+
+// Derive the directory for PATH adjustments when the command uses an absolute path
+const resolveCommandDirectory = (command: string): string | null => {
+	if (!command) {
+		return null;
+	}
+	const lastSlash = Math.max(
+		command.lastIndexOf("/"),
+		command.lastIndexOf("\\"),
+	);
+	if (lastSlash <= 0) {
+		return null;
+	}
+	return command.slice(0, lastSlash);
+};
 
 // Collapsible thought component
 function CollapsibleThought({
@@ -345,10 +376,10 @@ class AcpClient implements acp.Client {
 				this.updateLastMessage({
 					type: "tool_call",
 					toolCallId: update.toolCallId,
-					title: update.title, // Don't provide empty string fallback
+					title: update.title, // Don't provide fallback - let updateLastMessage preserve existing title
 					status: update.status || "pending",
-					kind: update.kind,
-					content: update.content,
+					kind: update.kind || undefined,
+					content: update.content || undefined,
 				});
 				break;
 			case "plan":
@@ -364,8 +395,10 @@ class AcpClient implements acp.Client {
 		this.currentMessageId = null;
 	}
 
-	async requestPermission(params: acp.RequestPermissionRequest) {
-		return { outcome: { outcome: "cancelled" } };
+	async requestPermission(
+		params: acp.RequestPermissionRequest,
+	): Promise<acp.RequestPermissionResponse> {
+		return { outcome: { outcome: "cancelled" as const } };
 	}
 	async readTextFile(params: acp.ReadTextFileRequest) {
 		return { content: "" };
@@ -450,12 +483,36 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		null,
 	);
 	const [showAuthSelection, setShowAuthSelection] = useState(false);
+	const [currentAgentId, setCurrentAgentId] = useState<string>(
+		plugin.settings.activeAgentId || plugin.settings.claude.id,
+	);
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
 	const connectionRef = useRef<acp.ClientSideConnection | null>(null);
 	const agentProcessRef = useRef<ChildProcess | null>(null);
 	const acpClientRef = useRef<AcpClient | null>(null);
+
+	const getActiveAgentLabel = () => {
+		const activeId = currentAgentId;
+		if (activeId === plugin.settings.claude.id) {
+			return (
+				plugin.settings.claude.displayName || plugin.settings.claude.id
+			);
+		}
+		if (activeId === plugin.settings.gemini.id) {
+			return (
+				plugin.settings.gemini.displayName || plugin.settings.gemini.id
+			);
+		}
+		const custom = plugin.settings.customAgents.find(
+			(agent) => agent.id === activeId,
+		);
+		return custom?.displayName || custom?.id || activeId;
+	};
+
+	const activeAgentLabel = getActiveAgentLabel();
+	const activeAgentId = currentAgentId;
 
 	const addMessage = (message: ChatMessage) => {
 		setMessages((prev) => [...prev, message]);
@@ -545,88 +602,165 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 	useEffect(() => {
 		async function setupConnection() {
 			console.log("[Debug] Starting connection setup...");
-			console.log(
-				"[Debug] Gemini API Key:",
-				plugin.settings.geminiApiKey ? "Set" : "Not set",
-			);
 
-			console.log(
-				"[Debug] Gemini Command Path:",
-				plugin.settings.geminiCommandPath,
-			);
+			type LaunchableAgent = {
+				id: string;
+				label: string;
+				command: string;
+				args: string[];
+				env: { key: string; value: string }[];
+				extraEnv: Record<string, string>;
+			};
 
-			const agentProcess = spawn(
-				plugin.settings.geminiCommandPath,
-				["--experimental-acp"],
+			const launchCandidates: LaunchableAgent[] = [
 				{
-					stdio: ["pipe", "pipe", "pipe"], // Changed from inherit to pipe for stderr
-					env: {
-						...process.env,
-						PATH: plugin.settings.geminiCommandPath.includes("/")
-							? `${plugin.settings.geminiCommandPath.substring(0, plugin.settings.geminiCommandPath.lastIndexOf("/"))}:${process.env.PATH || ""}`
-							: process.env.PATH || "",
-						GEMINI_API_KEY: plugin.settings.geminiApiKey || "",
+					id: plugin.settings.claude.id,
+					label:
+						plugin.settings.claude.displayName ||
+						plugin.settings.claude.id,
+					command: plugin.settings.claude.command,
+					args: plugin.settings.claude.args,
+					env: plugin.settings.claude.env,
+					extraEnv: {
+						ANTHROPIC_API_KEY: plugin.settings.claude.apiKey,
 					},
 				},
+				{
+					id: plugin.settings.gemini.id,
+					label:
+						plugin.settings.gemini.displayName ||
+						plugin.settings.gemini.id,
+					command: plugin.settings.gemini.command,
+					args: plugin.settings.gemini.args,
+					env: plugin.settings.gemini.env,
+					extraEnv: { GEMINI_API_KEY: plugin.settings.gemini.apiKey },
+				},
+				...plugin.settings.customAgents.map((agent) => ({
+					id: agent.id,
+					label:
+						agent.displayName && agent.displayName.length > 0
+							? agent.displayName
+							: agent.id,
+					command: agent.command,
+					args: agent.args,
+					env: agent.env,
+					extraEnv: {},
+				})),
+			];
+
+			if (launchCandidates.length === 0) {
+				console.error("[Error] No agents available to launch.");
+				return;
+			}
+
+			const activeAgentCandidate =
+				launchCandidates.find(
+					(candidate) => candidate.id === currentAgentId,
+				) ?? launchCandidates[0];
+
+			if (
+				!activeAgentCandidate.command ||
+				activeAgentCandidate.command.trim().length === 0
+			) {
+				console.error(
+					`[Error] Command not configured for agent "${activeAgentCandidate.label}" (${activeAgentCandidate.id}).`,
+				);
+				return;
+			}
+
+			const activeAgent: LaunchableAgent = {
+				...activeAgentCandidate,
+				command: activeAgentCandidate.command.trim(),
+			};
+
+			const agentArgs =
+				activeAgent.args.length > 0 ? [...activeAgent.args] : [];
+
+			console.log(
+				`[Debug] Active agent: ${activeAgent.label} (${activeAgent.id})`,
 			);
+			console.log("[Debug] Command:", activeAgent.command);
+			console.log(
+				"[Debug] Args:",
+				agentArgs.length > 0 ? agentArgs.join(" ") : "(none)",
+			);
+
+			const baseEnv: NodeJS.ProcessEnv = {
+				...process.env,
+				...envVarsToRecord(activeAgent.env),
+			};
+
+			for (const [key, value] of Object.entries(activeAgent.extraEnv)) {
+				if (typeof value === "string" && value.length > 0) {
+					baseEnv[key] = value;
+				}
+			}
+
+			const commandDir = resolveCommandDirectory(activeAgent.command);
+			if (commandDir) {
+				baseEnv.PATH = baseEnv.PATH
+					? `${commandDir}:${baseEnv.PATH}`
+					: commandDir;
+			}
+
+			const agentProcess = spawn(activeAgent.command, agentArgs, {
+				stdio: ["pipe", "pipe", "pipe"],
+				env: baseEnv,
+			});
 			agentProcessRef.current = agentProcess;
 
-			// Add process event listeners for debugging
+			const agentLabel = `${activeAgent.label} (${activeAgent.id})`;
+
 			agentProcess.on("spawn", () => {
 				console.log(
-					"[Debug] Gemini process spawned successfully, PID:",
+					`[Debug] ${agentLabel} process spawned successfully, PID:`,
 					agentProcess.pid,
 				);
 			});
 
 			agentProcess.on("error", (error) => {
-				console.error("[Debug] Gemini process error:", error);
-				if (error.message.includes("ENOENT")) {
+				console.error(`[Debug] ${agentLabel} process error:`, error);
+				if ((error as NodeJS.ErrnoException).code === "ENOENT") {
 					console.error(
-						`[Error] Gemini command not found at: ${plugin.settings.geminiCommandPath}`,
+						`[Error] Command not found: ${activeAgent.command || "(empty)"}`,
 					);
 					console.error(
-						"[Info] Please check your Gemini Command Path setting and ensure gemini is installed.",
+						`[Info] Check the command or update the correct path in settings for "${agentLabel}".`,
 					);
 				}
 			});
 
 			agentProcess.on("exit", (code, signal) => {
 				console.log(
-					"[Debug] Gemini process exited with code:",
+					`[Debug] ${agentLabel} process exited with code:`,
 					code,
 					"signal:",
 					signal,
 				);
 				if (code === 127) {
 					console.error(
-						`[Error] Command not found: ${plugin.settings.geminiCommandPath}`,
+						`[Error] Command not found: ${activeAgent.command || "(empty)"}`,
 					);
 					console.error(
-						"[Info] Please install gemini CLI: npm install -g @google/gemini-cli",
-					);
-					console.error(
-						"[Info] Or update the Gemini Command Path in plugin settings",
+						"[Info] Make sure the CLI is installed and the command path is correct.",
 					);
 				}
 			});
 
 			agentProcess.on("close", (code, signal) => {
 				console.log(
-					"[Debug] Gemini process closed with code:",
+					`[Debug] ${agentLabel} process closed with code:`,
 					code,
 					"signal:",
 					signal,
 				);
 			});
 
-			// Capture and log stderr
 			agentProcess.stderr?.setEncoding("utf8");
 			agentProcess.stderr?.on("data", (data) => {
-				console.log("[Debug] Gemini stderr:", data);
+				console.log(`[Debug] ${agentLabel} stderr:`, data);
 			});
 
-			// Test if process is working
 			setTimeout(() => {
 				if (
 					agentProcess.exitCode === null &&
@@ -645,10 +779,24 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				}
 			}, 2000);
 
-			const input = Writable.toWeb(agentProcess.stdin!) as WritableStream;
-			const output = Readable.toWeb(
-				agentProcess.stdout!,
-			) as ReadableStream;
+			const input = new WritableStream({
+				write(chunk) {
+					agentProcess.stdin!.write(chunk);
+				},
+				close() {
+					agentProcess.stdin!.end();
+				},
+			});
+			const output = new ReadableStream({
+				start(controller) {
+					agentProcess.stdout!.on("data", (chunk) => {
+						controller.enqueue(chunk);
+					});
+					agentProcess.stdout!.on("end", () => {
+						controller.close();
+					});
+				},
+			});
 
 			const client = new AcpClient(addMessage, updateLastMessage);
 			acpClientRef.current = client;
@@ -697,7 +845,16 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		return () => {
 			agentProcessRef.current?.kill();
 		};
-	}, []);
+	}, [currentAgentId]);
+
+	// Monitor agent changes from settings when messages are empty
+	useEffect(() => {
+		const newActiveAgentId =
+			plugin.settings.activeAgentId || plugin.settings.claude.id;
+		if (messages.length === 0 && newActiveAgentId !== currentAgentId) {
+			setCurrentAgentId(newActiveAgentId);
+		}
+	}, [plugin.settings.activeAgentId, messages.length, currentAgentId]);
 
 	useEffect(() => {
 		adjustTextareaHeight();
@@ -758,6 +915,13 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			setMessages([]);
 			setInputValue("");
 			acpClientRef.current?.resetCurrentMessage();
+
+			// Switch to the active agent from settings if different from current
+			const newActiveAgentId =
+				plugin.settings.activeAgentId || plugin.settings.claude.id;
+			if (newActiveAgentId !== currentAgentId) {
+				setCurrentAgentId(newActiveAgentId);
+			}
 		} catch (error) {
 			console.error("[Client] New Session Error:", error);
 		}
@@ -870,26 +1034,26 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					justifyContent: "space-between",
 				}}
 			>
-				<h3 style={{ margin: "0" }}>Agent Chat</h3>
+				<h3 style={{ margin: "0" }}>{activeAgentLabel}</h3>
 				<div style={{ display: "flex", gap: "8px" }}>
 					<HeaderButton
 						iconName="plus"
-						tooltip="新しいチャット"
+						tooltip="New chat"
 						onClick={createNewSession}
 					/>
 					<HeaderButton
 						iconName="list"
-						tooltip="チャット履歴"
+						tooltip="Chat history"
 						onClick={() => {
-							// TODO: チャット履歴を表示
+							// TODO: show chat history
 							console.log("Chat history clicked");
 						}}
 					/>
 					<HeaderButton
 						iconName="settings"
-						tooltip="設定"
+						tooltip="Settings"
 						onClick={() => {
-							// プラグイン設定を開く
+							// Open plugin settings
 							(plugin.app as any).setting.open();
 							(plugin.app as any).setting.openTabById(
 								plugin.manifest.id,
