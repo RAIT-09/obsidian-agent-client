@@ -10,6 +10,7 @@ import {
 	DropdownComponent,
 } from "obsidian";
 import { ChatView, VIEW_TYPE_CHAT } from "./ChatView";
+import { createSettingsStore, type SettingsStore } from "./settings-store";
 
 export interface AgentEnvVar {
 	key: string;
@@ -169,9 +170,13 @@ const normalizeCustomAgent = (agent: any): CustomAgentSettings => {
 
 export default class AgentClientPlugin extends Plugin {
 	settings: AgentClientPluginSettings;
+	settingsStore!: SettingsStore;
 
 	async onload() {
 		await this.loadSettings();
+
+		// Initialize settings store
+		this.settingsStore = createSettingsStore(this.settings);
 
 		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
 
@@ -352,6 +357,12 @@ export default class AgentClientPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
+	async saveSettingsAndNotify(nextSettings: AgentClientPluginSettings) {
+		this.settings = nextSettings;
+		await this.saveData(this.settings);
+		this.settingsStore.set(this.settings);
+	}
+
 	ensureActiveAgentId(): void {
 		const availableIds = this.collectAvailableAgentIds();
 		if (availableIds.length === 0) {
@@ -432,9 +443,12 @@ class AgentClientSettingTab extends PluginSettingTab {
 				this.populateAgentDropdown(dropdown);
 				dropdown.setValue(this.plugin.settings.activeAgentId);
 				dropdown.onChange(async (value) => {
-					this.plugin.settings.activeAgentId = value;
+					const nextSettings = {
+						...this.plugin.settings,
+						activeAgentId: value,
+					};
 					this.plugin.ensureActiveAgentId();
-					await this.plugin.saveSettings();
+					await this.plugin.saveSettingsAndNotify(nextSettings);
 				});
 			});
 	}

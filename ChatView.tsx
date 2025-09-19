@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, MarkdownRenderer } from "obsidian";
 import * as React from "react";
-const { useState, useRef, useEffect } = React;
+const { useState, useRef, useEffect, useSyncExternalStore } = React;
 import { createRoot, Root } from "react-dom/client";
 import { setIcon } from "obsidian";
 
@@ -474,6 +474,13 @@ function HeaderButton({
 }
 
 function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
+	// Use the settings store to get reactive settings
+	const settings = useSyncExternalStore(
+		plugin.settingsStore.subscribe,
+		plugin.settingsStore.getSnapshot,
+		plugin.settingsStore.getSnapshot,
+	);
+
 	const [inputValue, setInputValue] = useState("");
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [sessionId, setSessionId] = useState<string | null>(null);
@@ -484,7 +491,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 	);
 	const [showAuthSelection, setShowAuthSelection] = useState(false);
 	const [currentAgentId, setCurrentAgentId] = useState<string>(
-		plugin.settings.activeAgentId || plugin.settings.claude.id,
+		settings.activeAgentId || settings.claude.id,
 	);
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -849,12 +856,11 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 	// Monitor agent changes from settings when messages are empty
 	useEffect(() => {
-		const newActiveAgentId =
-			plugin.settings.activeAgentId || plugin.settings.claude.id;
+		const newActiveAgentId = settings.activeAgentId || settings.claude.id;
 		if (messages.length === 0 && newActiveAgentId !== currentAgentId) {
 			setCurrentAgentId(newActiveAgentId);
 		}
-	}, [plugin.settings.activeAgentId, messages.length, currentAgentId]);
+	}, [settings.activeAgentId, messages.length]);
 
 	useEffect(() => {
 		adjustTextareaHeight();
