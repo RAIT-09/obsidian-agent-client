@@ -1131,6 +1131,10 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		async function setupConnection() {
 			console.log("[Debug] Starting connection setup...");
 
+			// Get the Vault root path
+			const vaultPath =
+				(plugin.app.vault.adapter as any).basePath || process.cwd();
+
 			type LaunchableAgent = {
 				id: string;
 				label: string;
@@ -1231,9 +1235,16 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					: commandDir;
 			}
 
+			// Get the Vault root path for agent process
+			console.log(
+				"[Debug] Starting agent process in directory:",
+				vaultPath,
+			);
+
 			const agentProcess = spawn(activeAgent.command, agentArgs, {
 				stdio: ["pipe", "pipe", "pipe"],
 				env: baseEnv,
+				cwd: vaultPath,
 			});
 			agentProcessRef.current = agentProcess;
 
@@ -1326,9 +1337,6 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				},
 			});
 
-			// Get the Vault root path
-			const vaultPath =
-				(plugin.app.vault.adapter as any).basePath || process.cwd();
 			console.log("[Debug] Using vault path for AcpClient:", vaultPath);
 
 			const client = new AcpClient(
@@ -1362,9 +1370,11 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				);
 				console.log(initResult.authMethods);
 
+				console.log("process.cwd():", process.cwd());
+				console.log("vaultPath:", vaultPath);
 				console.log("[Debug] Starting session creation...");
 				const sessionResult = await connection.newSession({
-					cwd: process.cwd(),
+					cwd: vaultPath,
 					mcpServers: [],
 				});
 				console.log(`📝 Created session: ${sessionResult.sessionId}`);
