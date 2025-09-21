@@ -748,6 +748,26 @@ class AcpClient implements acp.Client {
 	): Promise<acp.RequestPermissionResponse> {
 		console.log("Permission request received:", params);
 
+		// If tool call details are provided, add the tool call message first
+		if ((params as any).toolCall && (params as any).toolCall.title) {
+			const toolCallInfo = (params as any).toolCall;
+			this.addMessage({
+				id: crypto.randomUUID(),
+				role: "assistant",
+				content: [
+					{
+						type: "tool_call",
+						toolCallId: toolCallInfo.toolCallId,
+						title: toolCallInfo.title,
+						status: toolCallInfo.status || "pending",
+						kind: toolCallInfo.kind,
+						content: toolCallInfo.content,
+					},
+				],
+				timestamp: new Date(),
+			});
+		}
+
 		// Generate unique ID for this permission request
 		const requestId = crypto.randomUUID();
 
