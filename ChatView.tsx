@@ -169,28 +169,23 @@ function MarkdownTextRenderer({
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
-		if (containerRef.current && text) {
-			// Clear previous content
-			containerRef.current.innerHTML = "";
+		const el = containerRef.current;
+		if (!el) return;
+		el.empty?.();
+		el.innerHTML = "";
+		el.classList.add("markdown-rendered");
 
-			// Render markdown
-			MarkdownRenderer.renderMarkdown(
-				text,
-				containerRef.current,
-				"", // sourcePath - empty for dynamic content
-				plugin, // Component for context
-			);
-		}
+		// Render markdown
+		MarkdownRenderer.render(
+			plugin.app,
+			text,
+			el,
+			"", // sourcePath - empty for dynamic content
+			plugin,
+		);
 	}, [text, plugin]);
 
-,
-
-
-
-
-
-
-					return <div ref={containerRef} style={{ userSelect: "text" }} />;
+	return <div ref={containerRef} style={{ userSelect: "text" }} />;
 }
 
 // Message content rendering components
@@ -1001,6 +996,8 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 	const connectionRef = useRef<acp.ClientSideConnection | null>(null);
 	const agentProcessRef = useRef<ChildProcess | null>(null);
 	const acpClientRef = useRef<AcpClient | null>(null);
+	const messagesContainerRef = useRef<HTMLDivElement>(null);
+	const [isAtBottom, setIsAtBottom] = useState(true);
 
 	const getActiveAgentLabel = () => {
 		const activeId = currentAgentId;
@@ -1022,6 +1019,26 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 	const activeAgentLabel = getActiveAgentLabel();
 	const activeAgentId = currentAgentId;
+
+	// Auto-scroll functions
+	const checkIfAtBottom = () => {
+		const container = messagesContainerRef.current;
+		if (!container) return true;
+
+		const threshold = 50; // pixels from bottom
+		const isNearBottom =
+			container.scrollTop + container.clientHeight >=
+			container.scrollHeight - threshold;
+		setIsAtBottom(isNearBottom);
+		return isNearBottom;
+	};
+
+	const scrollToBottom = () => {
+		const container = messagesContainerRef.current;
+		if (container) {
+			container.scrollTop = container.scrollHeight;
+		}
+	};
 
 	const addMessage = (message: ChatMessage) => {
 		setMessages((prev) => [...prev, message]);
@@ -1446,6 +1463,35 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		}
 	}, [settings.activeAgentId, messages.length]);
 
+	// Auto-scroll when messages change
+	useEffect(() => {
+		if (isAtBottom && messages.length > 0) {
+			// Use setTimeout to ensure DOM has updated
+			setTimeout(() => {
+				scrollToBottom();
+			}, 0);
+		}
+	}, [messages, isAtBottom]);
+
+	// Set up scroll event listener
+	useEffect(() => {
+		const container = messagesContainerRef.current;
+		if (!container) return;
+
+		const handleScroll = () => {
+			checkIfAtBottom();
+		};
+
+		container.addEventListener("scroll", handleScroll, { passive: true });
+
+		// Initial check
+		checkIfAtBottom();
+
+		return () => {
+			container.removeEventListener("scroll", handleScroll);
+		};
+	}, []);
+
 	useEffect(() => {
 		adjustTextareaHeight();
 	}, [inputValue]);
@@ -1538,6 +1584,12 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 		const messageText = inputValue;
 		setInputValue("");
+
+		// Force scroll to bottom when user sends a message
+		setIsAtBottom(true);
+		setTimeout(() => {
+			scrollToBottom();
+		}, 0);
 
 		// Reset current message for new assistant response
 		acpClientRef.current?.resetCurrentMessage();
@@ -1659,6 +1711,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			</div>
 
 			<div
+				ref={messagesContainerRef}
 				style={{
 					flex: 1,
 					padding: "16px",
