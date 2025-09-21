@@ -8,6 +8,7 @@ import { spawn, ChildProcess } from "child_process";
 import { Writable, Readable } from "stream";
 import * as acp from "@zed-industries/agent-client-protocol";
 import type AgentClientPlugin from "./main";
+import { TerminalManager } from "./terminal-manager";
 
 // Message types based on ACP schema
 type MessageRole = "user" | "assistant";
@@ -64,6 +65,10 @@ type MessageContent =
 				kind?: "allow_always" | "allow_once" | "reject_once";
 			}[];
 			selectedOptionId?: string;
+	  }
+	| {
+			type: "terminal";
+			terminalId: string;
 	  };
 
 interface ChatMessage {
@@ -214,10 +219,29 @@ function MessageContentRenderer({
 					<div style={{ fontWeight: "bold", marginBottom: "4px" }}>
 						🔧 {content.title}
 					</div>
-					<div style={{ color: "var(--text-muted)" }}>
+					<div
+						style={{
+							color: "var(--text-muted)",
+							marginBottom: content.content ? "8px" : "0",
+						}}
+					>
 						Status: {content.status}
 						{content.kind && ` | Kind: ${content.kind}`}
 					</div>
+					{content.content &&
+						content.content.map((item, index) => {
+							if (item.type === "terminal") {
+								return (
+									<TerminalRenderer
+										key={index}
+										terminalId={item.terminalId}
+										acpClient={acpClient}
+									/>
+								);
+							}
+							// Handle other content types here if needed
+							return null;
+						})}
 				</div>
 			);
 
@@ -431,9 +455,159 @@ function MessageContentRenderer({
 				</div>
 			);
 
+		case "terminal":
+			return (
+				<TerminalRenderer
+					terminalId={content.terminalId}
+					acpClient={acpClient}
+				/>
+			);
+
 		default:
 			return <span>Unsupported content type</span>;
 	}
+}
+
+// Terminal component that displays real-time output
+function TerminalRenderer({
+	terminalId,
+	acpClient,
+}: {
+	terminalId: string;
+	acpClient: AcpClient | null;
+}) {
+	const [output, setOutput] = useState("");
+	const [exitStatus, setExitStatus] = useState<{
+		exitCode: number | null;
+		signal: string | null;
+	} | null>(null);
+	const [isRunning, setIsRunning] = useState(true);
+	const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+	useEffect(() => {
+		if (!acpClient || !terminalId) return;
+
+		const pollOutput = async () => {
+			try {
+				const result = await acpClient.terminalOutput({
+					terminalId,
+					sessionId: "",
+				});
+				setOutput(result.output);
+				if (result.exitStatus) {
+					setExitStatus(result.exitStatus);
+					setIsRunning(false);
+					if (intervalRef.current) {
+						clearInterval(intervalRef.current);
+						intervalRef.current = null;
+					}
+				}
+			} catch (error) {
+				console.error(
+					`[TerminalRenderer] Error polling terminal ${terminalId}:`,
+					error,
+				);
+				setIsRunning(false);
+				if (intervalRef.current) {
+					clearInterval(intervalRef.current);
+					intervalRef.current = null;
+				}
+			}
+		};
+
+		// Initial poll
+		pollOutput();
+
+		// Poll every 500ms while running
+		if (isRunning) {
+			intervalRef.current = setInterval(pollOutput, 500);
+		}
+
+		return () => {
+			if (intervalRef.current) {
+				clearInterval(intervalRef.current);
+			}
+		};
+	}, [terminalId, acpClient, isRunning]);
+
+	return (
+		<div
+			style={{
+				padding: "12px",
+				marginTop: "4px",
+				backgroundColor: "var(--background-secondary)",
+				border: "1px solid var(--background-modifier-border)",
+				borderRadius: "8px",
+				fontSize: "12px",
+				fontFamily: "var(--font-monospace)",
+			}}
+		>
+			<div
+				style={{
+					fontWeight: "bold",
+					marginBottom: "8px",
+					display: "flex",
+					alignItems: "center",
+					gap: "8px",
+					fontFamily: "var(--font-interface)",
+				}}
+			>
+				🖥️ Terminal {terminalId.slice(0, 8)}
+				{isRunning ? (
+					<span
+						style={{
+							color: "var(--color-green)",
+							fontSize: "10px",
+						}}
+					>
+						● RUNNING
+					</span>
+				) : (
+					<span
+						style={{ color: "var(--text-muted)", fontSize: "10px" }}
+					>
+						● FINISHED
+					</span>
+				)}
+			</div>
+
+			<div
+				style={{
+					backgroundColor: "var(--background-primary)",
+					padding: "8px",
+					borderRadius: "4px",
+					border: "1px solid var(--background-modifier-border)",
+					minHeight: "100px",
+					maxHeight: "400px",
+					overflow: "auto",
+					whiteSpace: "pre-wrap",
+					wordBreak: "break-word",
+				}}
+			>
+				{output || (isRunning ? "Waiting for output..." : "No output")}
+			</div>
+
+			{exitStatus && (
+				<div
+					style={{
+						marginTop: "8px",
+						padding: "4px 8px",
+						backgroundColor:
+							exitStatus.exitCode === 0
+								? "var(--color-green)"
+								: "var(--color-red)",
+						color: "white",
+						borderRadius: "4px",
+						fontSize: "11px",
+						fontFamily: "var(--font-interface)",
+					}}
+				>
+					Exit Code: {exitStatus.exitCode}
+					{exitStatus.signal && ` | Signal: ${exitStatus.signal}`}
+				</div>
+			)}
+		</div>
+	);
 }
 
 function MessageRenderer({
@@ -494,15 +668,19 @@ class AcpClient implements acp.Client {
 		string,
 		(response: acp.RequestPermissionResponse) => void
 	>();
+	private terminalManager = new TerminalManager();
+	private vaultPath: string;
 
 	constructor(
 		addMessage: (message: ChatMessage) => void,
 		updateLastMessage: (content: MessageContent) => void,
 		updateMessage: (toolCallId: string, content: MessageContent) => void,
+		vaultPath: string,
 	) {
 		this.addMessage = addMessage;
 		this.updateLastMessage = updateLastMessage;
 		this.updateMessage = updateMessage;
+		this.vaultPath = vaultPath;
 	}
 
 	async sessionUpdate(params: acp.SessionNotification): Promise<void> {
@@ -614,10 +792,58 @@ class AcpClient implements acp.Client {
 	async writeTextFile(params: acp.WriteTextFileRequest) {
 		return {};
 	}
-	async createTerminal(params: acp.CreateTerminalRequest) {
-		return {
-			terminalId: "",
+	async createTerminal(
+		params: acp.CreateTerminalRequest,
+	): Promise<acp.CreateTerminalResponse> {
+		console.log("[AcpClient] createTerminal called with params:", params);
+
+		// Use vault path if cwd is not provided
+		const modifiedParams = {
+			...params,
+			cwd: params.cwd || this.vaultPath,
 		};
+		console.log("[AcpClient] Using modified params:", modifiedParams);
+
+		const terminalId = this.terminalManager.createTerminal(modifiedParams);
+		return {
+			terminalId,
+		};
+	}
+
+	async terminalOutput(
+		params: acp.TerminalOutputRequest,
+	): Promise<acp.TerminalOutputResponse> {
+		const result = this.terminalManager.getOutput(params.terminalId);
+		if (!result) {
+			throw new Error(`Terminal ${params.terminalId} not found`);
+		}
+		return result;
+	}
+
+	async waitForTerminalExit(
+		params: acp.WaitForTerminalExitRequest,
+	): Promise<acp.WaitForTerminalExitResponse> {
+		return await this.terminalManager.waitForExit(params.terminalId);
+	}
+
+	async killTerminal(
+		params: acp.KillTerminalCommandRequest,
+	): Promise<acp.KillTerminalResponse> {
+		const success = this.terminalManager.killTerminal(params.terminalId);
+		if (!success) {
+			throw new Error(`Terminal ${params.terminalId} not found`);
+		}
+		return {};
+	}
+
+	async releaseTerminal(
+		params: acp.ReleaseTerminalRequest,
+	): Promise<acp.ReleaseTerminalResponse> {
+		const success = this.terminalManager.releaseTerminal(params.terminalId);
+		if (!success) {
+			throw new Error(`Terminal ${params.terminalId} not found`);
+		}
+		return {};
 	}
 }
 
@@ -1080,10 +1306,16 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				},
 			});
 
+			// Get the Vault root path
+			const vaultPath =
+				(plugin.app.vault.adapter as any).basePath || process.cwd();
+			console.log("[Debug] Using vault path for AcpClient:", vaultPath);
+
 			const client = new AcpClient(
 				addMessage,
 				updateLastMessage,
 				updateMessage,
+				vaultPath,
 			);
 			acpClientRef.current = client;
 			const stream = acp.ndJsonStream(input, output);
@@ -1099,8 +1331,8 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					protocolVersion: acp.PROTOCOL_VERSION,
 					clientCapabilities: {
 						fs: {
-							readTextFile: true,
-							writeTextFile: true,
+							readTextFile: false,
+							writeTextFile: false,
 						},
 						terminal: true,
 					},
@@ -1190,8 +1422,13 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 		try {
 			console.log("[Debug] Creating new session...");
+			// Get the Vault root path
+			const vaultPath =
+				(plugin.app.vault.adapter as any).basePath || process.cwd();
+			console.log("[Debug] Using vault path as cwd:", vaultPath);
+
 			const sessionResult = await connectionRef.current.newSession({
-				cwd: process.cwd(),
+				cwd: vaultPath,
 				mcpServers: [],
 			});
 			console.log(`📝 Created new session: ${sessionResult.sessionId}`);
