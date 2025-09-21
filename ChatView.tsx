@@ -30,7 +30,7 @@ type MessageContent =
 	| {
 			type: "tool_call";
 			toolCallId: string;
-			title: string;
+			title?: string | null;
 			status: "pending" | "in_progress" | "completed" | "failed";
 			kind?:
 				| "read"
@@ -485,6 +485,10 @@ function MessageRenderer({
 class AcpClient implements acp.Client {
 	private addMessage: (message: ChatMessage) => void;
 	private updateLastMessage: (content: MessageContent) => void;
+	private updateMessage: (
+		toolCallId: string,
+		content: MessageContent,
+	) => void;
 	private currentMessageId: string | null = null;
 	private pendingPermissionRequests = new Map<
 		string,
@@ -494,9 +498,11 @@ class AcpClient implements acp.Client {
 	constructor(
 		addMessage: (message: ChatMessage) => void,
 		updateLastMessage: (content: MessageContent) => void,
+		updateMessage: (toolCallId: string, content: MessageContent) => void,
 	) {
 		this.addMessage = addMessage;
 		this.updateLastMessage = updateLastMessage;
+		this.updateMessage = updateMessage;
 	}
 
 	async sessionUpdate(params: acp.SessionNotification): Promise<void> {
@@ -505,55 +511,39 @@ class AcpClient implements acp.Client {
 		switch (update.sessionUpdate) {
 			case "agent_message_chunk":
 				if (update.content.type === "text") {
-					if (!this.currentMessageId) {
-						// Start new assistant message
-						this.currentMessageId = crypto.randomUUID();
-						this.addMessage({
-							id: this.currentMessageId,
-							role: "assistant",
-							content: [
-								{ type: "text", text: update.content.text },
-							],
-							timestamp: new Date(),
-						});
-					} else {
-						// Update existing message
-						this.updateLastMessage({
-							type: "text",
-							text: update.content.text,
-						});
-					}
+					this.updateLastMessage({
+						type: "text",
+						text: update.content.text,
+					});
 				}
 				break;
 			case "agent_thought_chunk":
 				if (update.content.type === "text") {
-					// Always create new thought message
-					this.addMessage({
-						id: crypto.randomUUID(),
-						role: "assistant",
-						content: [
-							{
-								type: "agent_thought",
-								text: update.content.text,
-							},
-						],
-						timestamp: new Date(),
+					this.updateLastMessage({
+						type: "agent_thought",
+						text: update.content.text,
 					});
-					// Don't set currentMessageId for thoughts as they are standalone
 				}
 				break;
 			case "tool_call":
-				this.updateLastMessage({
-					type: "tool_call",
-					toolCallId: update.toolCallId,
-					title: update.title,
-					status: update.status || "pending",
-					kind: update.kind,
-					content: update.content,
+				this.addMessage({
+					id: crypto.randomUUID(),
+					role: "assistant",
+					content: [
+						{
+							type: "tool_call",
+							toolCallId: update.toolCallId,
+							title: update.title,
+							status: update.status || "pending",
+							kind: update.kind,
+							content: update.content,
+						},
+					],
+					timestamp: new Date(),
 				});
 				break;
 			case "tool_call_update":
-				this.updateLastMessage({
+				this.updateMessage(update.toolCallId, {
 					type: "tool_call",
 					toolCallId: update.toolCallId,
 					title: update.title, // Don't provide fallback - let updateLastMessage preserve existing title
@@ -623,6 +613,11 @@ class AcpClient implements acp.Client {
 	}
 	async writeTextFile(params: acp.WriteTextFileRequest) {
 		return {};
+	}
+	async createTerminal(params: acp.CreateTerminalRequest) {
+		return {
+			terminalId: "",
+		};
 	}
 }
 
@@ -770,24 +765,40 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 	const updateLastMessage = (content: MessageContent) => {
 		setMessages((prev) => {
-			if (prev.length === 0) return prev;
+			if (
+				prev.length === 0 ||
+				prev[prev.length - 1].role !== "assistant"
+			) {
+				return [
+					...prev,
+					{
+						id: crypto.randomUUID(),
+						role: "assistant",
+						content: [content],
+						timestamp: new Date(),
+					},
+				];
+			}
 
 			const lastMessage = prev[prev.length - 1];
-			if (lastMessage.role !== "assistant") return prev;
-
 			const updatedMessage = { ...lastMessage };
 
-			if (content.type === "text") {
-				// Append text to existing text content or create new text content
-				const textContentIndex = updatedMessage.content.findIndex(
-					(c) => c.type === "text",
+			if (content.type === "text" || content.type === "agent_thought") {
+				// Append to existing content of same type or create new content
+				const existingContentIndex = updatedMessage.content.findIndex(
+					(c) => c.type === content.type,
 				);
-				if (textContentIndex >= 0) {
-					updatedMessage.content[textContentIndex] = {
-						type: "text",
+				if (existingContentIndex >= 0) {
+					updatedMessage.content[existingContentIndex] = {
+						type: content.type,
 						text:
-							(updatedMessage.content[textContentIndex] as any)
-								.text + content.text,
+							(
+								updatedMessage.content[
+									existingContentIndex
+								] as any
+							).text +
+							"\n" +
+							content.text,
 					};
 				} else {
 					updatedMessage.content.push(content);
@@ -795,41 +806,11 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			} else {
 				// Replace or add non-text content
 				const existingIndex = updatedMessage.content.findIndex(
-					(c) =>
-						c.type === content.type &&
-						(content.type === "tool_call"
-							? (c as any).toolCallId ===
-								(content as any).toolCallId
-							: true),
+					(c) => c.type === content.type,
 				);
 
 				if (existingIndex >= 0) {
-					if (content.type === "tool_call") {
-						// For tool_call updates, preserve existing values if new ones are empty
-						const existing = updatedMessage.content[
-							existingIndex
-						] as any;
-						const updated = content as any;
-						updatedMessage.content[existingIndex] = {
-							...existing,
-							...updated,
-							// Preserve existing title if update doesn't have one
-							title:
-								updated.title !== undefined
-									? updated.title
-									: existing.title,
-							// Merge content arrays if update has content
-							content:
-								updated.content !== undefined
-									? [
-											...(existing.content || []),
-											...(updated.content || []),
-										]
-									: existing.content,
-						};
-					} else {
-						updatedMessage.content[existingIndex] = content;
-					}
+					updatedMessage.content[existingIndex] = content;
 				} else {
 					updatedMessage.content.push(content);
 				}
@@ -837,6 +818,57 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 			return [...prev.slice(0, -1), updatedMessage];
 		});
+	};
+
+	// ChatComponent内に追加
+	const updateMessage = (
+		toolCallId: string,
+		updatedContent: MessageContent,
+	) => {
+		setMessages((prev) =>
+			prev.map((message) => {
+				// tool_callを含むメッセージを検索
+				const hasTargetToolCall = message.content.some(
+					(content) =>
+						content.type === "tool_call" &&
+						(content as any).toolCallId === toolCallId,
+				);
+
+				if (hasTargetToolCall) {
+					return {
+						...message,
+						content: message.content.map((content) => {
+							if (
+								content.type === "tool_call" &&
+								(content as any).toolCallId === toolCallId
+							) {
+								// 既存のtool_callを更新（マージ）
+								const existing = content as any;
+								const updated = updatedContent as any;
+								return {
+									...existing,
+									...updated,
+									// statusとcontentは上書き、titleは新しい値があれば更新
+									title:
+										updated.title !== undefined
+											? updated.title
+											: existing.title,
+									content:
+										updated.content !== undefined
+											? [
+													...(existing.content || []),
+													...(updated.content || []),
+												]
+											: existing.content,
+								};
+							}
+							return content;
+						}),
+					};
+				}
+				return message;
+			}),
+		);
 	};
 
 	const adjustTextareaHeight = () => {
@@ -1048,7 +1080,11 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				},
 			});
 
-			const client = new AcpClient(addMessage, updateLastMessage);
+			const client = new AcpClient(
+				addMessage,
+				updateLastMessage,
+				updateMessage,
+			);
 			acpClientRef.current = client;
 			const stream = acp.ndJsonStream(input, output);
 			const connection = new acp.ClientSideConnection(
@@ -1066,7 +1102,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 							readTextFile: true,
 							writeTextFile: true,
 						},
-						terminal: false,
+						terminal: true,
 					},
 				});
 				console.log(
