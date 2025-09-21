@@ -144,7 +144,13 @@ function CollapsibleThought({
 				</span>
 			</div>
 			{isExpanded && (
-				<div style={{ marginTop: "8px", paddingLeft: "16px" }}>
+				<div
+					style={{
+						marginTop: "8px",
+						paddingLeft: "16px",
+						userSelect: "text",
+					}}
+				>
 					<MarkdownTextRenderer text={text} plugin={plugin} />
 				</div>
 			)}
@@ -177,7 +183,14 @@ function MarkdownTextRenderer({
 		}
 	}, [text, plugin]);
 
-	return <div ref={containerRef} />;
+,
+
+
+
+
+
+
+					return <div ref={containerRef} style={{ userSelect: "text" }} />;
 }
 
 // Message content rendering components
@@ -214,15 +227,23 @@ function MessageContentRenderer({
 						border: "1px solid var(--background-modifier-border)",
 						borderRadius: "4px",
 						fontSize: "12px",
+						userSelect: "text",
 					}}
 				>
-					<div style={{ fontWeight: "bold", marginBottom: "4px" }}>
+					<div
+						style={{
+							fontWeight: "bold",
+							marginBottom: "4px",
+							userSelect: "text",
+						}}
+					>
 						🔧 {content.title}
 					</div>
 					<div
 						style={{
 							color: "var(--text-muted)",
 							marginBottom: content.content ? "8px" : "0",
+							userSelect: "text",
 						}}
 					>
 						Status: {content.status}
@@ -254,9 +275,16 @@ function MessageContentRenderer({
 						backgroundColor: "var(--background-modifier-border)",
 						borderRadius: "4px",
 						fontSize: "12px",
+						userSelect: "text",
 					}}
 				>
-					<div style={{ fontWeight: "bold", marginBottom: "4px" }}>
+					<div
+						style={{
+							fontWeight: "bold",
+							marginBottom: "4px",
+							userSelect: "text",
+						}}
+					>
 						📋 Plan
 					</div>
 					{content.entries.map((entry, idx) => (
@@ -266,6 +294,7 @@ function MessageContentRenderer({
 								margin: "2px 0",
 								padding: "2px 4px",
 								borderLeft: "2px solid var(--text-muted)",
+								userSelect: "text",
 							}}
 						>
 							<span
@@ -276,6 +305,7 @@ function MessageContentRenderer({
 											: entry.status === "in_progress"
 												? "orange"
 												: "var(--text-muted)",
+									userSelect: "text",
 								}}
 							>
 								{entry.status === "completed"
@@ -304,6 +334,7 @@ function MessageContentRenderer({
 						border: "1px solid var(--background-modifier-border)",
 						borderRadius: "8px",
 						fontSize: "14px",
+						userSelect: "text",
 					}}
 				>
 					<div
@@ -313,6 +344,7 @@ function MessageContentRenderer({
 							display: "flex",
 							alignItems: "center",
 							gap: "8px",
+							userSelect: "text",
 						}}
 					>
 						🔐 Permission Request
@@ -321,6 +353,7 @@ function MessageContentRenderer({
 						style={{
 							marginBottom: "12px",
 							color: "var(--text-normal)",
+							userSelect: "text",
 						}}
 					>
 						The agent is requesting permission to perform an action.
@@ -447,6 +480,7 @@ function MessageContentRenderer({
 								borderRadius: "4px",
 								fontSize: "13px",
 								color: "var(--text-accent)",
+								userSelect: "text",
 							}}
 						>
 							✓ Selected: {selectedOption.name}
@@ -540,6 +574,7 @@ function TerminalRenderer({
 				borderRadius: "8px",
 				fontSize: "12px",
 				fontFamily: "var(--font-monospace)",
+				userSelect: "text",
 			}}
 		>
 			<div
@@ -550,6 +585,7 @@ function TerminalRenderer({
 					alignItems: "center",
 					gap: "8px",
 					fontFamily: "var(--font-interface)",
+					userSelect: "text",
 				}}
 			>
 				🖥️ Terminal {terminalId.slice(0, 8)}
@@ -558,13 +594,18 @@ function TerminalRenderer({
 						style={{
 							color: "var(--color-green)",
 							fontSize: "10px",
+							userSelect: "text",
 						}}
 					>
 						● RUNNING
 					</span>
 				) : (
 					<span
-						style={{ color: "var(--text-muted)", fontSize: "10px" }}
+						style={{
+							color: "var(--text-muted)",
+							fontSize: "10px",
+							userSelect: "text",
+						}}
 					>
 						● FINISHED
 					</span>
@@ -582,6 +623,7 @@ function TerminalRenderer({
 					overflow: "auto",
 					whiteSpace: "pre-wrap",
 					wordBreak: "break-word",
+					userSelect: "text",
 				}}
 			>
 				{output || (isRunning ? "Waiting for output..." : "No output")}
@@ -600,6 +642,7 @@ function TerminalRenderer({
 						borderRadius: "4px",
 						fontSize: "11px",
 						fontFamily: "var(--font-interface)",
+						userSelect: "text",
 					}}
 				>
 					Exit Code: {exitStatus.exitCode}
