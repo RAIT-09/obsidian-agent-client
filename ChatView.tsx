@@ -1103,7 +1103,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 									existingContentIndex
 								] as any
 							).text +
-							"\n" +
+							(content.type === "agent_thought" ? "\n" : "") +
 							content.text,
 					};
 				} else {
