@@ -65,6 +65,7 @@ type MessageContent =
 				kind?: "allow_always" | "allow_once" | "reject_once";
 			}[];
 			selectedOptionId?: string;
+			isCancelled?: boolean;
 	  }
 	| {
 			type: "terminal";
@@ -316,6 +317,7 @@ function MessageContentRenderer({
 			);
 		case "permission_request":
 			const isSelected = content.selectedOptionId !== undefined;
+			const isCancelled = content.isCancelled === true;
 			const selectedOption = content.options.find(
 				(opt) => opt.optionId === content.selectedOptionId,
 			);
@@ -367,12 +369,13 @@ function MessageContentRenderer({
 							return (
 								<button
 									key={option.optionId}
-									disabled={isSelected}
+									disabled={isSelected || isCancelled}
 									onClick={() => {
 										if (
 											acpClient &&
 											messageId &&
-											updateMessageContent
+											updateMessageContent &&
+											!isCancelled
 										) {
 											// Update UI immediately
 											const updatedContent = {
@@ -402,17 +405,18 @@ function MessageContentRenderer({
 										borderRadius: "6px",
 										backgroundColor: isThisSelected
 											? "var(--interactive-accent)"
-											: isSelected
+											: isSelected || isCancelled
 												? "var(--background-modifier-border)"
 												: "var(--background-primary)",
 										color: isThisSelected
 											? "white"
-											: isSelected
+											: isSelected || isCancelled
 												? "var(--text-muted)"
 												: "var(--text-normal)",
-										cursor: isSelected
-											? "not-allowed"
-											: "pointer",
+										cursor:
+											isSelected || isCancelled
+												? "not-allowed"
+												: "pointer",
 										fontSize: "13px",
 										fontWeight: isThisSelected
 											? "600"
@@ -421,7 +425,8 @@ function MessageContentRenderer({
 										minWidth: "80px",
 										textAlign: "center",
 										opacity:
-											isSelected && !isThisSelected
+											(isSelected && !isThisSelected) ||
+											isCancelled
 												? 0.5
 												: 1,
 										...(option.kind === "allow_always" &&
@@ -481,6 +486,21 @@ function MessageContentRenderer({
 							✓ Selected: {selectedOption.name}
 						</div>
 					)}
+					{isCancelled && (
+						<div
+							style={{
+								marginTop: "12px",
+								padding: "8px",
+								backgroundColor: "var(--background-primary)",
+								borderRadius: "4px",
+								fontSize: "13px",
+								color: "var(--color-orange)",
+								userSelect: "text",
+							}}
+						>
+							⚠ Cancelled: Permission request was cancelled
+						</div>
+					)}
 				</div>
 			);
 
@@ -511,6 +531,7 @@ function TerminalRenderer({
 		signal: string | null;
 	} | null>(null);
 	const [isRunning, setIsRunning] = useState(true);
+	const [isCancelled, setIsCancelled] = useState(false);
 	const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
 	useEffect(() => {
@@ -532,10 +553,23 @@ function TerminalRenderer({
 					}
 				}
 			} catch (error) {
-				console.error(
-					`[TerminalRenderer] Error polling terminal ${terminalId}:`,
-					error,
-				);
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+
+				// Check if the error is because terminal was not found (cancelled/killed)
+				if (errorMessage.includes("not found")) {
+					console.log(
+						`[TerminalRenderer] Terminal ${terminalId} was cancelled/killed, stopping polling`,
+					);
+					setIsCancelled(true);
+				} else {
+					// Log other errors but don't spam the console
+					console.log(
+						`[TerminalRenderer] Polling stopped for terminal ${terminalId}: ${errorMessage}`,
+					);
+					setIsCancelled(true); // Treat any polling error as cancelled
+				}
+
 				setIsRunning(false);
 				if (intervalRef.current) {
 					clearInterval(intervalRef.current);
@@ -547,17 +581,24 @@ function TerminalRenderer({
 		// Initial poll
 		pollOutput();
 
-		// Poll every 500ms while running
-		if (isRunning) {
-			intervalRef.current = setInterval(pollOutput, 500);
-		}
+		// Set up polling interval - will be cleared when isRunning becomes false
+		intervalRef.current = setInterval(pollOutput, 500);
 
 		return () => {
 			if (intervalRef.current) {
 				clearInterval(intervalRef.current);
+				intervalRef.current = null;
 			}
 		};
-	}, [terminalId, acpClient, isRunning]);
+	}, [terminalId, acpClient]); // Remove isRunning from dependencies
+
+	// Separate effect to stop polling when no longer running
+	useEffect(() => {
+		if (!isRunning && intervalRef.current) {
+			clearInterval(intervalRef.current);
+			intervalRef.current = null;
+		}
+	}, [isRunning]);
 
 	return (
 		<div
@@ -593,6 +634,16 @@ function TerminalRenderer({
 						}}
 					>
 						● RUNNING
+					</span>
+				) : isCancelled ? (
+					<span
+						style={{
+							color: "var(--color-orange)",
+							fontSize: "10px",
+							userSelect: "text",
+						}}
+					>
+						● CANCELLED
 					</span>
 				) : (
 					<span
@@ -844,6 +895,32 @@ class AcpClient implements acp.Client {
 			this.pendingPermissionRequests.delete(requestId);
 		}
 	}
+
+	// Method to cancel all pending permission requests
+	cancelPendingPermissionRequests() {
+		console.log(
+			`Cancelling ${this.pendingPermissionRequests.size} pending permission requests`,
+		);
+		this.pendingPermissionRequests.forEach((resolve, requestId) => {
+			resolve({
+				outcome: {
+					outcome: "cancelled",
+				},
+			});
+		});
+		this.pendingPermissionRequests.clear();
+	}
+
+	// Method to cancel all running operations
+	cancelAllOperations() {
+		console.log("Cancelling all running operations...");
+
+		// Cancel pending permission requests
+		this.cancelPendingPermissionRequests();
+
+		// Kill all running terminals
+		this.terminalManager.killAllTerminals();
+	}
 	async readTextFile(params: acp.ReadTextFileRequest) {
 		return { content: "" };
 	}
@@ -1042,6 +1119,20 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 	const addMessage = (message: ChatMessage) => {
 		setMessages((prev) => [...prev, message]);
+	};
+
+	const markPermissionRequestsAsCancelled = () => {
+		setMessages((prev) =>
+			prev.map((message) => ({
+				...message,
+				content: message.content.map((content) =>
+					content.type === "permission_request" &&
+					!content.selectedOptionId
+						? { ...content, isCancelled: true }
+						: content,
+				),
+			})),
+		);
 	};
 
 	const updateMessageContent = (
@@ -1498,13 +1589,15 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 	useEffect(() => {
 		if (sendButtonRef.current) {
-			setIcon(sendButtonRef.current, "send-horizontal");
+			// Set icon based on sending state
+			const iconName = isSending ? "square" : "send-horizontal";
+			setIcon(sendButtonRef.current, iconName);
 			const svg = sendButtonRef.current.querySelector("svg");
 			if (svg) {
 				updateIconColor(svg);
 			}
 		}
-	}, []);
+	}, [isSending]);
 
 	useEffect(() => {
 		if (sendButtonRef.current) {
@@ -1513,13 +1606,19 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				updateIconColor(svg);
 			}
 		}
-	}, [inputValue]);
+	}, [inputValue, isSending]);
 
 	const updateIconColor = (svg: SVGElement) => {
-		const hasInput = inputValue.trim() !== "";
-		svg.style.color = hasInput
-			? "var(--interactive-accent)"
-			: "var(--text-muted)";
+		if (isSending) {
+			// Stop button - always active when sending
+			svg.style.color = "var(--color-red)";
+		} else {
+			// Send button - active when has input
+			const hasInput = inputValue.trim() !== "";
+			svg.style.color = hasInput
+				? "var(--interactive-accent)"
+				: "var(--text-muted)";
+		}
 	};
 
 	const authenticate = async (methodId: string) => {
@@ -1565,6 +1664,44 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			}
 		} catch (error) {
 			console.error("[Client] New Session Error:", error);
+		}
+	};
+
+	const handleStopGeneration = async () => {
+		if (!connectionRef.current || !sessionId) {
+			console.warn("Cannot cancel: no connection or session");
+			setIsSending(false);
+			return;
+		}
+
+		try {
+			console.log("Sending session/cancel notification...");
+
+			// Send cancellation notification using the proper ACP method
+			await connectionRef.current.cancel({
+				sessionId: sessionId,
+			});
+
+			console.log("Cancellation request sent successfully");
+
+			// Cancel all running operations (permission requests + terminals)
+			acpClientRef.current?.cancelAllOperations();
+
+			// Mark permission requests as cancelled in UI
+			markPermissionRequestsAsCancelled();
+
+			// Update UI state immediately
+			setIsSending(false);
+		} catch (error) {
+			console.error("Failed to send cancellation:", error);
+
+			// Still cancel all operations even if network cancellation failed
+			acpClientRef.current?.cancelAllOperations();
+
+			// Mark permission requests as cancelled in UI
+			markPermissionRequestsAsCancelled();
+
+			setIsSending(false);
 		}
 	};
 
@@ -1848,9 +1985,11 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					/>
 					<button
 						ref={sendButtonRef}
-						onClick={handleSendMessage}
+						onClick={
+							isSending ? handleStopGeneration : handleSendMessage
+						}
 						disabled={
-							inputValue.trim() === "" || !isReady || isSending
+							!isSending && (inputValue.trim() === "" || !isReady)
 						}
 						style={{
 							position: "absolute",
@@ -1862,9 +2001,8 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 							borderRadius: "0",
 							backgroundColor: "transparent",
 							cursor:
-								inputValue.trim() === "" ||
-								!isReady ||
-								isSending
+								!isSending &&
+								(inputValue.trim() === "" || !isReady)
 									? "not-allowed"
 									: "pointer",
 							display: "flex",
@@ -1882,7 +2020,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 							!isReady
 								? "Connecting..."
 								: isSending
-									? "Sending..."
+									? "Stop generation"
 									: "Send message"
 						}
 					></button>

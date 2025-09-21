@@ -52,11 +52,6 @@ export class TerminalManager {
 			stdio: ["pipe", "pipe", "pipe"],
 		});
 
-		// Handle spawn errors
-		childProcess.on("error", (error) => {
-			console.error(`[Terminal ${terminalId}] Process error:`, error);
-		});
-
 		const terminal: TerminalProcess = {
 			id: terminalId,
 			process: childProcess,
@@ -65,6 +60,21 @@ export class TerminalManager {
 			outputByteLimit: params.outputByteLimit,
 			waitPromises: [],
 		};
+
+		// Handle spawn errors
+		childProcess.on("error", (error) => {
+			console.log(
+				`[Terminal ${terminalId}] Process error:`,
+				error.message,
+			);
+			// Set exit status to indicate failure
+			terminal.exitStatus = { exitCode: 127, signal: null }; // 127 = command not found
+			// Resolve all waiting promises
+			terminal.waitPromises.forEach((resolve) =>
+				resolve(terminal.exitStatus!),
+			);
+			terminal.waitPromises = [];
+		});
 
 		// Capture stdout and stderr
 		childProcess.stdout?.on("data", (data: Buffer) => {
@@ -170,5 +180,15 @@ export class TerminalManager {
 		}
 		this.terminals.delete(terminalId);
 		return true;
+	}
+
+	killAllTerminals(): void {
+		console.log(`Killing ${this.terminals.size} running terminals...`);
+		this.terminals.forEach((terminal, terminalId) => {
+			if (!terminal.exitStatus) {
+				console.log(`Killing terminal ${terminalId}`);
+				this.killTerminal(terminalId);
+			}
+		});
 	}
 }
