@@ -1,6 +1,13 @@
-import { ItemView, WorkspaceLeaf, MarkdownRenderer } from "obsidian";
+import {
+	ItemView,
+	WorkspaceLeaf,
+	MarkdownRenderer,
+	TFile,
+	prepareFuzzySearch,
+	FuzzyMatch,
+} from "obsidian";
 import * as React from "react";
-const { useState, useRef, useEffect, useSyncExternalStore } = React;
+const { useState, useRef, useEffect, useSyncExternalStore, useMemo } = React;
 import { createRoot, Root } from "react-dom/client";
 import { setIcon } from "obsidian";
 
@@ -9,6 +16,339 @@ import { Writable, Readable } from "stream";
 import * as acp from "@zed-industries/agent-client-protocol";
 import type AgentClientPlugin from "./main";
 import { TerminalManager } from "./terminal-manager";
+
+// Note mention service for @-mention functionality
+class NoteMentionService {
+	private files: TFile[] = [];
+	private lastBuild = 0;
+	private plugin: AgentClientPlugin;
+
+	constructor(plugin: AgentClientPlugin) {
+		this.plugin = plugin;
+		this.rebuildIndex();
+
+		// Listen for vault changes to keep index up to date
+		this.plugin.app.vault.on("create", (file) => {
+			if (file instanceof TFile && file.extension === "md") {
+				this.rebuildIndex();
+			}
+		});
+		this.plugin.app.vault.on("delete", () => this.rebuildIndex());
+		this.plugin.app.vault.on("rename", (file) => {
+			if (file instanceof TFile && file.extension === "md") {
+				this.rebuildIndex();
+			}
+		});
+	}
+
+	private rebuildIndex() {
+		this.files = this.plugin.app.vault.getMarkdownFiles();
+		this.lastBuild = Date.now();
+		console.log(
+			`[NoteMentionService] Rebuilt index with ${this.files.length} files`,
+		);
+	}
+
+	searchNotes(query: string): TFile[] {
+		console.log(
+			"[DEBUG] NoteMentionService.searchNotes called with:",
+			query,
+		);
+		console.log("[DEBUG] Total files indexed:", this.files.length);
+
+		if (!query.trim()) {
+			console.log("[DEBUG] Empty query, returning recent files");
+			// If no query, return recently modified files
+			const recentFiles = this.files
+				.slice()
+				.sort((a, b) => (b.stat?.mtime || 0) - (a.stat?.mtime || 0))
+				.slice(0, 5);
+			console.log(
+				"[DEBUG] Recent files:",
+				recentFiles.map((f) => f.name),
+			);
+			return recentFiles;
+		}
+
+		console.log("[DEBUG] Preparing fuzzy search for:", query.trim());
+		const fuzzySearch = prepareFuzzySearch(query.trim());
+
+		// Score each file based on multiple fields
+		const scored: Array<{ file: TFile; score: number }> = this.files.map(
+			(file) => {
+				const basename = file.basename;
+				const path = file.path;
+
+				// Get aliases from frontmatter
+				const fileCache =
+					this.plugin.app.metadataCache.getFileCache(file);
+				const aliases = fileCache?.frontmatter?.aliases;
+				const aliasArray: string[] = Array.isArray(aliases)
+					? aliases
+					: aliases
+						? [aliases]
+						: [];
+
+				// Search in basename, path, and aliases
+				const searchFields = [basename, path, ...aliasArray];
+				let bestScore = -Infinity;
+
+				for (const field of searchFields) {
+					const match = fuzzySearch(field);
+					if (match && match.score > bestScore) {
+						bestScore = match.score;
+					}
+				}
+
+				return { file, score: bestScore };
+			},
+		);
+
+		return scored
+			.filter((item) => item.score > -Infinity)
+			.sort((a, b) => b.score - a.score)
+			.slice(0, 5)
+			.map((item) => item.file);
+	}
+
+	getAllFiles(): TFile[] {
+		return this.files;
+	}
+
+	getFileByPath(path: string): TFile | null {
+		return this.files.find((file) => file.path === path) || null;
+	}
+}
+
+// Mention detection utilities
+interface MentionContext {
+	start: number; // Start index of the @ symbol
+	end: number; // Current cursor position
+	query: string; // Text after @ symbol
+}
+
+// Detect @-mention at current cursor position
+function detectMention(
+	text: string,
+	cursorPosition: number,
+): MentionContext | null {
+	console.log("[DEBUG] detectMention called with:", { text, cursorPosition });
+
+	if (cursorPosition < 0 || cursorPosition > text.length) {
+		console.log("[DEBUG] Invalid cursor position");
+		return null;
+	}
+
+	// Get text up to cursor position
+	const textUpToCursor = text.slice(0, cursorPosition);
+	console.log("[DEBUG] Text up to cursor:", textUpToCursor);
+
+	// Find the last @ symbol
+	const atIndex = textUpToCursor.lastIndexOf("@");
+	console.log("[DEBUG] @ index found:", atIndex);
+	if (atIndex === -1) {
+		console.log("[DEBUG] No @ symbol found");
+		return null;
+	}
+
+	// Get the token after @
+	const afterAt = textUpToCursor.slice(atIndex + 1);
+	console.log("[DEBUG] Text after @:", afterAt);
+
+	// Check if there are any whitespace or bracket characters that would break the mention
+	if (
+		afterAt.includes(" ") ||
+		afterAt.includes("\t") ||
+		afterAt.includes("\n") ||
+		afterAt.includes("]")
+	) {
+		console.log("[DEBUG] Mention contains invalid characters");
+		return null;
+	}
+
+	const mentionContext = {
+		start: atIndex,
+		end: cursorPosition,
+		query: afterAt,
+	};
+	console.log("[DEBUG] Mention context created:", mentionContext);
+	return mentionContext;
+}
+
+// Replace mention in text with the selected note
+function replaceMention(
+	text: string,
+	mentionContext: MentionContext,
+	noteTitle: string,
+): { newText: string; newCursorPos: number } {
+	const before = text.slice(0, mentionContext.start);
+	const after = text.slice(mentionContext.end);
+	const replacement = `@${noteTitle}`;
+	const newText = before + replacement + after;
+	const newCursorPos = mentionContext.start + replacement.length;
+
+	return { newText, newCursorPos };
+}
+
+// Convert @mentions to relative paths for agent
+function convertMentionsToPath(
+	text: string,
+	noteMentionService: NoteMentionService,
+	vaultPath: string,
+): string {
+	// Find all @mentions in the text
+	const mentionRegex = /@([^\s\[\]]+)/g;
+	let convertedText = text;
+
+	convertedText = convertedText.replace(mentionRegex, (match, noteTitle) => {
+		// Find the file by basename
+		const file = noteMentionService
+			.getAllFiles()
+			.find((f) => f.basename === noteTitle);
+		if (file) {
+			// Calculate absolute path by combining vault path with file path
+			const absolutePath = vaultPath
+				? `${vaultPath}/${file.path}`
+				: file.path;
+			console.log(
+				`[DEBUG] Converting @${noteTitle} to absolute path: ${absolutePath}`,
+			);
+			return absolutePath;
+		}
+		// If file not found, keep original @mention
+		return match;
+	});
+
+	return convertedText;
+}
+
+// Extract @mentions from text for display purposes
+function extractMentions(
+	text: string,
+): Array<{ text: string; start: number; end: number }> {
+	const mentions: Array<{ text: string; start: number; end: number }> = [];
+	const mentionRegex = /@([^\s\[\]]+)/g;
+	let match;
+
+	while ((match = mentionRegex.exec(text)) !== null) {
+		mentions.push({
+			text: match[1], // Note title without @
+			start: match.index,
+			end: match.index + match[0].length,
+		});
+	}
+
+	return mentions;
+}
+
+// MentionDropdown component
+interface MentionDropdownProps {
+	files: TFile[];
+	selectedIndex: number;
+	onSelect: (file: TFile) => void;
+	onClose: () => void;
+}
+
+function MentionDropdown({
+	files,
+	selectedIndex,
+	onSelect,
+	onClose,
+}: MentionDropdownProps) {
+	const dropdownRef = useRef<HTMLDivElement>(null);
+
+	console.log("[DEBUG] MentionDropdown component rendering with:", {
+		files: files.map((f) => f.name),
+		selectedIndex,
+		filesCount: files.length,
+	});
+
+	// Handle mouse clicks outside dropdown to close
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (
+				dropdownRef.current &&
+				!dropdownRef.current.contains(event.target as Node)
+			) {
+				onClose();
+			}
+		};
+
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
+	}, [onClose]);
+
+	if (files.length === 0) {
+		return null;
+	}
+
+	return (
+		<div
+			ref={dropdownRef}
+			style={{
+				// Overlay positioning - positioned above textarea
+				position: "absolute",
+				bottom: "100%", // Position above the textarea
+				left: "0",
+				right: "0",
+				backgroundColor: "var(--background-secondary)",
+				border: "2px solid var(--background-modifier-border)",
+				borderRadius: "8px",
+				boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+				overflowY: "auto",
+				fontSize: "14px",
+				marginBottom: "8px", // Space between dropdown and textarea
+				zIndex: 1000,
+				// Temporary debug styling
+			}}
+		>
+			{files.map((file, index) => (
+				<div
+					key={file.path}
+					style={{
+						padding: "4px 16px",
+						cursor: "pointer",
+						backgroundColor:
+							index === selectedIndex
+								? "var(--background-primary)" // More visible selection
+								: "transparent",
+						borderBottom:
+							index < files.length - 1
+								? "1px solid var(--background-modifier-border)"
+								: "none",
+						userSelect: "none",
+						transition: "background-color 0.1s ease",
+					}}
+					onClick={() => onSelect(file)}
+					onMouseEnter={() => {
+						// Could update selected index on hover, but keeping it keyboard-focused for now
+					}}
+				>
+					<div
+						style={{
+							fontWeight: "500",
+							color: "var(--text-normal)",
+							marginBottom: "2px",
+						}}
+					>
+						{file.basename}
+					</div>
+					<div
+						style={{
+							fontSize: "12px",
+							color: "var(--text-muted)",
+							opacity: 0.8,
+						}}
+					>
+						{file.path}
+					</div>
+				</div>
+			))}
+		</div>
+	);
+}
 
 // Message types based on ACP schema
 type MessageRole = "user" | "assistant";
@@ -189,6 +529,63 @@ function MarkdownTextRenderer({
 	return <div ref={containerRef} style={{ userSelect: "text" }} />;
 }
 
+// Function to render text with @mentions
+function renderTextWithMentions(
+	text: string,
+	plugin: AgentClientPlugin,
+): React.ReactElement {
+	const mentionRegex = /@([^@\s]+)/g;
+	const parts: React.ReactNode[] = [];
+	let lastIndex = 0;
+	let match;
+
+	while ((match = mentionRegex.exec(text)) !== null) {
+		// Add text before the mention
+		if (match.index > lastIndex) {
+			parts.push(text.slice(lastIndex, match.index));
+		}
+
+		// Add the mention as a styled element
+		const noteName = match[1];
+		parts.push(
+			<span
+				key={match.index}
+				style={{
+					backgroundColor: "transparent",
+					color: "var(--interactive-accent-hover)",
+					borderRadius: "3px",
+					fontSize: "0.9em",
+					fontWeight: "500",
+					cursor: "pointer",
+				}}
+				onClick={() => {
+					// Try to open the note when clicked
+					const file =
+						plugin.app.vault.getAbstractFileByPath(noteName);
+					if (file) {
+						plugin.app.workspace.openLinkText(noteName, "");
+					}
+				}}
+			>
+				@{noteName}
+			</span>,
+		);
+
+		lastIndex = match.index + match[0].length;
+	}
+
+	// Add any remaining text
+	if (lastIndex < text.length) {
+		parts.push(text.slice(lastIndex));
+	}
+
+	return (
+		<div className="markdown-rendered" style={{ userSelect: "text" }}>
+			<p className="auto">{parts}</p>
+		</div>
+	);
+}
+
 // Message content rendering components
 function MessageContentRenderer({
 	content,
@@ -208,6 +605,11 @@ function MessageContentRenderer({
 }) {
 	switch (content.type) {
 		case "text":
+			// Check if this is a user message by looking at the parent message role
+			// For now, we'll detect @mentions and render them appropriately
+			if (content.text.includes("@")) {
+				return renderTextWithMentions(content.text, plugin);
+			}
 			return <MarkdownTextRenderer text={content.text} plugin={plugin} />;
 
 		case "agent_thought":
@@ -252,7 +654,7 @@ function MessageContentRenderer({
 									<TerminalRenderer
 										key={index}
 										terminalId={item.terminalId}
-										acpClient={acpClient}
+										acpClient={acpClient || null}
 									/>
 								);
 							}
@@ -508,7 +910,7 @@ function MessageContentRenderer({
 			return (
 				<TerminalRenderer
 					terminalId={content.terminalId}
-					acpClient={acpClient}
+					acpClient={acpClient || null}
 				/>
 			);
 
@@ -1076,6 +1478,20 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
 
+	// Note mention service for @-mention functionality
+	const noteMentionService = useMemo(
+		() => new NoteMentionService(plugin),
+		[plugin],
+	);
+
+	// Mention dropdown state
+	const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+	const [mentionSuggestions, setMentionSuggestions] = useState<TFile[]>([]);
+	const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+	const [mentionContext, setMentionContext] = useState<MentionContext | null>(
+		null,
+	);
+
 	const getActiveAgentLabel = () => {
 		const activeId = currentAgentId;
 		if (activeId === plugin.settings.claude.id) {
@@ -1115,6 +1531,68 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		if (container) {
 			container.scrollTop = container.scrollHeight;
 		}
+	};
+
+	// Mention handling functions
+	const updateMentionSuggestions = (context: MentionContext | null) => {
+		console.log("[DEBUG] updateMentionSuggestions called with:", context);
+
+		if (!context) {
+			console.log("[DEBUG] No context, hiding dropdown");
+			setShowMentionDropdown(false);
+			setMentionSuggestions([]);
+			setMentionContext(null);
+			return;
+		}
+
+		console.log("[DEBUG] Searching notes with query:", context.query);
+		const suggestions = noteMentionService.searchNotes(context.query);
+		console.log(
+			"[DEBUG] Found suggestions:",
+			suggestions.length,
+			suggestions.map((f) => f.name),
+		);
+
+		setMentionSuggestions(suggestions);
+		setMentionContext(context);
+		setSelectedMentionIndex(0);
+
+		if (suggestions.length > 0) {
+			console.log("[DEBUG] Showing dropdown");
+			setShowMentionDropdown(true);
+		} else {
+			console.log("[DEBUG] No suggestions, hiding dropdown");
+			setShowMentionDropdown(false);
+		}
+	};
+
+	const closeMentionDropdown = () => {
+		setShowMentionDropdown(false);
+		setMentionSuggestions([]);
+		setMentionContext(null);
+		setSelectedMentionIndex(0);
+	};
+
+	const selectMention = (file: TFile) => {
+		if (!mentionContext) return;
+
+		const { newText, newCursorPos } = replaceMention(
+			inputValue,
+			mentionContext,
+			file.basename,
+		);
+		setInputValue(newText);
+		closeMentionDropdown();
+
+		// Set cursor position after replacement
+		setTimeout(() => {
+			const textarea = textareaRef.current;
+			if (textarea) {
+				textarea.selectionStart = newCursorPos;
+				textarea.selectionEnd = newCursorPos;
+				textarea.focus();
+			}
+		}, 0);
 	};
 
 	const addMessage = (message: ChatMessage) => {
@@ -1710,7 +2188,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 		setIsSending(true);
 
-		// Add user message to chat
+		// Add user message to chat (keep original text with @mentions for display)
 		const userMessage: ChatMessage = {
 			id: crypto.randomUUID(),
 			role: "user",
@@ -1719,7 +2197,12 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		};
 		addMessage(userMessage);
 
-		const messageText = inputValue;
+		// Convert @mentions to relative paths for agent consumption
+		const messageTextForAgent = convertMentionsToPath(
+			inputValue,
+			noteMentionService,
+			(plugin.app.vault.adapter as any).basePath || "",
+		);
 		setInputValue("");
 
 		// Force scroll to bottom when user sends a message
@@ -1732,13 +2215,13 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		acpClientRef.current?.resetCurrentMessage();
 
 		try {
-			console.log(`\n✅ Sending Message...: ${messageText}`);
+			console.log(`\n✅ Sending Message...: ${messageTextForAgent}`);
 			const promptResult = await connectionRef.current.prompt({
 				sessionId: sessionId!,
 				prompt: [
 					{
 						type: "text",
-						text: messageText,
+						text: messageTextForAgent,
 					},
 				],
 			});
@@ -1768,7 +2251,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 								prompt: [
 									{
 										type: "text",
-										text: messageText,
+										text: messageTextForAgent,
 									},
 								],
 							},
@@ -1789,6 +2272,38 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 	};
 
 	const handleKeyPress = (e: React.KeyboardEvent) => {
+		// Handle mention dropdown navigation first
+		if (showMentionDropdown) {
+			if (e.key === "ArrowDown") {
+				e.preventDefault();
+				setSelectedMentionIndex((prev) =>
+					prev < mentionSuggestions.length - 1 ? prev + 1 : 0,
+				);
+				return;
+			}
+			if (e.key === "ArrowUp") {
+				e.preventDefault();
+				setSelectedMentionIndex((prev) =>
+					prev > 0 ? prev - 1 : mentionSuggestions.length - 1,
+				);
+				return;
+			}
+			if (e.key === "Enter" || e.key === "Tab") {
+				e.preventDefault();
+				const selectedFile = mentionSuggestions[selectedMentionIndex];
+				if (selectedFile) {
+					selectMention(selectedFile);
+				}
+				return;
+			}
+			if (e.key === "Escape") {
+				e.preventDefault();
+				closeMentionDropdown();
+				return;
+			}
+		}
+
+		// Normal input handling
 		if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
 			e.preventDefault();
 			handleSendMessage();
@@ -1796,7 +2311,22 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 	};
 
 	const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-		setInputValue(e.target.value);
+		const newValue = e.target.value;
+		const cursorPosition = e.target.selectionStart || 0;
+
+		console.log(
+			"[DEBUG] Input changed:",
+			newValue,
+			"cursor:",
+			cursorPosition,
+		);
+
+		setInputValue(newValue);
+
+		// Check for mention detection
+		const mentionDetected = detectMention(newValue, cursorPosition);
+		console.log("[DEBUG] Mention detected:", mentionDetected);
+		updateMentionSuggestions(mentionDetected);
 	};
 
 	return (
@@ -1945,7 +2475,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 							key={message.id}
 							message={message}
 							plugin={plugin}
-							acpClient={acpClientRef.current}
+							acpClient={acpClientRef.current || undefined}
 							updateMessageContent={updateMessageContent}
 						/>
 					))
@@ -1954,6 +2484,23 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 			<div style={{ flexShrink: 0 }}>
 				<div style={{ position: "relative" }}>
+					{/* Mention Dropdown - overlay positioned */}
+					{(() => {
+						console.log("[DEBUG] Dropdown render check:", {
+							showMentionDropdown,
+							suggestionsCount: mentionSuggestions.length,
+							selectedIndex: selectedMentionIndex,
+						});
+						return null;
+					})()}
+					{showMentionDropdown && (
+						<MentionDropdown
+							files={mentionSuggestions}
+							selectedIndex={selectedMentionIndex}
+							onSelect={selectMention}
+							onClose={closeMentionDropdown}
+						/>
+					)}
 					<textarea
 						ref={textareaRef}
 						value={inputValue}
