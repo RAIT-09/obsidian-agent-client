@@ -581,6 +581,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				updateLastMessage,
 				updateMessage,
 				vaultPath,
+				settings.autoAllowPermissions,
 			);
 			acpClientRef.current = client;
 			const stream = acp.ndJsonStream(input, output);

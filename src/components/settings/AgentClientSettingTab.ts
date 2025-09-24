@@ -20,6 +20,22 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		this.renderAgentSelector(containerEl);
 
+		containerEl.createEl("h2", { text: "General Settings" });
+
+		new Setting(containerEl)
+			.setName("Auto-allow permissions")
+			.setDesc(
+				"Automatically allow all permission requests from agents. ⚠️ Use with caution - this gives agents full access to your system.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoAllowPermissions)
+					.onChange(async (value) => {
+						this.plugin.settings.autoAllowPermissions = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
 		containerEl.createEl("h2", { text: "Built-in agents" });
 
 		const builtInSection = containerEl.createDiv();

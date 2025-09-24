@@ -20,17 +20,20 @@ export class AcpClient implements IAcpClient {
 	>();
 	private terminalManager = new TerminalManager();
 	private vaultPath: string;
+	private autoAllowPermissions: boolean = false;
 
 	constructor(
 		addMessage: (message: ChatMessage) => void,
 		updateLastMessage: (content: MessageContent) => void,
 		updateMessage: (toolCallId: string, content: MessageContent) => void,
 		vaultPath: string,
+		autoAllowPermissions: boolean = false,
 	) {
 		this.addMessage = addMessage;
 		this.updateLastMessage = updateLastMessage;
 		this.updateMessage = updateMessage;
 		this.vaultPath = vaultPath;
+		this.autoAllowPermissions = autoAllowPermissions;
 	}
 
 	async sessionUpdate(params: acp.SessionNotification): Promise<void> {
@@ -115,6 +118,27 @@ export class AcpClient implements IAcpClient {
 					},
 				],
 				timestamp: new Date(),
+			});
+		}
+
+		// If auto-allow is enabled, automatically approve the first allow option
+		if (this.autoAllowPermissions) {
+			const allowOption =
+				params.options.find(
+					(option) =>
+						option.kind === "allow_once" ||
+						option.kind === "allow_always" ||
+						(!option.kind &&
+							option.name.toLowerCase().includes("allow")),
+				) || params.options[0]; // fallback to first option
+
+			console.log("Auto-allowing permission request:", allowOption);
+
+			return Promise.resolve({
+				outcome: {
+					outcome: "selected",
+					optionId: allowOption.optionId,
+				},
 			});
 		}
 
