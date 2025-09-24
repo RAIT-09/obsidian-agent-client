@@ -4,10 +4,8 @@ const { useState, useRef, useEffect, useSyncExternalStore, useMemo } = React;
 import { createRoot, Root } from "react-dom/client";
 
 import { spawn, ChildProcess } from "child_process";
-import { Writable, Readable } from "stream";
 import * as acp from "@zed-industries/agent-client-protocol";
 import type AgentClientPlugin from "./main";
-import { TerminalManager } from "./terminal-manager";
 
 // Component imports
 import { MentionDropdown } from "./components/chat/MentionDropdown";
@@ -19,11 +17,7 @@ import { NoteMentionService } from "./services/mention-service";
 import { AcpClient } from "./services/acp-client";
 
 // Type imports
-import type {
-	ChatMessage,
-	MessageContent,
-	AcpClient as IAcpClient,
-} from "./types/acp-types";
+import type { ChatMessage, MessageContent } from "./types/acp-types";
 
 // Utility imports
 import {
@@ -1112,11 +1106,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 						value={inputValue}
 						onChange={handleInputChange}
 						onKeyDown={handleKeyPress}
-						placeholder={
-							isSending
-								? "Sending..."
-								: "Message Agent (Enter to send, Shift+Enter for new line)"
-						}
+						placeholder={`Message ${activeAgentLabel} - @ to mention notes`}
 						style={{
 							width: "100%",
 							padding: "12px 40px 12px 12px",

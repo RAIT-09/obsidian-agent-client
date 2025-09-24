@@ -1,5 +1,5 @@
 import * as React from "react";
-import type { MessageContent, AcpClient } from "../../types/acp-types";
+import type { MessageContent, IAcpClient } from "../../types/acp-types";
 import type AgentClientPlugin from "../../main";
 import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 import { CollapsibleThought } from "./CollapsibleThought";
@@ -10,7 +10,7 @@ interface MessageContentRendererProps {
 	content: MessageContent;
 	plugin: AgentClientPlugin;
 	messageId?: string;
-	acpClient?: AcpClient;
+	acpClient?: IAcpClient;
 	updateMessageContent?: (
 		messageId: string,
 		updatedContent: MessageContent,

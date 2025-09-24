@@ -2,7 +2,7 @@ import * as acp from "@zed-industries/agent-client-protocol";
 import type {
 	ChatMessage,
 	MessageContent,
-	AcpClient as IAcpClient,
+	IAcpClient,
 } from "../types/acp-types";
 import { TerminalManager } from "../terminal-manager";
 

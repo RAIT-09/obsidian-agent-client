@@ -1,12 +1,16 @@
 import * as React from "react";
-import type { ChatMessage, MessageContent, AcpClient } from "../../types/acp-types";
+import type {
+	ChatMessage,
+	MessageContent,
+	IAcpClient,
+} from "../../types/acp-types";
 import type AgentClientPlugin from "../../main";
 import { MessageContentRenderer } from "./MessageContentRenderer";
 
 interface MessageRendererProps {
 	message: ChatMessage;
 	plugin: AgentClientPlugin;
-	acpClient?: AcpClient;
+	acpClient?: IAcpClient;
 	updateMessageContent?: (
 		messageId: string,
 		updatedContent: MessageContent,

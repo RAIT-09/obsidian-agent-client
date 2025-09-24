@@ -1,10 +1,10 @@
 import * as React from "react";
 const { useState, useRef, useEffect } = React;
-import type { AcpClient } from "../../types/acp-types";
+import type { IAcpClient } from "../../types/acp-types";
 
 interface TerminalRendererProps {
 	terminalId: string;
-	acpClient: AcpClient | null;
+	acpClient: IAcpClient | null;
 }
 
 export function TerminalRenderer({

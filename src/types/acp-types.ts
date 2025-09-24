@@ -1,7 +1,7 @@
 import * as acp from "@zed-industries/agent-client-protocol";
 
 // ACP Client interface - extracted from ChatView.tsx
-export interface AcpClient extends acp.Client {
+export interface IAcpClient extends acp.Client {
 	handlePermissionResponse(requestId: string, optionId: string): void;
 	cancelAllOperations(): void;
 	resetCurrentMessage(): void;
