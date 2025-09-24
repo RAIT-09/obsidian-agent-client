@@ -1000,9 +1000,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 							border: "1px solid var(--background-modifier-border)",
 						}}
 					>
-						<h4 style={{ margin: "0 0 8px 0" }}>
-							Choose Authentication Method
-						</h4>
+						<h4 style={{ margin: "0 0 8px 0" }}>Error Occurred</h4>
 						<p
 							style={{
 								margin: "0",
@@ -1010,10 +1008,11 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 								fontSize: "14px",
 							}}
 						>
-							Select how you want to authenticate with the AI
-							agent:
+							An error has occurred. Please check if you are
+							logged into the agent or if your API key is
+							correctly set.
 						</p>
-						{authMethods?.map((method) => (
+						{/*authMethods?.map((method) => (
 							<button
 								key={method.id}
 								onClick={() => authenticate(method.id)}
@@ -1041,7 +1040,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 									{method.name || method.id}
 								</div>
 							</button>
-						))}
+						))*/}
 						<button
 							onClick={() => setShowAuthSelection(false)}
 							style={{
@@ -1054,7 +1053,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 								fontSize: "14px",
 							}}
 						>
-							Cancel
+							OK
 						</button>
 					</div>
 				) : messages.length === 0 ? (
