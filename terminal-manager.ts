@@ -47,17 +47,17 @@ export class TerminalManager {
 
 		// Spawn the process
 		const childProcess = spawn(command, args, {
-			cwd: params.cwd,
+			cwd: params.cwd || undefined,
 			env,
 			stdio: ["pipe", "pipe", "pipe"],
-		});
+		} as any); // Type assertion to avoid complex spawn overload issues
 
 		const terminal: TerminalProcess = {
 			id: terminalId,
 			process: childProcess,
 			output: "",
 			exitStatus: null,
-			outputByteLimit: params.outputByteLimit,
+			outputByteLimit: params.outputByteLimit ?? undefined,
 			waitPromises: [],
 		};
 
