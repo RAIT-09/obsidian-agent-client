@@ -52,7 +52,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		displayName: "Gemini CLI",
 		apiKey: "",
 		command: "gemini",
-		args: [],
+		args: ["--experimental-acp"],
 		env: [],
 	},
 	claude: {
@@ -216,7 +216,10 @@ export default class AgentClientPlugin extends Plugin {
 							  (raw as any).geminiCommandPath.trim().length > 0
 							? (raw as any).geminiCommandPath.trim()
 							: DEFAULT_SETTINGS.gemini.command,
-				args: resolvedGeminiArgs.length > 0 ? resolvedGeminiArgs : [],
+				args:
+					resolvedGeminiArgs.length > 0
+						? resolvedGeminiArgs
+						: DEFAULT_SETTINGS.gemini.args,
 				env: resolvedGeminiEnv.length > 0 ? resolvedGeminiEnv : [],
 			},
 			claude: {

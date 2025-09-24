@@ -1,9 +1,4 @@
-import {
-	App,
-	PluginSettingTab,
-	Setting,
-	DropdownComponent,
-} from "obsidian";
+import { App, PluginSettingTab, Setting, DropdownComponent } from "obsidian";
 import type AgentClientPlugin from "../../main";
 import type { CustomAgentSettings, AgentEnvVar } from "../../main";
 import { normalizeEnvVars } from "../../utils/settings-utils";
@@ -116,7 +111,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		new Setting(sectionEl)
 			.setName("API key")
-			.setDesc("Gemini API key. Stored as plain text.")
+			.setDesc(
+				"Gemini API key. Required if not logging in with a Google account. (Stored as plain text)",
+			)
 			.addText((text) => {
 				text.setPlaceholder("Enter your Gemini API key")
 					.setValue(gemini.apiKey)
@@ -128,12 +125,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(sectionEl)
-			.setName("Command")
+			.setName("Path")
 			.setDesc(
-				"Command that launches the Gemini CLI. Use only the filename if it is on PATH.",
+				'Absolute path to the Gemini CLI. On macOS/Linux, use "which gemini", and on Windows, use "where gemini" to find it.',
 			)
 			.addText((text) => {
-				text.setPlaceholder("gemini")
+				text.setPlaceholder("Absolute path to gemini")
 					.setValue(gemini.command)
 					.onChange(async (value) => {
 						this.plugin.settings.gemini.command = value.trim();
@@ -144,10 +141,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("Arguments")
 			.setDesc(
-				"Enter one argument per line. Leave empty to run without arguments.",
+				'Enter one argument per line. Leave empty to run without arguments.(Currently, the Gemini CLI requires the "--experimental-acp" option.)',
 			)
 			.addTextArea((text) => {
-				text.setPlaceholder("--project\n--other-flag")
+				text.setPlaceholder("")
 					.setValue(this.formatArgs(gemini.args))
 					.onChange(async (value) => {
 						this.plugin.settings.gemini.args =
@@ -160,10 +157,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("Environment variables")
 			.setDesc(
-				"Enter KEY=VALUE pairs, one per line. GEMINI_API_KEY is derived from the field above.",
+				"Enter KEY=VALUE pairs, one per line. Required to authenticate with Vertex AI. GEMINI_API_KEY is derived from the field above.(Stored as plain text)",
 			)
 			.addTextArea((text) => {
-				text.setPlaceholder("GEMINI_API_KEY=...")
+				text.setPlaceholder("GOOGLE_CLOUD_PROJECT=...")
 					.setValue(this.formatEnv(gemini.env))
 					.onChange(async (value) => {
 						this.plugin.settings.gemini.env = this.parseEnv(value);
@@ -182,7 +179,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		new Setting(sectionEl)
 			.setName("API key")
-			.setDesc("Anthropic API key. Stored as plain text.")
+			.setDesc(
+				"Anthropic API key. Required if not logging in with a Anthropic account. (Stored as plain text)",
+			)
 			.addText((text) => {
 				text.setPlaceholder("Enter your Anthropic API key")
 					.setValue(claude.apiKey)
@@ -194,12 +193,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(sectionEl)
-			.setName("Command")
+			.setName("Path")
 			.setDesc(
-				"Command for the Claude Code ACP CLI or another ACP-compatible agent.",
+				'Absolute path to the claude-code-acp. On macOS/Linux, use "which claude-code-acp", and on Windows, use "where claude-code-acp" to find it.',
 			)
 			.addText((text) => {
-				text.setPlaceholder("claude-code-acp")
+				text.setPlaceholder("Absolute path to claude-code-acp")
 					.setValue(claude.command)
 					.onChange(async (value) => {
 						this.plugin.settings.claude.command = value.trim();
@@ -213,7 +212,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				"Enter one argument per line. Leave empty to run without arguments.",
 			)
 			.addTextArea((text) => {
-				text.setPlaceholder("--model=claude-3-5")
+				text.setPlaceholder("")
 					.setValue(this.formatArgs(claude.args))
 					.onChange(async (value) => {
 						this.plugin.settings.claude.args =
@@ -229,7 +228,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				"Enter KEY=VALUE pairs, one per line. ANTHROPIC_API_KEY is derived from the field above.",
 			)
 			.addTextArea((text) => {
-				text.setPlaceholder("ANTHROPIC_API_KEY=...")
+				text.setPlaceholder("")
 					.setValue(this.formatEnv(claude.env))
 					.onChange(async (value) => {
 						this.plugin.settings.claude.env = this.parseEnv(value);
@@ -335,19 +334,24 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					});
 			});
 
-		new Setting(blockEl).setName("Command").addText((text) => {
-			text.setPlaceholder("my-agent-cli")
-				.setValue(agent.command)
-				.onChange(async (value) => {
-					this.plugin.settings.customAgents[index].command =
-						value.trim();
-					await this.plugin.saveSettings();
-				});
-		});
+		new Setting(blockEl)
+			.setName("Path")
+			.setDesc("Absolute path to the custom agent.")
+			.addText((text) => {
+				text.setPlaceholder("Absolute path to custom agent")
+					.setValue(agent.command)
+					.onChange(async (value) => {
+						this.plugin.settings.customAgents[index].command =
+							value.trim();
+						await this.plugin.saveSettings();
+					});
+			});
 
 		new Setting(blockEl)
 			.setName("Arguments")
-			.setDesc("Enter one argument per line.")
+			.setDesc(
+				"Enter one argument per line. Leave empty to run without arguments.",
+			)
 			.addTextArea((text) => {
 				text.setPlaceholder("--flag\n--another=value")
 					.setValue(this.formatArgs(agent.args))
@@ -361,7 +365,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		new Setting(blockEl)
 			.setName("Environment variables")
-			.setDesc("Enter KEY=VALUE pairs, one per line.")
+			.setDesc(
+				"Enter KEY=VALUE pairs, one per line. (Stored as plain text)",
+			)
 			.addTextArea((text) => {
 				text.setPlaceholder("TOKEN=...")
 					.setValue(this.formatEnv(agent.env))
