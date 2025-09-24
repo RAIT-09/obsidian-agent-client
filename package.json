@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
-	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "obsidian-agent-client",
+	"version": "0.1.0",
+	"description": "Use AI coding agents via the Agent Client Protocol directly inside Obsidian",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
@@ -10,7 +10,7 @@
 	},
 	"keywords": [],
 	"author": "",
-	"license": "MIT",
+	"license": "Apache-2.0",
 	"devDependencies": {
 		"@types/node": "^16.11.6",
 		"@types/react": "^19.1.13",
