@@ -1190,6 +1190,10 @@ export class ChatView extends ItemView {
 		return "Chat";
 	}
 
+	getIcon() {
+		return "bot-message-square";
+	}
+
 	async onOpen() {
 		const container = this.containerEl.children[1];
 		container.empty();
