@@ -155,21 +155,50 @@ function detectMention(
 	const afterAt = textUpToCursor.slice(atIndex + 1);
 	console.log("[DEBUG] Text after @:", afterAt);
 
-	// Check if there are any whitespace or bracket characters that would break the mention
-	if (
-		afterAt.includes(" ") ||
-		afterAt.includes("\t") ||
-		afterAt.includes("\n") ||
-		afterAt.includes("]")
-	) {
-		console.log("[DEBUG] Mention contains invalid characters");
-		return null;
+	// Support both @filename and @[filename with spaces] formats
+	let query = "";
+	let endPos = cursorPosition;
+
+	if (afterAt.startsWith("[")) {
+		// @[filename] format - find closing bracket
+		const closingBracket = afterAt.indexOf("]");
+		if (closingBracket === -1) {
+			// Still typing inside brackets
+			query = afterAt.slice(1); // Remove opening [
+			endPos = cursorPosition;
+		} else {
+			// Found closing bracket - check if cursor is after it
+			const closingBracketPos = atIndex + 1 + closingBracket;
+			if (cursorPosition > closingBracketPos) {
+				// Cursor is after ], no longer a mention
+				console.log(
+					"[DEBUG] Cursor is after closing ], stopping mention detection",
+				);
+				return null;
+			}
+			// Complete bracket format
+			query = afterAt.slice(1, closingBracket); // Between [ and ]
+			endPos = closingBracketPos + 1; // Include closing ]
+		}
+	} else {
+		// @filename format (no spaces allowed)
+		if (
+			afterAt.includes(" ") ||
+			afterAt.includes("\t") ||
+			afterAt.includes("\n") ||
+			afterAt.includes("]")
+		) {
+			console.log("[DEBUG] Mention contains invalid characters");
+			return null;
+		}
+		query = afterAt;
+		endPos = cursorPosition;
 	}
 
 	const mentionContext = {
 		start: atIndex,
-		end: cursorPosition,
-		query: afterAt,
+		end: endPos,
+		query: query,
 	};
 	console.log("[DEBUG] Mention context created:", mentionContext);
 	return mentionContext;
@@ -183,7 +212,12 @@ function replaceMention(
 ): { newText: string; newCursorPos: number } {
 	const before = text.slice(0, mentionContext.start);
 	const after = text.slice(mentionContext.end);
-	const replacement = `@${noteTitle}`;
+
+	// Use @[filename] format if title contains spaces, otherwise @filename
+	const replacement = noteTitle.includes(" ")
+		? `@[${noteTitle}]`
+		: `@${noteTitle}`;
+
 	const newText = before + replacement + after;
 	const newCursorPos = mentionContext.start + replacement.length;
 
@@ -196,28 +230,34 @@ function convertMentionsToPath(
 	noteMentionService: NoteMentionService,
 	vaultPath: string,
 ): string {
-	// Find all @mentions in the text
-	const mentionRegex = /@([^\s\[\]]+)/g;
+	// Find all @mentions in the text (both @filename and @[filename] formats)
+	const mentionRegex = /@(?:\[([^\]]+)\]|([^@\s]+))/g;
 	let convertedText = text;
 
-	convertedText = convertedText.replace(mentionRegex, (match, noteTitle) => {
-		// Find the file by basename
-		const file = noteMentionService
-			.getAllFiles()
-			.find((f) => f.basename === noteTitle);
-		if (file) {
-			// Calculate absolute path by combining vault path with file path
-			const absolutePath = vaultPath
-				? `${vaultPath}/${file.path}`
-				: file.path;
-			console.log(
-				`[DEBUG] Converting @${noteTitle} to absolute path: ${absolutePath}`,
-			);
-			return absolutePath;
-		}
-		// If file not found, keep original @mention
-		return match;
-	});
+	convertedText = convertedText.replace(
+		mentionRegex,
+		(match, bracketName, plainName) => {
+			// Extract filename - either from [brackets] or plain text
+			const noteTitle = bracketName || plainName;
+
+			// Find the file by basename
+			const file = noteMentionService
+				.getAllFiles()
+				.find((f) => f.basename === noteTitle);
+			if (file) {
+				// Calculate absolute path by combining vault path with file path
+				const absolutePath = vaultPath
+					? `${vaultPath}/${file.path}`
+					: file.path;
+				console.log(
+					`[DEBUG] Converting @${noteTitle} to absolute path: ${absolutePath}`,
+				);
+				return absolutePath;
+			}
+			// If file not found, keep original @mention
+			return match;
+		},
+	);
 
 	return convertedText;
 }
@@ -227,12 +267,15 @@ function extractMentions(
 	text: string,
 ): Array<{ text: string; start: number; end: number }> {
 	const mentions: Array<{ text: string; start: number; end: number }> = [];
-	const mentionRegex = /@([^\s\[\]]+)/g;
+	// Match both @filename and @[filename with spaces] formats
+	const mentionRegex = /@(?:\[([^\]]+)\]|([^@\s]+))/g;
 	let match;
 
 	while ((match = mentionRegex.exec(text)) !== null) {
+		// Extract filename - either from [brackets] or plain text
+		const noteTitle = match[1] || match[2];
 		mentions.push({
-			text: match[1], // Note title without @
+			text: noteTitle, // Note title without @ and brackets
 			start: match.index,
 			end: match.index + match[0].length,
 		});
@@ -534,7 +577,8 @@ function renderTextWithMentions(
 	text: string,
 	plugin: AgentClientPlugin,
 ): React.ReactElement {
-	const mentionRegex = /@([^@\s]+)/g;
+	// Match both @filename and @[filename with spaces] formats
+	const mentionRegex = /@(?:\[([^\]]+)\]|([^@\s]+))/g;
 	const parts: React.ReactNode[] = [];
 	let lastIndex = 0;
 	let match;
@@ -545,31 +589,38 @@ function renderTextWithMentions(
 			parts.push(text.slice(lastIndex, match.index));
 		}
 
-		// Add the mention as a styled element
-		const noteName = match[1];
-		parts.push(
-			<span
-				key={match.index}
-				style={{
-					backgroundColor: "transparent",
-					color: "var(--interactive-accent-hover)",
-					borderRadius: "3px",
-					fontSize: "0.9em",
-					fontWeight: "500",
-					cursor: "pointer",
-				}}
-				onClick={() => {
-					// Try to open the note when clicked
-					const file =
-						plugin.app.vault.getAbstractFileByPath(noteName);
-					if (file) {
-						plugin.app.workspace.openLinkText(noteName, "");
-					}
-				}}
-			>
-				@{noteName}
-			</span>,
-		);
+		// Extract filename - either from [brackets] or plain text
+		const noteName = match[1] || match[2];
+
+		// Check if file actually exists
+		const file = plugin.app.vault
+			.getMarkdownFiles()
+			.find((f) => f.basename === noteName);
+
+		if (file) {
+			// File exists - render as clickable mention
+			parts.push(
+				<span
+					key={match.index}
+					style={{
+						backgroundColor: "transparent",
+						color: "var(--interactive-accent-hover)",
+						borderRadius: "3px",
+						fontSize: "0.9em",
+						fontWeight: "500",
+						cursor: "pointer",
+					}}
+					onClick={() => {
+						plugin.app.workspace.openLinkText(file.path, "");
+					}}
+				>
+					@{noteName}
+				</span>,
+			);
+		} else {
+			// File doesn't exist - render as plain text
+			parts.push(`@${noteName}`);
+		}
 
 		lastIndex = match.index + match[0].length;
 	}
@@ -670,7 +721,7 @@ function MessageContentRenderer({
 					style={{
 						padding: "8px",
 						marginTop: "4px",
-						backgroundColor: "var(--background-modifier-border)",
+						border: "1px solid var(--background-modifier-border)",
 						borderRadius: "4px",
 						fontSize: "12px",
 						userSelect: "text",
