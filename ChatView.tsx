@@ -2407,14 +2407,6 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 						onClick={createNewSession}
 					/>
 					<HeaderButton
-						iconName="list"
-						tooltip="Chat history"
-						onClick={() => {
-							// TODO: show chat history
-							console.log("Chat history clicked");
-						}}
-					/>
-					<HeaderButton
 						iconName="settings"
 						tooltip="Settings"
 						onClick={() => {
