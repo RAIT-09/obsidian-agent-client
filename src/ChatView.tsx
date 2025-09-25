@@ -472,16 +472,46 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					: commandDir;
 			}
 
+			// Windows: Automatically add common Node.js paths to avoid "node not found" errors
+			if (process.platform === "win32") {
+				const commonNodePaths = [
+					"C:\\Program Files\\nodejs",
+					"C:\\Program Files (x86)\\nodejs",
+					`${process.env.USERPROFILE}\\AppData\\Roaming\\npm`,
+					`${process.env.APPDATA}\\npm`,
+				];
+
+				// Add paths that exist to PATH
+				const existingPaths = commonNodePaths.filter(path => {
+					try {
+						require("fs").accessSync(path);
+						return true;
+					} catch {
+						return false;
+					}
+				});
+
+				if (existingPaths.length > 0) {
+					baseEnv.PATH = baseEnv.PATH
+						? `${existingPaths.join(";")}${baseEnv.PATH}`
+						: existingPaths.join(";");
+				}
+			}
+
 			// Get the Vault root path for agent process
 			console.log(
 				"[Debug] Starting agent process in directory:",
 				vaultPath,
 			);
 
+			// Use shell on Windows for .cmd/.bat files, optional on Unix systems
+			const needsShell = process.platform === "win32" || activeAgent.command.endsWith(".cmd") || activeAgent.command.endsWith(".bat");
+
 			const agentProcess = spawn(activeAgent.command, agentArgs, {
 				stdio: ["pipe", "pipe", "pipe"],
 				env: baseEnv,
 				cwd: vaultPath,
+				shell: needsShell,
 			});
 			agentProcessRef.current = agentProcess;
 
