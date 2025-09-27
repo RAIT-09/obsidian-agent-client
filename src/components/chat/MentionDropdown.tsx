@@ -1,12 +1,15 @@
 import * as React from "react";
-const { useRef, useEffect } = React;
+const { useRef, useEffect, useMemo } = React;
 import { TFile } from "obsidian";
+import { Logger } from "../../utils/logger";
+import type AgentClientPlugin from "../../main";
 
 interface MentionDropdownProps {
 	files: TFile[];
 	selectedIndex: number;
 	onSelect: (file: TFile) => void;
 	onClose: () => void;
+	plugin: AgentClientPlugin;
 }
 
 export function MentionDropdown({
@@ -14,10 +17,12 @@ export function MentionDropdown({
 	selectedIndex,
 	onSelect,
 	onClose,
+	plugin,
 }: MentionDropdownProps) {
 	const dropdownRef = useRef<HTMLDivElement>(null);
+	const logger = useMemo(() => new Logger(plugin), [plugin]);
 
-	console.log("[DEBUG] MentionDropdown component rendering with:", {
+	logger.log("[DEBUG] MentionDropdown component rendering with:", {
 		files: files.map((f) => f.name),
 		selectedIndex,
 		filesCount: files.length,

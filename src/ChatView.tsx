@@ -16,6 +16,9 @@ import { HeaderButton } from "./components/ui/HeaderButton";
 import { NoteMentionService } from "./services/mention-service";
 import { AcpClient } from "./services/acp-client";
 
+// Utility imports
+import { Logger } from "./utils/logger";
+
 // Type imports
 import type { ChatMessage, MessageContent } from "./types/acp-types";
 
@@ -60,6 +63,9 @@ const resolveCommandDirectory = (command: string): string | null => {
 };
 
 function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
+	// Create logger instance
+	const logger = useMemo(() => new Logger(plugin), [plugin]);
+
 	// Use the settings store to get reactive settings
 	const settings = useSyncExternalStore(
 		plugin.settingsStore.subscribe,
@@ -148,19 +154,19 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 	// Mention handling functions
 	const updateMentionSuggestions = (context: MentionContext | null) => {
-		console.log("[DEBUG] updateMentionSuggestions called with:", context);
+		logger.log("[DEBUG] updateMentionSuggestions called with:", context);
 
 		if (!context) {
-			console.log("[DEBUG] No context, hiding dropdown");
+			logger.log("[DEBUG] No context, hiding dropdown");
 			setShowMentionDropdown(false);
 			setMentionSuggestions([]);
 			setMentionContext(null);
 			return;
 		}
 
-		console.log("[DEBUG] Searching notes with query:", context.query);
+		logger.log("[DEBUG] Searching notes with query:", context.query);
 		const suggestions = noteMentionService.searchNotes(context.query);
-		console.log(
+		logger.log(
 			"[DEBUG] Found suggestions:",
 			suggestions.length,
 			suggestions.map((f) => f.name),
@@ -171,10 +177,10 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		setSelectedMentionIndex(0);
 
 		if (suggestions.length > 0) {
-			console.log("[DEBUG] Showing dropdown");
+			logger.log("[DEBUG] Showing dropdown");
 			setShowMentionDropdown(true);
 		} else {
-			console.log("[DEBUG] No suggestions, hiding dropdown");
+			logger.log("[DEBUG] No suggestions, hiding dropdown");
 			setShowMentionDropdown(false);
 		}
 	};
@@ -370,7 +376,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 	useEffect(() => {
 		async function setupConnection() {
-			console.log("[Debug] Starting connection setup...");
+			logger.log("[Debug] Starting connection setup...");
 
 			// Get the Vault root path
 			const vaultPath =
@@ -422,7 +428,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			];
 
 			if (launchCandidates.length === 0) {
-				console.error("[Error] No agents available to launch.");
+				logger.error("[Error] No agents available to launch.");
 				return;
 			}
 
@@ -435,7 +441,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				!activeAgentCandidate.command ||
 				activeAgentCandidate.command.trim().length === 0
 			) {
-				console.error(
+				logger.error(
 					`[Error] Command not configured for agent "${activeAgentCandidate.label}" (${activeAgentCandidate.id}).`,
 				);
 				return;
@@ -449,11 +455,11 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			const agentArgs =
 				activeAgent.args.length > 0 ? [...activeAgent.args] : [];
 
-			console.log(
+			logger.log(
 				`[Debug] Active agent: ${activeAgent.label} (${activeAgent.id})`,
 			);
-			console.log("[Debug] Command:", activeAgent.command);
-			console.log(
+			logger.log("[Debug] Command:", activeAgent.command);
+			logger.log(
 				"[Debug] Args:",
 				agentArgs.length > 0 ? agentArgs.join(" ") : "(none)",
 			);
@@ -503,7 +509,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			}
 
 			// Get the Vault root path for agent process
-			console.log(
+			logger.log(
 				"[Debug] Starting agent process in directory:",
 				vaultPath,
 			);
@@ -525,19 +531,19 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			const agentLabel = `${activeAgent.label} (${activeAgent.id})`;
 
 			agentProcess.on("spawn", () => {
-				console.log(
+				logger.log(
 					`[Debug] ${agentLabel} process spawned successfully, PID:`,
 					agentProcess.pid,
 				);
 			});
 
 			agentProcess.on("error", (error) => {
-				console.error(`[Debug] ${agentLabel} process error:`, error);
+				logger.error(`[Debug] ${agentLabel} process error:`, error);
 				if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-					console.error(
+					logger.error(
 						`[Error] Command not found: ${activeAgent.command || "(empty)"}`,
 					);
-					console.error(
+					logger.error(
 						`[Info] Check the command or update the correct path in settings for "${agentLabel}".`,
 					);
 
@@ -559,17 +565,17 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			});
 
 			agentProcess.on("exit", (code, signal) => {
-				console.log(
+				logger.log(
 					`[Debug] ${agentLabel} process exited with code:`,
 					code,
 					"signal:",
 					signal,
 				);
 				if (code === 127) {
-					console.error(
+					logger.error(
 						`[Error] Command not found: ${activeAgent.command || "(empty)"}`,
 					);
-					console.error(
+					logger.error(
 						"[Info] Make sure the CLI is installed and the command path is correct.",
 					);
 
@@ -584,7 +590,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			});
 
 			agentProcess.on("close", (code, signal) => {
-				console.log(
+				logger.log(
 					`[Debug] ${agentLabel} process closed with code:`,
 					code,
 					"signal:",
@@ -594,7 +600,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 			agentProcess.stderr?.setEncoding("utf8");
 			agentProcess.stderr?.on("data", (data) => {
-				console.log(`[Debug] ${agentLabel} stderr:`, data);
+				logger.log(`[Debug] ${agentLabel} stderr:`, data);
 			});
 
 			setTimeout(() => {
@@ -602,11 +608,9 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					agentProcess.exitCode === null &&
 					agentProcess.killed === false
 				) {
-					console.log(
-						"[Debug] Process still running after 2 seconds",
-					);
+					logger.log("[Debug] Process still running after 2 seconds");
 				} else {
-					console.log(
+					logger.log(
 						"[Debug] Process not running. Exit code:",
 						agentProcess.exitCode,
 						"Killed:",
@@ -634,13 +638,14 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				},
 			});
 
-			console.log("[Debug] Using vault path for AcpClient:", vaultPath);
+			logger.log("[Debug] Using vault path for AcpClient:", vaultPath);
 
 			const client = new AcpClient(
 				addMessage,
 				updateLastMessage,
 				updateMessage,
 				vaultPath,
+				plugin,
 				settings.autoAllowPermissions,
 			);
 			acpClientRef.current = client;
@@ -652,7 +657,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			connectionRef.current = connection;
 
 			try {
-				console.log("[Debug] Starting ACP initialization...");
+				logger.log("[Debug] Starting ACP initialization...");
 				const initResult = await connection.initialize({
 					protocolVersion: acp.PROTOCOL_VERSION,
 					clientCapabilities: {
@@ -663,26 +668,26 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 						terminal: true,
 					},
 				});
-				console.log(
+				logger.log(
 					`✅ Connected to agent (protocol v${initResult.protocolVersion})`,
 				);
-				console.log(initResult.authMethods);
+				logger.log(initResult.authMethods);
 
-				console.log("process.cwd():", process.cwd());
-				console.log("vaultPath:", vaultPath);
-				console.log("[Debug] Starting session creation...");
+				logger.log("process.cwd():", process.cwd());
+				logger.log("vaultPath:", vaultPath);
+				logger.log("[Debug] Starting session creation...");
 				const sessionResult = await connection.newSession({
 					cwd: vaultPath,
 					mcpServers: [],
 				});
-				console.log(`📝 Created session: ${sessionResult.sessionId}`);
+				logger.log(`📝 Created session: ${sessionResult.sessionId}`);
 
 				setSessionId(sessionResult.sessionId);
 				setAuthMethods(initResult.authMethods || []);
 				setIsReady(true);
 			} catch (error) {
-				console.error("[Client] Initialization Error:", error);
-				console.error("[Client] Error details:", error);
+				logger.error("[Client] Initialization Error:", error);
+				logger.error("[Client] Error details:", error);
 			}
 		}
 
@@ -773,10 +778,10 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 		try {
 			await connectionRef.current.authenticate({ methodId });
-			console.log("✅ authenticate ok:", methodId);
+			logger.log("✅ authenticate ok:", methodId);
 			return true;
 		} catch (error) {
-			console.error("[Client] Authentication Error:", error);
+			logger.error("[Client] Authentication Error:", error);
 			return false;
 		}
 	};
@@ -785,17 +790,17 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		if (!connectionRef.current) return;
 
 		try {
-			console.log("[Debug] Creating new session...");
+			logger.log("[Debug] Creating new session...");
 			// Get the Vault root path
 			const vaultPath =
 				(plugin.app.vault.adapter as any).basePath || process.cwd();
-			console.log("[Debug] Using vault path as cwd:", vaultPath);
+			logger.log("[Debug] Using vault path as cwd:", vaultPath);
 
 			const sessionResult = await connectionRef.current.newSession({
 				cwd: vaultPath,
 				mcpServers: [],
 			});
-			console.log(`📝 Created new session: ${sessionResult.sessionId}`);
+			logger.log(`📝 Created new session: ${sessionResult.sessionId}`);
 
 			setSessionId(sessionResult.sessionId);
 			setMessages([]);
@@ -809,26 +814,26 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				setCurrentAgentId(newActiveAgentId);
 			}
 		} catch (error) {
-			console.error("[Client] New Session Error:", error);
+			logger.error("[Client] New Session Error:", error);
 		}
 	};
 
 	const handleStopGeneration = async () => {
 		if (!connectionRef.current || !sessionId) {
-			console.warn("Cannot cancel: no connection or session");
+			logger.warn("Cannot cancel: no connection or session");
 			setIsSending(false);
 			return;
 		}
 
 		try {
-			console.log("Sending session/cancel notification...");
+			logger.log("Sending session/cancel notification...");
 
 			// Send cancellation notification using the proper ACP method
 			await connectionRef.current.cancel({
 				sessionId: sessionId,
 			});
 
-			console.log("Cancellation request sent successfully");
+			logger.log("Cancellation request sent successfully");
 
 			// Cancel all running operations (permission requests + terminals)
 			acpClientRef.current?.cancelAllOperations();
@@ -839,7 +844,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			// Update UI state immediately
 			setIsSending(false);
 		} catch (error) {
-			console.error("Failed to send cancellation:", error);
+			logger.error("Failed to send cancellation:", error);
 
 			// Still cancel all operations even if network cancellation failed
 			acpClientRef.current?.cancelAllOperations();
@@ -883,7 +888,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		acpClientRef.current?.resetCurrentMessage();
 
 		try {
-			console.log(`\n✅ Sending Message...: ${messageTextForAgent}`);
+			logger.log(`\n✅ Sending Message...: ${messageTextForAgent}`);
 			const promptResult = await connectionRef.current.prompt({
 				sessionId: sessionId!,
 				prompt: [
@@ -893,17 +898,15 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					},
 				],
 			});
-			console.log(
-				`\n✅ Agent completed with: ${promptResult.stopReason}`,
-			);
+			logger.log(`\n✅ Agent completed with: ${promptResult.stopReason}`);
 
 			setIsSending(false);
 		} catch (error) {
-			console.error("[Client] Prompt Error:", error);
+			logger.error("[Client] Prompt Error:", error);
 			setIsSending(false);
 
 			if (!authMethods || authMethods.length === 0) {
-				console.error("No auth methods available");
+				logger.error("No auth methods available");
 				return;
 			}
 
@@ -924,12 +927,12 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 								],
 							},
 						);
-						console.log(
+						logger.log(
 							`\n✅ Agent completed with: ${promptResult.stopReason}`,
 						);
 						setIsSending(false);
 					} catch (retryError) {
-						console.error("[Client] Retry Error:", retryError);
+						logger.error("[Client] Retry Error:", retryError);
 						setIsSending(false);
 					}
 				}
@@ -994,7 +997,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		const newValue = e.target.value;
 		const cursorPosition = e.target.selectionStart || 0;
 
-		console.log(
+		logger.log(
 			"[DEBUG] Input changed:",
 			newValue,
 			"cursor:",
@@ -1004,8 +1007,8 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		setInputValue(newValue);
 
 		// Check for mention detection
-		const mentionDetected = detectMention(newValue, cursorPosition);
-		console.log("[DEBUG] Mention detected:", mentionDetected);
+		const mentionDetected = detectMention(newValue, cursorPosition, plugin);
+		logger.log("[DEBUG] Mention detected:", mentionDetected);
 		updateMentionSuggestions(mentionDetected);
 	};
 
@@ -1156,7 +1159,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				<div style={{ position: "relative" }}>
 					{/* Mention Dropdown - overlay positioned */}
 					{(() => {
-						console.log("[DEBUG] Dropdown render check:", {
+						logger.log("[DEBUG] Dropdown render check:", {
 							showMentionDropdown,
 							suggestionsCount: mentionSuggestions.length,
 							selectedIndex: selectedMentionIndex,
@@ -1169,6 +1172,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 							selectedIndex={selectedMentionIndex}
 							onSelect={selectMention}
 							onClose={closeMentionDropdown}
+							plugin={plugin}
 						/>
 					)}
 					<textarea

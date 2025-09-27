@@ -1,5 +1,7 @@
 import { spawn, ChildProcess } from "child_process";
 import * as acp from "@zed-industries/agent-client-protocol";
+import type AgentClientPlugin from "./main";
+import { Logger } from "./utils/logger";
 
 interface TerminalProcess {
 	id: string;
@@ -14,6 +16,11 @@ interface TerminalProcess {
 
 export class TerminalManager {
 	private terminals = new Map<string, TerminalProcess>();
+	private logger: Logger;
+
+	constructor(plugin: AgentClientPlugin) {
+		this.logger = new Logger(plugin);
+	}
 
 	createTerminal(params: acp.CreateTerminalRequest): string {
 		const terminalId = crypto.randomUUID();
@@ -39,7 +46,7 @@ export class TerminalManager {
 			args = parts.slice(1);
 		}
 
-		console.log(`[Terminal ${terminalId}] Creating terminal:`, {
+		this.logger.log(`[Terminal ${terminalId}] Creating terminal:`, {
 			command,
 			args,
 			cwd: params.cwd,
@@ -63,7 +70,7 @@ export class TerminalManager {
 
 		// Handle spawn errors
 		childProcess.on("error", (error) => {
-			console.log(
+			this.logger.log(
 				`[Terminal ${terminalId}] Process error:`,
 				error.message,
 			);
@@ -79,19 +86,19 @@ export class TerminalManager {
 		// Capture stdout and stderr
 		childProcess.stdout?.on("data", (data: Buffer) => {
 			const output = data.toString();
-			console.log(`[Terminal ${terminalId}] stdout:`, output);
+			this.logger.log(`[Terminal ${terminalId}] stdout:`, output);
 			this.appendOutput(terminal, output);
 		});
 
 		childProcess.stderr?.on("data", (data: Buffer) => {
 			const output = data.toString();
-			console.log(`[Terminal ${terminalId}] stderr:`, output);
+			this.logger.log(`[Terminal ${terminalId}] stderr:`, output);
 			this.appendOutput(terminal, output);
 		});
 
 		// Handle process exit
 		childProcess.on("exit", (code, signal) => {
-			console.log(
+			this.logger.log(
 				`[Terminal ${terminalId}] Process exited with code: ${code}, signal: ${signal}`,
 			);
 			terminal.exitStatus = { exitCode: code, signal };
@@ -183,10 +190,10 @@ export class TerminalManager {
 	}
 
 	killAllTerminals(): void {
-		console.log(`Killing ${this.terminals.size} running terminals...`);
+		this.logger.log(`Killing ${this.terminals.size} running terminals...`);
 		this.terminals.forEach((terminal, terminalId) => {
 			if (!terminal.exitStatus) {
-				console.log(`Killing terminal ${terminalId}`);
+				this.logger.log(`Killing terminal ${terminalId}`);
 				this.killTerminal(terminalId);
 			}
 		});

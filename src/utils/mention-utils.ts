@@ -1,4 +1,6 @@
 import { TFile } from "obsidian";
+import { Logger } from "./logger";
+import type AgentClientPlugin from "../main";
 
 // Mention detection utilities
 export interface MentionContext {
@@ -11,29 +13,31 @@ export interface MentionContext {
 export function detectMention(
 	text: string,
 	cursorPosition: number,
+	plugin: AgentClientPlugin,
 ): MentionContext | null {
-	console.log("[DEBUG] detectMention called with:", { text, cursorPosition });
+	const logger = new Logger(plugin);
+	logger.log("[DEBUG] detectMention called with:", { text, cursorPosition });
 
 	if (cursorPosition < 0 || cursorPosition > text.length) {
-		console.log("[DEBUG] Invalid cursor position");
+		logger.log("[DEBUG] Invalid cursor position");
 		return null;
 	}
 
 	// Get text up to cursor position
 	const textUpToCursor = text.slice(0, cursorPosition);
-	console.log("[DEBUG] Text up to cursor:", textUpToCursor);
+	logger.log("[DEBUG] Text up to cursor:", textUpToCursor);
 
 	// Find the last @ symbol
 	const atIndex = textUpToCursor.lastIndexOf("@");
-	console.log("[DEBUG] @ index found:", atIndex);
+	logger.log("[DEBUG] @ index found:", atIndex);
 	if (atIndex === -1) {
-		console.log("[DEBUG] No @ symbol found");
+		logger.log("[DEBUG] No @ symbol found");
 		return null;
 	}
 
 	// Get the token after @
 	const afterAt = textUpToCursor.slice(atIndex + 1);
-	console.log("[DEBUG] Text after @:", afterAt);
+	logger.log("[DEBUG] Text after @:", afterAt);
 
 	// Support both @filename and @[filename with spaces] formats
 	let query = "";
@@ -51,7 +55,7 @@ export function detectMention(
 			const closingBracketPos = atIndex + 1 + closingBracket;
 			if (cursorPosition > closingBracketPos) {
 				// Cursor is after ], no longer a mention
-				console.log(
+				logger.log(
 					"[DEBUG] Cursor is after closing ], stopping mention detection",
 				);
 				return null;
@@ -68,7 +72,7 @@ export function detectMention(
 			afterAt.includes("\n") ||
 			afterAt.includes("]")
 		) {
-			console.log("[DEBUG] Mention contains invalid characters");
+			logger.log("[DEBUG] Mention contains invalid characters");
 			return null;
 		}
 		query = afterAt;
@@ -80,7 +84,7 @@ export function detectMention(
 		end: endPos,
 		query: query,
 	};
-	console.log("[DEBUG] Mention context created:", mentionContext);
+	logger.log("[DEBUG] Mention context created:", mentionContext);
 	return mentionContext;
 }
 
@@ -129,9 +133,10 @@ export function convertMentionsToPath(
 				const absolutePath = vaultPath
 					? `${vaultPath}/${file.path}`
 					: file.path;
-				console.log(
-					`[DEBUG] Converting @${noteTitle} to absolute path: ${absolutePath}`,
-				);
+				// TODO: Fix logger usage in utility functions
+				// logger.log(
+				// 	`[DEBUG] Converting @${noteTitle} to absolute path: ${absolutePath}`,
+				// );
 				return absolutePath;
 			}
 			// If file not found, keep original @mention

@@ -1,16 +1,21 @@
 import * as React from "react";
-const { useState, useRef, useEffect } = React;
+const { useState, useRef, useEffect, useMemo } = React;
 import type { IAcpClient } from "../../types/acp-types";
+import { Logger } from "../../utils/logger";
+import type AgentClientPlugin from "../../main";
 
 interface TerminalRendererProps {
 	terminalId: string;
 	acpClient: IAcpClient | null;
+	plugin: AgentClientPlugin;
 }
 
 export function TerminalRenderer({
 	terminalId,
 	acpClient,
+	plugin,
 }: TerminalRendererProps) {
+	const logger = useMemo(() => new Logger(plugin), [plugin]);
 	const [output, setOutput] = useState("");
 	const [exitStatus, setExitStatus] = useState<{
 		exitCode: number | null;
@@ -47,13 +52,13 @@ export function TerminalRenderer({
 
 				// Check if the error is because terminal was not found (cancelled/killed)
 				if (errorMessage.includes("not found")) {
-					console.log(
+					logger.log(
 						`[TerminalRenderer] Terminal ${terminalId} was cancelled/killed, stopping polling`,
 					);
 					setIsCancelled(true);
 				} else {
 					// Log other errors but don't spam the console
-					console.log(
+					logger.log(
 						`[TerminalRenderer] Polling stopped for terminal ${terminalId}: ${errorMessage}`,
 					);
 					setIsCancelled(true); // Treat any polling error as cancelled

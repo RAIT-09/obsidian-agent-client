@@ -46,6 +46,22 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		const customSection = containerEl.createDiv();
 		this.renderCustomAgents(customSection);
+
+		containerEl.createEl("h2", { text: "Developer Settings" });
+
+		new Setting(containerEl)
+			.setName("Debug mode")
+			.setDesc(
+				"Enable debug logging to console. Useful for development and troubleshooting.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.debugMode)
+					.onChange(async (value) => {
+						this.plugin.settings.debugMode = value;
+						await this.plugin.saveSettings();
+					}),
+			);
 	}
 
 	private renderAgentSelector(containerEl: HTMLElement) {

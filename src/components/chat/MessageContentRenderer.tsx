@@ -1,10 +1,12 @@
 import * as React from "react";
+const { useMemo } = React;
 import type { MessageContent, IAcpClient } from "../../types/acp-types";
 import type AgentClientPlugin from "../../main";
 import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 import { CollapsibleThought } from "./CollapsibleThought";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { TextWithMentions } from "./TextWithMentions";
+import { Logger } from "../../utils/logger";
 
 interface MessageContentRendererProps {
 	content: MessageContent;
@@ -24,6 +26,8 @@ export function MessageContentRenderer({
 	acpClient,
 	updateMessageContent,
 }: MessageContentRendererProps) {
+	const logger = useMemo(() => new Logger(plugin), [plugin]);
+
 	switch (content.type) {
 		case "text":
 			// Check if this is a user message by looking at the parent message role
@@ -76,6 +80,7 @@ export function MessageContentRenderer({
 										key={index}
 										terminalId={item.terminalId}
 										acpClient={acpClient || null}
+										plugin={plugin}
 									/>
 								);
 							}
@@ -218,7 +223,7 @@ export function MessageContentRenderer({
 												option.optionId,
 											);
 										} else {
-											console.warn(
+											logger.warn(
 												"Cannot handle permission response: missing acpClient, messageId, or updateMessageContent",
 											);
 										}
@@ -333,6 +338,7 @@ export function MessageContentRenderer({
 				<TerminalRenderer
 					terminalId={content.terminalId}
 					acpClient={acpClient || null}
+					plugin={plugin}
 				/>
 			);
 

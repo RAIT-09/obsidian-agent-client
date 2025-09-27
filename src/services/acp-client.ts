@@ -5,6 +5,8 @@ import type {
 	IAcpClient,
 } from "../types/acp-types";
 import { TerminalManager } from "../terminal-manager";
+import { Logger } from "../utils/logger";
+import type AgentClientPlugin from "../main";
 
 export class AcpClient implements IAcpClient {
 	private addMessage: (message: ChatMessage) => void;
@@ -18,15 +20,17 @@ export class AcpClient implements IAcpClient {
 		string,
 		(response: acp.RequestPermissionResponse) => void
 	>();
-	private terminalManager = new TerminalManager();
+	private terminalManager: TerminalManager;
 	private vaultPath: string;
 	private autoAllowPermissions: boolean = false;
+	private logger: Logger;
 
 	constructor(
 		addMessage: (message: ChatMessage) => void,
 		updateLastMessage: (content: MessageContent) => void,
 		updateMessage: (toolCallId: string, content: MessageContent) => void,
 		vaultPath: string,
+		plugin: AgentClientPlugin,
 		autoAllowPermissions: boolean = false,
 	) {
 		this.addMessage = addMessage;
@@ -34,11 +38,13 @@ export class AcpClient implements IAcpClient {
 		this.updateMessage = updateMessage;
 		this.vaultPath = vaultPath;
 		this.autoAllowPermissions = autoAllowPermissions;
+		this.logger = new Logger(plugin);
+		this.terminalManager = new TerminalManager(plugin);
 	}
 
 	async sessionUpdate(params: acp.SessionNotification): Promise<void> {
 		const update = params.update;
-		console.log(update);
+		this.logger.log(update);
 		switch (update.sessionUpdate) {
 			case "agent_message_chunk":
 				if (update.content.type === "text") {
@@ -99,7 +105,7 @@ export class AcpClient implements IAcpClient {
 	async requestPermission(
 		params: acp.RequestPermissionRequest,
 	): Promise<acp.RequestPermissionResponse> {
-		console.log("Permission request received:", params);
+		this.logger.log("Permission request received:", params);
 
 		// If tool call details are provided, add the tool call message first
 		if ((params as any).toolCall && (params as any).toolCall.title) {
@@ -132,7 +138,7 @@ export class AcpClient implements IAcpClient {
 							option.name.toLowerCase().includes("allow")),
 				) || params.options[0]; // fallback to first option
 
-			console.log("Auto-allowing permission request:", allowOption);
+			this.logger.log("Auto-allowing permission request:", allowOption);
 
 			return Promise.resolve({
 				outcome: {
@@ -190,7 +196,7 @@ export class AcpClient implements IAcpClient {
 
 	// Method to cancel all pending permission requests
 	cancelPendingPermissionRequests() {
-		console.log(
+		this.logger.log(
 			`Cancelling ${this.pendingPermissionRequests.size} pending permission requests`,
 		);
 		this.pendingPermissionRequests.forEach((resolve, requestId) => {
@@ -205,7 +211,7 @@ export class AcpClient implements IAcpClient {
 
 	// Method to cancel all running operations
 	cancelAllOperations() {
-		console.log("Cancelling all running operations...");
+		this.logger.log("Cancelling all running operations...");
 
 		// Cancel pending permission requests
 		this.cancelPendingPermissionRequests();
@@ -222,14 +228,14 @@ export class AcpClient implements IAcpClient {
 	async createTerminal(
 		params: acp.CreateTerminalRequest,
 	): Promise<acp.CreateTerminalResponse> {
-		console.log("[AcpClient] createTerminal called with params:", params);
+		this.logger.log("[AcpClient] createTerminal called with params:", params);
 
 		// Use vault path if cwd is not provided
 		const modifiedParams = {
 			...params,
 			cwd: params.cwd || this.vaultPath,
 		};
-		console.log("[AcpClient] Using modified params:", modifiedParams);
+		this.logger.log("[AcpClient] Using modified params:", modifiedParams);
 
 		const terminalId = this.terminalManager.createTerminal(modifiedParams);
 		return {

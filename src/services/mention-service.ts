@@ -1,14 +1,17 @@
 import { TFile, prepareFuzzySearch } from "obsidian";
 import type AgentClientPlugin from "../main";
+import { Logger } from "../utils/logger";
 
 // Note mention service for @-mention functionality
 export class NoteMentionService {
 	private files: TFile[] = [];
 	private lastBuild = 0;
 	private plugin: AgentClientPlugin;
+	private logger: Logger;
 
 	constructor(plugin: AgentClientPlugin) {
 		this.plugin = plugin;
+		this.logger = new Logger(plugin);
 		this.rebuildIndex();
 
 		// Listen for vault changes to keep index up to date
@@ -28,33 +31,33 @@ export class NoteMentionService {
 	private rebuildIndex() {
 		this.files = this.plugin.app.vault.getMarkdownFiles();
 		this.lastBuild = Date.now();
-		console.log(
+		this.logger.log(
 			`[NoteMentionService] Rebuilt index with ${this.files.length} files`,
 		);
 	}
 
 	searchNotes(query: string): TFile[] {
-		console.log(
+		this.logger.log(
 			"[DEBUG] NoteMentionService.searchNotes called with:",
 			query,
 		);
-		console.log("[DEBUG] Total files indexed:", this.files.length);
+		this.logger.log("[DEBUG] Total files indexed:", this.files.length);
 
 		if (!query.trim()) {
-			console.log("[DEBUG] Empty query, returning recent files");
+			this.logger.log("[DEBUG] Empty query, returning recent files");
 			// If no query, return recently modified files
 			const recentFiles = this.files
 				.slice()
 				.sort((a, b) => (b.stat?.mtime || 0) - (a.stat?.mtime || 0))
 				.slice(0, 5);
-			console.log(
+			this.logger.log(
 				"[DEBUG] Recent files:",
 				recentFiles.map((f) => f.name),
 			);
 			return recentFiles;
 		}
 
-		console.log("[DEBUG] Preparing fuzzy search for:", query.trim());
+		this.logger.log("[DEBUG] Preparing fuzzy search for:", query.trim());
 		const fuzzySearch = prepareFuzzySearch(query.trim());
 
 		// Score each file based on multiple fields
