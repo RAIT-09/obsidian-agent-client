@@ -2,6 +2,8 @@
 
 Bring your AI coding buddies directly into Obsidian! This plugin lets you chat with Claude Code, Gemini CLI, and other AI agents right from your vault. Your coding companion is now just a side panel away. ✨
 
+Built on [Agent Client Protocol (ACP)](https://github.com/zed-industries/agent-client-protocol) by Zed.
+
 ## ✨ Features
 
 - 🔗 **Direct Agent Integration**: Chat with AI coding agents in a dedicated right-side panel
@@ -107,6 +109,10 @@ where gemini
     ├── 📍 Path: C:\Users\Username\AppData\Roaming\npm\gemini.cmd
     └── 🔑 API key: (optional)
 ```
+
+## ⚠️ Known Issues
+
+- Windows: Gemini CLI is currently not supported. See [this issue](https://github.com/zed-industries/zed/issues/37675) for details.
 
 ## 🚀 Usage
 
