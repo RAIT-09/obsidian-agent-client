@@ -17,8 +17,11 @@ https://github.com/user-attachments/assets/218a5c07-f18c-4cdb-93b6-5782f5590f6b
 
 ## 📦 Installation
 
-1. 📥 Download the latest release
-2. 📁 Extract to your Obsidian plugins folder: `VaultFolder/.obsidian/plugins/agent-client/`
+1. 📥 Download the latest release files from [GitHub Releases](https://github.com/RAIT-09/obsidian-agent-client/releases):
+   - `main.js`
+   - `manifest.json`
+   - `styles.css`
+2. 📁 Create plugin folder and place the files in: `VaultFolder/.obsidian/plugins/agent-client/`
 3. ⚡ Enable the plugin in Obsidian Settings → Community Plugins
 
 ## ⚙️ Configuration
