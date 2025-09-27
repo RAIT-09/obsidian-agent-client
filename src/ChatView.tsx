@@ -75,7 +75,11 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 	const [authMethods, setAuthMethods] = useState<acp.AuthMethod[] | null>(
 		null,
 	);
-	const [showAuthSelection, setShowAuthSelection] = useState(false);
+	const [errorInfo, setErrorInfo] = useState<{
+		title: string;
+		message: string;
+		suggestion?: string;
+	} | null>(null);
 	const [currentAgentId, setCurrentAgentId] = useState<string>(
 		settings.activeAgentId || settings.claude.id,
 	);
@@ -482,7 +486,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				];
 
 				// Add paths that exist to PATH
-				const existingPaths = commonNodePaths.filter(path => {
+				const existingPaths = commonNodePaths.filter((path) => {
 					try {
 						require("fs").accessSync(path);
 						return true;
@@ -505,7 +509,10 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			);
 
 			// Use shell on Windows for .cmd/.bat files, optional on Unix systems
-			const needsShell = process.platform === "win32" || activeAgent.command.endsWith(".cmd") || activeAgent.command.endsWith(".bat");
+			const needsShell =
+				process.platform === "win32" ||
+				activeAgent.command.endsWith(".cmd") ||
+				activeAgent.command.endsWith(".bat");
 
 			const agentProcess = spawn(activeAgent.command, agentArgs, {
 				stdio: ["pipe", "pipe", "pipe"],
@@ -533,6 +540,21 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					console.error(
 						`[Info] Check the command or update the correct path in settings for "${agentLabel}".`,
 					);
+
+					// Show error in UI
+					setErrorInfo({
+						title: "Command Not Found",
+						message: `The command "${activeAgent.command || "(empty)"}" could not be found. Please check the path configuration for ${agentLabel}.`,
+						suggestion: `On macOS/Linux, use "which ${activeAgent.command?.split("/").pop() || "command"}" to find the correct path. On Windows, use "where ${activeAgent.command?.split("\\").pop()?.split("/").pop() || "command"}".`,
+					});
+				} else {
+					// Show generic error in UI for other spawn errors
+					setErrorInfo({
+						title: "Agent Startup Error",
+						message: `Failed to start ${agentLabel}: ${error.message}`,
+						suggestion:
+							"Please check the agent configuration in settings.",
+					});
 				}
 			});
 
@@ -550,6 +572,14 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					console.error(
 						"[Info] Make sure the CLI is installed and the command path is correct.",
 					);
+
+					// Show error in UI for exit code 127 (command not found)
+					setErrorInfo({
+						title: "Command Not Found",
+						message: `The command "${activeAgent.command || "(empty)"}" could not be found or is not executable.`,
+						suggestion:
+							"Make sure the CLI is installed and the command path is correct in settings.",
+					});
 				}
 			});
 
@@ -744,7 +774,6 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		try {
 			await connectionRef.current.authenticate({ methodId });
 			console.log("✅ authenticate ok:", methodId);
-			setShowAuthSelection(false);
 			return true;
 		} catch (error) {
 			console.error("[Client] Authentication Error:", error);
@@ -905,7 +934,14 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					}
 				}
 			} else {
-				setShowAuthSelection(true);
+				// Show authentication error using the new error UI
+				setErrorInfo({
+					title: "Authentication Required",
+					message:
+						"Authentication failed. Please check if you are logged into the agent or if your API key is correctly set.",
+					suggestion:
+						"Check your agent configuration in settings and ensure API keys are valid.",
+				});
 			}
 		}
 	};
@@ -945,7 +981,12 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		// Normal input handling
 		if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
 			e.preventDefault();
-			handleSendMessage();
+			// Only send if send button would not be disabled (same condition as button)
+			const buttonDisabled =
+				!isSending && (inputValue.trim() === "" || !isReady);
+			if (!buttonDisabled && !isSending) {
+				handleSendMessage();
+			}
 		}
 	};
 
@@ -1019,7 +1060,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					gap: "2px",
 				}}
 			>
-				{showAuthSelection ? (
+				{errorInfo ? (
 					<div
 						style={{
 							display: "flex",
@@ -1028,52 +1069,51 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 							padding: "20px",
 							backgroundColor: "var(--background-secondary)",
 							borderRadius: "8px",
-							border: "1px solid var(--background-modifier-border)",
+							border: "1px solid var(--color-red)",
+							borderColor: "var(--color-red)",
+							maxWidth: "100%",
+							overflow: "hidden",
 						}}
 					>
-						<h4 style={{ margin: "0 0 8px 0" }}>Error Occurred</h4>
+						<h4
+							style={{
+								margin: "0 0 8px 0",
+								color: "var(--color-red)",
+							}}
+						>
+							{errorInfo.title}
+						</h4>
 						<p
 							style={{
 								margin: "0",
-								color: "var(--text-muted)",
+								color: "var(--text-normal)",
 								fontSize: "14px",
+								lineHeight: "1.4",
+								wordWrap: "break-word",
+								wordBreak: "break-all",
+								overflowWrap: "anywhere",
 							}}
 						>
-							An error has occurred. Please check if you are
-							logged into the agent or if your API key is
-							correctly set.
+							{errorInfo.message}
 						</p>
-						{/*authMethods?.map((method) => (
-							<button
-								key={method.id}
-								onClick={() => authenticate(method.id)}
+						{errorInfo.suggestion && (
+							<p
 								style={{
-									padding: "12px 16px",
-									border: "1px solid var(--background-modifier-border)",
-									borderRadius: "6px",
-									backgroundColor:
-										"var(--background-primary)",
-									color: "var(--text-normal)",
-									cursor: "pointer",
-									textAlign: "left",
-									transition: "all 0.2s ease",
-								}}
-								onMouseEnter={(e) => {
-									e.currentTarget.style.backgroundColor =
-										"var(--background-modifier-hover)";
-								}}
-								onMouseLeave={(e) => {
-									e.currentTarget.style.backgroundColor =
-										"var(--background-primary)";
+									margin: "8px 0 0 0",
+									color: "var(--text-muted)",
+									fontSize: "13px",
+									fontStyle: "italic",
+									lineHeight: "1.4",
+									wordWrap: "break-word",
+									wordBreak: "break-all",
+									overflowWrap: "anywhere",
 								}}
 							>
-								<div style={{ fontWeight: "500" }}>
-									{method.name || method.id}
-								</div>
-							</button>
-						))*/}
+								💡 {errorInfo.suggestion}
+							</p>
+						)}
 						<button
-							onClick={() => setShowAuthSelection(false)}
+							onClick={() => setErrorInfo(null)}
 							style={{
 								padding: "8px 16px",
 								border: "1px solid var(--background-modifier-border)",
