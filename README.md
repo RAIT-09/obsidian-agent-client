@@ -4,6 +4,9 @@ Bring your AI coding buddies directly into Obsidian! This plugin lets you chat w
 
 Built on [Agent Client Protocol (ACP)](https://github.com/zed-industries/agent-client-protocol) by Zed.
 
+https://github.com/user-attachments/assets/218a5c07-f18c-4cdb-93b6-5782f5590f6b
+
+
 ## ✨ Features
 
 - 🔗 **Direct Agent Integration**: Chat with AI coding agents in a dedicated right-side panel
