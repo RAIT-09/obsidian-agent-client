@@ -167,9 +167,7 @@ export default class AgentClientPlugin extends Plugin {
 				apiKey:
 					typeof geminiFromRaw.apiKey === "string"
 						? geminiFromRaw.apiKey
-						: typeof (raw as any).geminiApiKey === "string"
-							? (raw as any).geminiApiKey
-							: DEFAULT_SETTINGS.gemini.apiKey,
+						: DEFAULT_SETTINGS.gemini.apiKey,
 				command:
 					typeof geminiFromRaw.command === "string" &&
 					geminiFromRaw.command.trim().length > 0
@@ -194,9 +192,7 @@ export default class AgentClientPlugin extends Plugin {
 				apiKey:
 					typeof claudeFromRaw.apiKey === "string"
 						? claudeFromRaw.apiKey
-						: typeof (raw as any).anthropicApiKey === "string"
-							? (raw as any).anthropicApiKey
-							: DEFAULT_SETTINGS.claude.apiKey,
+						: DEFAULT_SETTINGS.claude.apiKey,
 				command:
 					typeof claudeFromRaw.command === "string" &&
 					claudeFromRaw.command.trim().length > 0
