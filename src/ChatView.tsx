@@ -475,36 +475,16 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				}
 			}
 
-			const commandDir = resolveCommandDirectory(activeAgent.command);
-			if (commandDir) {
-				baseEnv.PATH = baseEnv.PATH
-					? `${commandDir}:${baseEnv.PATH}`
-					: commandDir;
-			}
-
-			// Windows: Automatically add common Node.js paths to avoid "node not found" errors
-			if (process.platform === "win32") {
-				const commonNodePaths = [
-					"C:\\Program Files\\nodejs",
-					"C:\\Program Files (x86)\\nodejs",
-					`${process.env.USERPROFILE}\\AppData\\Roaming\\npm`,
-					`${process.env.APPDATA}\\npm`,
-				];
-
-				// Add paths that exist to PATH
-				const existingPaths = commonNodePaths.filter((path) => {
-					try {
-						require("fs").accessSync(path);
-						return true;
-					} catch {
-						return false;
-					}
-				});
-
-				if (existingPaths.length > 0) {
+			// Add Node.js path to PATH if specified in settings
+			if (settings.nodePath && settings.nodePath.trim().length > 0) {
+				const nodeDir = resolveCommandDirectory(
+					settings.nodePath.trim(),
+				);
+				if (nodeDir) {
+					const separator = process.platform === "win32" ? ";" : ":";
 					baseEnv.PATH = baseEnv.PATH
-						? `${existingPaths.join(";")}${baseEnv.PATH}`
-						: existingPaths.join(";");
+						? `${nodeDir}${separator}${baseEnv.PATH}`
+						: nodeDir;
 				}
 			}
 
@@ -551,7 +531,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					setErrorInfo({
 						title: "Command Not Found",
 						message: `The command "${activeAgent.command || "(empty)"}" could not be found. Please check the path configuration for ${agentLabel}.`,
-						suggestion: `On macOS/Linux, use "which ${activeAgent.command?.split("/").pop() || "command"}" to find the correct path. On Windows, use "where ${activeAgent.command?.split("\\").pop()?.split("/").pop() || "command"}".`,
+						suggestion: `1. Verify the agent path: On macOS/Linux, use "which ${activeAgent.command?.split("/").pop() || "command"}" to find the correct path. On Windows, use "where ${activeAgent.command?.split("\\").pop()?.split("/").pop() || "command"}". 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "which node" on macOS/Linux or "where node" on Windows).`,
 					});
 				} else {
 					// Show generic error in UI for other spawn errors
@@ -582,9 +562,8 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					// Show error in UI for exit code 127 (command not found)
 					setErrorInfo({
 						title: "Command Not Found",
-						message: `The command "${activeAgent.command || "(empty)"}" could not be found or is not executable.`,
-						suggestion:
-							"Make sure the CLI is installed and the command path is correct in settings.",
+						message: `The command "${activeAgent.command || "(empty)"}" could not be found. Please check the path configuration for ${agentLabel}.`,
+						suggestion: `1. Verify the agent path: On macOS/Linux, use "which ${activeAgent.command?.split("/").pop() || "command"}" to find the correct path. On Windows, use "where ${activeAgent.command?.split("\\").pop()?.split("/").pop() || "command"}". 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "which node" on macOS/Linux or "where node" on Windows).`,
 					});
 				}
 			});

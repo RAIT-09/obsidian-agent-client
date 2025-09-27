@@ -39,6 +39,7 @@ export interface AgentClientPluginSettings {
 	activeAgentId: string;
 	autoAllowPermissions: boolean;
 	debugMode: boolean;
+	nodePath: string;
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -62,6 +63,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	activeAgentId: "claude-code-acp",
 	autoAllowPermissions: false,
 	debugMode: false,
+	nodePath: "",
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -218,6 +220,10 @@ export default class AgentClientPlugin extends Plugin {
 				typeof (raw as any).debugMode === "boolean"
 					? (raw as any).debugMode
 					: DEFAULT_SETTINGS.debugMode,
+			nodePath:
+				typeof (raw as any).nodePath === "string"
+					? (raw as any).nodePath.trim()
+					: DEFAULT_SETTINGS.nodePath,
 		};
 
 		this.ensureActiveAgentId();

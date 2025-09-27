@@ -23,6 +23,20 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		containerEl.createEl("h2", { text: "General Settings" });
 
 		new Setting(containerEl)
+			.setName("Node.js path")
+			.setDesc(
+				'Absolute path to Node.js executable. On macOS/Linux, use "which node", and on Windows, use "where node" to find it. Leave empty to use system PATH.',
+			)
+			.addText((text) => {
+				text.setPlaceholder("Absolute path to node")
+					.setValue(this.plugin.settings.nodePath)
+					.onChange(async (value) => {
+						this.plugin.settings.nodePath = value.trim();
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(containerEl)
 			.setName("Auto-allow permissions")
 			.setDesc(
 				"Automatically allow all permission requests from agents. ⚠️ Use with caution - this gives agents full access to your system.",
