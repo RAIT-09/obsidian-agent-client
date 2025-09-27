@@ -3,7 +3,7 @@
 	"name": "Agent Client",
 	"version": "0.1.0",
 	"minAppVersion": "0.15.0",
-	"description": "Use AI agents via the Agent Client Protocol directly inside Obsidian.",
+	"description": "Chat with AI agents via the Agent Client Protocol directly from your vault.",
 	"author": "RAIT-09",
 	"authorUrl": "https://github.com/RAIT-09",
 	"isDesktopOnly": true
