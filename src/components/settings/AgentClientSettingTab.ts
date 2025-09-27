@@ -25,7 +25,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Node.js path")
 			.setDesc(
-				'Absolute path to Node.js executable. On macOS/Linux, use "which node", and on Windows, use "where node" to find it. Leave empty to use system PATH.',
+				'Absolute path to Node.js executable. On macOS/Linux, use "which node", and on Windows, use "where node" to find it.',
 			)
 			.addText((text) => {
 				text.setPlaceholder("Absolute path to node")
