@@ -57,15 +57,15 @@ which gemini
 **🪟 On Windows:**
 ```cmd
 # Find Node.js path
-where node
+where.exe node
 # Example output: C:\Program Files\nodejs\node.exe
 
 # Find Claude Code path
-where claude-code-acp
+where.exe claude-code-acp
 # Example output: C:\Users\Username\AppData\Roaming\npm\claude-code-acp.cmd
 
 # Find Gemini CLI path
-where gemini
+where.exe gemini
 # Example output: C:\Users\Username\AppData\Roaming\npm\gemini.cmd
 ```
 
@@ -136,6 +136,14 @@ For production builds:
 ```bash
 npm run build
 ```
+
+## 🗺️ Roadmap
+
+- **📊 Diff Display**: Visual diff viewer for code changes and file modifications suggested by agents
+- **⚡ Slash Command Support**: Quick actions and shortcuts using `/` commands within the chat interface
+- **📚 Chat History Access**: Browse, search, and restore previous chat sessions with agents
+
+Have ideas or feature requests? Feel free to [open an issue](https://github.com/RAIT-09/obsidian-agent-client/issues) on GitHub!
 
 ## 📄 License
 
