@@ -69,12 +69,11 @@ where gemini
 1. Open **Settings → Agent Client**
 2. In **General Settings**:
    - **Node.js path**: Enter the absolute path found above (e.g., `/usr/local/bin/node` or `C:\Program Files\nodejs\node.exe`)
-   - Leave empty to use system PATH (not recommended)
 3. Configure your preferred agents:
-   - **Claude Code**: 
+   - **Claude Code**:
      - **Path**: Enter absolute path (e.g., `/usr/local/bin/claude-code-acp`)
      - **API key**: Optional if logged in to Anthropic account
-   - **Gemini CLI**: 
+   - **Gemini CLI**:
      - **Path**: Enter absolute path (e.g., `/usr/local/bin/gemini`)
      - **API key**: Optional if logged in to Google account
    - **Custom Agents**: Add any ACP-compatible agents
@@ -116,11 +115,6 @@ Built-in agents:
 - Chat with your configured agent in the right panel
 - Reference notes using `@notename` syntax
 - Switch agents using the dropdown in plugin settings
-
-## Requirements
-
-- Node.js (version 16 or higher)
-- Any other Agent Client Protocol compatible tools
 
 ## Development
 
