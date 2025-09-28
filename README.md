@@ -16,7 +16,17 @@ https://github.com/user-attachments/assets/218a5c07-f18c-4cdb-93b6-5782f5590f6b
 - 🔐 **Permission Management**: Fine-grained control over agent actions
 
 ## 📦 Installation
+### 🧪 Install via BRAT
+1. 📥 Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin from the Community Plugins browser.
+2. ⚙️ In Obsidian settings, go to Community Plugins → BRAT → Add Beta Plugin.
+3. 🔗 Paste this repo URL:
+   ```
+   https://github.com/RAIT-09/obsidian-agent-client
+   ```
+4. ⬇️ BRAT will download the latest release and keep it auto-updated.
+5. ⚡ Enable Agent Client from the plugin list.
 
+### 💻 Manual Installation
 1. 📥 Download the latest release files from [GitHub Releases](https://github.com/RAIT-09/obsidian-agent-client/releases):
    - `main.js`
    - `manifest.json`
