@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile, setIcon } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, setIcon, Platform } from "obsidian";
 import * as React from "react";
 const { useState, useRef, useEffect, useSyncExternalStore, useMemo } = React;
 import { createRoot, Root } from "react-dom/client";
@@ -377,6 +377,11 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 	useEffect(() => {
 		async function setupConnection() {
 			logger.log("[Debug] Starting connection setup...");
+
+			// Check current platform
+			if (!Platform.isDesktopApp) {
+				throw new Error("Agent Client is only available on desktop");
+			}
 
 			// Get the Vault root path
 			const vaultPath =

@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from "child_process";
 import * as acp from "@zed-industries/agent-client-protocol";
 import type AgentClientPlugin from "./main";
 import { Logger } from "./utils/logger";
+import { Platform } from "obsidian";
 
 interface TerminalProcess {
 	id: string;
@@ -24,6 +25,11 @@ export class TerminalManager {
 
 	createTerminal(params: acp.CreateTerminalRequest): string {
 		const terminalId = crypto.randomUUID();
+
+		// Check current platform
+		if (!Platform.isDesktopApp) {
+			throw new Error("Agent Client is only available on desktop");
+		}
 
 		// Set up environment variables
 		const env = { ...process.env };
