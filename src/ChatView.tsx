@@ -997,26 +997,10 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 	};
 
 	return (
-		<div
-			style={{
-				height: "100%",
-				display: "flex",
-				flexDirection: "column",
-				padding: "0",
-			}}
-		>
-			<div
-				style={{
-					padding: "16px",
-					borderBottom: "1px solid var(--background-modifier-border)",
-					flexShrink: 0,
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "space-between",
-				}}
-			>
-				<h3 style={{ margin: "0" }}>{activeAgentLabel}</h3>
-				<div style={{ display: "flex", gap: "8px" }}>
+		<div className="chat-view-container">
+			<div className="chat-view-header">
+				<h3 className="chat-view-header-title">{activeAgentLabel}</h3>
+				<div className="chat-view-header-actions">
 					<HeaderButton
 						iconName="plus"
 						tooltip="New chat"
@@ -1036,92 +1020,27 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				</div>
 			</div>
 
-			<div
-				ref={messagesContainerRef}
-				style={{
-					flex: 1,
-					padding: "16px",
-					overflowY: "auto",
-					display: "flex",
-					flexDirection: "column",
-					gap: "2px",
-				}}
-			>
+			<div ref={messagesContainerRef} className="chat-view-messages">
 				{errorInfo ? (
-					<div
-						style={{
-							display: "flex",
-							flexDirection: "column",
-							gap: "12px",
-							padding: "20px",
-							backgroundColor: "var(--background-secondary)",
-							borderRadius: "8px",
-							border: "1px solid var(--color-red)",
-							borderColor: "var(--color-red)",
-							maxWidth: "100%",
-							overflow: "hidden",
-						}}
-					>
-						<h4
-							style={{
-								margin: "0 0 8px 0",
-								color: "var(--color-red)",
-							}}
-						>
-							{errorInfo.title}
-						</h4>
-						<p
-							style={{
-								margin: "0",
-								color: "var(--text-normal)",
-								fontSize: "14px",
-								lineHeight: "1.4",
-								wordWrap: "break-word",
-								wordBreak: "break-all",
-								overflowWrap: "anywhere",
-							}}
-						>
+					<div className="chat-error-container">
+						<h4 className="chat-error-title">{errorInfo.title}</h4>
+						<p className="chat-error-message">
 							{errorInfo.message}
 						</p>
 						{errorInfo.suggestion && (
-							<p
-								style={{
-									margin: "8px 0 0 0",
-									color: "var(--text-muted)",
-									fontSize: "13px",
-									fontStyle: "italic",
-									lineHeight: "1.4",
-									wordWrap: "break-word",
-									wordBreak: "break-all",
-									overflowWrap: "anywhere",
-								}}
-							>
+							<p className="chat-error-suggestion">
 								💡 {errorInfo.suggestion}
 							</p>
 						)}
 						<button
 							onClick={() => setErrorInfo(null)}
-							style={{
-								padding: "8px 16px",
-								border: "1px solid var(--background-modifier-border)",
-								borderRadius: "6px",
-								backgroundColor: "transparent",
-								color: "var(--text-muted)",
-								cursor: "pointer",
-								fontSize: "14px",
-							}}
+							className="chat-error-button"
 						>
 							OK
 						</button>
 					</div>
 				) : messages.length === 0 ? (
-					<div
-						style={{
-							color: "var(--text-muted)",
-							textAlign: "center",
-							marginTop: "20px",
-						}}
-					>
+					<div className="chat-empty-state">
 						{!isReady
 							? "Connecting to AI agent..."
 							: "Start a conversation with AI..."}
@@ -1139,8 +1058,8 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				)}
 			</div>
 
-			<div style={{ flexShrink: 0 }}>
-				<div style={{ position: "relative" }}>
+			<div className="chat-input-container">
+				<div className="chat-input-wrapper">
 					{/* Mention Dropdown - overlay positioned */}
 					{(() => {
 						logger.log("[DEBUG] Dropdown render check:", {
@@ -1165,23 +1084,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 						onChange={handleInputChange}
 						onKeyDown={handleKeyPress}
 						placeholder={`Message ${activeAgentLabel} - @ to mention notes`}
-						style={{
-							width: "100%",
-							padding: "12px 40px 12px 12px",
-							border: "1px solid var(--background-modifier-border)",
-							borderRadius: "8px",
-							backgroundColor: "var(--background-primary)",
-							color: "var(--text-normal)",
-							resize: "none",
-							minHeight: "80px",
-							height: "80px",
-							fontFamily: "inherit",
-							boxSizing: "border-box",
-							outline: "none",
-							overflow: "hidden",
-							scrollbarWidth: "none",
-							msOverflowStyle: "none",
-						}}
+						className="chat-input-textarea"
 						rows={1}
 					/>
 					<button
@@ -1192,31 +1095,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 						disabled={
 							!isSending && (inputValue.trim() === "" || !isReady)
 						}
-						style={{
-							position: "absolute",
-							right: "8px",
-							bottom: "8px",
-							width: "20px",
-							height: "20px",
-							border: "none",
-							borderRadius: "0",
-							backgroundColor: "transparent",
-							cursor:
-								!isSending &&
-								(inputValue.trim() === "" || !isReady)
-									? "not-allowed"
-									: "pointer",
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							fontSize: "16px",
-							transition: "all 0.2s ease",
-							padding: "0",
-							margin: "0",
-							outline: "none",
-							appearance: "none",
-							boxShadow: "none",
-						}}
+						className={`chat-send-button ${isSending ? "sending" : ""} ${!isSending && (inputValue.trim() === "" || !isReady) ? "disabled" : ""}`}
 						title={
 							!isReady
 								? "Connecting..."

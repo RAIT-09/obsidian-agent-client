@@ -36,14 +36,7 @@ export function TextWithMentions({
 			parts.push(
 				<span
 					key={match.index}
-					style={{
-						backgroundColor: "transparent",
-						color: "var(--interactive-accent-hover)",
-						borderRadius: "3px",
-						fontSize: "0.9em",
-						fontWeight: "500",
-						cursor: "pointer",
-					}}
+					className="text-mention"
 					onClick={() => {
 						plugin.app.workspace.openLinkText(file.path, "");
 					}}
@@ -65,7 +58,7 @@ export function TextWithMentions({
 	}
 
 	return (
-		<div className="markdown-rendered" style={{ userSelect: "text" }}>
+		<div className="text-with-mentions">
 			<p className="auto">{parts}</p>
 		</div>
 	);

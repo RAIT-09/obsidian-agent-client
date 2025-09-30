@@ -95,95 +95,27 @@ export function TerminalRenderer({
 	}, [isRunning]);
 
 	return (
-		<div
-			style={{
-				padding: "12px",
-				marginTop: "4px",
-				backgroundColor: "var(--background-secondary)",
-				border: "1px solid var(--background-modifier-border)",
-				borderRadius: "8px",
-				fontSize: "12px",
-				fontFamily: "var(--font-monospace)",
-				userSelect: "text",
-			}}
-		>
-			<div
-				style={{
-					fontWeight: "bold",
-					marginBottom: "8px",
-					display: "flex",
-					alignItems: "center",
-					gap: "8px",
-					fontFamily: "var(--font-interface)",
-					userSelect: "text",
-				}}
-			>
+		<div className="terminal-renderer">
+			<div className="terminal-renderer-header">
 				🖥️ Terminal {terminalId.slice(0, 8)}
 				{isRunning ? (
-					<span
-						style={{
-							color: "var(--color-green)",
-							fontSize: "10px",
-							userSelect: "text",
-						}}
-					>
-						● RUNNING
-					</span>
+					<span className="terminal-status running">● RUNNING</span>
 				) : isCancelled ? (
-					<span
-						style={{
-							color: "var(--color-orange)",
-							fontSize: "10px",
-							userSelect: "text",
-						}}
-					>
+					<span className="terminal-status cancelled">
 						● CANCELLED
 					</span>
 				) : (
-					<span
-						style={{
-							color: "var(--text-muted)",
-							fontSize: "10px",
-							userSelect: "text",
-						}}
-					>
-						● FINISHED
-					</span>
+					<span className="terminal-status finished">● FINISHED</span>
 				)}
 			</div>
 
-			<div
-				style={{
-					backgroundColor: "var(--background-primary)",
-					padding: "8px",
-					borderRadius: "4px",
-					border: "1px solid var(--background-modifier-border)",
-					minHeight: "100px",
-					maxHeight: "400px",
-					overflow: "auto",
-					whiteSpace: "pre-wrap",
-					wordBreak: "break-word",
-					userSelect: "text",
-				}}
-			>
+			<div className="terminal-renderer-output">
 				{output || (isRunning ? "Waiting for output..." : "No output")}
 			</div>
 
 			{exitStatus && (
 				<div
-					style={{
-						marginTop: "8px",
-						padding: "4px 8px",
-						backgroundColor:
-							exitStatus.exitCode === 0
-								? "var(--color-green)"
-								: "var(--color-red)",
-						color: "white",
-						borderRadius: "4px",
-						fontSize: "11px",
-						fontFamily: "var(--font-interface)",
-						userSelect: "text",
-					}}
+					className={`terminal-renderer-exit ${exitStatus.exitCode === 0 ? "success" : "error"}`}
 				>
 					Exit Code: {exitStatus.exitCode}
 					{exitStatus.signal && ` | Signal: ${exitStatus.signal}`}

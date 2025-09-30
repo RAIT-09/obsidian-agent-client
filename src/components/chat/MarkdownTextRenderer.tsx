@@ -30,5 +30,5 @@ export function MarkdownTextRenderer({
 		);
 	}, [text, plugin]);
 
-	return <div ref={containerRef} style={{ userSelect: "text" }} />;
+	return <div ref={containerRef} className="markdown-text-renderer" />;
 }

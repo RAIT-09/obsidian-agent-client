@@ -50,62 +50,20 @@ export function MentionDropdown({
 	}
 
 	return (
-		<div
-			ref={dropdownRef}
-			style={{
-				// Overlay positioning - positioned above textarea
-				position: "absolute",
-				bottom: "100%", // Position above the textarea
-				left: "0",
-				right: "0",
-				backgroundColor: "var(--background-secondary)",
-				border: "2px solid var(--background-modifier-border)",
-				borderRadius: "8px",
-				boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-				overflowY: "auto",
-				fontSize: "14px",
-				marginBottom: "8px", // Space between dropdown and textarea
-				zIndex: 1000,
-			}}
-		>
+		<div ref={dropdownRef} className="mention-dropdown">
 			{files.map((file, index) => (
 				<div
 					key={file.path}
-					style={{
-						padding: "4px 16px",
-						cursor: "pointer",
-						backgroundColor:
-							index === selectedIndex
-								? "var(--background-primary)" // More visible selection
-								: "transparent",
-						borderBottom:
-							index < files.length - 1
-								? "1px solid var(--background-modifier-border)"
-								: "none",
-						userSelect: "none",
-						transition: "background-color 0.1s ease",
-					}}
+					className={`mention-dropdown-item ${index === selectedIndex ? "selected" : ""} ${index < files.length - 1 ? "has-border" : ""}`}
 					onClick={() => onSelect(file)}
 					onMouseEnter={() => {
 						// Could update selected index on hover, but keeping it keyboard-focused for now
 					}}
 				>
-					<div
-						style={{
-							fontWeight: "500",
-							color: "var(--text-normal)",
-							marginBottom: "2px",
-						}}
-					>
+					<div className="mention-dropdown-item-name">
 						{file.basename}
 					</div>
-					<div
-						style={{
-							fontSize: "12px",
-							color: "var(--text-muted)",
-							opacity: 0.8,
-						}}
-					>
+					<div className="mention-dropdown-item-path">
 						{file.path}
 					</div>
 				</div>

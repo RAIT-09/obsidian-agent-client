@@ -25,20 +25,7 @@ export function MessageRenderer({
 }: MessageRendererProps) {
 	return (
 		<div
-			style={{
-				backgroundColor:
-					message.role === "user"
-						? "var(--background-primary)"
-						: "transparent",
-				padding: "0px 16px",
-				borderRadius: message.role === "user" ? "8px" : "0px",
-				width: "100%",
-				border:
-					message.role === "user"
-						? "1px solid var(--background-modifier-border)"
-						: "none",
-				margin: "4px 0",
-			}}
+			className={`message-renderer ${message.role === "user" ? "message-user" : "message-assistant"}`}
 		>
 			{message.content.map((content, idx) => (
 				<div key={idx}>

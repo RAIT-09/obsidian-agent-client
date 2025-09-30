@@ -42,31 +42,14 @@ export function MessageContentRenderer({
 
 		case "tool_call":
 			return (
-				<div
-					style={{
-						padding: "8px",
-						marginTop: "4px",
-						backgroundColor: "transparent",
-						border: "1px solid var(--background-modifier-border)",
-						borderRadius: "4px",
-						fontSize: "12px",
-						userSelect: "text",
-					}}
-				>
-					<div
-						style={{
-							fontWeight: "bold",
-							marginBottom: "4px",
-							userSelect: "text",
-						}}
-					>
+				<div className="message-tool-call">
+					<div className="message-tool-call-title">
 						🔧 {content.title}
 					</div>
 					<div
+						className="message-tool-call-status"
 						style={{
-							color: "var(--text-muted)",
 							marginBottom: content.content ? "8px" : "0",
-							userSelect: "text",
 						}}
 					>
 						Status: {content.status}
@@ -92,45 +75,12 @@ export function MessageContentRenderer({
 
 		case "plan":
 			return (
-				<div
-					style={{
-						padding: "8px",
-						marginTop: "4px",
-						border: "1px solid var(--background-modifier-border)",
-						borderRadius: "4px",
-						fontSize: "12px",
-						userSelect: "text",
-					}}
-				>
-					<div
-						style={{
-							fontWeight: "bold",
-							marginBottom: "4px",
-							userSelect: "text",
-						}}
-					>
-						📋 Plan
-					</div>
+				<div className="message-plan">
+					<div className="message-plan-title">📋 Plan</div>
 					{content.entries.map((entry, idx) => (
-						<div
-							key={idx}
-							style={{
-								margin: "2px 0",
-								padding: "2px 4px",
-								borderLeft: "2px solid var(--text-muted)",
-								userSelect: "text",
-							}}
-						>
+						<div key={idx} className="message-plan-entry">
 							<span
-								style={{
-									color:
-										entry.status === "completed"
-											? "green"
-											: entry.status === "in_progress"
-												? "orange"
-												: "var(--text-muted)",
-									userSelect: "text",
-								}}
+								className={`message-plan-entry-icon status-${entry.status}`}
 							>
 								{entry.status === "completed"
 									? "✓"
@@ -152,53 +102,34 @@ export function MessageContentRenderer({
 			);
 
 			return (
-				<div
-					style={{
-						padding: "12px",
-						marginTop: "4px",
-						backgroundColor: "var(--background-secondary)",
-						border: "1px solid var(--background-modifier-border)",
-						borderRadius: "8px",
-						fontSize: "14px",
-						userSelect: "text",
-					}}
-				>
-					<div
-						style={{
-							fontWeight: "bold",
-							marginBottom: "8px",
-							display: "flex",
-							alignItems: "center",
-							gap: "8px",
-							userSelect: "text",
-						}}
-					>
+				<div className="message-permission-request">
+					<div className="message-permission-request-title">
 						🔐 Permission Request
 					</div>
-					<div
-						style={{
-							marginBottom: "12px",
-							color: "var(--text-normal)",
-							userSelect: "text",
-						}}
-					>
+					<div className="message-permission-request-description">
 						The agent is requesting permission to perform an action.
 						Please choose how to proceed:
 					</div>
-					<div
-						style={{
-							display: "flex",
-							flexWrap: "wrap",
-							gap: "8px",
-						}}
-					>
+					<div className="message-permission-request-options">
 						{content.options.map((option) => {
 							const isThisSelected =
 								content.selectedOptionId === option.optionId;
+							const buttonClasses = [
+								"permission-option",
+								option.kind
+									? `permission-kind-${option.kind}`
+									: "",
+								isThisSelected ? "selected" : "",
+								isSelected || isCancelled ? "disabled" : "",
+							]
+								.filter(Boolean)
+								.join(" ");
+
 							return (
 								<button
 									key={option.optionId}
 									disabled={isSelected || isCancelled}
+									className={buttonClasses}
 									onClick={() => {
 										if (
 											acpClient &&
@@ -228,72 +159,6 @@ export function MessageContentRenderer({
 											);
 										}
 									}}
-									style={{
-										padding: "8px 16px",
-										border: "1px solid var(--background-modifier-border)",
-										borderRadius: "6px",
-										backgroundColor: isThisSelected
-											? "var(--interactive-accent)"
-											: isSelected || isCancelled
-												? "var(--background-modifier-border)"
-												: "var(--background-primary)",
-										color: isThisSelected
-											? "white"
-											: isSelected || isCancelled
-												? "var(--text-muted)"
-												: "var(--text-normal)",
-										cursor:
-											isSelected || isCancelled
-												? "not-allowed"
-												: "pointer",
-										fontSize: "13px",
-										fontWeight: isThisSelected
-											? "600"
-											: "500",
-										transition: "all 0.2s ease",
-										minWidth: "80px",
-										textAlign: "center",
-										opacity:
-											(isSelected && !isThisSelected) ||
-											isCancelled
-												? 0.5
-												: 1,
-										...(option.kind === "allow_always" &&
-											!isSelected && {
-												backgroundColor:
-													"var(--color-green)",
-												color: "white",
-												borderColor:
-													"var(--color-green)",
-											}),
-										...(option.kind === "reject_once" &&
-											!isSelected && {
-												backgroundColor:
-													"var(--color-red)",
-												color: "white",
-												borderColor: "var(--color-red)",
-											}),
-										...(option.kind === "allow_once" &&
-											!isSelected && {
-												backgroundColor:
-													"var(--color-orange)",
-												color: "white",
-												borderColor:
-													"var(--color-orange)",
-											}),
-									}}
-									onMouseEnter={(e) => {
-										if (!option.kind && !isSelected) {
-											e.currentTarget.style.backgroundColor =
-												"var(--background-modifier-hover)";
-										}
-									}}
-									onMouseLeave={(e) => {
-										if (!option.kind && !isSelected) {
-											e.currentTarget.style.backgroundColor =
-												"var(--background-primary)";
-										}
-									}}
 								>
 									{option.name}
 								</button>
@@ -301,32 +166,12 @@ export function MessageContentRenderer({
 						})}
 					</div>
 					{isSelected && selectedOption && (
-						<div
-							style={{
-								marginTop: "12px",
-								padding: "8px",
-								backgroundColor: "var(--background-primary)",
-								borderRadius: "4px",
-								fontSize: "13px",
-								color: "var(--text-accent)",
-								userSelect: "text",
-							}}
-						>
+						<div className="message-permission-request-result selected">
 							✓ Selected: {selectedOption.name}
 						</div>
 					)}
 					{isCancelled && (
-						<div
-							style={{
-								marginTop: "12px",
-								padding: "8px",
-								backgroundColor: "var(--background-primary)",
-								borderRadius: "4px",
-								fontSize: "13px",
-								color: "var(--color-orange)",
-								userSelect: "text",
-							}}
-						>
+						<div className="message-permission-request-result cancelled">
 							⚠ Cancelled: Permission request was cancelled
 						</div>
 					)}

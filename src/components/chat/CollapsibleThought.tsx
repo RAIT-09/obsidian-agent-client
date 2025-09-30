@@ -8,43 +8,22 @@ interface CollapsibleThoughtProps {
 	plugin: AgentClientPlugin;
 }
 
-export function CollapsibleThought({
-	text,
-	plugin,
-}: CollapsibleThoughtProps) {
+export function CollapsibleThought({ text, plugin }: CollapsibleThoughtProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 
 	return (
 		<div
-			style={{
-				fontStyle: "italic",
-				color: "var(--text-muted)",
-				backgroundColor: "transparent",
-				fontSize: "0.9em",
-				cursor: "pointer",
-			}}
+			className="collapsible-thought"
 			onClick={() => setIsExpanded(!isExpanded)}
 		>
-			<div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+			<div className="collapsible-thought-header">
 				💡Thinking
-				<span
-					style={{
-						fontSize: "0.8em",
-						opacity: 0.7,
-						marginLeft: "auto",
-					}}
-				>
+				<span className="collapsible-thought-icon">
 					{isExpanded ? "▼" : "▶"}
 				</span>
 			</div>
 			{isExpanded && (
-				<div
-					style={{
-						marginTop: "8px",
-						paddingLeft: "16px",
-						userSelect: "text",
-					}}
-				>
+				<div className="collapsible-thought-content">
 					<MarkdownTextRenderer text={text} plugin={plugin} />
 				</div>
 			)}
