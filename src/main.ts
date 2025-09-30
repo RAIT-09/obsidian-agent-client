@@ -98,9 +98,7 @@ export default class AgentClientPlugin extends Plugin {
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
 	}
 
-	onunload() {
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_CHAT);
-	}
+	onunload() {}
 
 	async activateView() {
 		const { workspace } = this.app;
