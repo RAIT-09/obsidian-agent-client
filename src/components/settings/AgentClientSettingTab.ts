@@ -100,7 +100,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 	}
 
 	private populateAgentDropdown(dropdown: DropdownComponent) {
-		dropdown.selectEl.innerHTML = "";
+		dropdown.selectEl.empty();
 		for (const option of this.getAgentOptions()) {
 			dropdown.addOption(option.id, option.label);
 		}

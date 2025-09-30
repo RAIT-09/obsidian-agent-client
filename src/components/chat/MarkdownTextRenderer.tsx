@@ -18,7 +18,6 @@ export function MarkdownTextRenderer({
 		const el = containerRef.current;
 		if (!el) return;
 		el.empty?.();
-		el.innerHTML = "";
 		el.classList.add("markdown-rendered");
 
 		// Render markdown
