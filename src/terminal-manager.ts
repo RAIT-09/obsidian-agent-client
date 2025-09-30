@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from "child_process";
+import { spawn, ChildProcess, SpawnOptions } from "child_process";
 import * as acp from "@zed-industries/agent-client-protocol";
 import type AgentClientPlugin from "./main";
 import { Logger } from "./utils/logger";
@@ -59,11 +59,12 @@ export class TerminalManager {
 		});
 
 		// Spawn the process
-		const childProcess = spawn(command, args, {
+		const spawnOptions: SpawnOptions = {
 			cwd: params.cwd || undefined,
 			env,
 			stdio: ["pipe", "pipe", "pipe"],
-		} as any); // Type assertion to avoid complex spawn overload issues
+		};
+		const childProcess = spawn(command, args, spawnOptions);
 
 		const terminal: TerminalProcess = {
 			id: terminalId,

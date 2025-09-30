@@ -3,25 +3,25 @@ import type AgentClientPlugin from "../main";
 export class Logger {
 	constructor(private plugin: AgentClientPlugin) {}
 
-	log(...args: any[]): void {
+	log(...args: unknown[]): void {
 		if (this.plugin.settings.debugMode) {
 			console.log(...args);
 		}
 	}
 
-	error(...args: any[]): void {
+	error(...args: unknown[]): void {
 		if (this.plugin.settings.debugMode) {
 			console.error(...args);
 		}
 	}
 
-	warn(...args: any[]): void {
+	warn(...args: unknown[]): void {
 		if (this.plugin.settings.debugMode) {
 			console.warn(...args);
 		}
 	}
 
-	info(...args: any[]): void {
+	info(...args: unknown[]): void {
 		if (this.plugin.settings.debugMode) {
 			console.info(...args);
 		}

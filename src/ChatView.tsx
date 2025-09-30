@@ -30,6 +30,18 @@ import {
 	type MentionContext,
 } from "./utils/mention-utils";
 
+// Type definitions for Obsidian internal APIs
+interface VaultAdapterWithBasePath {
+	basePath?: string;
+}
+
+interface AppWithSettings {
+	setting: {
+		open: () => void;
+		openTabById: (id: string) => void;
+	};
+}
+
 export const VIEW_TYPE_CHAT = "chat-view";
 
 // Convert environment variable definitions from settings into a simple record
@@ -241,15 +253,24 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				if (message.id === messageId) {
 					return {
 						...message,
-						content: message.content.map((content, index) =>
-							content.type === updatedContent.type &&
-							(updatedContent.type !== "tool_call" ||
-								(content as any).toolCall?.toolCallId ===
-									(updatedContent as any).toolCall
-										?.toolCallId)
+						content: message.content.map((content, index) => {
+							// Type guard: check if both are tool_call type
+							if (
+								content.type === updatedContent.type &&
+								updatedContent.type === "tool_call"
+							) {
+								// Both are guaranteed to be tool_call type
+								return content.type === "tool_call" &&
+									content.toolCallId ===
+										updatedContent.toolCallId
+									? updatedContent
+									: content;
+							}
+							// For other types, just check type match
+							return content.type === updatedContent.type
 								? updatedContent
-								: content,
-						),
+								: content;
+						}),
 					};
 				}
 				return message;
@@ -283,17 +304,21 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 					(c) => c.type === content.type,
 				);
 				if (existingContentIndex >= 0) {
-					updatedMessage.content[existingContentIndex] = {
-						type: content.type,
-						text:
-							(
-								updatedMessage.content[
-									existingContentIndex
-								] as any
-							).text +
-							(content.type === "agent_thought" ? "\n" : "") +
-							content.text,
-					};
+					const existingContent =
+						updatedMessage.content[existingContentIndex];
+					// Type guard: we know it's text or agent_thought from findIndex condition
+					if (
+						existingContent.type === "text" ||
+						existingContent.type === "agent_thought"
+					) {
+						updatedMessage.content[existingContentIndex] = {
+							type: content.type,
+							text:
+								existingContent.text +
+								(content.type === "agent_thought" ? "\n" : "") +
+								content.text,
+						};
+					}
 				} else {
 					updatedMessage.content.push(content);
 				}
@@ -324,7 +349,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				const hasTargetToolCall = message.content.some(
 					(content) =>
 						content.type === "tool_call" &&
-						(content as any).toolCallId === toolCallId,
+						content.toolCallId === toolCallId,
 				);
 
 				if (hasTargetToolCall) {
@@ -333,27 +358,30 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 						content: message.content.map((content) => {
 							if (
 								content.type === "tool_call" &&
-								(content as any).toolCallId === toolCallId
+								content.toolCallId === toolCallId
 							) {
 								// 既存のtool_callを更新（マージ）
-								const existing = content as any;
-								const updated = updatedContent as any;
-								return {
-									...existing,
-									...updated,
-									// statusとcontentは上書き、titleは新しい値があれば更新
-									title:
-										updated.title !== undefined
-											? updated.title
-											: existing.title,
-									content:
-										updated.content !== undefined
-											? [
-													...(existing.content || []),
-													...(updated.content || []),
-												]
-											: existing.content,
-								};
+								// Type guard: both are tool_call type
+								if (updatedContent.type === "tool_call") {
+									return {
+										...content,
+										...updatedContent,
+										// statusとcontentは上書き、titleは新しい値があれば更新
+										title:
+											updatedContent.title !== undefined
+												? updatedContent.title
+												: content.title,
+										content:
+											updatedContent.content !== undefined
+												? [
+														...(content.content ||
+															[]),
+														...(updatedContent.content ||
+															[]),
+													]
+												: content.content,
+									};
+								}
 							}
 							return content;
 						}),
@@ -385,7 +413,8 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 			// Get the Vault root path
 			const vaultPath =
-				(plugin.app.vault.adapter as any).basePath || process.cwd();
+				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
+					.basePath || process.cwd();
 
 			type LaunchableAgent = {
 				id: string;
@@ -777,7 +806,8 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			logger.log("[Debug] Creating new session...");
 			// Get the Vault root path
 			const vaultPath =
-				(plugin.app.vault.adapter as any).basePath || process.cwd();
+				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
+					.basePath || process.cwd();
 			logger.log("[Debug] Using vault path as cwd:", vaultPath);
 
 			const sessionResult = await connectionRef.current.newSession({
@@ -858,7 +888,8 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		const messageTextForAgent = convertMentionsToPath(
 			inputValue,
 			noteMentionService,
-			(plugin.app.vault.adapter as any).basePath || "",
+			(plugin.app.vault.adapter as VaultAdapterWithBasePath).basePath ||
+				"",
 		);
 		setInputValue("");
 
@@ -1011,8 +1042,10 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 						tooltip="Settings"
 						onClick={() => {
 							// Open plugin settings
-							(plugin.app as any).setting.open();
-							(plugin.app as any).setting.openTabById(
+							const appWithSettings =
+								plugin.app as unknown as AppWithSettings;
+							appWithSettings.setting.open();
+							appWithSettings.setting.openTabById(
 								plugin.manifest.id,
 							);
 						}}

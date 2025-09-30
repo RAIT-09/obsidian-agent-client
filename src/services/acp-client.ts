@@ -8,6 +8,11 @@ import { TerminalManager } from "../terminal-manager";
 import { Logger } from "../utils/logger";
 import type AgentClientPlugin from "../main";
 
+// Extended RequestPermissionRequest with optional toolCall metadata
+interface ExtendedRequestPermissionRequest {
+	toolCall?: acp.ToolCallUpdate;
+}
+
 export class AcpClient implements IAcpClient {
 	private addMessage: (message: ChatMessage) => void;
 	private updateLastMessage: (content: MessageContent) => void;
@@ -107,9 +112,35 @@ export class AcpClient implements IAcpClient {
 	): Promise<acp.RequestPermissionResponse> {
 		this.logger.log("Permission request received:", params);
 
+		// Type guard: check if params has extended toolCall property
+		const extendedParams =
+			params as unknown as ExtendedRequestPermissionRequest;
+
 		// If tool call details are provided, add the tool call message first
-		if ((params as any).toolCall && (params as any).toolCall.title) {
-			const toolCallInfo = (params as any).toolCall;
+		if (extendedParams.toolCall?.title) {
+			const toolCallInfo = extendedParams.toolCall;
+			// Type assertion for status and kind to match MessageContent union type
+			const status = (toolCallInfo.status || "pending") as
+				| "pending"
+				| "in_progress"
+				| "completed"
+				| "failed";
+			const kind = toolCallInfo.kind as
+				| "read"
+				| "edit"
+				| "delete"
+				| "move"
+				| "search"
+				| "execute"
+				| "think"
+				| "fetch"
+				| "switch_mode"
+				| "other"
+				| undefined;
+			const content = toolCallInfo.content as
+				| acp.ToolCallContent[]
+				| undefined;
+
 			this.addMessage({
 				id: crypto.randomUUID(),
 				role: "assistant",
@@ -118,9 +149,9 @@ export class AcpClient implements IAcpClient {
 						type: "tool_call",
 						toolCallId: toolCallInfo.toolCallId,
 						title: toolCallInfo.title,
-						status: toolCallInfo.status || "pending",
-						kind: toolCallInfo.kind,
-						content: toolCallInfo.content,
+						status,
+						kind,
+						content,
 					},
 				],
 				timestamp: new Date(),
@@ -228,7 +259,10 @@ export class AcpClient implements IAcpClient {
 	async createTerminal(
 		params: acp.CreateTerminalRequest,
 	): Promise<acp.CreateTerminalResponse> {
-		this.logger.log("[AcpClient] createTerminal called with params:", params);
+		this.logger.log(
+			"[AcpClient] createTerminal called with params:",
+			params,
+		);
 
 		// Use vault path if cwd is not provided
 		const modifiedParams = {

@@ -5,6 +5,9 @@ export interface IAcpClient extends acp.Client {
 	handlePermissionResponse(requestId: string, optionId: string): void;
 	cancelAllOperations(): void;
 	resetCurrentMessage(): void;
+	terminalOutput(
+		params: acp.TerminalOutputRequest,
+	): Promise<acp.TerminalOutputResponse>;
 }
 
 // Message types based on ACP schema

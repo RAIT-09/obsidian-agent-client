@@ -30,7 +30,7 @@ export function TerminalRenderer({
 
 		const pollOutput = async () => {
 			try {
-				const result = await (acpClient as any).terminalOutput({
+				const result = await acpClient.terminalOutput({
 					terminalId,
 					sessionId: "",
 				});

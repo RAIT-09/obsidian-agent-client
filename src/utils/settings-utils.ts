@@ -25,8 +25,10 @@ export const normalizeEnvVars = (value: unknown): AgentEnvVar[] => {
 	if (Array.isArray(value)) {
 		for (const entry of value) {
 			if (entry && typeof entry === "object") {
-				const key = "key" in entry ? (entry as any).key : undefined;
-				const val = "value" in entry ? (entry as any).value : undefined;
+				// Type guard: check if entry has key and value properties
+				const entryObj = entry as Record<string, unknown>;
+				const key = "key" in entryObj ? entryObj.key : undefined;
+				const val = "value" in entryObj ? entryObj.value : undefined;
 				if (typeof key === "string" && key.trim().length > 0) {
 					pairs.push({
 						key: key.trim(),
@@ -59,7 +61,9 @@ export const normalizeEnvVars = (value: unknown): AgentEnvVar[] => {
 };
 
 // Rebuild a custom agent entry with defaults and cleaned values
-export const normalizeCustomAgent = (agent: any): CustomAgentSettings => {
+export const normalizeCustomAgent = (
+	agent: Record<string, unknown>,
+): CustomAgentSettings => {
 	const rawId =
 		agent && typeof agent.id === "string" && agent.id.trim().length > 0
 			? agent.id.trim()

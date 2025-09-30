@@ -2,6 +2,11 @@ import { TFile } from "obsidian";
 import { Logger } from "./logger";
 import type AgentClientPlugin from "../main";
 
+// Interface for mention service to avoid circular dependency
+export interface IMentionService {
+	getAllFiles(): TFile[];
+}
+
 // Mention detection utilities
 export interface MentionContext {
 	start: number; // Start index of the @ symbol
@@ -111,7 +116,7 @@ export function replaceMention(
 // Convert @mentions to relative paths for agent
 export function convertMentionsToPath(
 	text: string,
-	noteMentionService: any, // Using any for now to avoid circular dependency
+	noteMentionService: IMentionService,
 	vaultPath: string,
 ): string {
 	// Find all @mentions in the text (both @filename and @[filename] formats)

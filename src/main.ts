@@ -126,18 +126,33 @@ export default class AgentClientPlugin extends Plugin {
 	async loadSettings() {
 		const raw = (await this.loadData()) ?? {};
 
-		const geminiFromRaw = (raw as any).gemini ?? {};
-		const claudeFromRaw = (raw as any).claude ?? {};
+		// Type guard: treat raw as a record of unknown values
+		const rawSettings = raw as Record<string, unknown>;
+
+		const geminiFromRaw =
+			typeof rawSettings.gemini === "object" &&
+			rawSettings.gemini !== null
+				? (rawSettings.gemini as Record<string, unknown>)
+				: {};
+		const claudeFromRaw =
+			typeof rawSettings.claude === "object" &&
+			rawSettings.claude !== null
+				? (rawSettings.claude as Record<string, unknown>)
+				: {};
 
 		const resolvedGeminiArgs = sanitizeArgs(geminiFromRaw.args);
 		const resolvedGeminiEnv = normalizeEnvVars(geminiFromRaw.env);
 		const resolvedClaudeArgs = sanitizeArgs(claudeFromRaw.args);
 		const resolvedClaudeEnv = normalizeEnvVars(claudeFromRaw.env);
-		const customAgents = Array.isArray((raw as any).customAgents)
+		const customAgents = Array.isArray(rawSettings.customAgents)
 			? ensureUniqueCustomAgentIds(
-					(raw as any).customAgents.map((agent: any) =>
-						normalizeCustomAgent(agent),
-					),
+					rawSettings.customAgents.map((agent: unknown) => {
+						const agentObj =
+							typeof agent === "object" && agent !== null
+								? (agent as Record<string, unknown>)
+								: {};
+						return normalizeCustomAgent(agentObj);
+					}),
 				)
 			: [];
 
@@ -147,8 +162,8 @@ export default class AgentClientPlugin extends Plugin {
 			...customAgents.map((agent) => agent.id),
 		];
 		const rawActiveId =
-			typeof (raw as any).activeAgentId === "string"
-				? (raw as any).activeAgentId.trim()
+			typeof rawSettings.activeAgentId === "string"
+				? rawSettings.activeAgentId.trim()
 				: "";
 		const fallbackActiveId =
 			availableAgentIds.find((id) => id.length > 0) ||
@@ -174,9 +189,9 @@ export default class AgentClientPlugin extends Plugin {
 					typeof geminiFromRaw.command === "string" &&
 					geminiFromRaw.command.trim().length > 0
 						? geminiFromRaw.command.trim()
-						: typeof (raw as any).geminiCommandPath === "string" &&
-							  (raw as any).geminiCommandPath.trim().length > 0
-							? (raw as any).geminiCommandPath.trim()
+						: typeof rawSettings.geminiCommandPath === "string" &&
+							  rawSettings.geminiCommandPath.trim().length > 0
+							? rawSettings.geminiCommandPath.trim()
 							: DEFAULT_SETTINGS.gemini.command,
 				args:
 					resolvedGeminiArgs.length > 0
@@ -199,11 +214,11 @@ export default class AgentClientPlugin extends Plugin {
 					typeof claudeFromRaw.command === "string" &&
 					claudeFromRaw.command.trim().length > 0
 						? claudeFromRaw.command.trim()
-						: typeof (raw as any).claudeCodeAcpCommandPath ===
+						: typeof rawSettings.claudeCodeAcpCommandPath ===
 									"string" &&
-							  (raw as any).claudeCodeAcpCommandPath.trim()
+							  rawSettings.claudeCodeAcpCommandPath.trim()
 									.length > 0
-							? (raw as any).claudeCodeAcpCommandPath.trim()
+							? rawSettings.claudeCodeAcpCommandPath.trim()
 							: DEFAULT_SETTINGS.claude.command,
 				args: resolvedClaudeArgs.length > 0 ? resolvedClaudeArgs : [],
 				env: resolvedClaudeEnv.length > 0 ? resolvedClaudeEnv : [],
@@ -211,16 +226,16 @@ export default class AgentClientPlugin extends Plugin {
 			customAgents: customAgents,
 			activeAgentId,
 			autoAllowPermissions:
-				typeof (raw as any).autoAllowPermissions === "boolean"
-					? (raw as any).autoAllowPermissions
+				typeof rawSettings.autoAllowPermissions === "boolean"
+					? rawSettings.autoAllowPermissions
 					: DEFAULT_SETTINGS.autoAllowPermissions,
 			debugMode:
-				typeof (raw as any).debugMode === "boolean"
-					? (raw as any).debugMode
+				typeof rawSettings.debugMode === "boolean"
+					? rawSettings.debugMode
 					: DEFAULT_SETTINGS.debugMode,
 			nodePath:
-				typeof (raw as any).nodePath === "string"
-					? (raw as any).nodePath.trim()
+				typeof rawSettings.nodePath === "string"
+					? rawSettings.nodePath.trim()
 					: DEFAULT_SETTINGS.nodePath,
 		};
 
