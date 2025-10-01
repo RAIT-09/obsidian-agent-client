@@ -168,6 +168,31 @@ logger.log("Component debug info");
 
 ## Development Guidelines
 
+### Obsidian Plugin Review Requirements
+
+**CRITICAL: These rules must be followed to pass Obsidian's automated review:**
+
+1. **Security**: Never use `innerHTML`, `outerHTML`, or similar APIs
+   - Use DOM API or Obsidian helper functions: `createEl`, `createDiv`, `createSpan`
+   - Reference: https://docs.obsidian.md/Plugins/User+interface/HTML+elements
+
+2. **Plugin Lifecycle**: Do NOT detach leaves with custom views in `onunload`
+   - This is an antipattern that causes issues
+   - Reference: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Don't+detach+leaves+in+%60onunload%60
+
+3. **Styling**: Move all styles to CSS files
+   - Do NOT assign styles via JavaScript or inline in HTML
+   - Allows themes and snippets to adapt styles
+   - Use CSS classes instead of direct style manipulation
+
+4. **Platform Detection**: Use Obsidian's `Platform` interface
+   - Do NOT use `process.platform` or other Node.js APIs directly
+   - Ensures proper cross-platform compatibility
+
+5. **Type Safety**: Minimize `any` casting
+   - Use proper TypeScript types throughout
+   - Only use `any` when absolutely necessary for Obsidian API limitations
+
 ### Code Patterns
 
 1. **Error Handling**: Always handle async operations with try-catch
