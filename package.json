@@ -24,7 +24,7 @@
 		"typescript": "4.7.4"
 	},
 	"dependencies": {
-		"@zed-industries/agent-client-protocol": "^0.4.0",
+		"@zed-industries/agent-client-protocol": "^0.4.4",
 		"react": "^19.1.1",
 		"react-dom": "^19.1.1"
 	}
