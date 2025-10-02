@@ -152,7 +152,6 @@ npm run build
 
 ## 🗺️ Roadmap
 
-- **📊 Diff Display**: Visual diff viewer for code changes and file modifications suggested by agents
 - **⚡ Slash Command Support**: Quick actions and shortcuts using `/` commands within the chat interface
 - **📚 Chat History Access**: Browse, search, and restore previous chat sessions with agents
 
