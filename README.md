@@ -17,33 +17,33 @@ https://github.com/user-attachments/assets/218a5c07-f18c-4cdb-93b6-5782f5590f6b
 
 ## 📦 Installation
 ### 🧪 Install via BRAT
-1. 📥 Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin from the Community Plugins browser.
-2. ⚙️ In Obsidian settings, go to Community Plugins → BRAT → Add Beta Plugin.
-3. 🔗 Paste this repo URL:
+1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin from the Community Plugins browser.
+2. In Obsidian settings, go to Community Plugins → BRAT → Add Beta Plugin.
+3. Paste this repo URL:
    ```
    https://github.com/RAIT-09/obsidian-agent-client
    ```
-4. ⬇️ BRAT will download the latest release and keep it auto-updated.
-5. ⚡ Enable Agent Client from the plugin list.
+4. BRAT will download the latest release and keep it auto-updated.
+5. Enable Agent Client from the plugin list.
 
 ### 💻 Manual Installation
-1. 📥 Download the latest release files from [GitHub Releases](https://github.com/RAIT-09/obsidian-agent-client/releases):
+1. Download the latest release files from [GitHub Releases](https://github.com/RAIT-09/obsidian-agent-client/releases):
    - `main.js`
    - `manifest.json`
    - `styles.css`
-2. 📁 Create plugin folder and place the files in: `VaultFolder/.obsidian/plugins/agent-client/`
-3. ⚡ Enable the plugin in Obsidian Settings → Community Plugins
+2. Create plugin folder and place the files in: `VaultFolder/.obsidian/plugins/agent-client/`
+3. Enable the plugin in Obsidian Settings → Community Plugins
 
 ## ⚙️ Configuration
 
 ### Step 1: 📦 Install Required Dependencies
 
-- For **🤖 Claude Code**:
+- For **Claude Code**:
   ```bash
   npm install -g @zed-industries/claude-code-acp
   ```
 
-- For **💎 Gemini CLI**:
+- For **Gemini CLI**:
   ```bash
   npm install -g @google/gemini-cli
   ```
@@ -52,7 +52,7 @@ https://github.com/user-attachments/assets/218a5c07-f18c-4cdb-93b6-5782f5590f6b
 
 After installing the agents, you need to find their absolute paths:
 
-**🍎 On macOS/Linux:**
+**On macOS/Linux:**
 ```bash
 # Find Node.js path
 which node
@@ -67,7 +67,7 @@ which gemini
 # Example output: /usr/local/bin/gemini
 ```
 
-**🪟 On Windows:**
+**On Windows:**
 ```cmd
 # Find Node.js path
 where.exe node
@@ -84,46 +84,46 @@ where.exe gemini
 
 ### Step 3: 🛠️ Configure Plugin Settings
 
-1. 📂 Open **Settings → Agent Client**
-2. In **🌐 General Settings**:
-   - **🟢 Node.js path**: Enter the absolute path found above (e.g., `/usr/local/bin/node` or `C:\Program Files\nodejs\node.exe`)
+1. Open **Settings → Agent Client**
+2. In **General Settings**:
+   - **Node.js path**: Enter the absolute path found above (e.g., `/usr/local/bin/node` or `C:\Program Files\nodejs\node.exe`)
 3. Configure your preferred agents:
-   - **🤖 Claude Code**:
-     - **📍 Path**: Enter absolute path (e.g., `/usr/local/bin/claude-code-acp`)
-     - **🔑 API key**: Optional if logged in to Anthropic account
-   - **💎 Gemini CLI**:
-     - **📍 Path**: Enter absolute path (e.g., `/usr/local/bin/gemini`)
-     - **🔑 API key**: Optional if logged in to Google account
-   - **🔧 Custom Agents**: Add any ACP-compatible agents
+   - **Claude Code**:
+     - **Path**: Enter absolute path (e.g., `/usr/local/bin/claude-code-acp`)
+     - **API key**: Optional if logged in to Anthropic account
+   - **Gemini CLI**:
+     - **Path**: Enter absolute path (e.g., `/usr/local/bin/gemini`)
+     - **API key**: Optional if logged in to Google account
+   - **Custom Agents**: Add any ACP-compatible agents
 
 ### 📋 Example Configuration
 
 **🍎 macOS/Linux Example:**
 ```
-🌐 General Settings:
-├── 🟢 Node.js path: /usr/local/bin/node
+General Settings:
+├── Node.js path: /usr/local/bin/node
 
-🤖 Built-in agents:
-├── 🤖 Claude Code
-│   ├── 📍 Path: /usr/local/bin/claude-code-acp
-│   └── 🔑 API key: (optional)
-└── 💎 Gemini CLI
-    ├── 📍 Path: /usr/local/bin/gemini
-    └── 🔑 API key: (optional)
+Built-in agents:
+├── Claude Code
+│   ├── Path: /usr/local/bin/claude-code-acp
+│   └── API key: (optional)
+└── Gemini CLI
+    ├── Path: /usr/local/bin/gemini
+    └── API key: (optional)
 ```
 
-**🪟 Windows Example:**
+**Windows Example:**
 ```
-🌐 General Settings:
-├── 🟢 Node.js path: C:\Program Files\nodejs\node.exe
+General Settings:
+├── Node.js path: C:\Program Files\nodejs\node.exe
 
-🤖 Built-in agents:
-├── 🤖 Claude Code
-│   ├── 📍 Path: C:\Users\Username\AppData\Roaming\npm\claude-code-acp.cmd
-│   └── 🔑 API key: (optional)
-└── 💎 Gemini CLI
-    ├── 📍 Path: C:\Users\Username\AppData\Roaming\npm\gemini.cmd
-    └── 🔑 API key: (optional)
+Built-in agents:
+├── Claude Code
+│   ├── Path: C:\Users\Username\AppData\Roaming\npm\claude-code-acp.cmd
+│   └── API key: (optional)
+└── Gemini CLI
+    ├── Path: C:\Users\Username\AppData\Roaming\npm\gemini.cmd
+    └── API key: (optional)
 ```
 
 ## ⚠️ Known Issues
@@ -152,8 +152,8 @@ npm run build
 
 ## 🗺️ Roadmap
 
-- **⚡ Slash Command Support**: Quick actions and shortcuts using `/` commands within the chat interface
-- **📚 Chat History Access**: Browse, search, and restore previous chat sessions with agents
+- **Slash Command Support**: Quick actions and shortcuts using `/` commands within the chat interface
+- **Chat History Access**: Browse, search, and restore previous chat sessions with agents
 
 Have ideas or feature requests? Feel free to [open an issue](https://github.com/RAIT-09/obsidian-agent-client/issues) on GitHub!
 
