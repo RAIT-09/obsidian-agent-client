@@ -6,6 +6,7 @@ import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 import { CollapsibleThought } from "./CollapsibleThought";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { TextWithMentions } from "./TextWithMentions";
+import { ToolCallRenderer } from "./ToolCallRenderer";
 import { Logger } from "../../utils/logger";
 
 interface MessageContentRendererProps {
@@ -42,35 +43,11 @@ export function MessageContentRenderer({
 
 		case "tool_call":
 			return (
-				<div className="message-tool-call">
-					<div className="message-tool-call-title">
-						🔧 {content.title}
-					</div>
-					<div
-						className="message-tool-call-status"
-						style={{
-							marginBottom: content.content ? "8px" : "0",
-						}}
-					>
-						Status: {content.status}
-						{content.kind && ` | Kind: ${content.kind}`}
-					</div>
-					{content.content &&
-						content.content.map((item, index) => {
-							if (item.type === "terminal") {
-								return (
-									<TerminalRenderer
-										key={index}
-										terminalId={item.terminalId}
-										acpClient={acpClient || null}
-										plugin={plugin}
-									/>
-								);
-							}
-							// Handle other content types here if needed
-							return null;
-						})}
-				</div>
+				<ToolCallRenderer
+					content={content}
+					plugin={plugin}
+					acpClient={acpClient}
+				/>
 			);
 
 		case "plan":

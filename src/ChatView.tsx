@@ -351,7 +351,7 @@ function ChatComponent({
 	) => {
 		setMessages((prev) =>
 			prev.map((message) => {
-				// tool_callを含むメッセージを検索
+				// Search message includes tool_call
 				const hasTargetToolCall = message.content.some(
 					(content) =>
 						content.type === "tool_call" &&
@@ -366,26 +366,44 @@ function ChatComponent({
 								content.type === "tool_call" &&
 								content.toolCallId === toolCallId
 							) {
-								// 既存のtool_callを更新（マージ）
 								// Type guard: both are tool_call type
 								if (updatedContent.type === "tool_call") {
+									// Merge content arrays
+									let mergedContent = content.content || [];
+									if (updatedContent.content !== undefined) {
+										const newContent =
+											updatedContent.content || [];
+
+										// If new content contains diff, replace all old diffs
+										const hasDiff = newContent.some(
+											(item) => item.type === "diff",
+										);
+										if (hasDiff) {
+											mergedContent =
+												mergedContent.filter(
+													(item) =>
+														item.type !== "diff",
+												);
+										}
+
+										mergedContent = [
+											...mergedContent,
+											...newContent,
+										];
+									}
+
 									return {
 										...content,
 										...updatedContent,
-										// statusとcontentは上書き、titleは新しい値があれば更新
 										title:
 											updatedContent.title !== undefined
 												? updatedContent.title
 												: content.title,
-										content:
-											updatedContent.content !== undefined
-												? [
-														...(content.content ||
-															[]),
-														...(updatedContent.content ||
-															[]),
-													]
-												: content.content,
+										kind:
+											updatedContent.kind !== undefined
+												? updatedContent.kind
+												: content.kind,
+										content: mergedContent,
 									};
 								}
 							}

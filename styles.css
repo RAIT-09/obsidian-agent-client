@@ -545,3 +545,95 @@ If your plugin does not need CSS, delete this file.
 .markdown-text-renderer {
 	user-select: text;
 }
+
+/* Tool Call Diff Renderer */
+.tool-call-diff {
+	margin-top: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	overflow: hidden;
+	font-family: var(--font-monospace);
+	font-size: 12px;
+}
+
+.tool-call-diff-content {
+	background-color: var(--background-primary);
+	max-height: 400px;
+	overflow: auto;
+}
+
+.tool-call-diff-new-file {
+	padding: 4px 0;
+}
+
+.diff-line-info {
+	padding: 4px 12px;
+	background-color: var(--background-secondary);
+	color: var(--text-muted);
+	font-size: 11px;
+	font-style: italic;
+}
+
+.diff-line {
+	padding: 2px 12px;
+	display: flex;
+	align-items: flex-start;
+	line-height: 1.5;
+	user-select: text;
+}
+
+.diff-line-marker {
+	display: inline-block;
+	width: 20px;
+	flex-shrink: 0;
+	font-weight: bold;
+	user-select: none;
+}
+
+.diff-line-content {
+	flex: 1;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.diff-line-added {
+	background-color: rgba(46, 160, 67, 0.15);
+}
+
+.diff-line-added .diff-line-marker {
+	color: var(--color-green);
+}
+
+.diff-line-removed {
+	background-color: rgba(248, 81, 73, 0.15);
+}
+
+.diff-line-removed .diff-line-marker {
+	color: var(--color-red);
+}
+
+/* Tool Call Details */
+.tool-call-read-details,
+.tool-call-edit-details,
+.tool-call-delete-details,
+.tool-call-move-details,
+.tool-call-search-details,
+.tool-call-execute-details,
+.tool-call-fetch-details {
+	padding: 4px 0;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.tool-call-location {
+	padding: 2px 0;
+}
+
+.tool-call-line {
+	color: var(--text-accent);
+	font-weight: 500;
+}
+
+.tool-call-content {
+	padding: 8px 0;
+}
