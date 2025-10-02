@@ -11,8 +11,6 @@ export interface IAcpClient extends acp.Client {
 }
 
 // Message types based on ACP schema
-export type MessageRole = "user" | "assistant";
-
 export type MessageContent =
 	| {
 			type: "text";
@@ -32,38 +30,21 @@ export type MessageContent =
 			type: "tool_call";
 			toolCallId: string;
 			title?: string | null;
-			status: "pending" | "in_progress" | "completed" | "failed";
-			kind?:
-				| "read"
-				| "edit"
-				| "delete"
-				| "move"
-				| "search"
-				| "execute"
-				| "think"
-				| "fetch"
-				| "switch_mode"
-				| "other";
+			status: acp.ToolCallStatus;
+			kind?: acp.ToolKind;
 			content?: acp.ToolCallContent[];
+			locations?: acp.ToolCallLocation[];
+			rawInput?: { [k: string]: unknown };
+			rawOutput?: { [k: string]: unknown };
 	  }
 	| {
 			type: "plan";
-			entries: {
-				content: string;
-				status: "pending" | "in_progress" | "completed";
-				priority: "high" | "medium" | "low";
-			}[];
+			entries: acp.PlanEntry[];
 	  }
 	| {
 			type: "permission_request";
-			toolCall: {
-				toolCallId: string;
-			};
-			options: {
-				optionId: string;
-				name: string;
-				kind?: "allow_always" | "allow_once" | "reject_once";
-			}[];
+			toolCall: acp.ToolCallUpdate;
+			options: acp.PermissionOption[];
 			selectedOptionId?: string;
 			isCancelled?: boolean;
 	  }
@@ -74,7 +55,7 @@ export type MessageContent =
 
 export interface ChatMessage {
 	id: string;
-	role: MessageRole;
+	role: acp.Role;
 	content: MessageContent[];
 	timestamp: Date;
 }
