@@ -23,7 +23,7 @@ export function TerminalRenderer({
 	} | null>(null);
 	const [isRunning, setIsRunning] = useState(true);
 	const [isCancelled, setIsCancelled] = useState(false);
-	const intervalRef = useRef<NodeJS.Timeout | null>(null);
+	const intervalRef = useRef<number | null>(null);
 
 	useEffect(() => {
 		if (!terminalId || !acpClient) return;
@@ -42,7 +42,7 @@ export function TerminalRenderer({
 					});
 					setIsRunning(false);
 					if (intervalRef.current) {
-						clearInterval(intervalRef.current);
+						window.clearInterval(intervalRef.current);
 						intervalRef.current = null;
 					}
 				}
@@ -66,7 +66,7 @@ export function TerminalRenderer({
 
 				setIsRunning(false);
 				if (intervalRef.current) {
-					clearInterval(intervalRef.current);
+					window.clearInterval(intervalRef.current);
 					intervalRef.current = null;
 				}
 			}
@@ -76,11 +76,11 @@ export function TerminalRenderer({
 		pollOutput();
 
 		// Set up polling interval - will be cleared when isRunning becomes false
-		intervalRef.current = setInterval(pollOutput, 500);
+		intervalRef.current = window.setInterval(pollOutput, 500);
 
 		return () => {
 			if (intervalRef.current) {
-				clearInterval(intervalRef.current);
+				window.clearInterval(intervalRef.current);
 				intervalRef.current = null;
 			}
 		};
@@ -89,7 +89,7 @@ export function TerminalRenderer({
 	// Separate effect to stop polling when no longer running
 	useEffect(() => {
 		if (!isRunning && intervalRef.current) {
-			clearInterval(intervalRef.current);
+			window.clearInterval(intervalRef.current);
 			intervalRef.current = null;
 		}
 	}, [isRunning]);

@@ -74,7 +74,13 @@ const resolveCommandDirectory = (command: string): string | null => {
 	return command.slice(0, lastSlash);
 };
 
-function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
+function ChatComponent({
+	plugin,
+	view,
+}: {
+	plugin: AgentClientPlugin;
+	view: ChatView;
+}) {
 	// Create logger instance
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 
@@ -216,7 +222,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 		closeMentionDropdown();
 
 		// Set cursor position after replacement
-		setTimeout(() => {
+		window.setTimeout(() => {
 			const textarea = textareaRef.current;
 			if (textarea) {
 				textarea.selectionStart = newCursorPos;
@@ -616,7 +622,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 				logger.log(`[Debug] ${agentLabel} stderr:`, data);
 			});
 
-			setTimeout(() => {
+			window.setTimeout(() => {
 				if (
 					agentProcess.exitCode === null &&
 					agentProcess.killed === false
@@ -723,7 +729,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 	useEffect(() => {
 		if (isAtBottom && messages.length > 0) {
 			// Use setTimeout to ensure DOM has updated
-			setTimeout(() => {
+			window.setTimeout(() => {
 				scrollToBottom();
 			}, 0);
 		}
@@ -738,14 +744,10 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 			checkIfAtBottom();
 		};
 
-		container.addEventListener("scroll", handleScroll, { passive: true });
+		view.registerDomEvent(container, "scroll", handleScroll);
 
 		// Initial check
 		checkIfAtBottom();
-
-		return () => {
-			container.removeEventListener("scroll", handleScroll);
-		};
 	}, []);
 
 	useEffect(() => {
@@ -895,7 +897,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 
 		// Force scroll to bottom when user sends a message
 		setIsAtBottom(true);
-		setTimeout(() => {
+		window.setTimeout(() => {
 			scrollToBottom();
 		}, 0);
 
@@ -1109,6 +1111,7 @@ function ChatComponent({ plugin }: { plugin: AgentClientPlugin }) {
 							onSelect={selectMention}
 							onClose={closeMentionDropdown}
 							plugin={plugin}
+							view={view}
 						/>
 					)}
 					<textarea
@@ -1169,7 +1172,7 @@ export class ChatView extends ItemView {
 		container.empty();
 
 		this.root = createRoot(container);
-		this.root.render(<ChatComponent plugin={this.plugin} />);
+		this.root.render(<ChatComponent plugin={this.plugin} view={this} />);
 	}
 
 	async onClose() {

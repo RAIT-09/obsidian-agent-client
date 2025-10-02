@@ -3,6 +3,7 @@ const { useRef, useEffect, useMemo } = React;
 import { TFile } from "obsidian";
 import { Logger } from "../../utils/logger";
 import type AgentClientPlugin from "../../main";
+import type { ChatView } from "../../ChatView";
 
 interface MentionDropdownProps {
 	files: TFile[];
@@ -10,6 +11,7 @@ interface MentionDropdownProps {
 	onSelect: (file: TFile) => void;
 	onClose: () => void;
 	plugin: AgentClientPlugin;
+	view: ChatView;
 }
 
 export function MentionDropdown({
@@ -18,6 +20,7 @@ export function MentionDropdown({
 	onSelect,
 	onClose,
 	plugin,
+	view,
 }: MentionDropdownProps) {
 	const dropdownRef = useRef<HTMLDivElement>(null);
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
@@ -39,10 +42,7 @@ export function MentionDropdown({
 			}
 		};
 
-		document.addEventListener("mousedown", handleClickOutside);
-		return () => {
-			document.removeEventListener("mousedown", handleClickOutside);
-		};
+		view.registerDomEvent(document, "mousedown", handleClickOutside);
 	}, [onClose]);
 
 	if (files.length === 0) {
