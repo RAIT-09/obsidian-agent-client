@@ -11,6 +11,7 @@ import type AgentClientPlugin from "./main";
 import { MentionDropdown } from "./components/chat/MentionDropdown";
 import { MessageRenderer } from "./components/chat/MessageRenderer";
 import { HeaderButton } from "./components/ui/HeaderButton";
+import { HistoryOverlay } from "./components/chat/HistoryOverlay";
 
 // Service imports
 import { NoteMentionService } from "./services/mention-service";
@@ -20,7 +21,11 @@ import { AcpClient } from "./services/acp-client";
 import { Logger } from "./utils/logger";
 
 // Type imports
-import type { ChatMessage, MessageContent } from "./types/acp-types";
+import type {
+	ChatMessage,
+	ChatSession,
+	MessageContent,
+} from "./types/acp-types";
 
 // Utility imports
 import {
@@ -108,6 +113,8 @@ function ChatComponent({
 		settings.activeAgentId || settings.claude.id,
 	);
 	const [lastActiveNote, setLastActiveNote] = useState<TFile | null>(null);
+	const [isSessionSaved, setIsSessionSaved] = useState(false);
+	const [showHistoryOverlay, setShowHistoryOverlay] = useState(false);
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
@@ -709,7 +716,7 @@ function ChatComponent({
 				logger.log(
 					`✅ Connected to agent (protocol v${initResult.protocolVersion})`,
 				);
-				logger.log(initResult.authMethods);
+				logger.log(initResult);
 
 				logger.log("process.cwd():", process.cwd());
 				logger.log("vaultPath:", vaultPath);
@@ -862,6 +869,7 @@ function ChatComponent({
 			setSessionId(sessionResult.sessionId);
 			setMessages([]);
 			setInputValue("");
+			setIsSessionSaved(false);
 			acpClientRef.current?.resetCurrentMessage();
 
 			// Switch to the active agent from settings if different from current
@@ -872,6 +880,36 @@ function ChatComponent({
 			}
 		} catch (error) {
 			logger.error("[Client] New Session Error:", error);
+		}
+	};
+
+	const loadSession = async (selectedChatSession: ChatSession) => {
+		if (!connectionRef.current) return;
+
+		try {
+			logger.log("[Debug] Loading session...");
+			// Get the Vault root path
+			const vaultPath =
+				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
+					.basePath || process.cwd();
+			logger.log("[Debug] Using vault path as cwd:", vaultPath);
+
+			await connectionRef.current.loadSession({
+				cwd: vaultPath,
+				sessionId: selectedChatSession.sessionId,
+				mcpServers: [],
+			});
+			logger.log(`📝 Session Loaded: ${selectedChatSession.sessionId}`);
+
+			setSessionId(selectedChatSession.sessionId);
+			setMessages([]);
+			setInputValue("");
+			setIsSessionSaved(true);
+			acpClientRef.current?.resetCurrentMessage();
+
+			setCurrentAgentId(selectedChatSession.agentId);
+		} catch (error) {
+			logger.error("[Client] Load Session Error:", error);
 		}
 	};
 
@@ -954,6 +992,9 @@ function ChatComponent({
 		// Reset current message for new assistant response
 		acpClientRef.current?.resetCurrentMessage();
 
+		// Check if this is the first message
+		const isFirstMessage = messages.length === 0 && !isSessionSaved;
+
 		try {
 			logger.log(`\n✅ Sending Message...: ${messageTextForAgent}`);
 			const promptResult = await connectionRef.current.prompt({
@@ -966,6 +1007,18 @@ function ChatComponent({
 				],
 			});
 			logger.log(`\n✅ Agent completed with: ${promptResult.stopReason}`);
+
+			// Save session after first successful message
+			if (isFirstMessage && sessionId) {
+				await plugin.saveChatSession({
+					sessionId,
+					firstMessage: inputValue.slice(0, 100),
+					timestamp: Date.now(),
+					lastActive: Date.now(),
+					agentId: currentAgentId,
+				});
+				setIsSessionSaved(true);
+			}
 
 			setIsSending(false);
 		} catch (error) {
@@ -1090,6 +1143,11 @@ function ChatComponent({
 						onClick={createNewSession}
 					/>
 					<HeaderButton
+						iconName="list"
+						tooltip="History"
+						onClick={() => setShowHistoryOverlay(true)}
+					/>
+					<HeaderButton
 						iconName="settings"
 						tooltip="Settings"
 						onClick={() => {
@@ -1199,6 +1257,22 @@ function ChatComponent({
 					></button>
 				</div>
 			</div>
+			{showHistoryOverlay && (
+				<HistoryOverlay
+					sessions={settings.chatSessions}
+					plugin={plugin}
+					onClose={() => setShowHistoryOverlay(false)}
+					onSelectSession={(sessionId) => {
+						const session = settings.chatSessions.find(
+							(s) => s.sessionId === sessionId,
+						);
+						if (session) {
+							loadSession(session);
+						}
+						setShowHistoryOverlay(false);
+					}}
+				/>
+			)}
 		</div>
 	);
 }

@@ -8,6 +8,7 @@ import {
 	normalizeCustomAgent,
 	ensureUniqueCustomAgentIds,
 } from "./utils/settings-utils";
+import type { ChatSession } from "./types/acp-types";
 
 export interface AgentEnvVar {
 	key: string;
@@ -41,6 +42,8 @@ export interface AgentClientPluginSettings {
 	autoMentionActiveNote: boolean;
 	debugMode: boolean;
 	nodePath: string;
+	chatSessions: ChatSession[];
+	maxSessions: number;
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -66,6 +69,8 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	autoMentionActiveNote: true,
 	debugMode: false,
 	nodePath: "",
+	chatSessions: [],
+	maxSessions: 50,
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -243,6 +248,25 @@ export default class AgentClientPlugin extends Plugin {
 				typeof rawSettings.nodePath === "string"
 					? rawSettings.nodePath.trim()
 					: DEFAULT_SETTINGS.nodePath,
+			chatSessions: Array.isArray(rawSettings.chatSessions)
+				? rawSettings.chatSessions.filter(
+						(session: unknown) =>
+							typeof session === "object" &&
+							session !== null &&
+							typeof (session as Record<string, unknown>)
+								.sessionId === "string" &&
+							typeof (session as Record<string, unknown>)
+								.firstMessage === "string" &&
+							typeof (session as Record<string, unknown>)
+								.timestamp === "number" &&
+							typeof (session as Record<string, unknown>)
+								.agentId === "string",
+					)
+				: DEFAULT_SETTINGS.chatSessions,
+			maxSessions:
+				typeof rawSettings.maxSessions === "number"
+					? rawSettings.maxSessions
+					: DEFAULT_SETTINGS.maxSessions,
 		};
 
 		this.ensureActiveAgentId();
@@ -256,6 +280,21 @@ export default class AgentClientPlugin extends Plugin {
 		this.settings = nextSettings;
 		await this.saveData(this.settings);
 		this.settingsStore.set(this.settings);
+	}
+
+	async saveChatSession(session: ChatSession) {
+		// Add to the beginning of the array
+		this.settings.chatSessions.unshift(session);
+
+		// Trim to max sessions
+		if (this.settings.chatSessions.length > this.settings.maxSessions) {
+			this.settings.chatSessions = this.settings.chatSessions.slice(
+				0,
+				this.settings.maxSessions,
+			);
+		}
+
+		await this.saveSettings();
 	}
 
 	ensureActiveAgentId(): void {

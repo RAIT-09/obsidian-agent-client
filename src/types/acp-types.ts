@@ -59,3 +59,11 @@ export interface ChatMessage {
 	content: MessageContent[];
 	timestamp: Date;
 }
+
+export interface ChatSession {
+	sessionId: string;
+	firstMessage: string;
+	timestamp: number;
+	lastActive: number;
+	agentId: string;
+}
