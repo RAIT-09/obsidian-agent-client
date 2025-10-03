@@ -316,6 +316,31 @@ If your plugin does not need CSS, delete this file.
 	position: relative;
 }
 
+/* Auto-mention inline display */
+.auto-mention-inline {
+	position: absolute;
+	top: 8px;
+	left: 12px;
+	right: 12px;
+	pointer-events: none;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding-bottom: 4px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.mention-badge {
+	background-color: transparent;
+	color: var(--interactive-accent-hover);
+	border-radius: 3px;
+	font-size: 0.9em;
+	font-weight: 500;
+	cursor: default;
+	user-select: none;
+}
+
 .chat-input-textarea {
 	width: 100%;
 	padding: 12px 40px 12px 12px;
@@ -332,6 +357,12 @@ If your plugin does not need CSS, delete this file.
 	overflow: hidden;
 	scrollbar-width: none;
 	-ms-overflow-style: none;
+}
+
+.chat-input-textarea.has-auto-mention {
+	padding-top: 36px;
+	min-height: 116px;
+	height: 116px;
 }
 
 .chat-input-textarea::-webkit-scrollbar {

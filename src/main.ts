@@ -38,6 +38,7 @@ export interface AgentClientPluginSettings {
 	customAgents: CustomAgentSettings[];
 	activeAgentId: string;
 	autoAllowPermissions: boolean;
+	autoMentionActiveNote: boolean;
 	debugMode: boolean;
 	nodePath: string;
 }
@@ -62,6 +63,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	customAgents: [],
 	activeAgentId: "claude-code-acp",
 	autoAllowPermissions: false,
+	autoMentionActiveNote: true,
 	debugMode: false,
 	nodePath: "",
 };
@@ -229,6 +231,10 @@ export default class AgentClientPlugin extends Plugin {
 				typeof rawSettings.autoAllowPermissions === "boolean"
 					? rawSettings.autoAllowPermissions
 					: DEFAULT_SETTINGS.autoAllowPermissions,
+			autoMentionActiveNote:
+				typeof rawSettings.autoMentionActiveNote === "boolean"
+					? rawSettings.autoMentionActiveNote
+					: DEFAULT_SETTINGS.autoMentionActiveNote,
 			debugMode:
 				typeof rawSettings.debugMode === "boolean"
 					? rawSettings.debugMode

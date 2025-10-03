@@ -107,6 +107,7 @@ function ChatComponent({
 	const [currentAgentId, setCurrentAgentId] = useState<string>(
 		settings.activeAgentId || settings.claude.id,
 	);
+	const [lastActiveNote, setLastActiveNote] = useState<TFile | null>(null);
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
@@ -793,6 +794,28 @@ function ChatComponent({
 		}
 	}, [inputValue, isSending]);
 
+	// Show auto-mention notes
+	useEffect(() => {
+		const current = plugin.app.workspace.getActiveFile();
+		if (current) {
+			setLastActiveNote(current);
+		}
+
+		const handleActiveLeafChange = () => {
+			const newActive = plugin.app.workspace.getActiveFile();
+			if (newActive) {
+				setLastActiveNote(newActive);
+			}
+		};
+
+		view.registerEvent(
+			plugin.app.workspace.on(
+				"active-leaf-change",
+				handleActiveLeafChange,
+			),
+		);
+	}, []);
+
 	const updateIconColor = (svg: SVGElement) => {
 		if (isSending) {
 			// Stop button - always active when sending
@@ -895,18 +918,27 @@ function ChatComponent({
 
 		setIsSending(true);
 
+		// Add auto-mention
+		let messageText = inputValue;
+		if (settings.autoMentionActiveNote && lastActiveNote) {
+			const autoMention = `@[${lastActiveNote.basename}]`;
+			if (!inputValue.includes(autoMention)) {
+				messageText = `${autoMention}\n${inputValue}`;
+			}
+		}
+
 		// Add user message to chat (keep original text with @mentions for display)
 		const userMessage: ChatMessage = {
 			id: crypto.randomUUID(),
 			role: "user",
-			content: [{ type: "text", text: inputValue }],
+			content: [{ type: "text", text: messageText }],
 			timestamp: new Date(),
 		};
 		addMessage(userMessage);
 
 		// Convert @mentions to relative paths for agent consumption
 		const messageTextForAgent = convertMentionsToPath(
-			inputValue,
+			messageText,
 			noteMentionService,
 			(plugin.app.vault.adapter as VaultAdapterWithBasePath).basePath ||
 				"",
@@ -1132,13 +1164,20 @@ function ChatComponent({
 							view={view}
 						/>
 					)}
+					{settings.autoMentionActiveNote && lastActiveNote && (
+						<div className="auto-mention-inline">
+							<span className="mention-badge">
+								@{lastActiveNote.basename}
+							</span>
+						</div>
+					)}
 					<textarea
 						ref={textareaRef}
 						value={inputValue}
 						onChange={handleInputChange}
 						onKeyDown={handleKeyPress}
 						placeholder={`Message ${activeAgentLabel} - @ to mention notes`}
-						className="chat-input-textarea"
+						className={`chat-input-textarea ${settings.autoMentionActiveNote && lastActiveNote ? "has-auto-mention" : ""}`}
 						rows={1}
 					/>
 					<button

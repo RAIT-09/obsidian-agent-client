@@ -50,6 +50,20 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		new Setting(containerEl)
+			.setName("Auto-mention active note")
+			.setDesc(
+				"Include the current note in your messages automatically. The agent will have access to its content without typing @notename.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoMentionActiveNote)
+					.onChange(async (value) => {
+						this.plugin.settings.autoMentionActiveNote = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
 		containerEl.createEl("h2", { text: "Built-in agents" });
 
 		const builtInSection = containerEl.createDiv();
