@@ -558,7 +558,6 @@ If your plugin does not need CSS, delete this file.
 
 .tool-call-diff-content {
 	background-color: var(--background-primary);
-	max-height: 400px;
 	overflow: auto;
 }
 
