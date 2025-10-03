@@ -10,7 +10,7 @@ https://github.com/user-attachments/assets/218a5c07-f18c-4cdb-93b6-5782f5590f6b
 ## ✨ Features
 
 - 🔗 **Direct Agent Integration**: Chat with AI coding agents in a dedicated right-side panel
-- 📝 **Note Mention Support**: Use `@notename` to reference notes in your vault within agent conversations
+- 📝 **Note Mention Support**: Automatically include the active note in conversations, or manually use `@notename` to reference specific notes
 - 🔄 **Multi-Agent Support**: Switch between Claude Code, Gemini CLI, and custom agents
 - 💻 **Terminal Integration**: Execute commands and see results directly in the chat
 - 🔐 **Permission Management**: Fine-grained control over agent actions
