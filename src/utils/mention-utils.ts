@@ -104,8 +104,8 @@ export function replaceMention(
 
 	// Use @[filename] format if title contains spaces, otherwise @filename
 	const replacement = noteTitle.includes(" ")
-		? `@[${noteTitle}]`
-		: `@${noteTitle}`;
+		? ` @[${noteTitle}] `
+		: ` @${noteTitle} `;
 
 	const newText = before + replacement + after;
 	const newCursorPos = mentionContext.start + replacement.length;
