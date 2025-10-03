@@ -566,6 +566,9 @@ If your plugin does not need CSS, delete this file.
 /* Text with Mentions */
 .text-with-mentions {
 	user-select: text;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	margin: 1em 0;
 }
 
 .text-mention {

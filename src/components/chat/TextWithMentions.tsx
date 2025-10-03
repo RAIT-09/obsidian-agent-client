@@ -57,9 +57,5 @@ export function TextWithMentions({
 		parts.push(text.slice(lastIndex));
 	}
 
-	return (
-		<div className="text-with-mentions">
-			<p className="auto">{parts}</p>
-		</div>
-	);
+	return <div className="text-with-mentions">{parts}</div>;
 }
