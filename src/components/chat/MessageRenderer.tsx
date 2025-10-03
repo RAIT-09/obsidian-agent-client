@@ -33,6 +33,7 @@ export function MessageRenderer({
 						content={content}
 						plugin={plugin}
 						messageId={message.id}
+						messageRole={message.role}
 						acpClient={acpClient}
 						updateMessageContent={updateMessageContent}
 					/>

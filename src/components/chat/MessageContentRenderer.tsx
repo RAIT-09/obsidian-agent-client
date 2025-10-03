@@ -13,6 +13,7 @@ interface MessageContentRendererProps {
 	content: MessageContent;
 	plugin: AgentClientPlugin;
 	messageId?: string;
+	messageRole?: "user" | "assistant";
 	acpClient?: IAcpClient;
 	updateMessageContent?: (
 		messageId: string,
@@ -24,6 +25,7 @@ export function MessageContentRenderer({
 	content,
 	plugin,
 	messageId,
+	messageRole,
 	acpClient,
 	updateMessageContent,
 }: MessageContentRendererProps) {
@@ -31,9 +33,9 @@ export function MessageContentRenderer({
 
 	switch (content.type) {
 		case "text":
-			// Check if this is a user message by looking at the parent message role
-			// For now, we'll detect @mentions and render them appropriately
-			if (content.text.includes("@")) {
+			// User messages: render with mention support
+			// Assistant messages: render as markdown
+			if (messageRole === "user") {
 				return <TextWithMentions text={content.text} plugin={plugin} />;
 			}
 			return <MarkdownTextRenderer text={content.text} plugin={plugin} />;
