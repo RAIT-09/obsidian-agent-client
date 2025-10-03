@@ -97,7 +97,7 @@ where.exe gemini
 
 ### 📋 Example Configuration
 
-**🍎 macOS/Linux Example:**
+**macOS/Linux Example:**
 ```
 General Settings:
 ├── Node.js path: /usr/local/bin/node
