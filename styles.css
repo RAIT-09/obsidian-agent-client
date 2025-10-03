@@ -338,6 +338,11 @@ If your plugin does not need CSS, delete this file.
 	display: none;
 }
 
+.chat-input-textarea:hover {
+	border: 1px solid var(--background-modifier-border) !important;
+	background-color: var(--background-primary) !important;
+}
+
 /* Send button */
 .chat-send-button {
 	position: absolute;
