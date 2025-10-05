@@ -15,6 +15,7 @@ interface MessageRendererProps {
 		messageId: string,
 		updatedContent: MessageContent,
 	) => void;
+	onPermissionSelected?: (requestId: string, optionId: string) => void;
 }
 
 export function MessageRenderer({
@@ -22,6 +23,7 @@ export function MessageRenderer({
 	plugin,
 	acpClient,
 	updateMessageContent,
+	onPermissionSelected,
 }: MessageRendererProps) {
 	return (
 		<div
@@ -36,6 +38,7 @@ export function MessageRenderer({
 						messageRole={message.role}
 						acpClient={acpClient}
 						updateMessageContent={updateMessageContent}
+						onPermissionSelected={onPermissionSelected}
 					/>
 				</div>
 			))}

@@ -19,6 +19,7 @@ interface MessageContentRendererProps {
 		messageId: string,
 		updatedContent: MessageContent,
 	) => void;
+	onPermissionSelected?: (requestId: string, optionId: string) => void;
 }
 
 export function MessageContentRenderer({
@@ -28,6 +29,7 @@ export function MessageContentRenderer({
 	messageRole,
 	acpClient,
 	updateMessageContent,
+	onPermissionSelected,
 }: MessageContentRendererProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 
@@ -49,6 +51,7 @@ export function MessageContentRenderer({
 					content={content}
 					plugin={plugin}
 					acpClient={acpClient}
+					onPermissionSelected={onPermissionSelected}
 				/>
 			);
 
@@ -70,90 +73,6 @@ export function MessageContentRenderer({
 							{entry.content}
 						</div>
 					))}
-				</div>
-			);
-
-		case "permission_request":
-			const isSelected = content.selectedOptionId !== undefined;
-			const isCancelled = content.isCancelled === true;
-			const selectedOption = content.options.find(
-				(opt) => opt.optionId === content.selectedOptionId,
-			);
-
-			return (
-				<div className="message-permission-request">
-					<div className="message-permission-request-title">
-						🔐 Permission Request
-					</div>
-					<div className="message-permission-request-description">
-						The agent is requesting permission to perform an action.
-						Please choose how to proceed:
-					</div>
-					<div className="message-permission-request-options">
-						{content.options.map((option) => {
-							const isThisSelected =
-								content.selectedOptionId === option.optionId;
-							const buttonClasses = [
-								"permission-option",
-								option.kind
-									? `permission-kind-${option.kind}`
-									: "",
-								isThisSelected ? "selected" : "",
-								isSelected || isCancelled ? "disabled" : "",
-							]
-								.filter(Boolean)
-								.join(" ");
-
-							return (
-								<button
-									key={option.optionId}
-									disabled={isSelected || isCancelled}
-									className={buttonClasses}
-									onClick={() => {
-										if (
-											acpClient &&
-											messageId &&
-											updateMessageContent &&
-											!isCancelled
-										) {
-											// Update UI immediately
-											const updatedContent = {
-												...content,
-												selectedOptionId:
-													option.optionId,
-											};
-											updateMessageContent(
-												messageId,
-												updatedContent,
-											);
-
-											// Send response to agent
-											acpClient.handlePermissionResponse(
-												messageId,
-												option.optionId,
-											);
-										} else {
-											logger.warn(
-												"Cannot handle permission response: missing acpClient, messageId, or updateMessageContent",
-											);
-										}
-									}}
-								>
-									{option.name}
-								</button>
-							);
-						})}
-					</div>
-					{isSelected && selectedOption && (
-						<div className="message-permission-request-result selected">
-							✓ Selected: {selectedOption.name}
-						</div>
-					)}
-					{isCancelled && (
-						<div className="message-permission-request-result cancelled">
-							⚠ Cancelled: Permission request was cancelled
-						</div>
-					)}
 				</div>
 			);
 

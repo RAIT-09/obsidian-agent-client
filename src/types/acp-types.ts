@@ -36,6 +36,12 @@ export type MessageContent =
 			locations?: acp.ToolCallLocation[];
 			rawInput?: { [k: string]: unknown };
 			rawOutput?: { [k: string]: unknown };
+			permissionRequest?: {
+				requestId: string;
+				options: acp.PermissionOption[];
+				selectedOptionId?: string;
+				isCancelled?: boolean;
+			};
 	  }
 	| {
 			type: "plan";

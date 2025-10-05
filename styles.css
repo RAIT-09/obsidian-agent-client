@@ -107,11 +107,9 @@ If your plugin does not need CSS, delete this file.
 
 /* Permission Request */
 .message-permission-request {
-	padding: 12px;
+	padding: 6px 0px;
 	margin-top: 4px;
 	background-color: var(--background-secondary);
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
 	font-size: 14px;
 	user-select: text;
 }
@@ -135,10 +133,10 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
+	justify-content: flex-end;
 }
 
 .message-permission-request-result {
-	margin-top: 12px;
 	padding: 8px;
 	background-color: var(--background-primary);
 	border-radius: 4px;

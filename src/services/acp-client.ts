@@ -19,7 +19,7 @@ export class AcpClient implements IAcpClient {
 	private updateMessage: (
 		toolCallId: string,
 		content: MessageContent,
-	) => void;
+	) => boolean;
 	private currentMessageId: string | null = null;
 	private pendingPermissionRequests = new Map<
 		string,
@@ -33,7 +33,7 @@ export class AcpClient implements IAcpClient {
 	constructor(
 		addMessage: (message: ChatMessage) => void,
 		updateLastMessage: (content: MessageContent) => void,
-		updateMessage: (toolCallId: string, content: MessageContent) => void,
+		updateMessage: (toolCallId: string, content: MessageContent) => boolean,
 		vaultPath: string,
 		plugin: AgentClientPlugin,
 		autoAllowPermissions: boolean = false,
@@ -116,48 +116,6 @@ export class AcpClient implements IAcpClient {
 		const extendedParams =
 			params as unknown as ExtendedRequestPermissionRequest;
 
-		// If tool call details are provided, add the tool call message first
-		if (extendedParams.toolCall?.title) {
-			const toolCallInfo = extendedParams.toolCall;
-			// Type assertion for status and kind to match MessageContent union type
-			const status = (toolCallInfo.status || "pending") as
-				| "pending"
-				| "in_progress"
-				| "completed"
-				| "failed";
-			const kind = toolCallInfo.kind as
-				| "read"
-				| "edit"
-				| "delete"
-				| "move"
-				| "search"
-				| "execute"
-				| "think"
-				| "fetch"
-				| "switch_mode"
-				| "other"
-				| undefined;
-			const content = toolCallInfo.content as
-				| acp.ToolCallContent[]
-				| undefined;
-
-			this.addMessage({
-				id: crypto.randomUUID(),
-				role: "assistant",
-				content: [
-					{
-						type: "tool_call",
-						toolCallId: toolCallInfo.toolCallId,
-						title: toolCallInfo.title,
-						status,
-						kind,
-						content,
-					},
-				],
-				timestamp: new Date(),
-			});
-		}
-
 		// If auto-allow is enabled, automatically approve the first allow option
 		if (this.autoAllowPermissions) {
 			const allowOption =
@@ -181,29 +139,55 @@ export class AcpClient implements IAcpClient {
 
 		// Generate unique ID for this permission request
 		const requestId = crypto.randomUUID();
+		const toolCallId = params.toolCall.toolCallId;
 
-		// Add permission request message to chat
-		this.addMessage({
-			id: requestId,
-			role: "assistant",
-			content: [
-				{
-					type: "permission_request",
-					toolCall: {
-						toolCallId: params.toolCall.toolCallId,
+		// Prepare permission request data
+		const permissionRequestData = {
+			requestId: requestId,
+			options: params.options.map((option) => ({
+				optionId: option.optionId,
+				name: option.name,
+				kind:
+					option.kind === "reject_always"
+						? "reject_once"
+						: option.kind,
+			})),
+		};
+
+		// Try to update existing tool_call with permission request
+		const updated = this.updateMessage(toolCallId, {
+			type: "tool_call",
+			toolCallId: toolCallId,
+			permissionRequest: permissionRequestData,
+		} as MessageContent);
+
+		// If no existing tool_call was found, create a new tool_call message with permission
+		if (!updated && extendedParams.toolCall?.title) {
+			const toolCallInfo = extendedParams.toolCall;
+			const status = (toolCallInfo.status ||
+				"pending") as acp.ToolCallStatus;
+			const kind = toolCallInfo.kind as acp.ToolKind | undefined;
+			const content = toolCallInfo.content as
+				| acp.ToolCallContent[]
+				| undefined;
+
+			this.addMessage({
+				id: crypto.randomUUID(),
+				role: "assistant",
+				content: [
+					{
+						type: "tool_call",
+						toolCallId: toolCallInfo.toolCallId,
+						title: toolCallInfo.title,
+						status,
+						kind,
+						content,
+						permissionRequest: permissionRequestData,
 					},
-					options: params.options.map((option) => ({
-						optionId: option.optionId,
-						name: option.name,
-						kind:
-							option.kind === "reject_always"
-								? "reject_once"
-								: option.kind,
-					})),
-				},
-			],
-			timestamp: new Date(),
-		});
+				],
+				timestamp: new Date(),
+			});
+		}
 
 		// Return a Promise that will be resolved when user clicks a button
 		return new Promise((resolve) => {

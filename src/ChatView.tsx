@@ -241,12 +241,56 @@ function ChatComponent({
 		setMessages((prev) =>
 			prev.map((message) => ({
 				...message,
-				content: message.content.map((content) =>
-					content.type === "permission_request" &&
-					!content.selectedOptionId
-						? { ...content, isCancelled: true }
-						: content,
-				),
+				content: message.content.map((content) => {
+					// Handle standalone permission_request
+					if (
+						content.type === "permission_request" &&
+						!content.selectedOptionId
+					) {
+						return { ...content, isCancelled: true };
+					}
+					// Handle permission_request within tool_call
+					if (
+						content.type === "tool_call" &&
+						content.permissionRequest &&
+						!content.permissionRequest.selectedOptionId
+					) {
+						return {
+							...content,
+							permissionRequest: {
+								...content.permissionRequest,
+								isCancelled: true,
+							},
+						};
+					}
+					return content;
+				}),
+			})),
+		);
+	};
+
+	const updatePermissionRequestInToolCall = (
+		requestId: string,
+		selectedOptionId: string,
+	) => {
+		setMessages((prev) =>
+			prev.map((message) => ({
+				...message,
+				content: message.content.map((content) => {
+					if (
+						content.type === "tool_call" &&
+						content.permissionRequest?.requestId === requestId
+					) {
+						return {
+							...content,
+							permissionRequest: {
+								...content.permissionRequest,
+								selectedOptionId: selectedOptionId,
+							},
+						};
+					}
+					return content;
+				}),
 			})),
 		);
 	};
@@ -349,72 +393,61 @@ function ChatComponent({
 	const updateMessage = (
 		toolCallId: string,
 		updatedContent: MessageContent,
-	) => {
+	): boolean => {
+		let found = false;
+
 		setMessages((prev) =>
-			prev.map((message) => {
-				// Search message includes tool_call
-				const hasTargetToolCall = message.content.some(
-					(content) =>
+			prev.map((message) => ({
+				...message,
+				content: message.content.map((content) => {
+					if (
 						content.type === "tool_call" &&
-						content.toolCallId === toolCallId,
-				);
+						content.toolCallId === toolCallId &&
+						updatedContent.type === "tool_call"
+					) {
+						found = true;
+						// Merge content arrays
+						let mergedContent = content.content || [];
+						if (updatedContent.content !== undefined) {
+							const newContent = updatedContent.content || [];
 
-				if (hasTargetToolCall) {
-					return {
-						...message,
-						content: message.content.map((content) => {
-							if (
-								content.type === "tool_call" &&
-								content.toolCallId === toolCallId
-							) {
-								// Type guard: both are tool_call type
-								if (updatedContent.type === "tool_call") {
-									// Merge content arrays
-									let mergedContent = content.content || [];
-									if (updatedContent.content !== undefined) {
-										const newContent =
-											updatedContent.content || [];
-
-										// If new content contains diff, replace all old diffs
-										const hasDiff = newContent.some(
-											(item) => item.type === "diff",
-										);
-										if (hasDiff) {
-											mergedContent =
-												mergedContent.filter(
-													(item) =>
-														item.type !== "diff",
-												);
-										}
-
-										mergedContent = [
-											...mergedContent,
-											...newContent,
-										];
-									}
-
-									return {
-										...content,
-										...updatedContent,
-										title:
-											updatedContent.title !== undefined
-												? updatedContent.title
-												: content.title,
-										kind:
-											updatedContent.kind !== undefined
-												? updatedContent.kind
-												: content.kind,
-										content: mergedContent,
-									};
-								}
+							// If new content contains diff, replace all old diffs
+							const hasDiff = newContent.some(
+								(item) => item.type === "diff",
+							);
+							if (hasDiff) {
+								mergedContent = mergedContent.filter(
+									(item) => item.type !== "diff",
+								);
 							}
-							return content;
-						}),
-					};
-				}
-				return message;
-			}),
+
+							mergedContent = [...mergedContent, ...newContent];
+						}
+
+						return {
+							...content,
+							...updatedContent,
+							title:
+								updatedContent.title !== undefined
+									? updatedContent.title
+									: content.title,
+							kind:
+								updatedContent.kind !== undefined
+									? updatedContent.kind
+									: content.kind,
+							content: mergedContent,
+							permissionRequest:
+								updatedContent.permissionRequest !== undefined
+									? updatedContent.permissionRequest
+									: content.permissionRequest,
+						};
+					}
+					return content;
+				}),
+			})),
 		);
+
+		return found;
 	};
 
 	const adjustTextareaHeight = () => {
@@ -1138,6 +1171,9 @@ function ChatComponent({
 							plugin={plugin}
 							acpClient={acpClientRef.current || undefined}
 							updateMessageContent={updateMessageContent}
+							onPermissionSelected={
+								updatePermissionRequestInToolCall
+							}
 						/>
 					))
 				)}

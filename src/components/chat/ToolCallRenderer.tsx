@@ -1,28 +1,38 @@
 import * as React from "react";
+const { useState } = React;
 import type { MessageContent, IAcpClient } from "../../types/acp-types";
 import type AgentClientPlugin from "../../main";
 import { TerminalRenderer } from "./TerminalRenderer";
+import { PermissionRequestSection } from "./PermissionRequestSection";
 // import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 
 interface ToolCallRendererProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
 	plugin: AgentClientPlugin;
 	acpClient?: IAcpClient;
+	onPermissionSelected?: (requestId: string, optionId: string) => void;
 }
 
 export function ToolCallRenderer({
 	content,
 	plugin,
 	acpClient,
+	onPermissionSelected,
 }: ToolCallRendererProps) {
 	const {
 		kind,
 		title,
 		status,
+		toolCallId,
+		permissionRequest,
 		// locations,
 		// rawInput,
 		content: toolContent,
 	} = content;
+
+	const [selectedOptionId, setSelectedOptionId] = useState<
+		string | undefined
+	>(permissionRequest?.selectedOptionId);
 
 	// Get icon based on kind
 	const getKindIcon = (kind?: string) => {
@@ -49,6 +59,20 @@ export function ToolCallRenderer({
 				return "🔧";
 		}
 	};
+
+	const handlePermissionSelected = (requestId: string, optionId: string) => {
+		setSelectedOptionId(optionId);
+		if (onPermissionSelected) {
+			onPermissionSelected(requestId, optionId);
+		}
+	};
+
+	// Update selectedOptionId when permissionRequest changes
+	React.useEffect(() => {
+		if (permissionRequest?.selectedOptionId !== selectedOptionId) {
+			setSelectedOptionId(permissionRequest?.selectedOptionId);
+		}
+	}, [permissionRequest?.selectedOptionId]);
 
 	return (
 		<div className="message-tool-call">
@@ -113,6 +137,20 @@ export function ToolCallRenderer({
 						}*/
 					return null;
 				})}
+
+			{/* Permission request section */}
+			{permissionRequest && (
+				<PermissionRequestSection
+					permissionRequest={{
+						...permissionRequest,
+						selectedOptionId: selectedOptionId,
+					}}
+					toolCallId={toolCallId}
+					acpClient={acpClient}
+					plugin={plugin}
+					onPermissionSelected={handlePermissionSelected}
+				/>
+			)}
 		</div>
 	);
 }
