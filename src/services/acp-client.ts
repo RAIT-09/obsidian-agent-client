@@ -85,6 +85,10 @@ export class AcpClient implements IAcpClient {
 				});
 				break;
 			case "tool_call_update":
+				this.logger.log(
+					`[AcpClient] tool_call_update for ${update.toolCallId}, content:`,
+					update.content,
+				);
 				this.updateMessage(update.toolCallId, {
 					type: "tool_call",
 					toolCallId: update.toolCallId,
@@ -291,8 +295,11 @@ export class AcpClient implements IAcpClient {
 		params: acp.ReleaseTerminalRequest,
 	): Promise<acp.ReleaseTerminalResponse> {
 		const success = this.terminalManager.releaseTerminal(params.terminalId);
+		// Don't throw error if terminal not found - it may have been already cleaned up
 		if (!success) {
-			throw new Error(`Terminal ${params.terminalId} not found`);
+			this.logger.log(
+				`[AcpClient] releaseTerminal: Terminal ${params.terminalId} not found (may have been already cleaned up)`,
+			);
 		}
 		return {};
 	}

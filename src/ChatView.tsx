@@ -426,7 +426,7 @@ function ChatComponent({
 
 						return {
 							...content,
-							...updatedContent,
+							toolCallId: updatedContent.toolCallId,
 							title:
 								updatedContent.title !== undefined
 									? updatedContent.title
@@ -435,6 +435,10 @@ function ChatComponent({
 								updatedContent.kind !== undefined
 									? updatedContent.kind
 									: content.kind,
+							status:
+								updatedContent.status !== undefined
+									? updatedContent.status
+									: content.status,
 							content: mergedContent,
 							permissionRequest:
 								updatedContent.permissionRequest !== undefined

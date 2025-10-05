@@ -25,7 +25,14 @@ export function TerminalRenderer({
 	const [isCancelled, setIsCancelled] = useState(false);
 	const intervalRef = useRef<number | null>(null);
 
+	logger.log(
+		`[TerminalRenderer] Component rendered for terminal ${terminalId}, acpClient: ${!!acpClient}`,
+	);
+
 	useEffect(() => {
+		logger.log(
+			`[TerminalRenderer] useEffect triggered for ${terminalId}, acpClient: ${!!acpClient}`,
+		);
 		if (!terminalId || !acpClient) return;
 
 		const pollOutput = async () => {
@@ -34,6 +41,10 @@ export function TerminalRenderer({
 					terminalId,
 					sessionId: "",
 				});
+				logger.log(
+					`[TerminalRenderer] Poll result for ${terminalId}:`,
+					result,
+				);
 				setOutput(result.output);
 				if (result.exitStatus) {
 					setExitStatus({
@@ -50,18 +61,13 @@ export function TerminalRenderer({
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
 
-				// Check if the error is because terminal was not found (cancelled/killed)
-				if (errorMessage.includes("not found")) {
-					logger.log(
-						`[TerminalRenderer] Terminal ${terminalId} was cancelled/killed, stopping polling`,
-					);
+				logger.log(
+					`[TerminalRenderer] Polling error for terminal ${terminalId}: ${errorMessage}`,
+				);
+
+				// If terminal not found and no exit status was captured, it was likely cancelled
+				if (errorMessage.includes("not found") && !exitStatus) {
 					setIsCancelled(true);
-				} else {
-					// Log other errors but don't spam the console
-					logger.log(
-						`[TerminalRenderer] Polling stopped for terminal ${terminalId}: ${errorMessage}`,
-					);
-					setIsCancelled(true); // Treat any polling error as cancelled
 				}
 
 				setIsRunning(false);
@@ -72,11 +78,11 @@ export function TerminalRenderer({
 			}
 		};
 
-		// Initial poll
+		// Start polling immediately
 		pollOutput();
 
-		// Set up polling interval - will be cleared when isRunning becomes false
-		intervalRef.current = window.setInterval(pollOutput, 500);
+		// Set up polling interval with shorter interval to catch fast commands
+		intervalRef.current = window.setInterval(pollOutput, 100);
 
 		return () => {
 			if (intervalRef.current) {
@@ -84,7 +90,7 @@ export function TerminalRenderer({
 				intervalRef.current = null;
 			}
 		};
-	}, [terminalId, acpClient]); // Include acpClient in dependencies
+	}, [terminalId, acpClient, logger]); // Include acpClient and logger in dependencies
 
 	// Separate effect to stop polling when no longer running
 	useEffect(() => {

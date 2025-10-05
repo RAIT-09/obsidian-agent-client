@@ -13,6 +13,7 @@ interface TerminalProcess {
 	waitPromises: Array<
 		(exitStatus: { exitCode: number | null; signal: string | null }) => void
 	>;
+	cleanupTimeout?: number;
 }
 
 export class TerminalManager {
@@ -39,17 +40,33 @@ export class TerminalManager {
 			}
 		}
 
-		// Handle command parsing - if command contains spaces and no args provided,
-		// split the command into command and args
+		// Handle command parsing
 		let command = params.command;
 		let args = params.args || [];
 
-		if (!params.args && params.command.includes(" ")) {
-			const parts = params.command
-				.split(" ")
-				.filter((part) => part.length > 0);
-			command = parts[0];
-			args = parts.slice(1);
+		// If no args provided and command contains shell syntax, use shell to execute
+		if (!params.args) {
+			// Check for shell syntax (pipes, redirects, logical operators, etc.)
+			const hasShellSyntax = /[|&;<>()$`\\"]/.test(params.command);
+
+			if (hasShellSyntax) {
+				// Use shell to execute the command
+				const shell =
+					Platform.isMacOS || Platform.isLinux
+						? "/bin/sh"
+						: "cmd.exe";
+				const shellFlag =
+					Platform.isMacOS || Platform.isLinux ? "-c" : "/c";
+				command = shell;
+				args = [shellFlag, params.command];
+			} else if (params.command.includes(" ")) {
+				// Simple command with arguments, split by space
+				const parts = params.command
+					.split(" ")
+					.filter((part) => part.length > 0);
+				command = parts[0];
+				args = parts.slice(1);
+			}
 		}
 
 		this.logger.log(`[Terminal ${terminalId}] Creating terminal:`, {
@@ -189,20 +206,35 @@ export class TerminalManager {
 		const terminal = this.terminals.get(terminalId);
 		if (!terminal) return false;
 
+		this.logger.log(`[Terminal ${terminalId}] Releasing terminal`);
 		if (!terminal.exitStatus) {
 			terminal.process.kill("SIGTERM");
 		}
-		this.terminals.delete(terminalId);
+
+		// Schedule cleanup after 30 seconds to allow UI to poll final output
+		terminal.cleanupTimeout = window.setTimeout(() => {
+			this.logger.log(
+				`[Terminal ${terminalId}] Cleaning up terminal after grace period`,
+			);
+			this.terminals.delete(terminalId);
+		}, 30000);
+
 		return true;
 	}
 
 	killAllTerminals(): void {
 		this.logger.log(`Killing ${this.terminals.size} running terminals...`);
 		this.terminals.forEach((terminal, terminalId) => {
+			// Clear cleanup timeout if scheduled
+			if (terminal.cleanupTimeout) {
+				window.clearTimeout(terminal.cleanupTimeout);
+			}
 			if (!terminal.exitStatus) {
 				this.logger.log(`Killing terminal ${terminalId}`);
 				this.killTerminal(terminalId);
 			}
 		});
+		// Clear all terminals
+		this.terminals.clear();
 	}
 }
