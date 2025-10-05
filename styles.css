@@ -317,16 +317,19 @@ If your plugin does not need CSS, delete this file.
 /* Auto-mention inline display */
 .auto-mention-inline {
 	position: absolute;
-	top: 8px;
-	left: 12px;
-	right: 12px;
+	top: 0;
+	left: 0;
+	right: 0;
 	pointer-events: none;
 	z-index: 1;
 	display: flex;
 	align-items: center;
 	gap: 4px;
-	padding-bottom: 4px;
-	border-bottom: 1px solid var(--background-modifier-border);
+	padding: 8px 12px 4px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-bottom-width: 1px;
+	background-color: var(--background-primary);
+	border-radius: 8px 8px 0 0;
 }
 
 .mention-badge {
@@ -348,11 +351,10 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-normal);
 	resize: none;
 	min-height: 80px;
-	height: 80px;
 	font-family: inherit;
 	box-sizing: border-box;
 	outline: none;
-	overflow: hidden;
+	overflow-y: auto;
 	scrollbar-width: none;
 	-ms-overflow-style: none;
 }
@@ -360,7 +362,6 @@ If your plugin does not need CSS, delete this file.
 .chat-input-textarea.has-auto-mention {
 	padding-top: 36px;
 	min-height: 116px;
-	height: 116px;
 }
 
 .chat-input-textarea::-webkit-scrollbar {

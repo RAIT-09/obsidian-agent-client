@@ -459,8 +459,12 @@ function ChatComponent({
 		if (textarea) {
 			textarea.style.height = "auto";
 			const scrollHeight = textarea.scrollHeight;
-			const maxHeight = 120;
-			textarea.style.height = Math.min(scrollHeight, maxHeight) + "px";
+			const maxHeight = 300; // Increased from 120 to 300
+			const hasAutoMention =
+				textarea.classList.contains("has-auto-mention");
+			const minHeight = hasAutoMention ? 116 : 80;
+			textarea.style.height =
+				Math.max(minHeight, Math.min(scrollHeight, maxHeight)) + "px";
 		}
 	};
 
