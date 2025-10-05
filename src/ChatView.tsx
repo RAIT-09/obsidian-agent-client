@@ -1168,8 +1168,8 @@ function ChatComponent({
 				) : messages.length === 0 ? (
 					<div className="chat-empty-state">
 						{!isReady
-							? "Connecting to AI agent..."
-							: "Start a conversation with AI..."}
+							? `Connecting to ${activeAgentLabel}...`
+							: `Start a conversation with ${activeAgentLabel}...`}
 					</div>
 				) : (
 					messages.map((message) => (
