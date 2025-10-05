@@ -568,6 +568,7 @@ If your plugin does not need CSS, delete this file.
 	white-space: pre-wrap;
 	word-wrap: break-word;
 	margin: 1em 0;
+	font-size: var(--font-text-size);
 }
 
 .text-mention {
@@ -582,6 +583,11 @@ If your plugin does not need CSS, delete this file.
 /* Markdown Text Renderer */
 .markdown-text-renderer {
 	user-select: text;
+	font-size: var(--font-text-size);
+}
+
+.markdown-text-renderer .markdown-rendered {
+	font-size: inherit;
 }
 
 /* Tool Call Diff Renderer */
