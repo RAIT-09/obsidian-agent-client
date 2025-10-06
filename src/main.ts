@@ -1,4 +1,4 @@
-import { App, Plugin, WorkspaceLeaf } from "obsidian";
+import { App, Plugin, WorkspaceLeaf, Notice } from "obsidian";
 import { ChatView, VIEW_TYPE_CHAT } from "./ChatView";
 import { createSettingsStore, type SettingsStore } from "./settings-store";
 import { AgentClientSettingTab } from "./components/settings/AgentClientSettingTab";
@@ -73,12 +73,16 @@ export default class AgentClientPlugin extends Plugin {
 	settingsStore!: SettingsStore;
 
 	async onload() {
+		const isUpdateavailable = await this.checkForUpdates();
 		await this.loadSettings();
 
 		// Initialize settings store
 		this.settingsStore = createSettingsStore(this.settings);
 
-		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
+		this.registerView(
+			VIEW_TYPE_CHAT,
+			(leaf) => new ChatView(leaf, this, isUpdateavailable),
+		);
 
 		const ribbonIconEl = this.addRibbonIcon(
 			"bot-message-square",
@@ -256,6 +260,21 @@ export default class AgentClientPlugin extends Plugin {
 		this.settings = nextSettings;
 		await this.saveData(this.settings);
 		this.settingsStore.set(this.settings);
+	}
+
+	async checkForUpdates(): Promise<boolean> {
+		const response = await fetch(
+			"https://api.github.com/repos/RAIT-09/obsidian-agent-client/releases/latest",
+		);
+		const data = await response.json();
+		const latestVersion = data.tag_name;
+		const currentVersion = this.manifest.version;
+
+		if (latestVersion !== currentVersion) {
+			new Notice(`[Agent Client] Update available: v${latestVersion}`);
+			return true;
+		}
+		return false;
 	}
 
 	ensureActiveAgentId(): void {

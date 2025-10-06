@@ -77,9 +77,11 @@ const resolveCommandDirectory = (command: string): string | null => {
 function ChatComponent({
 	plugin,
 	view,
+	isUpdateAvailable,
 }: {
 	plugin: AgentClientPlugin;
 	view: ChatView;
+	isUpdateAvailable: boolean;
 }) {
 	// Create logger instance
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
@@ -1124,6 +1126,9 @@ function ChatComponent({
 		<div className="chat-view-container">
 			<div className="chat-view-header">
 				<h3 className="chat-view-header-title">{activeAgentLabel}</h3>
+				{isUpdateAvailable && (
+					<p className="chat-view-header-update">Update available!</p>
+				)}
 				<div className="chat-view-header-actions">
 					<HeaderButton
 						iconName="plus"
@@ -1250,10 +1255,16 @@ function ChatComponent({
 export class ChatView extends ItemView {
 	private root: Root | null = null;
 	private plugin: AgentClientPlugin;
+	private isUpdateAvailable: boolean;
 
-	constructor(leaf: WorkspaceLeaf, plugin: AgentClientPlugin) {
+	constructor(
+		leaf: WorkspaceLeaf,
+		plugin: AgentClientPlugin,
+		isUpdateAvailable: boolean,
+	) {
 		super(leaf);
 		this.plugin = plugin;
+		this.isUpdateAvailable = isUpdateAvailable;
 	}
 
 	getViewType() {
@@ -1273,7 +1284,13 @@ export class ChatView extends ItemView {
 		container.empty();
 
 		this.root = createRoot(container);
-		this.root.render(<ChatComponent plugin={this.plugin} view={this} />);
+		this.root.render(
+			<ChatComponent
+				plugin={this.plugin}
+				view={this}
+				isUpdateAvailable={this.isUpdateAvailable}
+			/>,
+		);
 	}
 
 	async onClose() {

@@ -234,6 +234,16 @@ If your plugin does not need CSS, delete this file.
 	margin: 0 !important;
 }
 
+.chat-view-header-update {
+	margin: 0 10px 0 auto !important;
+	padding: 2px 8px;
+	font-size: 11px;
+	color: var(--text-muted);
+	background-color: var(--background-modifier-hover);
+	border-radius: 4px;
+	font-weight: 500;
+}
+
 .chat-view-header-actions {
 	display: flex;
 	gap: 8px;
