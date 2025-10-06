@@ -110,6 +110,10 @@ function ChatComponent({
 		settings.activeAgentId || settings.claude.id,
 	);
 	const [lastActiveNote, setLastActiveNote] = useState<TFile | null>(null);
+	const [
+		isAutoMentionTemporarilyDisabled,
+		setIsAutoMentionTemporarilyDisabled,
+	] = useState(false);
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
@@ -906,6 +910,7 @@ function ChatComponent({
 			setMessages([]);
 			setInputValue("");
 			acpClientRef.current?.resetCurrentMessage();
+			setIsAutoMentionTemporarilyDisabled(false);
 
 			// Switch to the active agent from settings if different from current
 			const newActiveAgentId =
@@ -963,7 +968,11 @@ function ChatComponent({
 
 		// Add auto-mention
 		let messageText = inputValue;
-		if (settings.autoMentionActiveNote && lastActiveNote) {
+		if (
+			settings.autoMentionActiveNote &&
+			lastActiveNote &&
+			!isAutoMentionTemporarilyDisabled
+		) {
 			const autoMention = `@[${lastActiveNote.basename}]`;
 			if (!inputValue.includes(autoMention)) {
 				messageText = `${autoMention}\n${inputValue}`;
@@ -1215,9 +1224,38 @@ function ChatComponent({
 					)}
 					{settings.autoMentionActiveNote && lastActiveNote && (
 						<div className="auto-mention-inline">
-							<span className="mention-badge">
+							<span
+								className={`mention-badge ${isAutoMentionTemporarilyDisabled ? "disabled" : ""}`}
+							>
 								@{lastActiveNote.basename}
 							</span>
+							<button
+								className="auto-mention-toggle-btn"
+								onClick={(e) => {
+									setIsAutoMentionTemporarilyDisabled(
+										!isAutoMentionTemporarilyDisabled,
+									);
+									const iconName =
+										!isAutoMentionTemporarilyDisabled
+											? "plus"
+											: "x";
+									setIcon(e.currentTarget, iconName);
+								}}
+								title={
+									isAutoMentionTemporarilyDisabled
+										? "Enable auto-mention"
+										: "Temporarily disable auto-mention"
+								}
+								ref={(el) => {
+									if (el) {
+										const iconName =
+											isAutoMentionTemporarilyDisabled
+												? "plus"
+												: "x";
+										setIcon(el, iconName);
+									}
+								}}
+							/>
 						</div>
 					)}
 					<textarea

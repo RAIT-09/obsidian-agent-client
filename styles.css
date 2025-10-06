@@ -334,8 +334,9 @@ If your plugin does not need CSS, delete this file.
 	z-index: 1;
 	display: flex;
 	align-items: center;
+	justify-content: space-between;
 	gap: 4px;
-	padding: 8px 12px 4px 12px;
+	padding: 6px 12px 6px 12px;
 	border: 1px solid var(--background-modifier-border);
 	border-bottom-width: 1px;
 	background-color: var(--background-primary);
@@ -350,6 +351,55 @@ If your plugin does not need CSS, delete this file.
 	font-weight: 500;
 	cursor: default;
 	user-select: none;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: calc(100% - 24px);
+}
+
+.mention-badge.disabled {
+	color: var(--text-faint);
+	text-decoration: line-through;
+}
+
+.auto-mention-toggle-btn {
+	background: none;
+	background-color: transparent !important;
+	border: none !important;
+	color: var(--text-muted);
+	cursor: pointer;
+	padding: 0 !important;
+	margin: 0 !important;
+	pointer-events: auto;
+	transition: color 0.2s;
+	outline: none !important;
+	appearance: none;
+	box-shadow: none !important;
+	width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.auto-mention-toggle-btn svg {
+	width: 14px;
+	height: 14px;
+	color: inherit;
+}
+
+.auto-mention-toggle-btn:hover {
+	background: none;
+	box-shadow: none;
+	color: var(--interactive-accent);
+}
+
+.auto-mention-toggle-btn:active,
+.auto-mention-toggle-btn:focus {
+	background: none;
+	box-shadow: none;
+	outline: none;
 }
 
 .chat-input-textarea {
