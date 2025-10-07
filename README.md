@@ -1,5 +1,7 @@
 # 🤖 Agent Client Plugin for Obsidian
 
+<a href="https://www.buymeacoffee.com/rait09" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="180" height="50" ></a>
+
 Bring your AI agents directly into Obsidian! This plugin lets you chat with Claude Code, Gemini CLI, and other AI agents right from your vault. Your AI assistant is now just a side panel away. ✨
 
 Built on [Agent Client Protocol (ACP)](https://github.com/zed-industries/agent-client-protocol) by Zed.
