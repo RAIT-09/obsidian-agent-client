@@ -1024,6 +1024,20 @@ function ChatComponent({
 			logger.error("[Client] Prompt Error:", error);
 			setIsSending(false);
 
+			// Check if this is an "empty response text" error - if so, silently ignore it
+			if (
+				error &&
+				typeof error === "object" &&
+				"code" in error &&
+				error.code === -32603
+			) {
+				const errorData = (error as any).data;
+				if (errorData?.details?.includes("empty response text")) {
+					logger.log("Empty response text error - ignoring");
+					return;
+				}
+			}
+
 			if (!authMethods || authMethods.length === 0) {
 				logger.error("No auth methods available");
 				return;
