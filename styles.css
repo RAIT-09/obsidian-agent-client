@@ -7,6 +7,15 @@ If your plugin does not need CSS, delete this file.
 
 */
 
+/* ===== Settings Tab Custom Agent Block ===== */
+.agent-client-custom-agent {
+	padding: 16px;
+	margin-bottom: 24px;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+}
+
 /* ===== Header Button Component ===== */
 .header-button {
 	width: 20px;

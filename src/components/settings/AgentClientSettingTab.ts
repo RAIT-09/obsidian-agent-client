@@ -20,7 +20,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		this.renderAgentSelector(containerEl);
 
-		containerEl.createEl("h2", { text: "General Settings" });
+		containerEl.createEl("h1", { text: "General Settings" });
 
 		new Setting(containerEl)
 			.setName("Node.js path")
@@ -64,18 +64,16 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		containerEl.createEl("h2", { text: "Built-in agents" });
+		containerEl.createEl("h1", { text: "Built-in agents" });
 
-		const builtInSection = containerEl.createDiv();
-		this.renderGeminiSettings(builtInSection);
-		this.renderClaudeSettings(builtInSection);
+		this.renderGeminiSettings(containerEl);
+		this.renderClaudeSettings(containerEl);
 
-		containerEl.createEl("h2", { text: "Custom agents" });
+		containerEl.createEl("h1", { text: "Custom agents" });
 
-		const customSection = containerEl.createDiv();
-		this.renderCustomAgents(customSection);
+		this.renderCustomAgents(containerEl);
 
-		containerEl.createEl("h2", { text: "Developer Settings" });
+		containerEl.createEl("h1", { text: "Developer Settings" });
 
 		new Setting(containerEl)
 			.setName("Debug mode")
