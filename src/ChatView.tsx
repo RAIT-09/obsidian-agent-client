@@ -77,11 +77,9 @@ const resolveCommandDirectory = (command: string): string | null => {
 function ChatComponent({
 	plugin,
 	view,
-	isUpdateAvailable,
 }: {
 	plugin: AgentClientPlugin;
 	view: ChatView;
-	isUpdateAvailable: boolean;
 }) {
 	// Create logger instance
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
@@ -92,6 +90,12 @@ function ChatComponent({
 		plugin.settingsStore.getSnapshot,
 		plugin.settingsStore.getSnapshot,
 	);
+
+	// Check for updates asynchronously
+	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+	useEffect(() => {
+		plugin.checkForUpdates().then(setIsUpdateAvailable);
+	}, []);
 
 	const [inputValue, setInputValue] = useState("");
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -1307,16 +1311,10 @@ function ChatComponent({
 export class ChatView extends ItemView {
 	private root: Root | null = null;
 	private plugin: AgentClientPlugin;
-	private isUpdateAvailable: boolean;
 
-	constructor(
-		leaf: WorkspaceLeaf,
-		plugin: AgentClientPlugin,
-		isUpdateAvailable: boolean,
-	) {
+	constructor(leaf: WorkspaceLeaf, plugin: AgentClientPlugin) {
 		super(leaf);
 		this.plugin = plugin;
-		this.isUpdateAvailable = isUpdateAvailable;
 	}
 
 	getViewType() {
@@ -1336,13 +1334,7 @@ export class ChatView extends ItemView {
 		container.empty();
 
 		this.root = createRoot(container);
-		this.root.render(
-			<ChatComponent
-				plugin={this.plugin}
-				view={this}
-				isUpdateAvailable={this.isUpdateAvailable}
-			/>,
-		);
+		this.root.render(<ChatComponent plugin={this.plugin} view={this} />);
 	}
 
 	async onClose() {

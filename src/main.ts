@@ -73,16 +73,12 @@ export default class AgentClientPlugin extends Plugin {
 	settingsStore!: SettingsStore;
 
 	async onload() {
-		const isUpdateavailable = await this.checkForUpdates();
 		await this.loadSettings();
 
 		// Initialize settings store
 		this.settingsStore = createSettingsStore(this.settings);
 
-		this.registerView(
-			VIEW_TYPE_CHAT,
-			(leaf) => new ChatView(leaf, this, isUpdateavailable),
-		);
+		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
 
 		const ribbonIconEl = this.addRibbonIcon(
 			"bot-message-square",
