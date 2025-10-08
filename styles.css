@@ -16,6 +16,77 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 8px;
 }
 
+/* ===== Loading Indicator ===== */
+.loading-indicator {
+	display: flex;
+	align-items: center;
+	padding: 16px;
+	margin: 4px 0;
+}
+
+.loading-dots {
+	display: grid;
+	grid-template-columns: repeat(3, 4px);
+	grid-template-rows: repeat(3, 5px);
+	gap: 3px;
+	width: 18px;
+	height: 21px;
+}
+
+.loading-dot {
+	width: 4px;
+	height: 5px;
+	background-color: var(--background-modifier-border);
+	border-radius: 50%;
+	animation: dotPulse 1.2s ease-in-out infinite;
+}
+
+.loading-dot:nth-child(1) {
+	animation-delay: 0s;
+}
+
+.loading-dot:nth-child(2) {
+	animation-delay: 0.15s;
+}
+
+.loading-dot:nth-child(3) {
+	animation-delay: 0.3s;
+}
+
+.loading-dot:nth-child(4) {
+	animation-delay: 0.9s;
+}
+
+.loading-dot:nth-child(5) {
+	animation-delay: 0s;
+}
+
+.loading-dot:nth-child(6) {
+	animation-delay: 0.15s;
+}
+
+.loading-dot:nth-child(7) {
+	animation-delay: 0.6s;
+}
+
+.loading-dot:nth-child(8) {
+	animation-delay: 0.45s;
+}
+
+.loading-dot:nth-child(9) {
+	animation-delay: 0.3s;
+}
+
+@keyframes dotPulse {
+	0%,
+	100% {
+		background-color: var(--background-modifier-border);
+	}
+	25% {
+		background-color: var(--interactive-accent);
+	}
+}
+
 /* ===== Header Button Component ===== */
 .header-button {
 	width: 20px;

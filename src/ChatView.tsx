@@ -1204,18 +1204,35 @@ function ChatComponent({
 							: `Start a conversation with ${activeAgentLabel}...`}
 					</div>
 				) : (
-					messages.map((message) => (
-						<MessageRenderer
-							key={message.id}
-							message={message}
-							plugin={plugin}
-							acpClient={acpClientRef.current || undefined}
-							updateMessageContent={updateMessageContent}
-							onPermissionSelected={
-								updatePermissionRequestInToolCall
-							}
-						/>
-					))
+					<>
+						{messages.map((message) => (
+							<MessageRenderer
+								key={message.id}
+								message={message}
+								plugin={plugin}
+								acpClient={acpClientRef.current || undefined}
+								updateMessageContent={updateMessageContent}
+								onPermissionSelected={
+									updatePermissionRequestInToolCall
+								}
+							/>
+						))}
+						{isSending && (
+							<div className="loading-indicator">
+								<div className="loading-dots">
+									<div className="loading-dot"></div>
+									<div className="loading-dot"></div>
+									<div className="loading-dot"></div>
+									<div className="loading-dot"></div>
+									<div className="loading-dot"></div>
+									<div className="loading-dot"></div>
+									<div className="loading-dot"></div>
+									<div className="loading-dot"></div>
+									<div className="loading-dot"></div>
+								</div>
+							</div>
+						)}
+					</>
 				)}
 			</div>
 
