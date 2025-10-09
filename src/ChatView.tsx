@@ -1,4 +1,11 @@
-import { ItemView, WorkspaceLeaf, TFile, setIcon, Platform } from "obsidian";
+import {
+	ItemView,
+	WorkspaceLeaf,
+	TFile,
+	setIcon,
+	Platform,
+	Notice,
+} from "obsidian";
 import * as React from "react";
 const { useState, useRef, useEffect, useSyncExternalStore, useMemo } = React;
 import { createRoot, Root } from "react-dom/client";
@@ -18,6 +25,7 @@ import { AcpClient } from "./services/acp-client";
 
 // Utility imports
 import { Logger } from "./utils/logger";
+import { ChatExporter } from "./utils/chat-exporter";
 
 // Type imports
 import type { ChatMessage, MessageContent } from "./types/acp-types";
@@ -1149,6 +1157,27 @@ function ChatComponent({
 		updateMentionSuggestions(mentionDetected);
 	};
 
+	const handleExportChat = async () => {
+		if (messages.length === 0) {
+			new Notice("[Agent Client] No messages to export");
+			return;
+		}
+
+		try {
+			const exporter = new ChatExporter(plugin);
+			const filePath = await exporter.exportToMarkdown(
+				messages,
+				activeAgentLabel,
+				currentAgentId,
+				sessionId || "unknown",
+			);
+			new Notice(`[Agent Client] Chat exported to ${filePath}`);
+		} catch (error) {
+			new Notice("[Agent Client] Failed to export chat");
+			logger.error("Export error:", error);
+		}
+	};
+
 	return (
 		<div className="chat-view-container">
 			<div className="chat-view-header">
@@ -1161,6 +1190,11 @@ function ChatComponent({
 						iconName="plus"
 						tooltip="New chat"
 						onClick={createNewSession}
+					/>
+					<HeaderButton
+						iconName="save"
+						tooltip="Export chat to Markdown"
+						onClick={handleExportChat}
 					/>
 					<HeaderButton
 						iconName="settings"

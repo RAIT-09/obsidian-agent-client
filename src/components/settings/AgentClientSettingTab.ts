@@ -73,6 +73,40 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		this.renderCustomAgents(containerEl);
 
+		containerEl.createEl("h1", { text: "Export Settings" });
+
+		new Setting(containerEl)
+			.setName("Export folder")
+			.setDesc("Folder where chat exports will be saved")
+			.addText((text) =>
+				text
+					.setPlaceholder("Agent Client")
+					.setValue(this.plugin.settings.exportSettings.defaultFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.exportSettings.defaultFolder =
+							value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Filename")
+			.setDesc(
+				"Template for exported filenames. Use {date} for date and {time} for time",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("agent_client_{date}_{time}")
+					.setValue(
+						this.plugin.settings.exportSettings.filenameTemplate,
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.exportSettings.filenameTemplate =
+							value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
 		containerEl.createEl("h1", { text: "Developer Settings" });
 
 		new Setting(containerEl)

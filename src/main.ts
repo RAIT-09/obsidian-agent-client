@@ -41,6 +41,10 @@ export interface AgentClientPluginSettings {
 	autoMentionActiveNote: boolean;
 	debugMode: boolean;
 	nodePath: string;
+	exportSettings: {
+		defaultFolder: string;
+		filenameTemplate: string;
+	};
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -66,6 +70,10 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	autoMentionActiveNote: true,
 	debugMode: false,
 	nodePath: "",
+	exportSettings: {
+		defaultFolder: "Agent Client",
+		filenameTemplate: "agent_client_{date}_{time}",
+	},
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -243,6 +251,26 @@ export default class AgentClientPlugin extends Plugin {
 				typeof rawSettings.nodePath === "string"
 					? rawSettings.nodePath.trim()
 					: DEFAULT_SETTINGS.nodePath,
+			exportSettings: (() => {
+				const rawExport = rawSettings.exportSettings as
+					| Record<string, unknown>
+					| null
+					| undefined;
+				if (rawExport && typeof rawExport === "object") {
+					return {
+						defaultFolder:
+							typeof rawExport.defaultFolder === "string"
+								? rawExport.defaultFolder
+								: DEFAULT_SETTINGS.exportSettings.defaultFolder,
+						filenameTemplate:
+							typeof rawExport.filenameTemplate === "string"
+								? rawExport.filenameTemplate
+								: DEFAULT_SETTINGS.exportSettings
+										.filenameTemplate,
+					};
+				}
+				return DEFAULT_SETTINGS.exportSettings;
+			})(),
 		};
 
 		this.ensureActiveAgentId();
