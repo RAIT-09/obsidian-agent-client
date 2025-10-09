@@ -11,8 +11,8 @@ export function TextWithMentions({
 	text,
 	plugin,
 }: TextWithMentionsProps): React.ReactElement {
-	// Match both @filename and @[filename with spaces] formats
-	const mentionRegex = /@(?:\[([^\]]+)\]|([^@\s]+))/g;
+	// Match @[[filename]] format only
+	const mentionRegex = /@\[\[([^\]]+)\]\]/g;
 	const parts: React.ReactNode[] = [];
 	let lastIndex = 0;
 	let match;
@@ -23,8 +23,8 @@ export function TextWithMentions({
 			parts.push(text.slice(lastIndex, match.index));
 		}
 
-		// Extract filename - either from [brackets] or plain text
-		const noteName = match[1] || match[2];
+		// Extract filename from [[brackets]]
+		const noteName = match[1];
 
 		// Check if file actually exists
 		const file = plugin.app.vault

@@ -985,7 +985,7 @@ function ChatComponent({
 			lastActiveNote &&
 			!isAutoMentionTemporarilyDisabled
 		) {
-			const autoMention = `@[${lastActiveNote.basename}]`;
+			const autoMention = `@[[${lastActiveNote.basename}]]`;
 			if (!inputValue.includes(autoMention)) {
 				messageText = `${autoMention}\n${inputValue}`;
 			}

@@ -44,42 +44,43 @@ export function detectMention(
 	const afterAt = textUpToCursor.slice(atIndex + 1);
 	logger.log("[DEBUG] Text after @:", afterAt);
 
-	// Support both @filename and @[filename with spaces] formats
+	// Trigger on @ and allow typing query directly
 	let query = "";
 	let endPos = cursorPosition;
 
-	if (afterAt.startsWith("[")) {
-		// @[filename] format - find closing bracket
-		const closingBracket = afterAt.indexOf("]");
-		if (closingBracket === -1) {
+	// Check if there's a space, tab, or newline - these end the mention
+	if (
+		afterAt.includes(" ") ||
+		afterAt.includes("\t") ||
+		afterAt.includes("\n")
+	) {
+		logger.log("[DEBUG] Mention ended by whitespace");
+		return null;
+	}
+
+	// If already in @[[...]] format, handle it
+	if (afterAt.startsWith("[[")) {
+		const closingBrackets = afterAt.indexOf("]]");
+		if (closingBrackets === -1) {
 			// Still typing inside brackets
-			query = afterAt.slice(1); // Remove opening [
+			query = afterAt.slice(2); // Remove opening [[
 			endPos = cursorPosition;
 		} else {
-			// Found closing bracket - check if cursor is after it
-			const closingBracketPos = atIndex + 1 + closingBracket;
-			if (cursorPosition > closingBracketPos) {
-				// Cursor is after ], no longer a mention
+			// Found closing brackets - check if cursor is after them
+			const closingBracketsPos = atIndex + 1 + closingBrackets + 1; // +1 for second ]
+			if (cursorPosition > closingBracketsPos) {
+				// Cursor is after ]], no longer a mention
 				logger.log(
-					"[DEBUG] Cursor is after closing ], stopping mention detection",
+					"[DEBUG] Cursor is after closing ]], stopping mention detection",
 				);
 				return null;
 			}
 			// Complete bracket format
-			query = afterAt.slice(1, closingBracket); // Between [ and ]
-			endPos = closingBracketPos + 1; // Include closing ]
+			query = afterAt.slice(2, closingBrackets); // Between [[ and ]]
+			endPos = closingBracketsPos + 1; // Include closing ]]
 		}
 	} else {
-		// @filename format (no spaces allowed)
-		if (
-			afterAt.includes(" ") ||
-			afterAt.includes("\t") ||
-			afterAt.includes("\n") ||
-			afterAt.includes("]")
-		) {
-			logger.log("[DEBUG] Mention contains invalid characters");
-			return null;
-		}
+		// Simple @query format - use everything after @
 		query = afterAt;
 		endPos = cursorPosition;
 	}
@@ -102,10 +103,8 @@ export function replaceMention(
 	const before = text.slice(0, mentionContext.start);
 	const after = text.slice(mentionContext.end);
 
-	// Use @[filename] format if title contains spaces, otherwise @filename
-	const replacement = noteTitle.includes(" ")
-		? ` @[${noteTitle}] `
-		: ` @${noteTitle} `;
+	// Always use @[[filename]] format
+	const replacement = ` @[[${noteTitle}]] `;
 
 	const newText = before + replacement + after;
 	const newCursorPos = mentionContext.start + replacement.length;
@@ -119,35 +118,31 @@ export function convertMentionsToPath(
 	noteMentionService: IMentionService,
 	vaultPath: string,
 ): string {
-	// Find all @mentions in the text (both @filename and @[filename] formats)
-	const mentionRegex = /@(?:\[([^\]]+)\]|([^@\s]+))/g;
+	// Find all @mentions in the text (@[[filename]] format only)
+	const mentionRegex = /@\[\[([^\]]+)\]\]/g;
 	let convertedText = text;
 
-	convertedText = convertedText.replace(
-		mentionRegex,
-		(match, bracketName, plainName) => {
-			// Extract filename - either from [brackets] or plain text
-			const noteTitle = bracketName || plainName;
+	convertedText = convertedText.replace(mentionRegex, (match, noteTitle) => {
+		// Extract filename from [[brackets]]
 
-			// Find the file by basename
-			const file = noteMentionService
-				.getAllFiles()
-				.find((f: TFile) => f.basename === noteTitle);
-			if (file) {
-				// Calculate absolute path by combining vault path with file path
-				const absolutePath = vaultPath
-					? `${vaultPath}/${file.path}`
-					: file.path;
-				// TODO: Fix logger usage in utility functions
-				// logger.log(
-				// 	`[DEBUG] Converting @${noteTitle} to absolute path: ${absolutePath}`,
-				// );
-				return absolutePath;
-			}
-			// If file not found, keep original @mention
-			return match;
-		},
-	);
+		// Find the file by basename
+		const file = noteMentionService
+			.getAllFiles()
+			.find((f: TFile) => f.basename === noteTitle);
+		if (file) {
+			// Calculate absolute path by combining vault path with file path
+			const absolutePath = vaultPath
+				? `${vaultPath}/${file.path}`
+				: file.path;
+			// TODO: Fix logger usage in utility functions
+			// logger.log(
+			// 	`[DEBUG] Converting @${noteTitle} to absolute path: ${absolutePath}`,
+			// );
+			return absolutePath;
+		}
+		// If file not found, keep original @mention
+		return match;
+	});
 
 	return convertedText;
 }
@@ -157,13 +152,13 @@ export function extractMentions(
 	text: string,
 ): Array<{ text: string; start: number; end: number }> {
 	const mentions: Array<{ text: string; start: number; end: number }> = [];
-	// Match both @filename and @[filename with spaces] formats
-	const mentionRegex = /@(?:\[([^\]]+)\]|([^@\s]+))/g;
+	// Match @[[filename]] format only
+	const mentionRegex = /@\[\[([^\]]+)\]\]/g;
 	let match;
 
 	while ((match = mentionRegex.exec(text)) !== null) {
-		// Extract filename - either from [brackets] or plain text
-		const noteTitle = match[1] || match[2];
+		// Extract filename from [[brackets]]
+		const noteTitle = match[1];
 		mentions.push({
 			text: noteTitle, // Note title without @ and brackets
 			start: match.index,
