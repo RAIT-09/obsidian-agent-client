@@ -69,6 +69,16 @@ export class TerminalManager {
 			}
 		}
 
+		// On macOS and Linux, wrap the command in a login shell to inherit the user's environment
+		if (Platform.isMacOS || Platform.isLinux) {
+			const shell = Platform.isMacOS ? "/bin/zsh" : "/bin/bash";
+			const commandString = [command, ...args]
+				.map((arg) => "'" + arg.replace(/'/g, "'\\''") + "'")
+				.join(" ");
+			command = shell;
+			args = ["-l", "-c", commandString];
+		}
+
 		this.logger.log(`[Terminal ${terminalId}] Creating terminal:`, {
 			command,
 			args,

@@ -612,13 +612,31 @@ function ChatComponent({
 				vaultPath,
 			);
 
-			// Use shell on Windows for .cmd/.bat files, optional on Unix systems
-			const needsShell =
-				process.platform === "win32" ||
-				activeAgent.command.endsWith(".cmd") ||
-				activeAgent.command.endsWith(".bat");
+			// Prepare command and args for spawning
+			let spawnCommand = activeAgent.command;
+			let spawnArgs = agentArgs;
 
-			const agentProcess = spawn(activeAgent.command, agentArgs, {
+			// On macOS and Linux, wrap the command in a login shell to inherit the user's environment
+			// This ensures that PATH modifications in .zshrc/.bash_profile are available
+			if (Platform.isMacOS || Platform.isLinux) {
+				const shell = Platform.isMacOS ? "/bin/zsh" : "/bin/bash";
+				const commandString = [activeAgent.command, ...agentArgs]
+					.map((arg) => "'" + arg.replace(/'/g, "'\\''") + "'")
+					.join(" ");
+				spawnCommand = shell;
+				spawnArgs = ["-l", "-c", commandString];
+				logger.log(
+					"[Debug] Using login shell:",
+					shell,
+					"with command:",
+					commandString,
+				);
+			}
+
+			// Use shell on Windows for .cmd/.bat files
+			const needsShell = process.platform === "win32";
+
+			const agentProcess = spawn(spawnCommand, spawnArgs, {
 				stdio: ["pipe", "pipe", "pipe"],
 				env: baseEnv,
 				cwd: vaultPath,
