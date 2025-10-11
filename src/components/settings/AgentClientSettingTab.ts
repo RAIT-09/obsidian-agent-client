@@ -20,8 +20,6 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		this.renderAgentSelector(containerEl);
 
-		containerEl.createEl("h1", { text: "General Settings" });
-
 		new Setting(containerEl)
 			.setName("Node.js path")
 			.setDesc(
@@ -64,16 +62,16 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		containerEl.createEl("h1", { text: "Built-in agents" });
+		new Setting(containerEl).setName("Built-in agents").setHeading();
 
 		this.renderGeminiSettings(containerEl);
 		this.renderClaudeSettings(containerEl);
 
-		containerEl.createEl("h1", { text: "Custom agents" });
+		new Setting(containerEl).setName("Custom agents").setHeading();
 
 		this.renderCustomAgents(containerEl);
 
-		containerEl.createEl("h1", { text: "Export Settings" });
+		new Setting(containerEl).setName("Export").setHeading();
 
 		new Setting(containerEl)
 			.setName("Export folder")
@@ -107,7 +105,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		containerEl.createEl("h1", { text: "Developer Settings" });
+		new Setting(containerEl).setName("Developer").setHeading();
 
 		new Setting(containerEl)
 			.setName("Debug mode")
@@ -199,7 +197,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 	private renderGeminiSettings(sectionEl: HTMLElement) {
 		const gemini = this.plugin.settings.gemini;
 
-		sectionEl.createEl("h3", { text: gemini.displayName || "Gemini CLI" });
+		new Setting(sectionEl)
+			.setName(gemini.displayName || "Gemini CLI")
+			.setHeading();
 
 		new Setting(sectionEl)
 			.setName("API key")
@@ -265,9 +265,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 	private renderClaudeSettings(sectionEl: HTMLElement) {
 		const claude = this.plugin.settings.claude;
 
-		sectionEl.createEl("h3", {
-			text: claude.displayName || "Claude Code (ACP)",
-		});
+		new Setting(sectionEl)
+			.setName(claude.displayName || "Claude Code (ACP)")
+			.setHeading();
 
 		new Setting(sectionEl)
 			.setName("API key")
