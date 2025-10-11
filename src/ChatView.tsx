@@ -475,14 +475,39 @@ function ChatComponent({
 	const adjustTextareaHeight = () => {
 		const textarea = textareaRef.current;
 		if (textarea) {
-			textarea.style.height = "auto";
+			// Remove previous dynamic height classes
+			textarea.classList.remove(
+				"textarea-auto-height",
+				"textarea-expanded",
+			);
+
+			// Temporarily use auto to measure
+			textarea.classList.add("textarea-auto-height");
 			const scrollHeight = textarea.scrollHeight;
 			const maxHeight = 300; // Increased from 120 to 300
 			const hasAutoMention =
 				textarea.classList.contains("has-auto-mention");
 			const minHeight = hasAutoMention ? 116 : 80;
-			textarea.style.height =
-				Math.max(minHeight, Math.min(scrollHeight, maxHeight)) + "px";
+
+			// Check if expansion is needed
+			const calculatedHeight = Math.max(
+				minHeight,
+				Math.min(scrollHeight, maxHeight),
+			);
+
+			// Apply expanded class if needed
+			if (calculatedHeight > minHeight) {
+				textarea.classList.add("textarea-expanded");
+				// Set CSS variable for dynamic height
+				textarea.style.setProperty(
+					"--textarea-height",
+					`${calculatedHeight}px`,
+				);
+			} else {
+				textarea.style.removeProperty("--textarea-height");
+			}
+
+			textarea.classList.remove("textarea-auto-height");
 		}
 	};
 
@@ -496,6 +521,7 @@ function ChatComponent({
 			}
 
 			// Get the Vault root path
+			// Desktop-only: fallback to process.cwd() if basePath is unavailable
 			const vaultPath =
 				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
 					.basePath || process.cwd();
@@ -582,6 +608,8 @@ function ChatComponent({
 				agentArgs.length > 0 ? agentArgs.join(" ") : "(none)",
 			);
 
+			// Desktop-only: Node.js process environment for agent spawning
+			// Note: This plugin is marked as isDesktopOnly in manifest.json
 			const baseEnv: NodeJS.ProcessEnv = {
 				...process.env,
 				...envVarsToRecord(activeAgent.env),
@@ -599,7 +627,7 @@ function ChatComponent({
 					settings.nodePath.trim(),
 				);
 				if (nodeDir) {
-					const separator = process.platform === "win32" ? ";" : ":";
+					const separator = Platform.isWin ? ";" : ":";
 					baseEnv.PATH = baseEnv.PATH
 						? `${nodeDir}${separator}${baseEnv.PATH}`
 						: nodeDir;
@@ -634,7 +662,7 @@ function ChatComponent({
 			}
 
 			// Use shell on Windows for .cmd/.bat files
-			const needsShell = process.platform === "win32";
+			const needsShell = Platform.isWin;
 
 			const agentProcess = spawn(spawnCommand, spawnArgs, {
 				stdio: ["pipe", "pipe", "pipe"],
@@ -894,15 +922,16 @@ function ChatComponent({
 	}, []);
 
 	const updateIconColor = (svg: SVGElement) => {
+		// Remove all state classes
+		svg.classList.remove("icon-sending", "icon-active", "icon-inactive");
+
 		if (isSending) {
 			// Stop button - always active when sending
-			svg.style.color = "var(--color-red)";
+			svg.classList.add("icon-sending");
 		} else {
 			// Send button - active when has input
 			const hasInput = inputValue.trim() !== "";
-			svg.style.color = hasInput
-				? "var(--interactive-accent)"
-				: "var(--text-muted)";
+			svg.classList.add(hasInput ? "icon-active" : "icon-inactive");
 		}
 	};
 
@@ -925,6 +954,7 @@ function ChatComponent({
 		try {
 			logger.log("[Debug] Creating new session...");
 			// Get the Vault root path
+			// Desktop-only: fallback to process.cwd() if basePath is unavailable
 			const vaultPath =
 				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
 					.basePath || process.cwd();

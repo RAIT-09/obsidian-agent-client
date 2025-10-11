@@ -513,6 +513,15 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--background-primary) !important;
 }
 
+/* Dynamic textarea height management */
+.chat-input-textarea.textarea-auto-height {
+	height: auto;
+}
+
+.chat-input-textarea.textarea-expanded {
+	height: var(--textarea-height, auto);
+}
+
 /* Send button */
 .chat-send-button {
 	position: absolute;
@@ -538,6 +547,23 @@ If your plugin does not need CSS, delete this file.
 
 .chat-send-button.disabled {
 	cursor: not-allowed !important;
+}
+
+/* Send button icon states */
+.chat-send-button svg {
+	transition: color 0.2s ease;
+}
+
+.chat-send-button svg.icon-sending {
+	color: var(--color-red);
+}
+
+.chat-send-button svg.icon-active {
+	color: var(--interactive-accent);
+}
+
+.chat-send-button svg.icon-inactive {
+	color: var(--text-muted);
 }
 
 /* ===== Other Chat Components ===== */

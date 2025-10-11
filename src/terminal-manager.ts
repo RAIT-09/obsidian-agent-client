@@ -33,6 +33,7 @@ export class TerminalManager {
 		}
 
 		// Set up environment variables
+		// Desktop-only: Node.js process environment for terminal operations
 		const env = { ...process.env };
 		if (params.env) {
 			for (const envVar of params.env) {
