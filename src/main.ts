@@ -1,4 +1,4 @@
-import { App, Plugin, WorkspaceLeaf, Notice } from "obsidian";
+import { App, Plugin, WorkspaceLeaf, Notice, requestUrl } from "obsidian";
 import { ChatView, VIEW_TYPE_CHAT } from "./ChatView";
 import { createSettingsStore, type SettingsStore } from "./settings-store";
 import { AgentClientSettingTab } from "./components/settings/AgentClientSettingTab";
@@ -287,10 +287,10 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	async checkForUpdates(): Promise<boolean> {
-		const response = await fetch(
-			"https://api.github.com/repos/RAIT-09/obsidian-agent-client/releases/latest",
-		);
-		const data = await response.json();
+		const response = await requestUrl({
+			url: "https://api.github.com/repos/RAIT-09/obsidian-agent-client/releases/latest",
+		});
+		const data = response.json;
 		const latestVersion = data.tag_name;
 		const currentVersion = this.manifest.version;
 
