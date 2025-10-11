@@ -50,7 +50,7 @@ interface AppWithSettings {
 	};
 }
 
-export const VIEW_TYPE_CHAT = "chat-view";
+export const VIEW_TYPE_CHAT = "agent-client-chat-view";
 
 // Convert environment variable definitions from settings into a simple record
 const envVarsToRecord = (vars?: { key: string; value: string }[]) => {
@@ -1421,7 +1421,7 @@ export class ChatView extends ItemView {
 	}
 
 	getDisplayText() {
-		return "Chat";
+		return "Agent client";
 	}
 
 	getIcon() {
