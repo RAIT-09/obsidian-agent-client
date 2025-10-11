@@ -95,7 +95,7 @@ export default class AgentClientPlugin extends Plugin {
 				this.activateView();
 			},
 		);
-		ribbonIconEl.addClass("my-plugin-ribbon-class");
+		ribbonIconEl.addClass("agent-client-ribbon-icon");
 
 		this.addCommand({
 			id: "open-agent-client-chat-view",
