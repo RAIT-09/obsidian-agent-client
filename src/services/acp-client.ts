@@ -4,6 +4,7 @@ import type {
 	MessageContent,
 	IAcpClient,
 } from "../types/acp-types";
+import { AcpTypeConverter } from "../adapters/acp-type-converter";
 import { TerminalManager } from "../terminal-manager";
 import { Logger } from "../utils/logger";
 import type AgentClientPlugin from "../main";
@@ -78,7 +79,9 @@ export class AcpClient implements IAcpClient {
 							title: update.title,
 							status: update.status || "pending",
 							kind: update.kind,
-							content: update.content,
+							content: AcpTypeConverter.toToolCallContent(
+								update.content,
+							),
 						},
 					],
 					timestamp: new Date(),
@@ -95,7 +98,7 @@ export class AcpClient implements IAcpClient {
 					title: update.title,
 					status: update.status || "pending",
 					kind: update.kind || undefined,
-					content: update.content || undefined,
+					content: AcpTypeConverter.toToolCallContent(update.content),
 				});
 				break;
 			case "plan":
@@ -171,9 +174,9 @@ export class AcpClient implements IAcpClient {
 			const status = (toolCallInfo.status ||
 				"pending") as acp.ToolCallStatus;
 			const kind = toolCallInfo.kind as acp.ToolKind | undefined;
-			const content = toolCallInfo.content as
-				| acp.ToolCallContent[]
-				| undefined;
+			const content = AcpTypeConverter.toToolCallContent(
+				toolCallInfo.content as acp.ToolCallContent[] | undefined,
+			);
 
 			this.addMessage({
 				id: crypto.randomUUID(),
