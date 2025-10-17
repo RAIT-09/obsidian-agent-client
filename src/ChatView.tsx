@@ -7,7 +7,14 @@ import {
 	Notice,
 } from "obsidian";
 import * as React from "react";
-const { useState, useRef, useEffect, useSyncExternalStore, useMemo } = React;
+const {
+	useState,
+	useRef,
+	useEffect,
+	useSyncExternalStore,
+	useMemo,
+	useCallback,
+} = React;
 import { createRoot, Root } from "react-dom/client";
 
 import { spawn, ChildProcess } from "child_process";
@@ -37,6 +44,8 @@ import {
 	convertMentionsToPath,
 	type MentionContext,
 } from "./utils/mention-utils";
+import { ChatSession } from "./domain/models/chat-session";
+import { ErrorInfo } from "./domain/models/agent-error";
 
 // Type definitions for Obsidian internal APIs
 interface VaultAdapterWithBasePath {
@@ -92,6 +101,19 @@ function ChatComponent({
 	// Create logger instance
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 
+	// Check current platform (Obsidian requires this check for desktop-only plugins)
+	if (!Platform.isDesktopApp) {
+		throw new Error("Agent Client is only available on desktop");
+	}
+
+	// Get the Vault root path (safe to use after platform check)
+	const vaultPath = useMemo(() => {
+		return (
+			(plugin.app.vault.adapter as VaultAdapterWithBasePath).basePath ||
+			process.cwd()
+		);
+	}, [plugin]);
+
 	// Use the settings store to get reactive settings
 	const settings = useSyncExternalStore(
 		plugin.settingsStore.subscribe,
@@ -107,20 +129,16 @@ function ChatComponent({
 
 	const [inputValue, setInputValue] = useState("");
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
-	const [sessionId, setSessionId] = useState<string | null>(null);
-	const [isReady, setIsReady] = useState(false);
-	const [isSending, setIsSending] = useState(false);
-	const [authMethods, setAuthMethods] = useState<acp.AuthMethod[] | null>(
-		null,
-	);
-	const [errorInfo, setErrorInfo] = useState<{
-		title: string;
-		message: string;
-		suggestion?: string;
-	} | null>(null);
-	const [currentAgentId, setCurrentAgentId] = useState<string>(
-		settings.activeAgentId || settings.claude.id,
-	);
+	const [session, setSession] = useState<ChatSession>({
+		sessionId: null,
+		state: "initializing",
+		agentId: settings.activeAgentId || settings.claude.id,
+		authMethods: [],
+		createdAt: new Date(),
+		lastActivityAt: new Date(),
+		workingDirectory: vaultPath,
+	});
+	const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
 	const [lastActiveNote, setLastActiveNote] = useState<TFile | null>(null);
 	const [
 		isAutoMentionTemporarilyDisabled,
@@ -149,8 +167,26 @@ function ChatComponent({
 		null,
 	);
 
+	// Helper function to update session with automatic lastActivityAt update
+	const updateSessionActivity = useCallback(
+		(updates: Partial<ChatSession>) => {
+			setSession((prev) => ({
+				...prev,
+				...updates,
+				lastActivityAt: new Date(),
+			}));
+		},
+		[],
+	);
+
+	// Helper to check if agent is currently processing a request
+	const isSending = session.state === "busy";
+
+	// Helper to check if session is ready for user input
+	const isSessionReady = session.state === "ready";
+
 	const getActiveAgentLabel = () => {
-		const activeId = currentAgentId;
+		const activeId = session.agentId;
 		if (activeId === plugin.settings.claude.id) {
 			return (
 				plugin.settings.claude.displayName || plugin.settings.claude.id
@@ -515,17 +551,6 @@ function ChatComponent({
 		async function setupConnection() {
 			logger.log("[Debug] Starting connection setup...");
 
-			// Check current platform
-			if (!Platform.isDesktopApp) {
-				throw new Error("Agent Client is only available on desktop");
-			}
-
-			// Get the Vault root path
-			// Desktop-only: fallback to process.cwd() if basePath is unavailable
-			const vaultPath =
-				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
-					.basePath || process.cwd();
-
 			type LaunchableAgent = {
 				id: string;
 				label: string;
@@ -578,7 +603,7 @@ function ChatComponent({
 
 			const activeAgentCandidate =
 				launchCandidates.find(
-					(candidate) => candidate.id === currentAgentId,
+					(candidate) => candidate.id === session.agentId,
 				) ?? launchCandidates[0];
 
 			if (
@@ -801,6 +826,9 @@ function ChatComponent({
 
 			try {
 				logger.log("[Debug] Starting ACP initialization...");
+
+				updateSessionActivity({ state: "initializing" });
+
 				const initResult = await connection.initialize({
 					protocolVersion: acp.PROTOCOL_VERSION,
 					clientCapabilities: {
@@ -825,12 +853,17 @@ function ChatComponent({
 				});
 				logger.log(`📝 Created session: ${sessionResult.sessionId}`);
 
-				setSessionId(sessionResult.sessionId);
-				setAuthMethods(initResult.authMethods || []);
-				setIsReady(true);
+				updateSessionActivity({
+					sessionId: sessionResult.sessionId,
+					authMethods: initResult.authMethods || [],
+					state: "ready",
+				});
 			} catch (error) {
 				logger.error("[Client] Initialization Error:", error);
 				logger.error("[Client] Error details:", error);
+				updateSessionActivity({
+					state: "error",
+				});
 			}
 		}
 
@@ -839,15 +872,22 @@ function ChatComponent({
 		return () => {
 			agentProcessRef.current?.kill();
 		};
-	}, [currentAgentId]);
+	}, [session.agentId]);
 
 	// Monitor agent changes from settings when messages are empty
 	useEffect(() => {
 		const newActiveAgentId = settings.activeAgentId || settings.claude.id;
-		if (messages.length === 0 && newActiveAgentId !== currentAgentId) {
-			setCurrentAgentId(newActiveAgentId);
+		if (messages.length === 0 && newActiveAgentId !== session.agentId) {
+			updateSessionActivity({
+				agentId: newActiveAgentId,
+			});
 		}
-	}, [settings.activeAgentId, messages.length]);
+	}, [
+		settings.activeAgentId,
+		messages.length,
+		session.agentId,
+		updateSessionActivity,
+	]);
 
 	// Auto-scroll when messages change
 	useEffect(() => {
@@ -953,12 +993,9 @@ function ChatComponent({
 
 		try {
 			logger.log("[Debug] Creating new session...");
-			// Get the Vault root path
-			// Desktop-only: fallback to process.cwd() if basePath is unavailable
-			const vaultPath =
-				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
-					.basePath || process.cwd();
 			logger.log("[Debug] Using vault path as cwd:", vaultPath);
+
+			updateSessionActivity({ state: "initializing" });
 
 			const sessionResult = await connectionRef.current.newSession({
 				cwd: vaultPath,
@@ -966,7 +1003,11 @@ function ChatComponent({
 			});
 			logger.log(`📝 Created new session: ${sessionResult.sessionId}`);
 
-			setSessionId(sessionResult.sessionId);
+			updateSessionActivity({
+				sessionId: sessionResult.sessionId,
+				state: "ready",
+				createdAt: new Date(),
+			});
 			setMessages([]);
 			setInputValue("");
 			acpClientRef.current?.resetCurrentMessage();
@@ -975,18 +1016,23 @@ function ChatComponent({
 			// Switch to the active agent from settings if different from current
 			const newActiveAgentId =
 				plugin.settings.activeAgentId || plugin.settings.claude.id;
-			if (newActiveAgentId !== currentAgentId) {
-				setCurrentAgentId(newActiveAgentId);
+			if (newActiveAgentId !== session.agentId) {
+				updateSessionActivity({
+					agentId: newActiveAgentId,
+				});
 			}
 		} catch (error) {
 			logger.error("[Client] New Session Error:", error);
+			updateSessionActivity({
+				state: "error",
+			});
 		}
 	};
 
 	const handleStopGeneration = async () => {
-		if (!connectionRef.current || !sessionId) {
+		if (!connectionRef.current || !session.sessionId) {
 			logger.warn("Cannot cancel: no connection or session");
-			setIsSending(false);
+			updateSessionActivity({ state: "ready" });
 			return;
 		}
 
@@ -995,7 +1041,7 @@ function ChatComponent({
 
 			// Send cancellation notification using the proper ACP method
 			await connectionRef.current.cancel({
-				sessionId: sessionId,
+				sessionId: session.sessionId,
 			});
 
 			logger.log("Cancellation request sent successfully");
@@ -1006,8 +1052,8 @@ function ChatComponent({
 			// Mark permission requests as cancelled in UI
 			markPermissionRequestsAsCancelled();
 
-			// Update UI state immediately
-			setIsSending(false);
+			// Update session state to ready
+			updateSessionActivity({ state: "ready" });
 		} catch (error) {
 			logger.error("Failed to send cancellation:", error);
 
@@ -1017,14 +1063,15 @@ function ChatComponent({
 			// Mark permission requests as cancelled in UI
 			markPermissionRequestsAsCancelled();
 
-			setIsSending(false);
+			updateSessionActivity({ state: "ready" });
 		}
 	};
 
 	const handleSendMessage = async () => {
 		if (!connectionRef.current || !inputValue.trim() || isSending) return;
 
-		setIsSending(true);
+		// Set session to busy state
+		updateSessionActivity({ state: "busy" });
 
 		// Add auto-mention
 		let messageText = inputValue;
@@ -1069,7 +1116,7 @@ function ChatComponent({
 		try {
 			logger.log(`\n✅ Sending Message...: ${messageTextForAgent}`);
 			const promptResult = await connectionRef.current.prompt({
-				sessionId: sessionId!,
+				sessionId: session.sessionId!,
 				prompt: [
 					{
 						type: "text",
@@ -1079,10 +1126,10 @@ function ChatComponent({
 			});
 			logger.log(`\n✅ Agent completed with: ${promptResult.stopReason}`);
 
-			setIsSending(false);
+			updateSessionActivity({ state: "ready" });
 		} catch (error) {
 			logger.error("[Client] Prompt Error:", error);
-			setIsSending(false);
+			updateSessionActivity({ state: "ready" });
 
 			// Check if this is an "empty response text" error - if so, silently ignore it
 			if (
@@ -1098,20 +1145,20 @@ function ChatComponent({
 				}
 			}
 
-			if (!authMethods || authMethods.length === 0) {
+			if (!session.authMethods || session.authMethods.length === 0) {
 				logger.error("No auth methods available");
 				return;
 			}
 
-			if (authMethods.length === 1) {
-				const success = await authenticate(authMethods[0].id);
+			if (session.authMethods.length === 1) {
+				const success = await authenticate(session.authMethods[0].id);
 				if (success) {
 					// Retry with the same message text
-					setIsSending(true);
+					updateSessionActivity({ state: "busy" });
 					try {
 						const promptResult = await connectionRef.current.prompt(
 							{
-								sessionId: sessionId!,
+								sessionId: session.sessionId!,
 								prompt: [
 									{
 										type: "text",
@@ -1123,10 +1170,10 @@ function ChatComponent({
 						logger.log(
 							`\n✅ Agent completed with: ${promptResult.stopReason}`,
 						);
-						setIsSending(false);
+						updateSessionActivity({ state: "ready" });
 					} catch (retryError) {
 						logger.error("[Client] Retry Error:", retryError);
-						setIsSending(false);
+						updateSessionActivity({ state: "ready" });
 					}
 				}
 			} else {
@@ -1179,7 +1226,7 @@ function ChatComponent({
 			e.preventDefault();
 			// Only send if send button would not be disabled (same condition as button)
 			const buttonDisabled =
-				!isSending && (inputValue.trim() === "" || !isReady);
+				!isSending && (inputValue.trim() === "" || !isSessionReady);
 			if (!buttonDisabled && !isSending) {
 				handleSendMessage();
 			}
@@ -1216,8 +1263,8 @@ function ChatComponent({
 			const filePath = await exporter.exportToMarkdown(
 				messages,
 				activeAgentLabel,
-				currentAgentId,
-				sessionId || "unknown",
+				session.agentId,
+				session.sessionId || "unknown",
 			);
 			new Notice(`[Agent Client] Chat exported to ${filePath}`);
 		} catch (error) {
@@ -1281,7 +1328,7 @@ function ChatComponent({
 					</div>
 				) : messages.length === 0 ? (
 					<div className="chat-empty-state">
-						{!isReady
+						{!isSessionReady
 							? `Connecting to ${activeAgentLabel}...`
 							: `Start a conversation with ${activeAgentLabel}...`}
 					</div>
@@ -1390,11 +1437,12 @@ function ChatComponent({
 							isSending ? handleStopGeneration : handleSendMessage
 						}
 						disabled={
-							!isSending && (inputValue.trim() === "" || !isReady)
+							!isSending &&
+							(inputValue.trim() === "" || !isSessionReady)
 						}
-						className={`chat-send-button ${isSending ? "sending" : ""} ${!isSending && (inputValue.trim() === "" || !isReady) ? "disabled" : ""}`}
+						className={`chat-send-button ${isSending ? "sending" : ""} ${!isSending && (inputValue.trim() === "" || !isSessionReady) ? "disabled" : ""}`}
 						title={
-							!isReady
+							!isSessionReady
 								? "Connecting..."
 								: isSending
 									? "Stop generation"
