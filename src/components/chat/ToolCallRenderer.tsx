@@ -2,6 +2,7 @@ import * as React from "react";
 const { useState } = React;
 import type { MessageContent, IAcpClient } from "../../types/acp-types";
 import type AgentClientPlugin from "../../main";
+import type { HandlePermissionUseCase } from "../../use-cases/handle-permission.use-case";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { PermissionRequestSection } from "./PermissionRequestSection";
 // import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
@@ -10,6 +11,7 @@ interface ToolCallRendererProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
 	plugin: AgentClientPlugin;
 	acpClient?: IAcpClient;
+	handlePermissionUseCase?: HandlePermissionUseCase;
 	onPermissionSelected?: (requestId: string, optionId: string) => void;
 }
 
@@ -17,6 +19,7 @@ export function ToolCallRenderer({
 	content,
 	plugin,
 	acpClient,
+	handlePermissionUseCase,
 	onPermissionSelected,
 }: ToolCallRendererProps) {
 	const {
@@ -147,6 +150,7 @@ export function ToolCallRenderer({
 					}}
 					toolCallId={toolCallId}
 					acpClient={acpClient}
+					handlePermissionUseCase={handlePermissionUseCase}
 					plugin={plugin}
 					onPermissionSelected={handlePermissionSelected}
 				/>

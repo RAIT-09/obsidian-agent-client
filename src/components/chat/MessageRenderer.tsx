@@ -5,12 +5,14 @@ import type {
 	IAcpClient,
 } from "../../types/acp-types";
 import type AgentClientPlugin from "../../main";
+import type { HandlePermissionUseCase } from "../../use-cases/handle-permission.use-case";
 import { MessageContentRenderer } from "./MessageContentRenderer";
 
 interface MessageRendererProps {
 	message: ChatMessage;
 	plugin: AgentClientPlugin;
 	acpClient?: IAcpClient;
+	handlePermissionUseCase?: HandlePermissionUseCase;
 	updateMessageContent?: (
 		messageId: string,
 		updatedContent: MessageContent,
@@ -22,6 +24,7 @@ export function MessageRenderer({
 	message,
 	plugin,
 	acpClient,
+	handlePermissionUseCase,
 	updateMessageContent,
 	onPermissionSelected,
 }: MessageRendererProps) {
@@ -37,6 +40,7 @@ export function MessageRenderer({
 						messageId={message.id}
 						messageRole={message.role}
 						acpClient={acpClient}
+						handlePermissionUseCase={handlePermissionUseCase}
 						updateMessageContent={updateMessageContent}
 						onPermissionSelected={onPermissionSelected}
 					/>

@@ -2,6 +2,7 @@ import * as React from "react";
 const { useMemo } = React;
 import type { IAcpClient } from "../../types/acp-types";
 import type AgentClientPlugin from "../../main";
+import type { HandlePermissionUseCase } from "../../use-cases/handle-permission.use-case";
 import { Logger } from "../../utils/logger";
 import * as acp from "@zed-industries/agent-client-protocol";
 
@@ -14,6 +15,7 @@ interface PermissionRequestSectionProps {
 	};
 	toolCallId: string;
 	acpClient?: IAcpClient;
+	handlePermissionUseCase?: HandlePermissionUseCase;
 	plugin: AgentClientPlugin;
 	onPermissionSelected?: (requestId: string, optionId: string) => void;
 }
@@ -22,6 +24,7 @@ export function PermissionRequestSection({
 	permissionRequest,
 	toolCallId,
 	acpClient,
+	handlePermissionUseCase,
 	plugin,
 	onPermissionSelected,
 }: PermissionRequestSectionProps) {
@@ -41,8 +44,8 @@ export function PermissionRequestSection({
 						<button
 							key={option.optionId}
 							className={`permission-option ${option.kind ? `permission-kind-${option.kind}` : ""}`}
-							onClick={() => {
-								if (acpClient) {
+							onClick={async () => {
+								if (handlePermissionUseCase) {
 									// Call the callback if provided
 									if (onPermissionSelected) {
 										onPermissionSelected(
@@ -51,14 +54,25 @@ export function PermissionRequestSection({
 										);
 									}
 
-									// Send response to agent
-									acpClient.handlePermissionResponse(
-										permissionRequest.requestId,
-										option.optionId,
-									);
+									// Send response to agent via Use Case
+									const result =
+										await handlePermissionUseCase.approvePermission(
+											{
+												requestId:
+													permissionRequest.requestId,
+												optionId: option.optionId,
+											},
+										);
+
+									if (!result.success) {
+										logger.error(
+											"Failed to approve permission:",
+											result.error,
+										);
+									}
 								} else {
 									logger.warn(
-										"Cannot handle permission response: missing acpClient",
+										"Cannot handle permission response: missing handlePermissionUseCase",
 									);
 								}
 							}}
