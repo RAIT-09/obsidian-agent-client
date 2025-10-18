@@ -8,29 +8,15 @@ import {
 	normalizeCustomAgent,
 	ensureUniqueCustomAgentIds,
 } from "./utils/settings-utils";
+import {
+	AgentEnvVar,
+	GeminiAgentSettings,
+	ClaudeAgentSettings,
+	CustomAgentSettings,
+} from "./domain/models/agent-config";
 
-export interface AgentEnvVar {
-	key: string;
-	value: string;
-}
-
-interface BaseAgentSettings {
-	id: string;
-	displayName: string;
-	command: string;
-	args: string[];
-	env: AgentEnvVar[];
-}
-
-interface GeminiAgentSettings extends BaseAgentSettings {
-	apiKey: string;
-}
-
-interface ClaudeAgentSettings extends BaseAgentSettings {
-	apiKey: string;
-}
-
-export interface CustomAgentSettings extends BaseAgentSettings {}
+// Re-export for backward compatibility
+export type { AgentEnvVar, CustomAgentSettings };
 
 export interface AgentClientPluginSettings {
 	gemini: GeminiAgentSettings;
