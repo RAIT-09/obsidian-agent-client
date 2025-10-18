@@ -1,6 +1,9 @@
 import { App, Plugin, WorkspaceLeaf, Notice, requestUrl } from "obsidian";
 import { ChatView, VIEW_TYPE_CHAT } from "./ChatView";
-import { createSettingsStore, type SettingsStore } from "./settings-store";
+import {
+	createSettingsStore,
+	type SettingsStore,
+} from "./adapters/settings-store.adapter";
 import { AgentClientSettingTab } from "./components/settings/AgentClientSettingTab";
 import {
 	sanitizeArgs,
@@ -70,7 +73,7 @@ export default class AgentClientPlugin extends Plugin {
 		await this.loadSettings();
 
 		// Initialize settings store
-		this.settingsStore = createSettingsStore(this.settings);
+		this.settingsStore = createSettingsStore(this.settings, this);
 
 		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
 
