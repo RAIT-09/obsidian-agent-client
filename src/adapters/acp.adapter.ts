@@ -15,7 +15,6 @@ import type {
 	IAcpClient,
 } from "../types/acp-types";
 import type { AgentError } from "../domain/models/agent-error";
-// OLD: import { AcpClient } from "../services/acp-client"; (no longer needed)
 import { AcpTypeConverter } from "./acp-type-converter";
 import { TerminalManager } from "../terminal-manager";
 import { Logger } from "../utils/logger";
@@ -33,7 +32,6 @@ import type AgentClientPlugin from "../main";
 export class AcpAdapter implements IAgentClient, IAcpClient {
 	private connection: acp.ClientSideConnection | null = null;
 	private agentProcess: ChildProcess | null = null;
-	// OLD: private acpClient: AcpClient | null = null; (removed after migration)
 	private logger: Logger;
 
 	// Callback handlers
@@ -299,18 +297,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			config.workingDirectory,
 		);
 
-		// OLD: Create ACP client wrapper (no longer needed after integration)
-		// this.acpClient = new AcpClient(
-		// 	this.addMessage,
-		// 	this.updateLastMessage,
-		// 	this.updateMessage,
-		// 	config.workingDirectory,
-		// 	this.plugin,
-		// 	this.autoAllowPermissions,
-		// );
-
 		const stream = acp.ndJsonStream(input, output);
-		// NEW: AcpAdapter now implements IAcpClient directly
 		this.connection = new acp.ClientSideConnection(() => this, stream);
 
 		try {
@@ -571,7 +558,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 		// Clear connection and config references
 		this.connection = null;
-		// OLD: this.acpClient = null; (no longer needed)
 		this.currentConfig = null;
 
 		this.logger.log("[AcpAdapter] Disconnected");

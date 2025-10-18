@@ -13,11 +13,6 @@ interface MessageRendererProps {
 	plugin: AgentClientPlugin;
 	acpClient?: IAcpClient;
 	handlePermissionUseCase?: HandlePermissionUseCase;
-	updateMessageContent?: (
-		messageId: string,
-		updatedContent: MessageContent,
-	) => void;
-	onPermissionSelected?: (requestId: string, optionId: string) => void;
 }
 
 export function MessageRenderer({
@@ -25,8 +20,6 @@ export function MessageRenderer({
 	plugin,
 	acpClient,
 	handlePermissionUseCase,
-	updateMessageContent,
-	onPermissionSelected,
 }: MessageRendererProps) {
 	return (
 		<div
@@ -41,8 +34,6 @@ export function MessageRenderer({
 						messageRole={message.role}
 						acpClient={acpClient}
 						handlePermissionUseCase={handlePermissionUseCase}
-						updateMessageContent={updateMessageContent}
-						onPermissionSelected={onPermissionSelected}
 					/>
 				</div>
 			))}

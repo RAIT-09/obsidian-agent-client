@@ -17,11 +17,6 @@ interface MessageContentRendererProps {
 	messageRole?: "user" | "assistant";
 	acpClient?: IAcpClient;
 	handlePermissionUseCase?: HandlePermissionUseCase;
-	updateMessageContent?: (
-		messageId: string,
-		updatedContent: MessageContent,
-	) => void;
-	onPermissionSelected?: (requestId: string, optionId: string) => void;
 }
 
 export function MessageContentRenderer({
@@ -31,8 +26,6 @@ export function MessageContentRenderer({
 	messageRole,
 	acpClient,
 	handlePermissionUseCase,
-	updateMessageContent,
-	onPermissionSelected,
 }: MessageContentRendererProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 
@@ -55,7 +48,6 @@ export function MessageContentRenderer({
 					plugin={plugin}
 					acpClient={acpClient}
 					handlePermissionUseCase={handlePermissionUseCase}
-					onPermissionSelected={onPermissionSelected}
 				/>
 			);
 
