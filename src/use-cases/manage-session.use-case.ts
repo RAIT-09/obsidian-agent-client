@@ -12,6 +12,12 @@ import type { IAgentClient } from "../ports/agent-client.port";
 import type { ISettingsAccess } from "../ports/settings-access.port";
 import type { AgentError } from "../domain/models/agent-error";
 import type { AuthenticationMethod } from "../domain/models/chat-session";
+import type {
+	BaseAgentSettings,
+	ClaudeAgentSettings,
+	GeminiAgentSettings,
+} from "../domain/models/agent-config";
+import { toAgentConfig } from "../utils/settings-utils";
 
 // ============================================================================
 // Input/Output Types
@@ -23,6 +29,9 @@ import type { AuthenticationMethod } from "../domain/models/chat-session";
 export interface CreateSessionInput {
 	/** Working directory for the session */
 	workingDirectory: string;
+
+	/** Agent ID to connect to */
+	agentId: string;
 }
 
 /**
@@ -35,6 +44,9 @@ export interface CreateSessionResult {
 	/** New session ID */
 	sessionId?: string;
 
+	/** Authentication methods supported by the agent */
+	authMethods?: AuthenticationMethod[];
+
 	/** Error information if creation failed */
 	error?: AgentError;
 }
@@ -45,6 +57,9 @@ export interface CreateSessionResult {
 export interface RestartSessionInput {
 	/** Working directory for the new session */
 	workingDirectory: string;
+
+	/** Agent ID to connect to */
+	agentId: string;
 
 	/** Current session ID to close (if any) */
 	currentSessionId?: string | null;
@@ -59,6 +74,9 @@ export interface RestartSessionResult {
 
 	/** New session ID */
 	sessionId?: string;
+
+	/** Authentication methods supported by the agent */
+	authMethods?: AuthenticationMethod[];
 
 	/** Error information if restart failed */
 	error?: AgentError;
@@ -76,18 +94,92 @@ export class ManageSessionUseCase {
 
 	/**
 	 * Create a new chat session
+	 *
+	 * This method:
+	 * 1. Gets agent settings from settings store
+	 * 2. Converts settings to AgentConfig
+	 * 3. Calls agentClient.initialize() to spawn and connect to agent
+	 * 4. Calls agentClient.newSession() to create a chat session
 	 */
 	async createSession(
 		input: CreateSessionInput,
 	): Promise<CreateSessionResult> {
 		try {
-			const result = await this.agentClient.newSession(
+			// Get agent settings from settings store
+			const settings = this.settingsAccess.getSnapshot();
+			let agentSettings: BaseAgentSettings | null = null;
+
+			// Find the agent by ID
+			if (input.agentId === settings.claude.id) {
+				agentSettings = settings.claude;
+			} else if (input.agentId === settings.gemini.id) {
+				agentSettings = settings.gemini;
+			} else {
+				// Search in custom agents
+				const customAgent = settings.customAgents.find(
+					(agent) => agent.id === input.agentId,
+				);
+				if (customAgent) {
+					agentSettings = customAgent;
+				}
+			}
+
+			if (!agentSettings) {
+				return {
+					success: false,
+					error: {
+						id: crypto.randomUUID(),
+						category: "configuration",
+						severity: "error",
+						title: "Agent Not Found",
+						message: `Agent with ID "${input.agentId}" not found in settings`,
+						suggestion:
+							"Please check your agent configuration in settings.",
+						occurredAt: new Date(),
+					},
+				};
+			}
+
+			// Build AgentConfig with API key handling
+			const baseConfig = toAgentConfig(
+				agentSettings,
+				input.workingDirectory,
+			);
+
+			// Add API keys to environment for Claude and Gemini
+			let agentConfig = baseConfig;
+			if (input.agentId === settings.claude.id) {
+				const claudeSettings = agentSettings as ClaudeAgentSettings;
+				agentConfig = {
+					...baseConfig,
+					env: {
+						...baseConfig.env,
+						ANTHROPIC_API_KEY: claudeSettings.apiKey,
+					},
+				};
+			} else if (input.agentId === settings.gemini.id) {
+				const geminiSettings = agentSettings as GeminiAgentSettings;
+				agentConfig = {
+					...baseConfig,
+					env: {
+						...baseConfig.env,
+						GOOGLE_API_KEY: geminiSettings.apiKey,
+					},
+				};
+			}
+
+			// Initialize connection to agent
+			const initResult = await this.agentClient.initialize(agentConfig);
+
+			// Create new session
+			const sessionResult = await this.agentClient.newSession(
 				input.workingDirectory,
 			);
 
 			return {
 				success: true,
-				sessionId: result.sessionId,
+				sessionId: sessionResult.sessionId,
+				authMethods: initResult.authMethods,
 			};
 		} catch (error) {
 			return {
@@ -99,7 +191,7 @@ export class ManageSessionUseCase {
 					title: "Session Creation Failed",
 					message: `Failed to create new session: ${error instanceof Error ? error.message : String(error)}`,
 					suggestion:
-						"Please try disconnecting and reconnecting to the agent.",
+						"Please check the agent configuration and try again.",
 					occurredAt: new Date(),
 					originalError: error,
 				},
@@ -129,11 +221,13 @@ export class ManageSessionUseCase {
 		// Create new session
 		const result = await this.createSession({
 			workingDirectory: input.workingDirectory,
+			agentId: input.agentId,
 		});
 
 		return {
 			success: result.success,
 			sessionId: result.sessionId,
+			authMethods: result.authMethods,
 			error: result.error,
 		};
 	}

@@ -35,7 +35,11 @@ import { Logger } from "./utils/logger";
 import { ChatExporter } from "./utils/chat-exporter";
 
 // Type imports
-import type { ChatMessage, MessageContent } from "./types/acp-types";
+import type {
+	ChatMessage,
+	MessageContent,
+	IAcpClient,
+} from "./types/acp-types";
 
 // Utility imports
 import {
@@ -47,11 +51,20 @@ import {
 import { ChatSession } from "./domain/models/chat-session";
 import { ErrorInfo } from "./domain/models/agent-error";
 
+// Adapter imports
+import { AcpAdapter } from "./adapters/acp.adapter";
+
 // Use Case imports
 import { SendMessageUseCase } from "./use-cases/send-message.use-case";
 import { ManageSessionUseCase } from "./use-cases/manage-session.use-case";
 import { HandlePermissionUseCase } from "./use-cases/handle-permission.use-case";
 import { SwitchAgentUseCase } from "./use-cases/switch-agent.use-case";
+
+// ViewModel imports
+import { ChatViewModel } from "./view-models/chat-view-model";
+
+// Adapter imports
+import { ObsidianVaultAdapter } from "./adapters/obsidian-vault.adapter";
 
 // Type definitions for Obsidian internal APIs
 interface VaultAdapterWithBasePath {
@@ -134,17 +147,10 @@ function ChatComponent({
 	}, []);
 
 	const [inputValue, setInputValue] = useState("");
-	const [messages, setMessages] = useState<ChatMessage[]>([]);
-	const [session, setSession] = useState<ChatSession>({
-		sessionId: null,
-		state: "initializing",
-		agentId: settings.activeAgentId || settings.claude.id,
-		authMethods: [],
-		createdAt: new Date(),
-		lastActivityAt: new Date(),
-		workingDirectory: vaultPath,
-	});
-	const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
+	// ViewModel state (messages, session, errorInfo are now managed by ViewModel)
+	// const [messages, setMessages] = useState<ChatMessage[]>([]);
+	// const [session, setSession] = useState<ChatSession>({...});
+	// const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
 	const [lastActiveNote, setLastActiveNote] = useState<TFile | null>(null);
 	const [
 		isAutoMentionTemporarilyDisabled,
@@ -155,7 +161,7 @@ function ChatComponent({
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
 	const connectionRef = useRef<acp.ClientSideConnection | null>(null);
 	const agentProcessRef = useRef<ChildProcess | null>(null);
-	const acpClientRef = useRef<AcpClient | null>(null);
+	const acpClientRef = useRef<IAcpClient | null>(null);
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
 
@@ -165,94 +171,87 @@ function ChatComponent({
 		[plugin],
 	);
 
-	// Create lightweight IAgentClient adapter wrapping existing connection
-	const agentClientAdapter = useMemo(
-		() => ({
-			async sendMessage(
-				sessionId: string,
-				message: string,
-			): Promise<void> {
-				if (!connectionRef.current) {
-					throw new Error("Connection not initialized");
-				}
-				await connectionRef.current.prompt({
-					sessionId,
-					prompt: [{ type: "text" as const, text: message }],
-				});
-			},
-			async authenticate(methodId: string) {
-				if (!connectionRef.current) return false;
-				try {
-					await connectionRef.current.authenticate({ methodId });
-					return true;
-				} catch {
-					return false;
-				}
-			},
-			async newSession(workingDirectory: string) {
-				if (!connectionRef.current) {
-					throw new Error("Connection not initialized");
-				}
-				return await connectionRef.current.newSession({
-					cwd: workingDirectory,
-					mcpServers: [],
-				});
-			},
-			async cancel(sessionId: string) {
-				if (!connectionRef.current) return;
-				await connectionRef.current.cancel({ sessionId });
-			},
-			// Other methods not used yet
-			initialize: async () => ({ authMethods: [], protocolVersion: 0 }),
-			disconnect: async () => {},
-			onMessage: () => {},
-			onError: () => {},
-			onPermissionRequest: () => {},
-			async respondToPermission(
-				requestId: string,
-				optionId: string,
-			): Promise<void> {
-				if (!acpClientRef.current)
-					throw new Error("ACP client not initialized");
-				acpClientRef.current.handlePermissionResponse(
-					requestId,
-					optionId,
-				);
-			},
-		}),
-		[],
-	);
+	// Create AcpAdapter (shared across all use cases)
+	// Callbacks will be set after ViewModel creation
+	const acpAdapter = useMemo(() => {
+		const adapter = new AcpAdapter(plugin);
+		// Set acpClientRef for TerminalRenderer access
+		acpClientRef.current = adapter;
+		return adapter;
+	}, [plugin]);
 
 	// Create SendMessageUseCase
 	const sendMessageUseCase = useMemo(() => {
 		return new SendMessageUseCase(
-			agentClientAdapter,
+			acpAdapter, // Use AcpAdapter as IAgentClient
 			{} as any, // vaultAccess not needed
 			plugin.settingsStore,
 			noteMentionService,
 		);
-	}, [agentClientAdapter, plugin, noteMentionService]);
+	}, [acpAdapter, plugin, noteMentionService]);
 
 	// Create ManageSessionUseCase
 	const manageSessionUseCase = useMemo(() => {
 		return new ManageSessionUseCase(
-			agentClientAdapter,
+			acpAdapter, // Use AcpAdapter as IAgentClient
 			plugin.settingsStore,
 		);
-	}, [agentClientAdapter, plugin]);
+	}, [acpAdapter, plugin]);
 
 	// Create HandlePermissionUseCase
 	const handlePermissionUseCase = useMemo(() => {
 		return new HandlePermissionUseCase(
-			agentClientAdapter,
+			acpAdapter, // Use AcpAdapter as IAgentClient
 			plugin.settingsStore,
 		);
-	}, [agentClientAdapter, plugin]);
+	}, [acpAdapter, plugin]);
 
 	// Create SwitchAgentUseCase
 	const switchAgentUseCase = useMemo(() => {
 		return new SwitchAgentUseCase(plugin.settingsStore);
 	}, [plugin]);
+
+	// Create ChatViewModel
+	const viewModel = useMemo(() => {
+		return new ChatViewModel(
+			plugin,
+			sendMessageUseCase,
+			manageSessionUseCase,
+			handlePermissionUseCase,
+			switchAgentUseCase,
+			vaultPath,
+		);
+	}, [
+		plugin,
+		sendMessageUseCase,
+		manageSessionUseCase,
+		handlePermissionUseCase,
+		switchAgentUseCase,
+		vaultPath,
+	]);
+
+	// Set AcpAdapter callbacks to ViewModel methods
+	// This connects the adapter's message updates to the ViewModel's state management
+	useEffect(() => {
+		acpAdapter.setMessageCallbacks(
+			viewModel.addMessage,
+			viewModel.updateLastMessage,
+			viewModel.updateMessage,
+		);
+	}, [acpAdapter, viewModel]);
+
+	// Subscribe to ViewModel state
+	const vmState = useSyncExternalStore(
+		viewModel.subscribe,
+		viewModel.getSnapshot,
+		viewModel.getSnapshot,
+	);
+
+	// Extract state from ViewModel for easier access
+	const messages = vmState.messages;
+	const session = vmState.session;
+	const errorInfo = vmState.errorInfo;
+	const isSendingFromVM = vmState.isSending;
 
 	// Mention dropdown state
 	const [showMentionDropdown, setShowMentionDropdown] = useState(false);
@@ -262,20 +261,11 @@ function ChatComponent({
 		null,
 	);
 
-	// Helper function to update session with automatic lastActivityAt update
-	const updateSessionActivity = useCallback(
-		(updates: Partial<ChatSession>) => {
-			setSession((prev) => ({
-				...prev,
-				...updates,
-				lastActivityAt: new Date(),
-			}));
-		},
-		[],
-	);
+	// DEPRECATED: Now handled by ViewModel
+	// const updateSessionActivity = useCallback(...);
 
 	// Helper to check if agent is currently processing a request
-	const isSending = session.state === "busy";
+	const isSending = isSendingFromVM; // Use ViewModel state
 
 	// Helper to check if session is ready for user input
 	const isSessionReady = session.state === "ready";
@@ -382,6 +372,8 @@ function ChatComponent({
 		}, 0);
 	};
 
+	// DEPRECATED: These message manipulation functions are now handled by ViewModel
+	/*
 	const addMessage = (message: ChatMessage) => {
 		setMessages((prev) => [...prev, message]);
 	};
@@ -602,6 +594,7 @@ function ChatComponent({
 
 		return found;
 	};
+	*/
 
 	const adjustTextareaHeight = () => {
 		const textarea = textareaRef.current;
@@ -642,6 +635,35 @@ function ChatComponent({
 		}
 	};
 
+	// Initialize session on mount or agent change
+	useEffect(() => {
+		logger.log("[Debug] Starting connection setup via ViewModel...");
+		viewModel.createNewSession();
+
+		return () => {
+			// Cleanup will be handled by ViewModel.dispose()
+			viewModel.disconnect();
+		};
+	}, [session.agentId, viewModel]);
+
+	// Cleanup ViewModel on unmount
+	useEffect(() => {
+		return () => {
+			viewModel.dispose();
+		};
+	}, [viewModel]);
+
+	// Monitor agent changes from settings when messages are empty
+	useEffect(() => {
+		const newActiveAgentId = settings.activeAgentId || settings.claude.id;
+		if (messages.length === 0 && newActiveAgentId !== session.agentId) {
+			// Switch agent via ViewModel
+			viewModel.switchAgent(newActiveAgentId);
+		}
+	}, [settings.activeAgentId, messages.length, session.agentId, viewModel]);
+
+	// TEMPORARY: Keep old code below for reference, will delete after verification
+	/*
 	useEffect(() => {
 		async function setupConnection() {
 			logger.log("[Debug] Starting connection setup...");
@@ -968,21 +990,7 @@ function ChatComponent({
 			agentProcessRef.current?.kill();
 		};
 	}, [session.agentId]);
-
-	// Monitor agent changes from settings when messages are empty
-	useEffect(() => {
-		const newActiveAgentId = settings.activeAgentId || settings.claude.id;
-		if (messages.length === 0 && newActiveAgentId !== session.agentId) {
-			updateSessionActivity({
-				agentId: newActiveAgentId,
-			});
-		}
-	}, [
-		settings.activeAgentId,
-		messages.length,
-		session.agentId,
-		updateSessionActivity,
-	]);
+	*/
 
 	// Auto-scroll when messages change
 	useEffect(() => {
@@ -1070,133 +1078,46 @@ function ChatComponent({
 		}
 	};
 
+	// DEPRECATED: Now using ViewModel.createNewSession and ViewModel.restartSession
 	const createNewSession = async () => {
-		if (!connectionRef.current) return;
-
-		logger.log("[Debug] Creating new session...");
-		logger.log("[Debug] Using vault path as cwd:", vaultPath);
-
-		updateSessionActivity({ state: "initializing" });
-
-		// Use ManageSessionUseCase to create new session
-		const result = await manageSessionUseCase.createSession({
-			workingDirectory: vaultPath,
-		});
-
-		if (result.success && result.sessionId) {
-			logger.log(`📝 Created new session: ${result.sessionId}`);
-
-			updateSessionActivity({
-				sessionId: result.sessionId,
-				state: "ready",
-				createdAt: new Date(),
-			});
-			setMessages([]);
-			setInputValue("");
-			acpClientRef.current?.resetCurrentMessage();
-			setIsAutoMentionTemporarilyDisabled(false);
-
-			// Switch to the active agent from settings if different from current
-			const newActiveAgentId = switchAgentUseCase.getActiveAgentId();
-			if (newActiveAgentId !== session.agentId) {
-				updateSessionActivity({
-					agentId: newActiveAgentId,
-				});
-			}
-		} else {
-			logger.error("[Client] New Session Error:", result.error);
-			updateSessionActivity({
-				state: "error",
-			});
-
-			// Show error if present
-			if (result.error) {
-				setErrorInfo({
-					title: result.error.title,
-					message: result.error.message,
-					suggestion: result.error.suggestion,
-				});
-			}
-		}
+		logger.log("[Debug] Creating new session via ViewModel...");
+		setInputValue("");
+		setIsAutoMentionTemporarilyDisabled(false);
+		await viewModel.restartSession();
 	};
 
+	// DEPRECATED: Stop generation is now handled differently
 	const handleStopGeneration = async () => {
-		if (!connectionRef.current || !session.sessionId) {
-			logger.warn("Cannot cancel: no connection or session");
-			updateSessionActivity({ state: "ready" });
-			return;
-		}
+		logger.log("Cancelling current operation...");
+		await viewModel.cancelCurrentOperation();
+	};
 
-		try {
-			logger.log("Sending session/cancel notification...");
-
-			// Send cancellation notification using the proper ACP method
-			await connectionRef.current.cancel({
-				sessionId: session.sessionId,
-			});
-
-			logger.log("Cancellation request sent successfully");
-
-			// Cancel all running operations (permission requests + terminals)
-			acpClientRef.current?.cancelAllOperations();
-
-			// Mark permission requests as cancelled in UI
-			markPermissionRequestsAsCancelled();
-
-			// Update session state to ready
-			updateSessionActivity({ state: "ready" });
-		} catch (error) {
-			logger.error("Failed to send cancellation:", error);
-
-			// Still cancel all operations even if network cancellation failed
-			acpClientRef.current?.cancelAllOperations();
-
-			// Mark permission requests as cancelled in UI
-			markPermissionRequestsAsCancelled();
-
-			updateSessionActivity({ state: "ready" });
-		}
+	// DEPRECATED: These are no longer needed but kept for MessageRenderer compatibility
+	// TODO: Remove these after MessageRenderer is updated to not need them
+	const updateMessageContent = (
+		messageId: string,
+		content: MessageContent,
+	) => {
+		logger.warn("updateMessageContent is deprecated");
+	};
+	const updatePermissionRequestInToolCall = (
+		requestId: string,
+		optionId: string,
+	) => {
+		logger.warn("updatePermissionRequestInToolCall is deprecated");
 	};
 
 	const handleSendMessage = async () => {
-		if (!connectionRef.current || !inputValue.trim() || isSending) return;
+		if (!inputValue.trim() || isSendingFromVM) return;
 
-		// Set session to busy state
-		updateSessionActivity({ state: "busy" });
+		// Save input value before clearing
+		const messageToSend = inputValue;
 
-		// Process message immediately for display (auto-mention logic)
-		let displayMessage = inputValue;
-		if (
-			settings.autoMentionActiveNote &&
-			lastActiveNote &&
-			!isAutoMentionTemporarilyDisabled
-		) {
-			const autoMention = `@[[${lastActiveNote.basename}]]`;
-			if (!inputValue.includes(autoMention)) {
-				displayMessage = `${autoMention}\n${inputValue}`;
-			}
-		}
-
-		// Add user message to chat immediately
-		const userMessage: ChatMessage = {
-			id: crypto.randomUUID(),
-			role: "user",
-			content: [{ type: "text", text: displayMessage }],
-			timestamp: new Date(),
-		};
-		addMessage(userMessage);
-
-		// Clear input and scroll immediately
+		// Clear input immediately (before sending)
 		setInputValue("");
 		setIsAtBottom(true);
-		window.setTimeout(() => {
-			scrollToBottom();
-		}, 0);
 
-		// Reset current message for new assistant response
-		acpClientRef.current?.resetCurrentMessage();
-
-		// Convert active note TFile to NoteMetadata for Use Case
+		// Convert active note TFile to NoteMetadata
 		const activeNoteMetadata = lastActiveNote
 			? {
 					path: lastActiveNote.path,
@@ -1207,37 +1128,19 @@ function ChatComponent({
 				}
 			: null;
 
-		// Execute Use Case (send to agent)
-		const result = await sendMessageUseCase.execute({
-			sessionId: session.sessionId!,
-			message: inputValue,
+		// Send message via ViewModel
+		await viewModel.sendMessage(messageToSend, {
 			activeNote: activeNoteMetadata,
 			vaultBasePath:
 				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
 					.basePath || "",
-			authMethods: session.authMethods,
 			isAutoMentionDisabled: isAutoMentionTemporarilyDisabled,
 		});
 
-		// Handle result
-		if (result.success) {
-			logger.log(
-				`✅ Message sent successfully${result.retriedSuccessfully ? " (after auth retry)" : ""}`,
-			);
-			updateSessionActivity({ state: "ready" });
-		} else {
-			logger.error("❌ Failed to send message:", result.error);
-			updateSessionActivity({ state: "ready" });
-
-			// Show error if present
-			if (result.error) {
-				setErrorInfo({
-					title: result.error.title,
-					message: result.error.message,
-					suggestion: result.error.suggestion,
-				});
-			}
-		}
+		// Scroll after sending
+		window.setTimeout(() => {
+			scrollToBottom();
+		}, 0);
 	};
 
 	const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -1371,7 +1274,7 @@ function ChatComponent({
 							</p>
 						)}
 						<button
-							onClick={() => setErrorInfo(null)}
+							onClick={() => viewModel.clearError()}
 							className="chat-error-button"
 						>
 							OK

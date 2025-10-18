@@ -12,7 +12,10 @@
  * - Manage error state
  */
 
-import type { ChatMessage } from "../domain/models/chat-message";
+import type {
+	ChatMessage,
+	MessageContent,
+} from "../domain/models/chat-message";
 import type { ChatSession, SessionState } from "../domain/models/chat-session";
 import type { ErrorInfo } from "../domain/models/agent-error";
 import type { NoteMetadata } from "../ports/vault-access.port";
@@ -20,6 +23,7 @@ import type { SendMessageUseCase } from "../use-cases/send-message.use-case";
 import type { ManageSessionUseCase } from "../use-cases/manage-session.use-case";
 import type { HandlePermissionUseCase } from "../use-cases/handle-permission.use-case";
 import type { SwitchAgentUseCase } from "../use-cases/switch-agent.use-case";
+import type AgentClientPlugin from "../main";
 
 // ============================================================================
 // ViewModel State
@@ -93,9 +97,17 @@ export class ChatViewModel {
 	private handlePermissionUseCase: HandlePermissionUseCase;
 	private switchAgentUseCase: SwitchAgentUseCase;
 
+	// ========================================
+	// Other Dependencies
+	// ========================================
+
+	/** Plugin instance for logger and settings */
+	private plugin: AgentClientPlugin;
+
 	/**
 	 * Create a new ChatViewModel.
 	 *
+	 * @param plugin - Plugin instance
 	 * @param sendMessageUseCase - Use case for sending messages
 	 * @param manageSessionUseCase - Use case for session management
 	 * @param handlePermissionUseCase - Use case for permission handling
@@ -103,12 +115,14 @@ export class ChatViewModel {
 	 * @param workingDirectory - Working directory for the agent
 	 */
 	constructor(
+		plugin: AgentClientPlugin,
 		sendMessageUseCase: SendMessageUseCase,
 		manageSessionUseCase: ManageSessionUseCase,
 		handlePermissionUseCase: HandlePermissionUseCase,
 		switchAgentUseCase: SwitchAgentUseCase,
 		private workingDirectory: string,
 	) {
+		this.plugin = plugin;
 		this.sendMessageUseCase = sendMessageUseCase;
 		this.manageSessionUseCase = manageSessionUseCase;
 		this.handlePermissionUseCase = handlePermissionUseCase;
@@ -238,37 +252,58 @@ export class ChatViewModel {
 			},
 		});
 
-		// Use ManageSessionUseCase to create session
-		const result = await this.manageSessionUseCase.createSession({
-			workingDirectory: this.workingDirectory,
-		});
-
-		if (result.success && result.sessionId) {
-			// Update session with new ID and ready state
+		try {
+			// Get active agent ID
 			const activeAgentId = this.switchAgentUseCase.getActiveAgentId();
 
-			this.setState({
-				messages: [], // Clear messages for new session
-				session: {
-					...this.state.session,
-					sessionId: result.sessionId,
-					state: "ready",
-					agentId: activeAgentId,
-					createdAt: new Date(),
-					lastActivityAt: new Date(),
-				},
-				errorInfo: null,
+			// Use ManageSessionUseCase to create session
+			// This will call IAgentClient.initialize() and IAgentClient.newSession()
+			const result = await this.manageSessionUseCase.createSession({
+				workingDirectory: this.workingDirectory,
+				agentId: activeAgentId,
 			});
-		} else {
-			// Handle error
+
+			if (result.success && result.sessionId) {
+				// Update session state
+				this.setState({
+					messages: [], // Clear messages for new session
+					session: {
+						...this.state.session,
+						sessionId: result.sessionId,
+						state: "ready",
+						agentId: activeAgentId,
+						authMethods: result.authMethods || [],
+						createdAt: new Date(),
+						lastActivityAt: new Date(),
+					},
+					errorInfo: null,
+				});
+			} else {
+				// Handle Use Case error
+				this.setState({
+					session: {
+						...this.state.session,
+						state: "error",
+					},
+					errorInfo: result.error || {
+						title: "Session Creation Failed",
+						message: "Failed to create new session",
+						suggestion: "Please try again.",
+					},
+				});
+			}
+		} catch (error) {
+			// Handle unexpected error
 			this.setState({
 				session: {
 					...this.state.session,
 					state: "error",
 				},
-				errorInfo: result.error || {
+				errorInfo: {
 					title: "Session Creation Failed",
-					message: "Failed to create new session",
+					message: `Failed to create new session: ${error instanceof Error ? error.message : String(error)}`,
+					suggestion:
+						"Please check the agent configuration and try again.",
 				},
 			});
 		}
@@ -284,14 +319,52 @@ export class ChatViewModel {
 	}
 
 	/**
-	 * Disconnect from the current session.
+	 * Cancel the current agent operation.
+	 *
+	 * Stops any ongoing message generation without disconnecting the session.
 	 */
-	async disconnect(): Promise<void> {
-		if (this.state.session.sessionId) {
+	async cancelCurrentOperation(): Promise<void> {
+		if (!this.state.session.sessionId) {
+			return;
+		}
+
+		try {
+			// Cancel via Use Case
 			await this.manageSessionUseCase.closeSession(
 				this.state.session.sessionId,
 			);
+
+			// Update state to ready (session still connected, just stopped)
+			this.setState({
+				isSending: false,
+				session: {
+					...this.state.session,
+					state: "ready",
+				},
+			});
+		} catch (error) {
+			// If cancel fails, log but don't crash
+			console.warn("Failed to cancel operation:", error);
+
+			// Still update UI to ready state
+			this.setState({
+				isSending: false,
+				session: {
+					...this.state.session,
+					state: "ready",
+				},
+			});
 		}
+	}
+
+	/**
+	 * Disconnect from the current session.
+	 */
+	async disconnect(): Promise<void> {
+		// Close session via Use Case
+		await this.manageSessionUseCase.closeSession(
+			this.state.session.sessionId,
+		);
 
 		this.setState({
 			session: {
@@ -320,45 +393,81 @@ export class ChatViewModel {
 			return;
 		}
 
-		// Set sending state
-		this.setState({ isSending: true });
-
-		// Add user message immediately (for UI responsiveness)
-		const userMessage: ChatMessage = {
-			id: crypto.randomUUID(),
-			role: "user",
-			content: [{ type: "text", text: content }],
-			timestamp: new Date(),
-		};
-		this.addMessage(userMessage);
-
-		// Execute SendMessageUseCase
-		const result = await this.sendMessageUseCase.execute({
-			sessionId: this.state.session.sessionId,
+		// Phase 1: Prepare message (synchronous)
+		const prepared = this.sendMessageUseCase.prepareMessage({
 			message: content,
 			activeNote: options.activeNote,
 			vaultBasePath: options.vaultBasePath,
 			isAutoMentionDisabled: options.isAutoMentionDisabled,
-			authMethods: this.state.session.authMethods,
 		});
 
-		if (result.success) {
-			// Update session state to ready
+		// Phase 2: Add user message to UI immediately
+		const userMessage: ChatMessage = {
+			id: crypto.randomUUID(),
+			role: "user",
+			content: [
+				{
+					type: "text",
+					text: prepared.displayMessage,
+				},
+			],
+			timestamp: new Date(),
+		};
+		this.addMessage(userMessage);
+
+		// Phase 3: Set sending state
+		this.setState({
+			isSending: true,
+			session: {
+				...this.state.session,
+				state: "busy",
+			},
+		});
+
+		// Phase 4: Send prepared message to agent (asynchronous)
+		try {
+			const result = await this.sendMessageUseCase.sendPreparedMessage({
+				sessionId: this.state.session.sessionId,
+				agentMessage: prepared.agentMessage,
+				displayMessage: prepared.displayMessage,
+				authMethods: this.state.session.authMethods,
+			});
+
+			if (result.success) {
+				// Update session state to ready
+				this.setState({
+					isSending: false,
+					session: {
+						...this.state.session,
+						state: "ready",
+						lastActivityAt: new Date(),
+					},
+				});
+			} else {
+				// Handle error from use case
+				this.setState({
+					isSending: false,
+					session: {
+						...this.state.session,
+						state: "ready",
+					},
+					errorInfo: result.error || {
+						title: "Send Message Failed",
+						message: "Failed to send message",
+					},
+				});
+			}
+		} catch (error) {
+			// Handle unexpected error
 			this.setState({
 				isSending: false,
 				session: {
 					...this.state.session,
 					state: "ready",
-					lastActivityAt: new Date(),
 				},
-			});
-		} else {
-			// Handle error
-			this.setState({
-				isSending: false,
-				errorInfo: result.error || {
+				errorInfo: {
 					title: "Send Message Failed",
-					message: "Failed to send message",
+					message: `Failed to send message: ${error instanceof Error ? error.message : String(error)}`,
 				},
 			});
 		}
@@ -367,13 +476,158 @@ export class ChatViewModel {
 	/**
 	 * Add a message to the chat.
 	 *
+	 * Used by AcpAdapter callback and internal methods.
+	 *
 	 * @param message - Message to add
 	 */
-	private addMessage(message: ChatMessage): void {
+	addMessage = (message: ChatMessage): void => {
 		this.setState({
 			messages: [...this.state.messages, message],
 		});
-	}
+	};
+
+	/**
+	 * Update the last message in the chat.
+	 *
+	 * Used by AcpAdapter callback for streaming updates.
+	 *
+	 * @param content - New content for the last message
+	 */
+	updateLastMessage = (content: MessageContent): void => {
+		// If no messages or last message is not assistant, create new assistant message
+		if (
+			this.state.messages.length === 0 ||
+			this.state.messages[this.state.messages.length - 1].role !==
+				"assistant"
+		) {
+			const newMessage: ChatMessage = {
+				id: crypto.randomUUID(),
+				role: "assistant",
+				content: [content],
+				timestamp: new Date(),
+			};
+			this.setState({
+				messages: [...this.state.messages, newMessage],
+			});
+			return;
+		}
+
+		const lastMessage = this.state.messages[this.state.messages.length - 1];
+		const updatedMessage = { ...lastMessage };
+
+		if (content.type === "text" || content.type === "agent_thought") {
+			// Append to existing content of same type or create new content
+			const existingContentIndex = updatedMessage.content.findIndex(
+				(c) => c.type === content.type,
+			);
+			if (existingContentIndex >= 0) {
+				const existingContent =
+					updatedMessage.content[existingContentIndex];
+				// Type guard: we know it's text or agent_thought from findIndex condition
+				if (
+					existingContent.type === "text" ||
+					existingContent.type === "agent_thought"
+				) {
+					updatedMessage.content[existingContentIndex] = {
+						type: content.type,
+						text:
+							existingContent.text +
+							(content.type === "agent_thought" ? "\n" : "") +
+							content.text,
+					};
+				}
+			} else {
+				updatedMessage.content.push(content);
+			}
+		} else {
+			// Replace or add non-text content
+			const existingIndex = updatedMessage.content.findIndex(
+				(c) => c.type === content.type,
+			);
+
+			if (existingIndex >= 0) {
+				updatedMessage.content[existingIndex] = content;
+			} else {
+				updatedMessage.content.push(content);
+			}
+		}
+
+		this.setState({
+			messages: [...this.state.messages.slice(0, -1), updatedMessage],
+		});
+	};
+
+	/**
+	 * Update a specific message by tool call ID.
+	 *
+	 * Used by AcpAdapter callback for tool call updates.
+	 *
+	 * @param toolCallId - ID of the tool call to update
+	 * @param content - New content for the tool call
+	 * @returns True if message was found and updated
+	 */
+	updateMessage = (toolCallId: string, content: MessageContent): boolean => {
+		let found = false;
+
+		const updatedMessages = this.state.messages.map((message) => ({
+			...message,
+			content: message.content.map((c) => {
+				if (
+					c.type === "tool_call" &&
+					c.toolCallId === toolCallId &&
+					content.type === "tool_call"
+				) {
+					found = true;
+					// Merge content arrays
+					let mergedContent = c.content || [];
+					if (content.content !== undefined) {
+						const newContent = content.content || [];
+
+						// If new content contains diff, replace all old diffs
+						const hasDiff = newContent.some(
+							(item) => item.type === "diff",
+						);
+						if (hasDiff) {
+							mergedContent = mergedContent.filter(
+								(item) => item.type !== "diff",
+							);
+						}
+
+						mergedContent = [...mergedContent, ...newContent];
+					}
+
+					return {
+						...c,
+						toolCallId: content.toolCallId,
+						title:
+							content.title !== undefined
+								? content.title
+								: c.title,
+						kind:
+							content.kind !== undefined ? content.kind : c.kind,
+						status:
+							content.status !== undefined
+								? content.status
+								: c.status,
+						content: mergedContent,
+						permissionRequest:
+							content.permissionRequest !== undefined
+								? content.permissionRequest
+								: c.permissionRequest,
+					};
+				}
+				return c;
+			}),
+		}));
+
+		if (found) {
+			this.setState({
+				messages: updatedMessages,
+			});
+		}
+
+		return found;
+	};
 
 	/**
 	 * Clear the current error.
@@ -396,18 +650,30 @@ export class ChatViewModel {
 		requestId: string,
 		optionId: string,
 	): Promise<void> {
-		const result = await this.handlePermissionUseCase.approvePermission({
-			requestId,
-			optionId,
-		});
+		try {
+			// Use HandlePermissionUseCase to respond to permission
+			const result = await this.handlePermissionUseCase.approvePermission(
+				{
+					requestId,
+					optionId,
+				},
+			);
 
-		if (!result.success) {
+			if (!result.success) {
+				this.setState({
+					errorInfo: {
+						title: "Permission Error",
+						message:
+							result.error ||
+							"Failed to respond to permission request",
+					},
+				});
+			}
+		} catch (error) {
 			this.setState({
 				errorInfo: {
 					title: "Permission Error",
-					message:
-						result.error ||
-						"Failed to respond to permission request",
+					message: `Failed to respond to permission request: ${error instanceof Error ? error.message : String(error)}`,
 				},
 			});
 		}

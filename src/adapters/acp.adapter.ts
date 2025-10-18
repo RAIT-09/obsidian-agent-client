@@ -12,9 +12,12 @@ import type {
 import type {
 	ChatMessage,
 	MessageContent,
-} from "../domain/models/chat-message";
+	IAcpClient,
+} from "../types/acp-types";
 import type { AgentError } from "../domain/models/agent-error";
-import { AcpClient } from "../services/acp-client";
+// OLD: import { AcpClient } from "../services/acp-client"; (no longer needed)
+import { AcpTypeConverter } from "./acp-type-converter";
+import { TerminalManager } from "../terminal-manager";
 import { Logger } from "../utils/logger";
 import type AgentClientPlugin from "../main";
 
@@ -23,14 +26,14 @@ import type AgentClientPlugin from "../main";
  *
  * This adapter:
  * - Manages agent process lifecycle (spawn, monitor, kill)
- * - Wraps ACP connection and session management
- * - Integrates with existing AcpClient for message handling
+ * - Implements ACP protocol directly (no intermediate AcpClient layer)
+ * - Handles message updates and terminal operations
  * - Provides callbacks for UI updates
  */
-export class AcpAdapter implements IAgentClient {
+export class AcpAdapter implements IAgentClient, IAcpClient {
 	private connection: acp.ClientSideConnection | null = null;
 	private agentProcess: ChildProcess | null = null;
-	private acpClient: AcpClient | null = null;
+	// OLD: private acpClient: AcpClient | null = null; (removed after migration)
 	private logger: Logger;
 
 	// Callback handlers
@@ -39,20 +42,63 @@ export class AcpAdapter implements IAgentClient {
 	private permissionCallback: ((request: PermissionRequest) => void) | null =
 		null;
 
+	// Message update callbacks (for ViewModel integration)
+	private addMessage: (message: ChatMessage) => void;
+	private updateLastMessage: (content: MessageContent) => void;
+	private updateMessage: (
+		toolCallId: string,
+		content: MessageContent,
+	) => boolean;
+
 	// Configuration state
 	private currentConfig: AgentConfig | null = null;
 	private autoAllowPermissions = false;
 
+	// IAcpClient implementation properties
+	private terminalManager: TerminalManager;
+	private currentMessageId: string | null = null;
+	private pendingPermissionRequests = new Map<
+		string,
+		(response: acp.RequestPermissionResponse) => void
+	>();
+
 	constructor(
 		private plugin: AgentClientPlugin,
-		private addMessage: (message: ChatMessage) => void,
-		private updateLastMessage: (content: MessageContent) => void,
-		private updateMessage: (
+		addMessage?: (message: ChatMessage) => void,
+		updateLastMessage?: (content: MessageContent) => void,
+		updateMessage?: (
 			toolCallId: string,
 			content: MessageContent,
 		) => boolean,
 	) {
 		this.logger = new Logger(plugin);
+		// Initialize with provided callbacks or no-ops
+		this.addMessage = addMessage || (() => {});
+		this.updateLastMessage = updateLastMessage || (() => {});
+		this.updateMessage = updateMessage || (() => false);
+
+		// Initialize TerminalManager
+		this.terminalManager = new TerminalManager(plugin);
+	}
+
+	/**
+	 * Set message callbacks after construction.
+	 *
+	 * This allows decoupling AcpAdapter creation from ViewModel creation,
+	 * enabling proper dependency injection in Clean Architecture.
+	 *
+	 * @param addMessage - Callback to add a new message to chat
+	 * @param updateLastMessage - Callback to update the last message
+	 * @param updateMessage - Callback to update a specific message by toolCallId
+	 */
+	setMessageCallbacks(
+		addMessage: (message: ChatMessage) => void,
+		updateLastMessage: (content: MessageContent) => void,
+		updateMessage: (toolCallId: string, content: MessageContent) => boolean,
+	): void {
+		this.addMessage = addMessage;
+		this.updateLastMessage = updateLastMessage;
+		this.updateMessage = updateMessage;
 	}
 
 	/**
@@ -249,25 +295,23 @@ export class AcpAdapter implements IAgentClient {
 		});
 
 		this.logger.log(
-			"[AcpAdapter] Using working directory for AcpClient:",
+			"[AcpAdapter] Using working directory:",
 			config.workingDirectory,
 		);
 
-		// Create ACP client wrapper
-		this.acpClient = new AcpClient(
-			this.addMessage,
-			this.updateLastMessage,
-			this.updateMessage,
-			config.workingDirectory,
-			this.plugin,
-			this.autoAllowPermissions,
-		);
+		// OLD: Create ACP client wrapper (no longer needed after integration)
+		// this.acpClient = new AcpClient(
+		// 	this.addMessage,
+		// 	this.updateLastMessage,
+		// 	this.updateMessage,
+		// 	config.workingDirectory,
+		// 	this.plugin,
+		// 	this.autoAllowPermissions,
+		// );
 
 		const stream = acp.ndJsonStream(input, output);
-		this.connection = new acp.ClientSideConnection(
-			() => this.acpClient!,
-			stream,
-		);
+		// NEW: AcpAdapter now implements IAcpClient directly
+		this.connection = new acp.ClientSideConnection(() => this, stream);
 
 		try {
 			this.logger.log("[AcpAdapter] Starting ACP initialization...");
@@ -412,7 +456,7 @@ export class AcpAdapter implements IAgentClient {
 		}
 
 		// Reset current message for new assistant response
-		this.acpClient?.resetCurrentMessage();
+		this.resetCurrentMessage();
 
 		try {
 			this.logger.log(`[AcpAdapter] ✅ Sending Message...: ${message}`);
@@ -497,7 +541,7 @@ export class AcpAdapter implements IAgentClient {
 			);
 
 			// Cancel all running operations (permission requests + terminals)
-			this.acpClient?.cancelAllOperations();
+			this.cancelAllOperations();
 		} catch (error) {
 			this.logger.error(
 				"[AcpAdapter] Failed to send cancellation:",
@@ -505,7 +549,7 @@ export class AcpAdapter implements IAgentClient {
 			);
 
 			// Still cancel all operations even if network cancellation failed
-			this.acpClient?.cancelAllOperations();
+			this.cancelAllOperations();
 		}
 	}
 
@@ -516,7 +560,7 @@ export class AcpAdapter implements IAgentClient {
 		this.logger.log("[AcpAdapter] Disconnecting...");
 
 		// Cancel all pending operations
-		this.acpClient?.cancelAllOperations();
+		this.cancelAllOperations();
 
 		// Kill the agent process
 		if (this.agentProcess) {
@@ -525,9 +569,9 @@ export class AcpAdapter implements IAgentClient {
 			this.agentProcess = null;
 		}
 
-		// Clear connection and client references
+		// Clear connection and config references
 		this.connection = null;
-		this.acpClient = null;
+		// OLD: this.acpClient = null; (no longer needed)
 		this.currentConfig = null;
 
 		this.logger.log("[AcpAdapter] Disconnected");
@@ -561,9 +605,9 @@ export class AcpAdapter implements IAgentClient {
 		requestId: string,
 		optionId: string,
 	): Promise<void> {
-		if (!this.acpClient) {
+		if (!this.connection) {
 			throw new Error(
-				"ACP client not initialized. Call initialize() first.",
+				"ACP connection not initialized. Call initialize() first.",
 			);
 		}
 
@@ -573,7 +617,7 @@ export class AcpAdapter implements IAgentClient {
 			"with option:",
 			optionId,
 		);
-		this.acpClient.handlePermissionResponse(requestId, optionId);
+		this.handlePermissionResponse(requestId, optionId);
 	}
 
 	// Helper methods
@@ -630,5 +674,298 @@ export class AcpAdapter implements IAgentClient {
 		} else {
 			return `1. Verify the agent path: Use "which ${commandName}" in Terminal to find the correct path. 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "which node" to find it).`;
 		}
+	}
+
+	// ========================================================================
+	// IAcpClient Implementation
+	// ========================================================================
+
+	/**
+	 * Handle session updates from the ACP protocol.
+	 * This is called by ClientSideConnection when the agent sends updates.
+	 */
+	async sessionUpdate(params: acp.SessionNotification): Promise<void> {
+		const update = params.update;
+		this.logger.log("[AcpAdapter] sessionUpdate:", update);
+
+		switch (update.sessionUpdate) {
+			case "agent_message_chunk":
+				if (update.content.type === "text") {
+					this.updateLastMessage({
+						type: "text",
+						text: update.content.text,
+					});
+				}
+				break;
+
+			case "agent_thought_chunk":
+				if (update.content.type === "text") {
+					this.updateLastMessage({
+						type: "agent_thought",
+						text: update.content.text,
+					});
+				}
+				break;
+
+			case "tool_call":
+				this.addMessage({
+					id: crypto.randomUUID(),
+					role: "assistant",
+					content: [
+						{
+							type: "tool_call",
+							toolCallId: update.toolCallId,
+							title: update.title,
+							status: update.status || "pending",
+							kind: update.kind,
+							content: AcpTypeConverter.toToolCallContent(
+								update.content,
+							),
+						},
+					],
+					timestamp: new Date(),
+				});
+				break;
+
+			case "tool_call_update":
+				this.logger.log(
+					`[AcpAdapter] tool_call_update for ${update.toolCallId}, content:`,
+					update.content,
+				);
+				this.updateMessage(update.toolCallId, {
+					type: "tool_call",
+					toolCallId: update.toolCallId,
+					title: update.title,
+					status: update.status || "pending",
+					kind: update.kind || undefined,
+					content: AcpTypeConverter.toToolCallContent(update.content),
+				});
+				break;
+
+			case "plan":
+				this.updateLastMessage({
+					type: "plan",
+					entries: update.entries,
+				});
+				break;
+		}
+	}
+
+	/**
+	 * Reset the current message ID.
+	 */
+	resetCurrentMessage(): void {
+		this.currentMessageId = null;
+	}
+
+	/**
+	 * Handle permission response from user.
+	 */
+	handlePermissionResponse(requestId: string, optionId: string): void {
+		const resolver = this.pendingPermissionRequests.get(requestId);
+		if (resolver) {
+			resolver({
+				outcome: {
+					outcome: "selected",
+					optionId: optionId,
+				},
+			});
+			this.pendingPermissionRequests.delete(requestId);
+		}
+	}
+
+	/**
+	 * Cancel all ongoing operations.
+	 */
+	cancelAllOperations(): void {
+		// Cancel pending permission requests
+		this.cancelPendingPermissionRequests();
+
+		// Kill all running terminals
+		this.terminalManager.killAllTerminals();
+	}
+
+	/**
+	 * Request permission from user for an operation.
+	 */
+	async requestPermission(
+		params: acp.RequestPermissionRequest,
+	): Promise<acp.RequestPermissionResponse> {
+		this.logger.log("[AcpAdapter] Permission request received:", params);
+
+		// Type guard: check if params has extended toolCall property
+		const extendedParams = params as unknown as {
+			toolCall?: acp.ToolCallUpdate;
+		};
+
+		// If auto-allow is enabled, automatically approve the first allow option
+		if (this.autoAllowPermissions) {
+			const allowOption =
+				params.options.find(
+					(option) =>
+						option.kind === "allow_once" ||
+						option.kind === "allow_always" ||
+						(!option.kind &&
+							option.name.toLowerCase().includes("allow")),
+				) || params.options[0]; // fallback to first option
+
+			this.logger.log(
+				"[AcpAdapter] Auto-allowing permission request:",
+				allowOption,
+			);
+
+			return Promise.resolve({
+				outcome: {
+					outcome: "selected",
+					optionId: allowOption.optionId,
+				},
+			});
+		}
+
+		// Generate unique ID for this permission request
+		const requestId = crypto.randomUUID();
+		const toolCallId = params.toolCall?.toolCallId || crypto.randomUUID();
+
+		// Prepare permission request data
+		const permissionRequestData = {
+			requestId: requestId,
+			options: params.options.map((option) => ({
+				optionId: option.optionId,
+				name: option.name,
+				kind:
+					option.kind === "reject_always"
+						? "reject_once"
+						: option.kind,
+			})),
+		};
+
+		// Try to update existing tool_call with permission request
+		const updated = this.updateMessage(toolCallId, {
+			type: "tool_call",
+			toolCallId: toolCallId,
+			permissionRequest: permissionRequestData,
+		} as MessageContent);
+
+		// If no existing tool_call was found, create a new tool_call message with permission
+		if (!updated && extendedParams.toolCall?.title) {
+			const toolCallInfo = extendedParams.toolCall;
+			const status = (toolCallInfo.status ||
+				"pending") as acp.ToolCallStatus;
+			const kind = toolCallInfo.kind as acp.ToolKind | undefined;
+			const content = AcpTypeConverter.toToolCallContent(
+				toolCallInfo.content as acp.ToolCallContent[] | undefined,
+			);
+
+			this.addMessage({
+				id: crypto.randomUUID(),
+				role: "assistant",
+				content: [
+					{
+						type: "tool_call",
+						toolCallId: toolCallInfo.toolCallId,
+						title: toolCallInfo.title,
+						status,
+						kind,
+						content,
+						permissionRequest: permissionRequestData,
+					},
+				],
+				timestamp: new Date(),
+			});
+		}
+
+		// Return a Promise that will be resolved when user clicks a button
+		return new Promise((resolve) => {
+			this.pendingPermissionRequests.set(requestId, resolve);
+		});
+	}
+
+	/**
+	 * Cancel all pending permission requests.
+	 */
+	private cancelPendingPermissionRequests(): void {
+		this.logger.log(
+			`[AcpAdapter] Cancelling ${this.pendingPermissionRequests.size} pending permission requests`,
+		);
+		this.pendingPermissionRequests.forEach((resolve, requestId) => {
+			resolve({
+				outcome: {
+					outcome: "cancelled",
+				},
+			});
+		});
+		this.pendingPermissionRequests.clear();
+	}
+
+	// ========================================================================
+	// Terminal Operations (IAcpClient)
+	// ========================================================================
+
+	async readTextFile(params: acp.ReadTextFileRequest) {
+		return { content: "" };
+	}
+
+	async writeTextFile(params: acp.WriteTextFileRequest) {
+		return {};
+	}
+
+	async createTerminal(
+		params: acp.CreateTerminalRequest,
+	): Promise<acp.CreateTerminalResponse> {
+		this.logger.log(
+			"[AcpAdapter] createTerminal called with params:",
+			params,
+		);
+
+		// Use current config's working directory if cwd is not provided
+		const modifiedParams = {
+			...params,
+			cwd: params.cwd || this.currentConfig?.workingDirectory || "",
+		};
+		this.logger.log("[AcpAdapter] Using modified params:", modifiedParams);
+
+		const terminalId = this.terminalManager.createTerminal(modifiedParams);
+		return {
+			terminalId,
+		};
+	}
+
+	async terminalOutput(
+		params: acp.TerminalOutputRequest,
+	): Promise<acp.TerminalOutputResponse> {
+		const result = this.terminalManager.getOutput(params.terminalId);
+		if (!result) {
+			throw new Error(`Terminal ${params.terminalId} not found`);
+		}
+		return result;
+	}
+
+	async waitForTerminalExit(
+		params: acp.WaitForTerminalExitRequest,
+	): Promise<acp.WaitForTerminalExitResponse> {
+		return await this.terminalManager.waitForExit(params.terminalId);
+	}
+
+	async killTerminal(
+		params: acp.KillTerminalCommandRequest,
+	): Promise<acp.KillTerminalResponse> {
+		const success = this.terminalManager.killTerminal(params.terminalId);
+		if (!success) {
+			throw new Error(`Terminal ${params.terminalId} not found`);
+		}
+		return {};
+	}
+
+	async releaseTerminal(
+		params: acp.ReleaseTerminalRequest,
+	): Promise<acp.ReleaseTerminalResponse> {
+		const success = this.terminalManager.releaseTerminal(params.terminalId);
+		// Don't throw error if terminal not found - it may have been already cleaned up
+		if (!success) {
+			this.logger.log(
+				`[AcpAdapter] releaseTerminal: Terminal ${params.terminalId} not found (may have been already cleaned up)`,
+			);
+		}
+		return {};
 	}
 }

@@ -25,7 +25,52 @@ import {
 // ============================================================================
 
 /**
- * Input for sending a message
+ * Input for preparing a message (Phase 1: synchronous)
+ */
+export interface PrepareMessageInput {
+	/** User's message text (may contain @mentions) */
+	message: string;
+
+	/** Currently active note (for auto-mention feature) */
+	activeNote?: NoteMetadata | null;
+
+	/** Vault base path for converting mentions to absolute paths */
+	vaultBasePath: string;
+
+	/** Whether auto-mention is temporarily disabled */
+	isAutoMentionDisabled?: boolean;
+}
+
+/**
+ * Result of preparing a message
+ */
+export interface PrepareMessageResult {
+	/** The processed message text (with auto-mention added if applicable) */
+	displayMessage: string;
+
+	/** The message text to send to agent (with mentions converted to paths) */
+	agentMessage: string;
+}
+
+/**
+ * Input for sending a prepared message (Phase 2: asynchronous)
+ */
+export interface SendPreparedMessageInput {
+	/** Current session ID */
+	sessionId: string;
+
+	/** The prepared agent message (from prepareMessage) */
+	agentMessage: string;
+
+	/** The display message (for error reporting) */
+	displayMessage: string;
+
+	/** Available authentication methods */
+	authMethods: AuthenticationMethod[];
+}
+
+/**
+ * Input for sending a message (legacy: single-phase)
  */
 export interface SendMessageInput {
 	/** Current session ID */
@@ -83,10 +128,16 @@ export class SendMessageUseCase {
 	) {}
 
 	/**
-	 * Execute the send message use case
+	 * Phase 1: Prepare message (synchronous)
+	 *
+	 * Processes the message by:
+	 * - Adding auto-mention if enabled
+	 * - Converting @mentions to file paths
+	 *
+	 * This is synchronous so the ViewModel can add the user message to UI immediately.
 	 */
-	async execute(input: SendMessageInput): Promise<SendMessageResult> {
-		// Step 1: Process message (add auto-mention if needed)
+	prepareMessage(input: PrepareMessageInput): PrepareMessageResult {
+		// Step 1: Add auto-mention if needed
 		const displayMessage = this.addAutoMention(
 			input.message,
 			input.activeNote,
@@ -100,25 +151,65 @@ export class SendMessageUseCase {
 			input.vaultBasePath,
 		);
 
-		// Step 3: Send message to agent
+		return {
+			displayMessage,
+			agentMessage,
+		};
+	}
+
+	/**
+	 * Phase 2: Send prepared message (asynchronous)
+	 *
+	 * Sends the prepared message to the agent and handles errors.
+	 * Call this after adding the user message to UI.
+	 */
+	async sendPreparedMessage(
+		input: SendPreparedMessageInput,
+	): Promise<SendMessageResult> {
 		try {
-			await this.agentClient.sendMessage(input.sessionId, agentMessage);
+			await this.agentClient.sendMessage(
+				input.sessionId,
+				input.agentMessage,
+			);
 
 			return {
 				success: true,
-				displayMessage,
-				agentMessage,
+				displayMessage: input.displayMessage,
+				agentMessage: input.agentMessage,
 			};
 		} catch (error) {
-			// Step 4: Handle errors (including authentication retry)
+			// Handle errors (including authentication retry)
 			return await this.handleSendError(
 				error,
 				input.sessionId,
-				agentMessage,
-				displayMessage,
+				input.agentMessage,
+				input.displayMessage,
 				input.authMethods,
 			);
 		}
+	}
+
+	/**
+	 * Execute the send message use case (legacy: single-phase)
+	 *
+	 * This combines prepareMessage + sendPreparedMessage for backward compatibility.
+	 */
+	async execute(input: SendMessageInput): Promise<SendMessageResult> {
+		// Step 1: Prepare message
+		const { displayMessage, agentMessage } = this.prepareMessage({
+			message: input.message,
+			activeNote: input.activeNote,
+			vaultBasePath: input.vaultBasePath,
+			isAutoMentionDisabled: input.isAutoMentionDisabled,
+		});
+
+		// Step 2: Send prepared message
+		return await this.sendPreparedMessage({
+			sessionId: input.sessionId,
+			agentMessage,
+			displayMessage,
+			authMethods: input.authMethods,
+		});
 	}
 
 	// ========================================================================
