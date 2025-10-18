@@ -19,11 +19,14 @@ import type {
 import type { ChatSession, SessionState } from "../domain/models/chat-session";
 import type { ErrorInfo } from "../domain/models/agent-error";
 import type { NoteMetadata } from "../ports/vault-access.port";
+import type { IVaultAccess } from "../ports/vault-access.port";
 import type { SendMessageUseCase } from "../use-cases/send-message.use-case";
 import type { ManageSessionUseCase } from "../use-cases/manage-session.use-case";
 import type { HandlePermissionUseCase } from "../use-cases/handle-permission.use-case";
 import type { SwitchAgentUseCase } from "../use-cases/switch-agent.use-case";
 import type AgentClientPlugin from "../main";
+import type { MentionContext } from "../utils/mention-utils";
+import { detectMention, replaceMention } from "../utils/mention-utils";
 
 // ============================================================================
 // ViewModel State
@@ -47,6 +50,22 @@ export interface ChatViewModelState {
 
 	/** Whether a message is currently being sent */
 	isSending: boolean;
+
+	// Mention dropdown state
+	/** Whether the mention dropdown is currently shown */
+	showMentionDropdown: boolean;
+
+	/** Note suggestions for mention dropdown */
+	mentionSuggestions: NoteMetadata[];
+
+	/** Currently selected index in mention dropdown */
+	selectedMentionIndex: number;
+
+	/** Current mention context (query and position) */
+	mentionContext: MentionContext | null;
+
+	/** Whether auto-mention is temporarily disabled */
+	isAutoMentionTemporarilyDisabled: boolean;
 }
 
 // ============================================================================
@@ -104,6 +123,9 @@ export class ChatViewModel {
 	/** Plugin instance for logger and settings */
 	private plugin: AgentClientPlugin;
 
+	/** Vault access for note search (mention functionality) */
+	private vaultAccess: IVaultAccess;
+
 	/**
 	 * Create a new ChatViewModel.
 	 *
@@ -112,6 +134,7 @@ export class ChatViewModel {
 	 * @param manageSessionUseCase - Use case for session management
 	 * @param handlePermissionUseCase - Use case for permission handling
 	 * @param switchAgentUseCase - Use case for agent switching
+	 * @param vaultAccess - Vault access port for note searching (mention functionality)
 	 * @param workingDirectory - Working directory for the agent
 	 */
 	constructor(
@@ -120,6 +143,7 @@ export class ChatViewModel {
 		manageSessionUseCase: ManageSessionUseCase,
 		handlePermissionUseCase: HandlePermissionUseCase,
 		switchAgentUseCase: SwitchAgentUseCase,
+		vaultAccess: IVaultAccess,
 		private workingDirectory: string,
 	) {
 		this.plugin = plugin;
@@ -127,6 +151,7 @@ export class ChatViewModel {
 		this.manageSessionUseCase = manageSessionUseCase;
 		this.handlePermissionUseCase = handlePermissionUseCase;
 		this.switchAgentUseCase = switchAgentUseCase;
+		this.vaultAccess = vaultAccess;
 
 		// Initialize state
 		this.state = this.createInitialState();
@@ -206,6 +231,12 @@ export class ChatViewModel {
 			},
 			errorInfo: null,
 			isSending: false,
+			// Mention dropdown state
+			showMentionDropdown: false,
+			mentionSuggestions: [],
+			selectedMentionIndex: 0,
+			mentionContext: null,
+			isAutoMentionTemporarilyDisabled: false,
 		};
 	}
 
@@ -707,6 +738,123 @@ export class ChatViewModel {
 	 */
 	getAvailableAgents(): Array<{ id: string; displayName: string }> {
 		return this.switchAgentUseCase.getAvailableAgents();
+	}
+
+	// ========================================
+	// Actions: Mention Management
+	// ========================================
+
+	/**
+	 * Update mention suggestions based on current input.
+	 *
+	 * @param input - Current input text
+	 * @param cursorPosition - Current cursor position in the input
+	 */
+	async updateMentionSuggestions(
+		input: string,
+		cursorPosition: number,
+	): Promise<void> {
+		// Detect mention context
+		const context = detectMention(input, cursorPosition, this.plugin);
+
+		if (!context) {
+			// No mention context - close dropdown
+			this.setState({
+				showMentionDropdown: false,
+				mentionSuggestions: [],
+				selectedMentionIndex: 0,
+				mentionContext: null,
+			});
+			return;
+		}
+
+		// Search for matching notes
+		const suggestions = await this.vaultAccess.searchNotes(context.query);
+
+		// Update state with suggestions
+		this.setState({
+			showMentionDropdown: true,
+			mentionSuggestions: suggestions,
+			selectedMentionIndex: 0,
+			mentionContext: context,
+		});
+	}
+
+	/**
+	 * Select a mention from the suggestion list.
+	 *
+	 * @param input - Current input text
+	 * @param suggestion - Selected note metadata
+	 * @returns Updated input text with mention replaced
+	 */
+	selectMention(input: string, suggestion: NoteMetadata): string {
+		if (!this.state.mentionContext) {
+			return input;
+		}
+
+		// Replace mention with selected note name (without extension)
+		const { newText } = replaceMention(
+			input,
+			this.state.mentionContext,
+			suggestion.name,
+		);
+
+		// Close dropdown
+		this.setState({
+			showMentionDropdown: false,
+			mentionSuggestions: [],
+			selectedMentionIndex: 0,
+			mentionContext: null,
+		});
+
+		return newText;
+	}
+
+	/**
+	 * Close the mention dropdown.
+	 */
+	closeMentionDropdown(): void {
+		this.setState({
+			showMentionDropdown: false,
+			mentionSuggestions: [],
+			selectedMentionIndex: 0,
+			mentionContext: null,
+		});
+	}
+
+	/**
+	 * Navigate mention dropdown selection.
+	 *
+	 * @param direction - 'up' or 'down'
+	 */
+	navigateMentionDropdown(direction: "up" | "down"): void {
+		if (!this.state.showMentionDropdown) {
+			return;
+		}
+
+		const maxIndex = this.state.mentionSuggestions.length - 1;
+		let newIndex = this.state.selectedMentionIndex;
+
+		if (direction === "down") {
+			newIndex = Math.min(newIndex + 1, maxIndex);
+		} else {
+			newIndex = Math.max(newIndex - 1, 0);
+		}
+
+		this.setState({
+			selectedMentionIndex: newIndex,
+		});
+	}
+
+	/**
+	 * Toggle auto-mention mode temporarily.
+	 *
+	 * @param disabled - Whether auto-mention should be disabled
+	 */
+	toggleAutoMention(disabled: boolean): void {
+		this.setState({
+			isAutoMentionTemporarilyDisabled: disabled,
+		});
 	}
 
 	// ========================================

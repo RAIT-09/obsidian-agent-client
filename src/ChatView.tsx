@@ -1,11 +1,4 @@
-import {
-	ItemView,
-	WorkspaceLeaf,
-	TFile,
-	setIcon,
-	Platform,
-	Notice,
-} from "obsidian";
+import { ItemView, WorkspaceLeaf, setIcon, Platform, Notice } from "obsidian";
 import * as React from "react";
 const { useState, useRef, useEffect, useSyncExternalStore, useMemo } = React;
 import { createRoot, Root } from "react-dom/client";
@@ -26,16 +19,11 @@ import { ChatExporter } from "./utils/chat-exporter";
 
 // Type imports
 import type { MessageContent, IAcpClient } from "./types/acp-types";
-
-// Utility imports
-import {
-	detectMention,
-	replaceMention,
-	type MentionContext,
-} from "./utils/mention-utils";
+import type { NoteMetadata } from "./ports/vault-access.port";
 
 // Adapter imports
 import { AcpAdapter } from "./adapters/acp.adapter";
+import { ObsidianVaultAdapter } from "./adapters/obsidian-vault.adapter";
 
 // Use Case imports
 import { SendMessageUseCase } from "./use-cases/send-message.use-case";
@@ -97,11 +85,9 @@ function ChatComponent({
 	}, []);
 
 	const [inputValue, setInputValue] = useState("");
-	const [lastActiveNote, setLastActiveNote] = useState<TFile | null>(null);
-	const [
-		isAutoMentionTemporarilyDisabled,
-		setIsAutoMentionTemporarilyDisabled,
-	] = useState(false);
+	const [lastActiveNote, setLastActiveNote] = useState<NoteMetadata | null>(
+		null,
+	);
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
@@ -124,15 +110,20 @@ function ChatComponent({
 		return adapter;
 	}, [plugin]);
 
+	// Create ObsidianVaultAdapter
+	const vaultAccessAdapter = useMemo(() => {
+		return new ObsidianVaultAdapter(plugin);
+	}, [plugin]);
+
 	// Create SendMessageUseCase
 	const sendMessageUseCase = useMemo(() => {
 		return new SendMessageUseCase(
 			acpAdapter, // Use AcpAdapter as IAgentClient
-			{} as any, // vaultAccess not needed
+			vaultAccessAdapter,
 			plugin.settingsStore,
 			noteMentionService,
 		);
-	}, [acpAdapter, plugin, noteMentionService]);
+	}, [acpAdapter, vaultAccessAdapter, plugin, noteMentionService]);
 
 	// Create ManageSessionUseCase
 	const manageSessionUseCase = useMemo(() => {
@@ -163,6 +154,7 @@ function ChatComponent({
 			manageSessionUseCase,
 			handlePermissionUseCase,
 			switchAgentUseCase,
+			vaultAccessAdapter,
 			vaultPath,
 		);
 	}, [
@@ -171,6 +163,7 @@ function ChatComponent({
 		manageSessionUseCase,
 		handlePermissionUseCase,
 		switchAgentUseCase,
+		vaultAccessAdapter,
 		vaultPath,
 	]);
 
@@ -197,13 +190,13 @@ function ChatComponent({
 	const errorInfo = vmState.errorInfo;
 	const isSendingFromVM = vmState.isSending;
 
-	// Mention dropdown state
-	const [showMentionDropdown, setShowMentionDropdown] = useState(false);
-	const [mentionSuggestions, setMentionSuggestions] = useState<TFile[]>([]);
-	const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
-	const [mentionContext, setMentionContext] = useState<MentionContext | null>(
-		null,
-	);
+	// Mention dropdown state from ViewModel
+	const showMentionDropdown = vmState.showMentionDropdown;
+	const mentionSuggestions = vmState.mentionSuggestions;
+	const selectedMentionIndex = vmState.selectedMentionIndex;
+	const mentionContext = vmState.mentionContext;
+	const isAutoMentionTemporarilyDisabled =
+		vmState.isAutoMentionTemporarilyDisabled;
 
 	// Helper to check if agent is currently processing a request
 	const isSending = isSendingFromVM; // Use ViewModel state
@@ -251,63 +244,19 @@ function ChatComponent({
 		}
 	};
 
-	// Mention handling functions
-	const updateMentionSuggestions = (context: MentionContext | null) => {
-		logger.log("[DEBUG] updateMentionSuggestions called with:", context);
-
-		if (!context) {
-			logger.log("[DEBUG] No context, hiding dropdown");
-			setShowMentionDropdown(false);
-			setMentionSuggestions([]);
-			setMentionContext(null);
-			return;
-		}
-
-		logger.log("[DEBUG] Searching notes with query:", context.query);
-		const suggestions = noteMentionService.searchNotes(context.query);
-		logger.log(
-			"[DEBUG] Found suggestions:",
-			suggestions.length,
-			suggestions.map((f) => f.name),
-		);
-
-		setMentionSuggestions(suggestions);
-		setMentionContext(context);
-		setSelectedMentionIndex(0);
-
-		if (suggestions.length > 0) {
-			logger.log("[DEBUG] Showing dropdown");
-			setShowMentionDropdown(true);
-		} else {
-			logger.log("[DEBUG] No suggestions, hiding dropdown");
-			setShowMentionDropdown(false);
-		}
-	};
-
-	const closeMentionDropdown = () => {
-		setShowMentionDropdown(false);
-		setMentionSuggestions([]);
-		setMentionContext(null);
-		setSelectedMentionIndex(0);
-	};
-
-	const selectMention = (file: TFile) => {
-		if (!mentionContext) return;
-
-		const { newText, newCursorPos } = replaceMention(
-			inputValue,
-			mentionContext,
-			file.basename,
-		);
+	// Mention handling - delegate to ViewModel
+	const selectMention = (suggestion: NoteMetadata) => {
+		const newText = viewModel.selectMention(inputValue, suggestion);
 		setInputValue(newText);
-		closeMentionDropdown();
 
 		// Set cursor position after replacement
 		window.setTimeout(() => {
 			const textarea = textareaRef.current;
 			if (textarea) {
-				textarea.selectionStart = newCursorPos;
-				textarea.selectionEnd = newCursorPos;
+				// Calculate new cursor position (end of replaced mention)
+				const cursorPos = newText.length;
+				textarea.selectionStart = cursorPos;
+				textarea.selectionEnd = cursorPos;
 				textarea.focus();
 			}
 		}, 0);
@@ -431,16 +380,17 @@ function ChatComponent({
 
 	// Show auto-mention notes
 	useEffect(() => {
-		const current = plugin.app.workspace.getActiveFile();
-		if (current) {
-			setLastActiveNote(current);
-		}
+		const updateActiveNote = async () => {
+			const activeNote = await vaultAccessAdapter.getActiveNote();
+			if (activeNote) {
+				setLastActiveNote(activeNote);
+			}
+		};
+
+		updateActiveNote();
 
 		const handleActiveLeafChange = () => {
-			const newActive = plugin.app.workspace.getActiveFile();
-			if (newActive) {
-				setLastActiveNote(newActive);
-			}
+			updateActiveNote();
 		};
 
 		view.registerEvent(
@@ -449,7 +399,7 @@ function ChatComponent({
 				handleActiveLeafChange,
 			),
 		);
-	}, []);
+	}, [vaultAccessAdapter]);
 
 	const updateIconColor = (svg: SVGElement) => {
 		// Remove all state classes
@@ -468,7 +418,7 @@ function ChatComponent({
 	const createNewSession = async () => {
 		logger.log("[Debug] Creating new session via ViewModel...");
 		setInputValue("");
-		setIsAutoMentionTemporarilyDisabled(false);
+		viewModel.toggleAutoMention(false);
 		await viewModel.restartSession();
 	};
 
@@ -487,20 +437,9 @@ function ChatComponent({
 		setInputValue("");
 		setIsAtBottom(true);
 
-		// Convert active note TFile to NoteMetadata
-		const activeNoteMetadata = lastActiveNote
-			? {
-					path: lastActiveNote.path,
-					name: lastActiveNote.basename,
-					extension: lastActiveNote.extension,
-					created: lastActiveNote.stat.ctime,
-					modified: lastActiveNote.stat.mtime,
-				}
-			: null;
-
 		// Send message via ViewModel
 		await viewModel.sendMessage(messageToSend, {
-			activeNote: activeNoteMetadata,
+			activeNote: lastActiveNote,
 			vaultBasePath:
 				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
 					.basePath || "",
@@ -518,29 +457,26 @@ function ChatComponent({
 		if (showMentionDropdown) {
 			if (e.key === "ArrowDown") {
 				e.preventDefault();
-				setSelectedMentionIndex((prev) =>
-					prev < mentionSuggestions.length - 1 ? prev + 1 : 0,
-				);
+				viewModel.navigateMentionDropdown("down");
 				return;
 			}
 			if (e.key === "ArrowUp") {
 				e.preventDefault();
-				setSelectedMentionIndex((prev) =>
-					prev > 0 ? prev - 1 : mentionSuggestions.length - 1,
-				);
+				viewModel.navigateMentionDropdown("up");
 				return;
 			}
 			if (e.key === "Enter" || e.key === "Tab") {
 				e.preventDefault();
-				const selectedFile = mentionSuggestions[selectedMentionIndex];
-				if (selectedFile) {
-					selectMention(selectedFile);
+				const selectedSuggestion =
+					mentionSuggestions[selectedMentionIndex];
+				if (selectedSuggestion) {
+					selectMention(selectedSuggestion);
 				}
 				return;
 			}
 			if (e.key === "Escape") {
 				e.preventDefault();
-				closeMentionDropdown();
+				viewModel.closeMentionDropdown();
 				return;
 			}
 		}
@@ -570,10 +506,8 @@ function ChatComponent({
 
 		setInputValue(newValue);
 
-		// Check for mention detection
-		const mentionDetected = detectMention(newValue, cursorPosition, plugin);
-		logger.log("[DEBUG] Mention detected:", mentionDetected);
-		updateMentionSuggestions(mentionDetected);
+		// Update mention suggestions via ViewModel
+		viewModel.updateMentionSuggestions(newValue, cursorPosition);
 	};
 
 	const handleExportChat = async () => {
@@ -704,7 +638,7 @@ function ChatComponent({
 							files={mentionSuggestions}
 							selectedIndex={selectedMentionIndex}
 							onSelect={selectMention}
-							onClose={closeMentionDropdown}
+							onClose={() => viewModel.closeMentionDropdown()}
 							plugin={plugin}
 							view={view}
 						/>
@@ -714,18 +648,19 @@ function ChatComponent({
 							<span
 								className={`mention-badge ${isAutoMentionTemporarilyDisabled ? "disabled" : ""}`}
 							>
-								@{lastActiveNote.basename}
+								@{lastActiveNote.name}
 							</span>
 							<button
 								className="auto-mention-toggle-btn"
 								onClick={(e) => {
-									setIsAutoMentionTemporarilyDisabled(
-										!isAutoMentionTemporarilyDisabled,
+									const newDisabledState =
+										!isAutoMentionTemporarilyDisabled;
+									viewModel.toggleAutoMention(
+										newDisabledState,
 									);
-									const iconName =
-										!isAutoMentionTemporarilyDisabled
-											? "plus"
-											: "x";
+									const iconName = newDisabledState
+										? "x"
+										: "plus";
 									setIcon(e.currentTarget, iconName);
 								}}
 								title={
