@@ -2,6 +2,7 @@ import * as React from "react";
 const { useMemo } = React;
 import type { MessageContent, IAcpClient } from "../../types/acp-types";
 import type AgentClientPlugin from "../../main";
+import type { HandlePermissionUseCase } from "../../use-cases/handle-permission.use-case";
 import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 import { CollapsibleThought } from "./CollapsibleThought";
 import { TerminalRenderer } from "./TerminalRenderer";
@@ -15,6 +16,7 @@ interface MessageContentRendererProps {
 	messageId?: string;
 	messageRole?: "user" | "assistant";
 	acpClient?: IAcpClient;
+	handlePermissionUseCase?: HandlePermissionUseCase;
 	updateMessageContent?: (
 		messageId: string,
 		updatedContent: MessageContent,
@@ -28,6 +30,7 @@ export function MessageContentRenderer({
 	messageId,
 	messageRole,
 	acpClient,
+	handlePermissionUseCase,
 	updateMessageContent,
 	onPermissionSelected,
 }: MessageContentRendererProps) {
@@ -51,6 +54,7 @@ export function MessageContentRenderer({
 					content={content}
 					plugin={plugin}
 					acpClient={acpClient}
+					handlePermissionUseCase={handlePermissionUseCase}
 					onPermissionSelected={onPermissionSelected}
 				/>
 			);

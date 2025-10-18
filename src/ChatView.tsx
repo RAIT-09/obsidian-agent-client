@@ -47,6 +47,12 @@ import {
 import { ChatSession } from "./domain/models/chat-session";
 import { ErrorInfo } from "./domain/models/agent-error";
 
+// Use Case imports
+import { SendMessageUseCase } from "./use-cases/send-message.use-case";
+import { ManageSessionUseCase } from "./use-cases/manage-session.use-case";
+import { HandlePermissionUseCase } from "./use-cases/handle-permission.use-case";
+import { SwitchAgentUseCase } from "./use-cases/switch-agent.use-case";
+
 // Type definitions for Obsidian internal APIs
 interface VaultAdapterWithBasePath {
 	basePath?: string;
@@ -158,6 +164,95 @@ function ChatComponent({
 		() => new NoteMentionService(plugin),
 		[plugin],
 	);
+
+	// Create lightweight IAgentClient adapter wrapping existing connection
+	const agentClientAdapter = useMemo(
+		() => ({
+			async sendMessage(
+				sessionId: string,
+				message: string,
+			): Promise<void> {
+				if (!connectionRef.current) {
+					throw new Error("Connection not initialized");
+				}
+				await connectionRef.current.prompt({
+					sessionId,
+					prompt: [{ type: "text" as const, text: message }],
+				});
+			},
+			async authenticate(methodId: string) {
+				if (!connectionRef.current) return false;
+				try {
+					await connectionRef.current.authenticate({ methodId });
+					return true;
+				} catch {
+					return false;
+				}
+			},
+			async newSession(workingDirectory: string) {
+				if (!connectionRef.current) {
+					throw new Error("Connection not initialized");
+				}
+				return await connectionRef.current.newSession({
+					cwd: workingDirectory,
+					mcpServers: [],
+				});
+			},
+			async cancel(sessionId: string) {
+				if (!connectionRef.current) return;
+				await connectionRef.current.cancel({ sessionId });
+			},
+			// Other methods not used yet
+			initialize: async () => ({ authMethods: [], protocolVersion: 0 }),
+			disconnect: async () => {},
+			onMessage: () => {},
+			onError: () => {},
+			onPermissionRequest: () => {},
+			async respondToPermission(
+				requestId: string,
+				optionId: string,
+			): Promise<void> {
+				if (!acpClientRef.current)
+					throw new Error("ACP client not initialized");
+				acpClientRef.current.handlePermissionResponse(
+					requestId,
+					optionId,
+				);
+			},
+		}),
+		[],
+	);
+
+	// Create SendMessageUseCase
+	const sendMessageUseCase = useMemo(() => {
+		return new SendMessageUseCase(
+			agentClientAdapter,
+			{} as any, // vaultAccess not needed
+			plugin.settingsStore,
+			noteMentionService,
+		);
+	}, [agentClientAdapter, plugin, noteMentionService]);
+
+	// Create ManageSessionUseCase
+	const manageSessionUseCase = useMemo(() => {
+		return new ManageSessionUseCase(
+			agentClientAdapter,
+			plugin.settingsStore,
+		);
+	}, [agentClientAdapter, plugin]);
+
+	// Create HandlePermissionUseCase
+	const handlePermissionUseCase = useMemo(() => {
+		return new HandlePermissionUseCase(
+			agentClientAdapter,
+			plugin.settingsStore,
+		);
+	}, [agentClientAdapter, plugin]);
+
+	// Create SwitchAgentUseCase
+	const switchAgentUseCase = useMemo(() => {
+		return new SwitchAgentUseCase(plugin.settingsStore);
+	}, [plugin]);
 
 	// Mention dropdown state
 	const [showMentionDropdown, setShowMentionDropdown] = useState(false);
@@ -975,36 +1070,24 @@ function ChatComponent({
 		}
 	};
 
-	const authenticate = async (methodId: string) => {
-		if (!connectionRef.current) return false;
-
-		try {
-			await connectionRef.current.authenticate({ methodId });
-			logger.log("✅ authenticate ok:", methodId);
-			return true;
-		} catch (error) {
-			logger.error("[Client] Authentication Error:", error);
-			return false;
-		}
-	};
-
 	const createNewSession = async () => {
 		if (!connectionRef.current) return;
 
-		try {
-			logger.log("[Debug] Creating new session...");
-			logger.log("[Debug] Using vault path as cwd:", vaultPath);
+		logger.log("[Debug] Creating new session...");
+		logger.log("[Debug] Using vault path as cwd:", vaultPath);
 
-			updateSessionActivity({ state: "initializing" });
+		updateSessionActivity({ state: "initializing" });
 
-			const sessionResult = await connectionRef.current.newSession({
-				cwd: vaultPath,
-				mcpServers: [],
-			});
-			logger.log(`📝 Created new session: ${sessionResult.sessionId}`);
+		// Use ManageSessionUseCase to create new session
+		const result = await manageSessionUseCase.createSession({
+			workingDirectory: vaultPath,
+		});
+
+		if (result.success && result.sessionId) {
+			logger.log(`📝 Created new session: ${result.sessionId}`);
 
 			updateSessionActivity({
-				sessionId: sessionResult.sessionId,
+				sessionId: result.sessionId,
 				state: "ready",
 				createdAt: new Date(),
 			});
@@ -1014,18 +1097,26 @@ function ChatComponent({
 			setIsAutoMentionTemporarilyDisabled(false);
 
 			// Switch to the active agent from settings if different from current
-			const newActiveAgentId =
-				plugin.settings.activeAgentId || plugin.settings.claude.id;
+			const newActiveAgentId = switchAgentUseCase.getActiveAgentId();
 			if (newActiveAgentId !== session.agentId) {
 				updateSessionActivity({
 					agentId: newActiveAgentId,
 				});
 			}
-		} catch (error) {
-			logger.error("[Client] New Session Error:", error);
+		} else {
+			logger.error("[Client] New Session Error:", result.error);
 			updateSessionActivity({
 				state: "error",
 			});
+
+			// Show error if present
+			if (result.error) {
+				setErrorInfo({
+					title: result.error.title,
+					message: result.error.message,
+					suggestion: result.error.suggestion,
+				});
+			}
 		}
 	};
 
@@ -1073,8 +1164,8 @@ function ChatComponent({
 		// Set session to busy state
 		updateSessionActivity({ state: "busy" });
 
-		// Add auto-mention
-		let messageText = inputValue;
+		// Process message immediately for display (auto-mention logic)
+		let displayMessage = inputValue;
 		if (
 			settings.autoMentionActiveNote &&
 			lastActiveNote &&
@@ -1082,29 +1173,21 @@ function ChatComponent({
 		) {
 			const autoMention = `@[[${lastActiveNote.basename}]]`;
 			if (!inputValue.includes(autoMention)) {
-				messageText = `${autoMention}\n${inputValue}`;
+				displayMessage = `${autoMention}\n${inputValue}`;
 			}
 		}
 
-		// Add user message to chat (keep original text with @mentions for display)
+		// Add user message to chat immediately
 		const userMessage: ChatMessage = {
 			id: crypto.randomUUID(),
 			role: "user",
-			content: [{ type: "text", text: messageText }],
+			content: [{ type: "text", text: displayMessage }],
 			timestamp: new Date(),
 		};
 		addMessage(userMessage);
 
-		// Convert @mentions to relative paths for agent consumption
-		const messageTextForAgent = convertMentionsToPath(
-			messageText,
-			noteMentionService,
-			(plugin.app.vault.adapter as VaultAdapterWithBasePath).basePath ||
-				"",
-		);
+		// Clear input and scroll immediately
 		setInputValue("");
-
-		// Force scroll to bottom when user sends a message
 		setIsAtBottom(true);
 		window.setTimeout(() => {
 			scrollToBottom();
@@ -1113,77 +1196,45 @@ function ChatComponent({
 		// Reset current message for new assistant response
 		acpClientRef.current?.resetCurrentMessage();
 
-		try {
-			logger.log(`\n✅ Sending Message...: ${messageTextForAgent}`);
-			const promptResult = await connectionRef.current.prompt({
-				sessionId: session.sessionId!,
-				prompt: [
-					{
-						type: "text",
-						text: messageTextForAgent,
-					},
-				],
-			});
-			logger.log(`\n✅ Agent completed with: ${promptResult.stopReason}`);
-
-			updateSessionActivity({ state: "ready" });
-		} catch (error) {
-			logger.error("[Client] Prompt Error:", error);
-			updateSessionActivity({ state: "ready" });
-
-			// Check if this is an "empty response text" error - if so, silently ignore it
-			if (
-				error &&
-				typeof error === "object" &&
-				"code" in error &&
-				error.code === -32603
-			) {
-				const errorData = (error as any).data;
-				if (errorData?.details?.includes("empty response text")) {
-					logger.log("Empty response text error - ignoring");
-					return;
+		// Convert active note TFile to NoteMetadata for Use Case
+		const activeNoteMetadata = lastActiveNote
+			? {
+					path: lastActiveNote.path,
+					name: lastActiveNote.basename,
+					extension: lastActiveNote.extension,
+					created: lastActiveNote.stat.ctime,
+					modified: lastActiveNote.stat.mtime,
 				}
-			}
+			: null;
 
-			if (!session.authMethods || session.authMethods.length === 0) {
-				logger.error("No auth methods available");
-				return;
-			}
+		// Execute Use Case (send to agent)
+		const result = await sendMessageUseCase.execute({
+			sessionId: session.sessionId!,
+			message: inputValue,
+			activeNote: activeNoteMetadata,
+			vaultBasePath:
+				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
+					.basePath || "",
+			authMethods: session.authMethods,
+			isAutoMentionDisabled: isAutoMentionTemporarilyDisabled,
+		});
 
-			if (session.authMethods.length === 1) {
-				const success = await authenticate(session.authMethods[0].id);
-				if (success) {
-					// Retry with the same message text
-					updateSessionActivity({ state: "busy" });
-					try {
-						const promptResult = await connectionRef.current.prompt(
-							{
-								sessionId: session.sessionId!,
-								prompt: [
-									{
-										type: "text",
-										text: messageTextForAgent,
-									},
-								],
-							},
-						);
-						logger.log(
-							`\n✅ Agent completed with: ${promptResult.stopReason}`,
-						);
-						updateSessionActivity({ state: "ready" });
-					} catch (retryError) {
-						logger.error("[Client] Retry Error:", retryError);
-						updateSessionActivity({ state: "ready" });
-					}
-				}
-			} else {
-				// Show authentication error using the new error UI
+		// Handle result
+		if (result.success) {
+			logger.log(
+				`✅ Message sent successfully${result.retriedSuccessfully ? " (after auth retry)" : ""}`,
+			);
+			updateSessionActivity({ state: "ready" });
+		} else {
+			logger.error("❌ Failed to send message:", result.error);
+			updateSessionActivity({ state: "ready" });
+
+			// Show error if present
+			if (result.error) {
 				setErrorInfo({
-					title: "Authentication Required",
-					message:
-						"Authentication failed. Please check if you are logged into the agent or if your API key is correctly set.",
-					suggestion:
-						"Check your agent configuration in settings and ensure API keys are valid.",
+					title: result.error.title,
+					message: result.error.message,
+					suggestion: result.error.suggestion,
 				});
 			}
 		}
@@ -1340,6 +1391,9 @@ function ChatComponent({
 								message={message}
 								plugin={plugin}
 								acpClient={acpClientRef.current || undefined}
+								handlePermissionUseCase={
+									handlePermissionUseCase
+								}
 								updateMessageContent={updateMessageContent}
 								onPermissionSelected={
 									updatePermissionRequestInToolCall
