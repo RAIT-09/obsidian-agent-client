@@ -1,6 +1,6 @@
 import * as React from "react";
 const { useMemo } = React;
-import type { IAcpClient } from "../../types/acp-types";
+import type { IAcpClient } from "../../adapters/acp.adapter";
 import type AgentClientPlugin from "../../main";
 import type { HandlePermissionUseCase } from "../../use-cases/handle-permission.use-case";
 import { Logger } from "../../utils/logger";

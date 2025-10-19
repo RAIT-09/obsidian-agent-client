@@ -1,6 +1,6 @@
 import * as React from "react";
 const { useState, useRef, useEffect, useMemo } = React;
-import type { IAcpClient } from "../../types/acp-types";
+import type { IAcpClient } from "../../adapters/acp.adapter";
 import { Logger } from "../../utils/logger";
 import type AgentClientPlugin from "../../main";
 

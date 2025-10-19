@@ -12,13 +12,35 @@ import type {
 import type {
 	ChatMessage,
 	MessageContent,
-	IAcpClient,
-} from "../types/acp-types";
+} from "../domain/models/chat-message";
 import type { AgentError } from "../domain/models/agent-error";
 import { AcpTypeConverter } from "./acp-type-converter";
 import { TerminalManager } from "../terminal-manager";
 import { Logger } from "../utils/logger";
 import type AgentClientPlugin from "../main";
+
+/**
+ * Extended ACP Client interface for UI layer.
+ *
+ * Provides ACP-specific operations needed by UI components
+ * (terminal rendering, permission handling, etc.) that are not
+ * part of the domain-level IAgentClient interface.
+ *
+ * This interface extends the base ACP Client from the protocol library
+ * with plugin-specific methods for:
+ * - Permission response handling
+ * - Operation cancellation
+ * - Message state management
+ * - Terminal I/O operations
+ */
+export interface IAcpClient extends acp.Client {
+	handlePermissionResponse(requestId: string, optionId: string): void;
+	cancelAllOperations(): void;
+	resetCurrentMessage(): void;
+	terminalOutput(
+		params: acp.TerminalOutputRequest,
+	): Promise<acp.TerminalOutputResponse>;
+}
 
 /**
  * Adapter that wraps the Agent Client Protocol (ACP) library.

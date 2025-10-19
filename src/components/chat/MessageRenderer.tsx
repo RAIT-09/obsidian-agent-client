@@ -2,8 +2,8 @@ import * as React from "react";
 import type {
 	ChatMessage,
 	MessageContent,
-	IAcpClient,
-} from "../../types/acp-types";
+} from "../../domain/models/chat-message";
+import type { IAcpClient } from "../../adapters/acp.adapter";
 import type AgentClientPlugin from "../../main";
 import type { HandlePermissionUseCase } from "../../use-cases/handle-permission.use-case";
 import { MessageContentRenderer } from "./MessageContentRenderer";

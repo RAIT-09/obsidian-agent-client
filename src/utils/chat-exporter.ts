@@ -1,5 +1,8 @@
 import type AgentClientPlugin from "../main";
-import type { ChatMessage, MessageContent } from "../types/acp-types";
+import type {
+	ChatMessage,
+	MessageContent,
+} from "../domain/models/chat-message";
 import { Logger } from "./logger";
 
 export class ChatExporter {

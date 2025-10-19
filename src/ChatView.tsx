@@ -18,11 +18,11 @@ import { Logger } from "./utils/logger";
 import { ChatExporter } from "./utils/chat-exporter";
 
 // Type imports
-import type { MessageContent, IAcpClient } from "./types/acp-types";
+import type { MessageContent } from "./domain/models/chat-message";
 import type { NoteMetadata } from "./ports/vault-access.port";
 
 // Adapter imports
-import { AcpAdapter } from "./adapters/acp.adapter";
+import { AcpAdapter, type IAcpClient } from "./adapters/acp.adapter";
 import { ObsidianVaultAdapter } from "./adapters/obsidian-vault.adapter";
 
 // Use Case imports
