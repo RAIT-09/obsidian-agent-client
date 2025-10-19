@@ -1,4 +1,4 @@
-import { App, Plugin, WorkspaceLeaf, Notice, requestUrl } from "obsidian";
+import { Plugin, WorkspaceLeaf, Notice, requestUrl } from "obsidian";
 import {
 	ChatView,
 	VIEW_TYPE_CHAT,

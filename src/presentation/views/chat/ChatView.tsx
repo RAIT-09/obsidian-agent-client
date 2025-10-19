@@ -18,7 +18,6 @@ import { Logger } from "../../../shared/logger";
 import { ChatExporter } from "../../../shared/chat-exporter";
 
 // Type imports
-import type { MessageContent } from "../../../core/domain/models/chat-message";
 import type { NoteMetadata } from "../../../core/domain/ports/vault-access.port";
 
 // Adapter imports
@@ -194,7 +193,6 @@ function ChatComponent({
 	const showMentionDropdown = vmState.showMentionDropdown;
 	const mentionSuggestions = vmState.mentionSuggestions;
 	const selectedMentionIndex = vmState.selectedMentionIndex;
-	const mentionContext = vmState.mentionContext;
 	const isAutoMentionTemporarilyDisabled =
 		vmState.isAutoMentionTemporarilyDisabled;
 
