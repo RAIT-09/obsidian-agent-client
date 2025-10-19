@@ -1,260 +1,205 @@
-# Agent Client Plugin - Development Documentation
+# Agent Client Plugin - LLM Developer Guide
 
-## Project Overview
+## Overview
+Obsidian plugin for AI agent interaction (Claude Code, Gemini CLI, custom agents). **Clean Architecture** (5 layers): Presentation → Adapters → Use Cases → Domain ← Infrastructure.
 
-The **Agent Client Plugin for Obsidian** enables users to interact with AI coding agents (Claude Code, Gemini CLI, and custom agents) directly within Obsidian. The plugin provides a dedicated chat interface in the right sidebar with support for note mentions, terminal integration, and permission management.
+**Tech**: React 19, TypeScript, Obsidian API, Agent Client Protocol (ACP)
 
 ## Architecture
 
-### Core Structure
+**Dependency Flow**: Inward only. Core domain has zero external dependencies.
 
 ```
 src/
-├── main.ts                      # Plugin entry point, settings management
-├── ChatView.tsx                 # Main React chat interface
-├── settings-store.ts            # Reactive settings state management  
-├── terminal-manager.ts          # Terminal process management
-├── services/
-│   ├── acp-client.ts           # Agent Client Protocol communication
-│   └── mention-service.ts      # Note mention functionality
-├── components/
-│   ├── chat/                   # Chat UI components
-│   ├── settings/               # Settings UI components
-│   └── ui/                     # Common UI components
-├── utils/
-│   ├── logger.ts               # Debug logging system
-│   ├── mention-utils.ts        # Mention parsing utilities
-│   └── settings-utils.ts       # Settings validation helpers
-└── types/
-    └── acp-types.ts            # TypeScript type definitions
+├── core/domain/              # Pure domain models + ports (interfaces)
+│   ├── models/               # agent-config, agent-error, chat-message, chat-session
+│   └── ports/                # IAgentClient, ISettingsAccess, IVaultAccess
+├── core/use-cases/           # Business logic
+│   ├── handle-permission.use-case.ts
+│   ├── manage-session.use-case.ts  
+│   ├── send-message.use-case.ts
+│   └── switch-agent.use-case.ts
+├── adapters/                 # Interface implementations
+│   ├── acp/                  # ACP protocol (acp.adapter.ts, acp-type-converter.ts)
+│   ├── obsidian/             # Platform adapters (vault, settings, mention-service)
+│   └── view-models/          # chat.view-model.ts (MVVM)
+├── infrastructure/           # External frameworks
+│   ├── obsidian-plugin/      # plugin.ts (lifecycle, persistence)
+│   └── terminal/             # terminal-manager.ts
+├── presentation/             # UI layer
+│   ├── views/chat/           # ChatView.tsx (DI container + rendering)
+│   └── components/           # chat/, settings/, shared/
+└── shared/                   # Utilities (logger, exporter, mention-utils, settings-utils)
 ```
 
-### Key Technologies
+## Key Components
 
-- **Agent Client Protocol (ACP)**: Communication with AI agents
-- **React 19**: UI framework for chat interface
-- **TypeScript**: Type safety throughout codebase
-- **Obsidian Plugin API**: Desktop-only plugin architecture
+### ChatView (`presentation/views/chat/ChatView.tsx`)
+- **DI Container**: Instantiates Use Cases, Adapters, ViewModel via useMemo
+- **Rendering**: Uses useSyncExternalStore for ViewModel state
+- **No Business Logic**: Pure UI component
 
-## Core Components
+### ChatViewModel (`adapters/view-models/chat.view-model.ts`)
+- **State**: messages, session, errorInfo, isSending, mention dropdown
+- **Methods** (23): Session mgmt, messaging, permissions, agent switching, mentions
+- **Delegates**: All logic to Use Cases
+- **Callbacks**: addMessage, updateLastMessage, updateMessage (from AcpAdapter)
 
-### 1. Main Plugin Class (`main.ts`)
+### Use Cases (`core/use-cases/`)
 
-**Purpose**: Plugin lifecycle management, settings persistence, view registration
+**SendMessageUseCase**:
+- `prepareMessage()`: Sync - auto-mention, convert @[[note]] → paths
+- `sendPreparedMessage()`: Async - send via IAgentClient, auth retry
+- Error handling: Ignore "empty response text", auto-retry auth failures
 
-**Key Features**:
-- Manages agent configurations (Claude Code, Gemini CLI, custom agents)
-- Handles settings loading/saving with validation
-- Registers chat view and ribbon icon
-- Maintains reactive settings store
+**ManageSessionUseCase**:
+- `createSession()`: Load config, inject API keys, initialize + newSession
+- `restartSession()`: Cancel old, create new
+- `closeSession()`: Call IAgentClient.cancel()
 
-**Settings Structure**:
-```typescript
-interface AgentClientPluginSettings {
-  gemini: GeminiAgentSettings;
-  claude: ClaudeAgentSettings; 
-  customAgents: CustomAgentSettings[];
-  activeAgentId: string;
-  autoAllowPermissions: boolean;
-  debugMode: boolean;  // Added for log management
-}
-```
+**HandlePermissionUseCase**:
+- `approvePermission()`: Respond with selected option
+- `shouldAutoApprove()`: Check settings.autoAllowPermissions
+- `getAutoApproveOption()`: Select first allow_once/allow_always
 
-### 2. Chat Interface (`ChatView.tsx`)
+**SwitchAgentUseCase**:
+- `switchAgent()`: Update settings.activeAgentId
+- `getAvailableAgents()`: Return claude, gemini, custom agents
 
-**Purpose**: Main React component providing chat UI and agent interaction
+### AcpAdapter (`adapters/acp/acp.adapter.ts`)
+Implements IAgentClient + IAcpClient (terminal ops)
 
-**Key Features**:
-- Real-time chat with selected AI agent
-- Note mention support using `@notename` syntax
-- Message rendering with markdown, thoughts, and terminal output
-- Input handling with mention dropdown suggestions
-- Agent switching and connection management
+- **Process**: spawn() with login shell (macOS/Linux -l, Windows shell:true)
+- **Protocol**: JSON-RPC over stdin/stdout via ndJsonStream
+- **Flow**: initialize() → newSession() → sendMessage() → sessionUpdate() callbacks
+- **Callbacks**: setMessageCallbacks() wires to ViewModel
+- **Updates**: agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan
+- **Permissions**: Promise-based Map<requestId, resolver>
+- **Terminal**: createTerminal, terminalOutput, killTerminal, releaseTerminal
 
-**State Management**:
-- Uses `useSyncExternalStore` for reactive settings
-- Manages chat messages, session state, and UI state
-- Handles mention context and suggestions
+### Obsidian Adapters
 
-### 3. ACP Client (`services/acp-client.ts`)
+**VaultAdapter**: IVaultAccess - searchNotes (fuzzy via NoteMentionService), getActiveNote, readNote
+**SettingsStore**: ISettingsAccess - Observer pattern, getSnapshot(), subscribe(), updateSettings()
+**MentionService**: File index, fuzzy search (basename, path, frontmatter aliases)
 
-**Purpose**: Handles communication with AI agents via Agent Client Protocol
+### Terminal Manager (`infrastructure/terminal/terminal-manager.ts`)
+- spawn(), capture stdout/stderr (10MB limit), track exit codes
+- killTerminal(): SIGTERM → wait → SIGKILL
 
-**Key Features**:
-- Session management (create, authenticate, cancel)
-- Message sending and response handling
-- Terminal operation proxying
-- Permission request management
-- Streaming response processing
-
-**Integration Points**:
-- Receives plugin instance for logger access
-- Manages TerminalManager for command execution
-- Provides callbacks for UI updates
-
-### 4. Terminal Manager (`terminal-manager.ts`)
-
-**Purpose**: Manages terminal processes spawned by AI agents
-
-**Key Features**:
-- Process lifecycle management (spawn, monitor, cleanup)
-- Output capture with byte limits
-- Exit status tracking
-- Graceful termination handling
-
-**Security Considerations**:
-- Processes run with inherited environment
-- Working directory control
-- Output size limitations
-
-### 5. Mention System
-
-**Components**:
-- `NoteMentionService`: Indexes vault files for fuzzy search
-- `mention-utils.ts`: Parsing and conversion utilities
-- `MentionDropdown`: UI for selecting mentioned notes
+### Mention System
 
 **Flow**:
-1. User types `@` in chat input
-2. System detects mention context
-3. Fuzzy search provides file suggestions
-4. Selected mentions convert to file paths for agents
+1. User types `@` → ChatViewModel.updateMentionSuggestions()
+2. detectMention() finds cursor context
+3. IVaultAccess.searchNotes() → fuzzy search
+4. Display MentionDropdown
+5. User selects → replaceMention() → convertMentionsToPath()
 
-## Settings System
+**Syntax**: `@[[note name]]` → `/absolute/path/to/note name.md`
 
-### Configuration Hierarchy
-1. **Built-in Agents**: Claude Code and Gemini CLI with predefined defaults
-2. **Custom Agents**: User-defined ACP-compatible tools
-3. **General Settings**: Auto-permissions and debug mode
+## Ports (Interfaces)
 
-### Settings Store Pattern
-- Reactive store using observer pattern
-- React components subscribe to settings changes
-- Automatic UI updates on settings modifications
-
-### Validation & Migration
-- Settings are validated and normalized on load
-- Handles legacy field names and missing properties
-- Ensures active agent ID remains valid
-
-## Debug System
-
-### Logger Implementation (`utils/logger.ts`)
-
-**Purpose**: Conditional logging based on debug mode setting
-
-**Features**:
-- Respects `debugMode` setting in plugin configuration
-- Provides standard console methods (log, error, warn, info)
-- Used consistently across all components
-
-**Usage Pattern**:
 ```typescript
-// In classes
-constructor(plugin: AgentClientPlugin) {
-  this.logger = new Logger(plugin);
+interface IAgentClient {
+  initialize(config: AgentConfig): Promise<InitializeResult>;
+  newSession(workingDirectory: string): Promise<NewSessionResult>;
+  authenticate(methodId: string): Promise<boolean>;
+  sendMessage(sessionId: string, message: string): Promise<void>;
+  cancel(sessionId: string): Promise<void>;
+  disconnect(): Promise<void>;
+  onMessage(callback: (message: ChatMessage) => void): void;
+  onError(callback: (error: AgentError) => void): void;
+  onPermissionRequest(callback: (request: PermissionRequest) => void): void;
+  respondToPermission(requestId: string, optionId: string): Promise<void>;
 }
-this.logger.log("Debug message", data);
 
-// In React components  
-const logger = useMemo(() => new Logger(plugin), [plugin]);
-logger.log("Component debug info");
+interface IVaultAccess {
+  readNote(path: string): Promise<string>;
+  searchNotes(query: string): Promise<NoteMetadata[]>;
+  getActiveNote(): Promise<NoteMetadata | null>;
+  listNotes(): Promise<NoteMetadata[]>;
+}
+
+interface ISettingsAccess {
+  getSnapshot(): AgentClientPluginSettings;
+  updateSettings(updates: Partial<AgentClientPluginSettings>): Promise<void>;
+  subscribe(listener: () => void): () => void;
+}
 ```
 
-### Debug Mode Control
-- Toggle in Settings → Developer Settings
-- Default: `false` (disabled for production)
-- Instantly affects all logging throughout application
+## Development Rules
 
-## Development Guidelines
+### Clean Architecture
+1. **Dependencies**: Inward only (Presentation → Adapters → Use Cases → Domain)
+2. **Domain**: Zero external deps (no `obsidian`, `@zed-industries/agent-client-protocol`)
+3. **Use Ports**: Use Cases depend on interfaces, not implementations
+4. **No UI Logic**: ChatView/components render only, delegate to ViewModel
 
-### Obsidian Plugin Review Requirements
+### Obsidian Plugin Review (CRITICAL)
+1. No innerHTML/outerHTML - use createEl/createDiv/createSpan
+2. NO detach leaves in onunload (antipattern)
+3. Styles in CSS only - no JS style manipulation
+4. Use Platform interface - not process.platform
+5. Minimize `any` - use proper types
 
-**CRITICAL: These rules must be followed to pass Obsidian's automated review:**
-
-1. **Security**: Never use `innerHTML`, `outerHTML`, or similar APIs
-   - Use DOM API or Obsidian helper functions: `createEl`, `createDiv`, `createSpan`
-   - Reference: https://docs.obsidian.md/Plugins/User+interface/HTML+elements
-
-2. **Plugin Lifecycle**: Do NOT detach leaves with custom views in `onunload`
-   - This is an antipattern that causes issues
-   - Reference: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Don't+detach+leaves+in+%60onunload%60
-
-3. **Styling**: Move all styles to CSS files
-   - Do NOT assign styles via JavaScript or inline in HTML
-   - Allows themes and snippets to adapt styles
-   - Use CSS classes instead of direct style manipulation
-
-4. **Platform Detection**: Use Obsidian's `Platform` interface
-   - Do NOT use `process.platform` or other Node.js APIs directly
-   - Ensures proper cross-platform compatibility
-
-5. **Type Safety**: Minimize `any` casting
-   - Use proper TypeScript types throughout
-   - Only use `any` when absolutely necessary for Obsidian API limitations
+### Naming Conventions
+- Ports: `*.port.ts`
+- Use Cases: `*.use-case.ts`
+- Adapters: `*.adapter.ts`
+- ViewModels: `*.view-model.ts`
+- Components: `PascalCase.tsx`
+- Utils/Models: `kebab-case.ts`
 
 ### Code Patterns
+1. Error handling: try-catch async ops
+2. Strict typing, avoid `any`
+3. React: hooks, useMemo for DI
+4. Settings: validate + defaults
+5. Logging: Logger class (respects debugMode)
 
-1. **Error Handling**: Always handle async operations with try-catch
-2. **TypeScript**: Strict typing, avoid `any` except for plugin API limitations
-3. **React**: Use hooks consistently, memoize expensive operations
-4. **Settings**: Always validate and provide defaults
-5. **Logging**: Use Logger class instead of direct console calls
+## Common Tasks
 
-### File Organization
+### Add Use Case
+1. Create `core/use-cases/[name].use-case.ts`
+2. Define input/output interfaces
+3. Inject ports via constructor
+4. Add to ChatViewModel dependencies
+5. Call from ChatViewModel method
 
-- Components are grouped by functionality (chat/, settings/, ui/)
-- Services handle external communication and business logic  
-- Utils contain pure functions and helpers
-- Types centralize TypeScript definitions
+### Add Agent Type
+1. **Optional**: Define config in `core/domain/models/agent-config.ts`
+2. **Adapter**: Implement IAgentClient in `adapters/[agent]/[agent].adapter.ts`
+3. **Settings**: Add to AgentClientPluginSettings in plugin.ts
+4. **UI**: Update AgentClientSettingTab
+**No changes in Use Cases/Domain!**
 
-### Testing Strategy
+### Modify Message Types
+1. Update `ChatMessage`/`MessageContent` in `core/domain/models/chat-message.ts`
+2. Update `AcpAdapter.sessionUpdate()` to handle new type
+3. Update `MessageContentRenderer` to render new type
+4. **Optional**: Update AcpTypeConverter
 
-- Build validation via TypeScript compiler
-- Manual testing in Obsidian development environment
-- Settings validation on load prevents runtime errors
+### Debug
+1. Settings → Developer Settings → Debug Mode ON
+2. Open DevTools (Cmd+Option+I / Ctrl+Shift+I)
+3. Filter logs: `[AcpAdapter]`, `[ViewModel]`, `[NoteMentionService]`
 
-## Common Issues & Solutions
+**Logged**: Process lifecycle, ACP messages, session state, permissions, terminal ops, errors
 
-### 1. Agent Connection Failures
-- **Cause**: Incorrect command paths or missing dependencies
-- **Solution**: Verify agent installation and path configuration
-- **Debug**: Enable debug mode to see detailed connection logs
+## ACP Protocol
 
-### 2. Permission Requests
-- **Cause**: Agents request file/system access
-- **Solution**: Use auto-allow for trusted agents or approve manually
-- **Security**: Review permissions carefully before allowing
+**Communication**: JSON-RPC 2.0 over stdin/stdout
 
-### 3. Terminal Process Cleanup
-- **Cause**: Long-running processes may persist after session end
-- **Solution**: TerminalManager handles cleanup on plugin unload
-- **Monitoring**: Debug logs track process lifecycle
+**Methods**: initialize, newSession, authenticate, prompt, cancel
+**Notifications**: session/update (agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan)
+**Requests**: requestPermission
 
-### 4. Mention Resolution
-- **Cause**: File paths may not resolve correctly across platforms
-- **Solution**: Uses Obsidian's TFile API for reliable path handling
-- **Fallback**: Original mention preserved if file not found
+**Agents**:
+- Claude Code: `@zed-industries/claude-code-acp` (ANTHROPIC_API_KEY)
+- Gemini CLI: `@google/gemini-cli --experimental-acp` (GOOGLE_API_KEY)
+- Custom: Any ACP-compatible agent
 
-## Future Considerations
+---
 
-1. **Performance**: Large vaults may need mention indexing optimization
-2. **Security**: Consider sandboxing for untrusted custom agents  
-3. **UI**: Mobile support would require significant rework
-4. **Testing**: Automated test suite for core functionality
-5. **Internationalization**: UI strings are currently hardcoded
-
-## Development Setup
-
-1. Install dependencies: `npm install`
-2. Development build: `npm run dev` (watches for changes)
-3. Production build: `npm run build`
-4. Link to Obsidian vault plugins folder for testing
-
-## Agent Requirements
-
-Compatible agents must support the Agent Client Protocol (ACP) specification. Examples:
-- `@zed-industries/claude-code-acp`
-- `@google/gemini-cli` (with --experimental-acp flag)
-
-Custom agents need to implement ACP's JSON-RPC protocol over stdin/stdout.
+**Last Updated**: October 2025 | **Architecture**: Clean (5-layer) | **Version**: 0.1.7
