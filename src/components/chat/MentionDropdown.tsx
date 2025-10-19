@@ -1,14 +1,14 @@
 import * as React from "react";
 const { useRef, useEffect, useMemo } = React;
-import { TFile } from "obsidian";
 import { Logger } from "../../utils/logger";
 import type AgentClientPlugin from "../../main";
 import type { ChatView } from "../../ChatView";
+import type { NoteMetadata } from "../../ports/vault-access.port";
 
 interface MentionDropdownProps {
-	files: TFile[];
+	files: NoteMetadata[];
 	selectedIndex: number;
-	onSelect: (file: TFile) => void;
+	onSelect: (file: NoteMetadata) => void;
 	onClose: () => void;
 	plugin: AgentClientPlugin;
 	view: ChatView;
@@ -61,7 +61,7 @@ export function MentionDropdown({
 					}}
 				>
 					<div className="mention-dropdown-item-name">
-						{file.basename}
+						{file.name}
 					</div>
 					<div className="mention-dropdown-item-path">
 						{file.path}

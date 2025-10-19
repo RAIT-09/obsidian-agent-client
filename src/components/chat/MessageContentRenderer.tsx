@@ -1,6 +1,7 @@
 import * as React from "react";
 const { useMemo } = React;
-import type { MessageContent, IAcpClient } from "../../types/acp-types";
+import type { MessageContent } from "../../domain/models/chat-message";
+import type { IAcpClient } from "../../adapters/acp.adapter";
 import type AgentClientPlugin from "../../main";
 import type { HandlePermissionUseCase } from "../../use-cases/handle-permission.use-case";
 import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
@@ -17,11 +18,6 @@ interface MessageContentRendererProps {
 	messageRole?: "user" | "assistant";
 	acpClient?: IAcpClient;
 	handlePermissionUseCase?: HandlePermissionUseCase;
-	updateMessageContent?: (
-		messageId: string,
-		updatedContent: MessageContent,
-	) => void;
-	onPermissionSelected?: (requestId: string, optionId: string) => void;
 }
 
 export function MessageContentRenderer({
@@ -31,8 +27,6 @@ export function MessageContentRenderer({
 	messageRole,
 	acpClient,
 	handlePermissionUseCase,
-	updateMessageContent,
-	onPermissionSelected,
 }: MessageContentRendererProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 
@@ -55,7 +49,6 @@ export function MessageContentRenderer({
 					plugin={plugin}
 					acpClient={acpClient}
 					handlePermissionUseCase={handlePermissionUseCase}
-					onPermissionSelected={onPermissionSelected}
 				/>
 			);
 

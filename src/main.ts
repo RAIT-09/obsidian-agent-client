@@ -69,6 +69,9 @@ export default class AgentClientPlugin extends Plugin {
 	settings: AgentClientPluginSettings;
 	settingsStore!: SettingsStore;
 
+	// Active ACP adapter instance (shared across use cases)
+	acpAdapter: import("./adapters/acp.adapter").AcpAdapter | null = null;
+
 	async onload() {
 		await this.loadSettings();
 

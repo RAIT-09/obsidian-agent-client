@@ -2,8 +2,8 @@ import * as React from "react";
 import type {
 	ChatMessage,
 	MessageContent,
-	IAcpClient,
-} from "../../types/acp-types";
+} from "../../domain/models/chat-message";
+import type { IAcpClient } from "../../adapters/acp.adapter";
 import type AgentClientPlugin from "../../main";
 import type { HandlePermissionUseCase } from "../../use-cases/handle-permission.use-case";
 import { MessageContentRenderer } from "./MessageContentRenderer";
@@ -13,11 +13,6 @@ interface MessageRendererProps {
 	plugin: AgentClientPlugin;
 	acpClient?: IAcpClient;
 	handlePermissionUseCase?: HandlePermissionUseCase;
-	updateMessageContent?: (
-		messageId: string,
-		updatedContent: MessageContent,
-	) => void;
-	onPermissionSelected?: (requestId: string, optionId: string) => void;
 }
 
 export function MessageRenderer({
@@ -25,8 +20,6 @@ export function MessageRenderer({
 	plugin,
 	acpClient,
 	handlePermissionUseCase,
-	updateMessageContent,
-	onPermissionSelected,
 }: MessageRendererProps) {
 	return (
 		<div
@@ -41,8 +34,6 @@ export function MessageRenderer({
 						messageRole={message.role}
 						acpClient={acpClient}
 						handlePermissionUseCase={handlePermissionUseCase}
-						updateMessageContent={updateMessageContent}
-						onPermissionSelected={onPermissionSelected}
 					/>
 				</div>
 			))}

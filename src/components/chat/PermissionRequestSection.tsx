@@ -1,6 +1,6 @@
 import * as React from "react";
 const { useMemo } = React;
-import type { IAcpClient } from "../../types/acp-types";
+import type { IAcpClient } from "../../adapters/acp.adapter";
 import type AgentClientPlugin from "../../main";
 import type { HandlePermissionUseCase } from "../../use-cases/handle-permission.use-case";
 import { Logger } from "../../utils/logger";
@@ -17,7 +17,7 @@ interface PermissionRequestSectionProps {
 	acpClient?: IAcpClient;
 	handlePermissionUseCase?: HandlePermissionUseCase;
 	plugin: AgentClientPlugin;
-	onPermissionSelected?: (requestId: string, optionId: string) => void;
+	onOptionSelected?: (optionId: string) => void;
 }
 
 export function PermissionRequestSection({
@@ -26,7 +26,7 @@ export function PermissionRequestSection({
 	acpClient,
 	handlePermissionUseCase,
 	plugin,
-	onPermissionSelected,
+	onOptionSelected,
 }: PermissionRequestSectionProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 
@@ -45,15 +45,12 @@ export function PermissionRequestSection({
 							key={option.optionId}
 							className={`permission-option ${option.kind ? `permission-kind-${option.kind}` : ""}`}
 							onClick={async () => {
-								if (handlePermissionUseCase) {
-									// Call the callback if provided
-									if (onPermissionSelected) {
-										onPermissionSelected(
-											permissionRequest.requestId,
-											option.optionId,
-										);
-									}
+								// Update local UI state immediately for feedback
+								if (onOptionSelected) {
+									onOptionSelected(option.optionId);
+								}
 
+								if (handlePermissionUseCase) {
 									// Send response to agent via Use Case
 									const result =
 										await handlePermissionUseCase.approvePermission(

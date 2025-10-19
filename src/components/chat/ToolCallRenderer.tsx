@@ -1,6 +1,7 @@
 import * as React from "react";
 const { useState } = React;
-import type { MessageContent, IAcpClient } from "../../types/acp-types";
+import type { MessageContent } from "../../domain/models/chat-message";
+import type { IAcpClient } from "../../adapters/acp.adapter";
 import type AgentClientPlugin from "../../main";
 import type { HandlePermissionUseCase } from "../../use-cases/handle-permission.use-case";
 import { TerminalRenderer } from "./TerminalRenderer";
@@ -12,7 +13,6 @@ interface ToolCallRendererProps {
 	plugin: AgentClientPlugin;
 	acpClient?: IAcpClient;
 	handlePermissionUseCase?: HandlePermissionUseCase;
-	onPermissionSelected?: (requestId: string, optionId: string) => void;
 }
 
 export function ToolCallRenderer({
@@ -20,7 +20,6 @@ export function ToolCallRenderer({
 	plugin,
 	acpClient,
 	handlePermissionUseCase,
-	onPermissionSelected,
 }: ToolCallRendererProps) {
 	const {
 		kind,
@@ -33,9 +32,17 @@ export function ToolCallRenderer({
 		content: toolContent,
 	} = content;
 
+	// Local state for selected option (for immediate UI feedback)
 	const [selectedOptionId, setSelectedOptionId] = useState<
 		string | undefined
 	>(permissionRequest?.selectedOptionId);
+
+	// Update selectedOptionId when permissionRequest changes
+	React.useEffect(() => {
+		if (permissionRequest?.selectedOptionId !== selectedOptionId) {
+			setSelectedOptionId(permissionRequest?.selectedOptionId);
+		}
+	}, [permissionRequest?.selectedOptionId]);
 
 	// Get icon based on kind
 	const getKindIcon = (kind?: string) => {
@@ -62,20 +69,6 @@ export function ToolCallRenderer({
 				return "🔧";
 		}
 	};
-
-	const handlePermissionSelected = (requestId: string, optionId: string) => {
-		setSelectedOptionId(optionId);
-		if (onPermissionSelected) {
-			onPermissionSelected(requestId, optionId);
-		}
-	};
-
-	// Update selectedOptionId when permissionRequest changes
-	React.useEffect(() => {
-		if (permissionRequest?.selectedOptionId !== selectedOptionId) {
-			setSelectedOptionId(permissionRequest?.selectedOptionId);
-		}
-	}, [permissionRequest?.selectedOptionId]);
 
 	return (
 		<div className="message-tool-call">
@@ -152,7 +145,7 @@ export function ToolCallRenderer({
 					acpClient={acpClient}
 					handlePermissionUseCase={handlePermissionUseCase}
 					plugin={plugin}
-					onPermissionSelected={handlePermissionSelected}
+					onOptionSelected={setSelectedOptionId}
 				/>
 			)}
 		</div>
