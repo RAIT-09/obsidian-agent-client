@@ -4,6 +4,7 @@ import type {
 	MessageContent,
 } from "../core/domain/models/chat-message";
 import { Logger } from "./logger";
+import { TFile } from "obsidian";
 
 export class ChatExporter {
 	private logger: Logger;
@@ -17,10 +18,10 @@ export class ChatExporter {
 		agentLabel: string,
 		agentId: string,
 		sessionId: string,
+		sessionCreatedAt: Date,
 	): Promise<string> {
 		const settings = this.plugin.settings.exportSettings;
-		const timestamp = new Date();
-		const fileName = this.generateFileName(timestamp);
+		const fileName = this.generateFileName(sessionCreatedAt);
 		const folderPath = settings.defaultFolder || "Agent Client";
 
 		// Create folder if it doesn't exist
@@ -33,20 +34,32 @@ export class ChatExporter {
 				agentLabel,
 				agentId,
 				sessionId,
-				timestamp,
+				sessionCreatedAt,
 			);
 			const chatContent = this.convertMessagesToMarkdown(
 				messages,
 				agentLabel,
 				sessionId,
-				timestamp,
+				sessionCreatedAt,
 			);
 			const fullContent = `${frontmatter}\n\n${chatContent}`;
 
-			const file = await this.plugin.app.vault.create(
-				filePath,
-				fullContent,
-			);
+			// Check if file already exists
+			const existingFile =
+				this.plugin.app.vault.getAbstractFileByPath(filePath);
+			let file: TFile;
+
+			if (existingFile instanceof TFile) {
+				// File exists, update it
+				await this.plugin.app.vault.modify(existingFile, fullContent);
+				file = existingFile;
+			} else {
+				// File doesn't exist, create it
+				file = await this.plugin.app.vault.create(
+					filePath,
+					fullContent,
+				);
+			}
 
 			// Open the exported file
 			const leaf = this.plugin.app.workspace.getLeaf(false);

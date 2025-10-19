@@ -526,6 +526,7 @@ function ChatComponent({
 				activeAgentLabel,
 				session.agentId,
 				session.sessionId || "unknown",
+				session.createdAt,
 			);
 			new Notice(`[Agent Client] Chat exported to ${filePath}`);
 		} catch (error) {
