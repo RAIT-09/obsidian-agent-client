@@ -496,7 +496,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Prompt Error:", error);
 
-			// Check if this is an "empty response text" error - if so, silently ignore it
+			// Check if this is an ignorable error (empty response or user abort)
 			if (
 				error &&
 				typeof error === "object" &&
@@ -509,13 +509,22 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					errorData &&
 					typeof errorData === "object" &&
 					"details" in errorData &&
-					typeof errorData.details === "string" &&
-					errorData.details.includes("empty response text")
+					typeof errorData.details === "string"
 				) {
-					this.logger.log(
-						"[AcpAdapter] Empty response text error - ignoring",
-					);
-					return;
+					// Ignore "empty response text" errors
+					if (errorData.details.includes("empty response text")) {
+						this.logger.log(
+							"[AcpAdapter] Empty response text error - ignoring",
+						);
+						return;
+					}
+					// Ignore "user aborted" errors (from cancel operation)
+					if (errorData.details.includes("user aborted")) {
+						this.logger.log(
+							"[AcpAdapter] User aborted request - ignoring",
+						);
+						return;
+					}
 				}
 			}
 
