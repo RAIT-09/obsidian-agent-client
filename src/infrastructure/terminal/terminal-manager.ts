@@ -1,5 +1,5 @@
 import { spawn, ChildProcess, SpawnOptions } from "child_process";
-import * as acp from "@zed-industries/agent-client-protocol";
+import * as acp from "@agentclientprotocol/sdk";
 import type AgentClientPlugin from "../obsidian-plugin/plugin";
 import { Logger } from "../../shared/logger";
 import { Platform } from "obsidian";

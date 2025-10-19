@@ -4,7 +4,7 @@ import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 import type { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";
 import { Logger } from "../../../shared/logger";
-import * as acp from "@zed-industries/agent-client-protocol";
+import * as acp from "@agentclientprotocol/sdk";
 
 interface PermissionRequestSectionProps {
 	permissionRequest: {

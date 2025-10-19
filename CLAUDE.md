@@ -132,7 +132,7 @@ interface ISettingsAccess {
 
 ### Clean Architecture
 1. **Dependencies**: Inward only (Presentation → Adapters → Use Cases → Domain)
-2. **Domain**: Zero external deps (no `obsidian`, `@zed-industries/agent-client-protocol`)
+2. **Domain**: Zero external deps (no `obsidian`, `@agentclientprotocol/sdk`)
 3. **Use Ports**: Use Cases depend on interfaces, not implementations
 4. **No UI Logic**: ChatView/components render only, delegate to ViewModel
 
