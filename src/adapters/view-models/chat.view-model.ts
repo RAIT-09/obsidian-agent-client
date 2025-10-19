@@ -16,7 +16,10 @@ import type {
 	ChatMessage,
 	MessageContent,
 } from "../../core/domain/models/chat-message";
-import type { ChatSession, SessionState } from "../../core/domain/models/chat-session";
+import type {
+	ChatSession,
+	SessionState,
+} from "../../core/domain/models/chat-session";
 import type { ErrorInfo } from "../../core/domain/models/agent-error";
 import type { NoteMetadata } from "../../core/domain/ports/vault-access.port";
 import type { IVaultAccess } from "../../core/domain/ports/vault-access.port";
@@ -275,39 +278,41 @@ export class ChatViewModel {
 	 * Initializes connection to the active agent and prepares for messaging.
 	 */
 	async createNewSession(): Promise<void> {
-		// Update state to initializing
+		// Get active agent ID before async operations
+		const activeAgentId = this.switchAgentUseCase.getActiveAgentId();
+
+		// Reset UI immediately (synchronous) - same as plugin startup flow
 		this.setState({
+			messages: [], // Clear messages immediately
 			session: {
 				...this.state.session,
+				agentId: activeAgentId,
 				state: "initializing",
+				sessionId: null,
+				authMethods: [],
+				createdAt: new Date(),
+				lastActivityAt: new Date(),
 			},
+			errorInfo: null,
 		});
 
 		try {
-			// Get active agent ID
-			const activeAgentId = this.switchAgentUseCase.getActiveAgentId();
-
-			// Use ManageSessionUseCase to create session
-			// This will call IAgentClient.initialize() and IAgentClient.newSession()
+			// Background: initialize + newSession
 			const result = await this.manageSessionUseCase.createSession({
 				workingDirectory: this.workingDirectory,
 				agentId: activeAgentId,
 			});
 
 			if (result.success && result.sessionId) {
-				// Update session state
+				// Update with session ID and ready state
 				this.setState({
-					messages: [], // Clear messages for new session
 					session: {
 						...this.state.session,
 						sessionId: result.sessionId,
 						state: "ready",
-						agentId: activeAgentId,
 						authMethods: result.authMethods || [],
-						createdAt: new Date(),
 						lastActivityAt: new Date(),
 					},
-					errorInfo: null,
 				});
 			} else {
 				// Handle Use Case error

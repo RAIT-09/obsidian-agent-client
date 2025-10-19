@@ -11,10 +11,7 @@
  * adapter layer, keeping the domain logic stable.
  */
 
-import type {
-	ChatMessage,
-	PermissionOption,
-} from "../models/chat-message";
+import type { ChatMessage, PermissionOption } from "../models/chat-message";
 import type { AgentError } from "../models/agent-error";
 import type { AuthenticationMethod } from "../models/chat-session";
 
@@ -204,4 +201,25 @@ export interface IAgentClient {
 	 * @param optionId - Selected option identifier
 	 */
 	respondToPermission(requestId: string, optionId: string): Promise<void>;
+
+	/**
+	 * Check if the agent connection is initialized and ready.
+	 *
+	 * Returns true if:
+	 * - initialize() has been called successfully
+	 * - The agent process is still running
+	 * - The connection is still active
+	 *
+	 * @returns true if initialized and connected, false otherwise
+	 */
+	isInitialized(): boolean;
+
+	/**
+	 * Get the ID of the currently connected agent.
+	 *
+	 * Returns null if no agent is connected.
+	 *
+	 * @returns Agent ID or null
+	 */
+	getCurrentAgentId(): string | null;
 }

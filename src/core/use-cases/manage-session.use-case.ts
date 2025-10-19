@@ -98,7 +98,9 @@ export class ManageSessionUseCase {
 	 * This method:
 	 * 1. Gets agent settings from settings store
 	 * 2. Converts settings to AgentConfig
-	 * 3. Calls agentClient.initialize() to spawn and connect to agent
+	 * 3. Conditionally calls agentClient.initialize() only if:
+	 *    - Agent is not initialized, OR
+	 *    - Agent ID has changed (switching agents)
 	 * 4. Calls agentClient.newSession() to create a chat session
 	 */
 	async createSession(
@@ -168,10 +170,24 @@ export class ManageSessionUseCase {
 				};
 			}
 
-			// Initialize connection to agent
-			const initResult = await this.agentClient.initialize(agentConfig);
+			// Check if initialization is needed
+			// Only initialize if:
+			// 1. Agent is not initialized yet, OR
+			// 2. Agent ID has changed (switching agents)
+			const needsInitialize =
+				!this.agentClient.isInitialized() ||
+				this.agentClient.getCurrentAgentId() !== input.agentId;
 
-			// Create new session
+			let authMethods: AuthenticationMethod[] = [];
+
+			if (needsInitialize) {
+				// Initialize connection to agent (spawn process + protocol handshake)
+				const initResult =
+					await this.agentClient.initialize(agentConfig);
+				authMethods = initResult.authMethods;
+			}
+
+			// Create new session (lightweight operation)
 			const sessionResult = await this.agentClient.newSession(
 				input.workingDirectory,
 			);
@@ -179,7 +195,7 @@ export class ManageSessionUseCase {
 			return {
 				success: true,
 				sessionId: sessionResult.sessionId,
-				authMethods: initResult.authMethods,
+				authMethods: authMethods,
 			};
 		} catch (error) {
 			return {

@@ -72,6 +72,8 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 	// Configuration state
 	private currentConfig: AgentConfig | null = null;
+	private isInitializedFlag = false;
+	private currentAgentId: string | null = null;
 	private autoAllowPermissions = false;
 
 	// IAcpClient implementation properties
@@ -344,12 +346,20 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				initResult.authMethods,
 			);
 
+			// Mark as initialized and store agent ID
+			this.isInitializedFlag = true;
+			this.currentAgentId = config.id;
+
 			return {
 				protocolVersion: initResult.protocolVersion,
 				authMethods: initResult.authMethods || [],
 			};
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Initialization Error:", error);
+
+			// Reset flags on failure
+			this.isInitializedFlag = false;
+			this.currentAgentId = null;
 
 			const agentError: AgentError = {
 				id: crypto.randomUUID(),
@@ -582,7 +592,33 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.connection = null;
 		this.currentConfig = null;
 
+		// Reset initialization state
+		this.isInitializedFlag = false;
+		this.currentAgentId = null;
+
 		this.logger.log("[AcpAdapter] Disconnected");
+	}
+
+	/**
+	 * Check if the agent connection is initialized and ready.
+	 *
+	 * Implementation of IAgentClient.isInitialized()
+	 */
+	isInitialized(): boolean {
+		return (
+			this.isInitializedFlag &&
+			this.connection !== null &&
+			this.agentProcess !== null
+		);
+	}
+
+	/**
+	 * Get the ID of the currently connected agent.
+	 *
+	 * Implementation of IAgentClient.getCurrentAgentId()
+	 */
+	getCurrentAgentId(): string | null {
+		return this.currentAgentId;
 	}
 
 	/**
