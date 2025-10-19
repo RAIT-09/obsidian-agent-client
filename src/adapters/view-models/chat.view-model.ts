@@ -69,6 +69,9 @@ export interface ChatViewModelState {
 
 	/** Whether auto-mention is temporarily disabled */
 	isAutoMentionTemporarilyDisabled: boolean;
+
+	/** Last user message that can be restored after cancel */
+	lastUserMessage: string | null;
 }
 
 // ============================================================================
@@ -240,6 +243,7 @@ export class ChatViewModel {
 			selectedMentionIndex: 0,
 			mentionContext: null,
 			isAutoMentionTemporarilyDisabled: false,
+			lastUserMessage: null,
 		};
 	}
 
@@ -451,13 +455,14 @@ export class ChatViewModel {
 		};
 		this.addMessage(userMessage);
 
-		// Phase 3: Set sending state
+		// Phase 3: Set sending state and store original message for potential restore
 		this.setState({
 			isSending: true,
 			session: {
 				...this.state.session,
 				state: "busy",
 			},
+			lastUserMessage: content, // Store original message before preparation
 		});
 
 		// Phase 4: Send prepared message to agent (asynchronous)
@@ -470,7 +475,7 @@ export class ChatViewModel {
 			});
 
 			if (result.success) {
-				// Update session state to ready
+				// Update session state to ready and clear stored message
 				this.setState({
 					isSending: false,
 					session: {
@@ -478,6 +483,7 @@ export class ChatViewModel {
 						state: "ready",
 						lastActivityAt: new Date(),
 					},
+					lastUserMessage: null, // Clear on success
 				});
 			} else {
 				// Handle error from use case

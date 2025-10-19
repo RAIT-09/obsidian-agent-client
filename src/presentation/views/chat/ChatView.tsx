@@ -427,7 +427,14 @@ function ChatComponent({
 
 	const handleStopGeneration = async () => {
 		logger.log("Cancelling current operation...");
+		// Get last user message before cancel (to restore it)
+		const lastMessage = viewModel.getSnapshot().lastUserMessage;
 		await viewModel.cancelCurrentOperation();
+
+		// Restore the last user message to input field
+		if (lastMessage) {
+			setInputValue(lastMessage);
+		}
 	};
 
 	const handleSendMessage = async () => {
