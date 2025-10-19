@@ -416,6 +416,11 @@ function ChatComponent({
 	};
 
 	const createNewSession = async () => {
+		if (messages.length === 0) {
+			new Notice("[Agent Client] Already a new session");
+			return;
+		}
+
 		logger.log("[Debug] Creating new session via ViewModel...");
 		setInputValue("");
 		viewModel.toggleAutoMention(false);
