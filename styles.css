@@ -39,6 +39,9 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--background-modifier-border);
 	border-radius: 50%;
 	animation: dotPulse 1.2s ease-in-out infinite;
+	will-change: background-color;
+	transform: translateZ(0);
+	backface-visibility: hidden;
 }
 
 .loading-dot:nth-child(1) {
