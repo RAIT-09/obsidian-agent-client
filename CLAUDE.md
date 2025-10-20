@@ -16,7 +16,7 @@ src/
 │   └── ports/                # IAgentClient, ISettingsAccess, IVaultAccess
 ├── core/use-cases/           # Business logic
 │   ├── handle-permission.use-case.ts
-│   ├── manage-session.use-case.ts  
+│   ├── manage-session.use-case.ts
 │   ├── send-message.use-case.ts
 │   └── switch-agent.use-case.ts
 ├── adapters/                 # Interface implementations
@@ -40,10 +40,10 @@ src/
 - **No Business Logic**: Pure UI component
 
 ### ChatViewModel (`adapters/view-models/chat.view-model.ts`)
-- **State**: messages, session, errorInfo, isSending, mention dropdown
-- **Methods** (23): Session mgmt, messaging, permissions, agent switching, mentions
+- **State**: messages, session, errorInfo, isSending, mention dropdown, slash command dropdown
+- **Methods** (27): Session mgmt, messaging, permissions, agent switching, mentions, slash commands
 - **Delegates**: All logic to Use Cases
-- **Callbacks**: addMessage, updateLastMessage, updateMessage (from AcpAdapter)
+- **Callbacks**: addMessage, updateLastMessage, updateMessage, updateAvailableCommands (from AcpAdapter)
 
 ### Use Cases (`core/use-cases/`)
 
@@ -73,7 +73,7 @@ Implements IAgentClient + IAcpClient (terminal ops)
 - **Protocol**: JSON-RPC over stdin/stdout via ndJsonStream
 - **Flow**: initialize() → newSession() → sendMessage() → sessionUpdate() callbacks
 - **Callbacks**: setMessageCallbacks() wires to ViewModel
-- **Updates**: agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan
+- **Updates**: agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan, available_commands_update
 - **Permissions**: Promise-based Map<requestId, resolver>
 - **Terminal**: createTerminal, terminalOutput, killTerminal, releaseTerminal
 
@@ -93,10 +93,26 @@ Implements IAgentClient + IAcpClient (terminal ops)
 1. User types `@` → ChatViewModel.updateMentionSuggestions()
 2. detectMention() finds cursor context
 3. IVaultAccess.searchNotes() → fuzzy search
-4. Display MentionDropdown
+4. Display SuggestionDropdown (type: "mention")
 5. User selects → replaceMention() → convertMentionsToPath()
 
 **Syntax**: `@[[note name]]` → `/absolute/path/to/note name.md`
+
+### Slash Command System
+
+**Flow**:
+1. User types `/` at start → ChatViewModel.updateSlashCommandSuggestions()
+2. Filter availableCommands by query after `/`
+3. Display SuggestionDropdown (type: "slash-command")
+4. User selects → Insert command, show hint overlay if command has hint
+5. Auto-mention temporarily disabled (ACP requires `/` at message start)
+
+**Features**:
+- **Hint Overlay**: Visual hint displayed using invisible span for precise alignment
+- **Auto-mention Disable**: Prevents auto-mention from interfering with slash command recognition
+- **Dropdown Reuse**: SuggestionDropdown component handles both mentions and slash commands
+
+**ACP Integration**: Receives `available_commands_update` notification with command metadata (name, description, hint)
 
 ## Ports (Interfaces)
 
@@ -192,8 +208,13 @@ interface ISettingsAccess {
 **Communication**: JSON-RPC 2.0 over stdin/stdout
 
 **Methods**: initialize, newSession, authenticate, prompt, cancel
-**Notifications**: session/update (agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan)
+**Notifications**: session/update (agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan, available_commands_update)
 **Requests**: requestPermission
+
+**Slash Commands**: Agents advertise available commands via `available_commands_update` notification. Commands include:
+- `name`: Command identifier (e.g., "web", "test")
+- `description`: Human-readable description
+- `hint`: Optional input hint (e.g., "query to search for")
 
 **Agents**:
 - Claude Code: `@zed-industries/claude-code-acp` (ANTHROPIC_API_KEY)
@@ -202,4 +223,4 @@ interface ISettingsAccess {
 
 ---
 
-**Last Updated**: October 2025 | **Architecture**: Clean (5-layer) | **Version**: 0.1.7
+**Last Updated**: October 2025 | **Architecture**: Clean (5-layer) | **Version**: 0.2.0
