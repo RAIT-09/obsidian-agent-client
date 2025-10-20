@@ -52,7 +52,7 @@ src/
 │       │   ├── ToolCallRenderer.tsx
 │       │   ├── TerminalRenderer.tsx
 │       │   ├── PermissionRequestSection.tsx
-│       │   ├── MentionDropdown.tsx
+│       │   ├── SuggestionDropdown.tsx  # Unified dropdown (mentions + slash commands)
 │       │   └── ... (8 more components)
 │       ├── settings/               # Settings UI
 │       │   └── AgentClientSettingTab.ts
@@ -76,7 +76,7 @@ src/
 
 #### Domain Models (`src/core/domain/models/`)
 - **Zero external dependencies** - Pure TypeScript types
-- Defines core entities: ChatMessage, ChatSession, AgentError, AgentConfig
+- Defines core entities: ChatMessage, ChatSession, AgentError, AgentConfig, SlashCommand
 - Independent of the ACP protocol library
 - Can be used across different implementations
 
