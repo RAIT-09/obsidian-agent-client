@@ -911,14 +911,24 @@ export class ChatViewModel {
 	 * @param cursorPosition - Current cursor position
 	 */
 	updateSlashCommandSuggestions(input: string, cursorPosition: number): void {
+		const wasShowingSlashDropdown = this.state.showSlashCommandDropdown;
+
 		// Slash commands only trigger at the very beginning of input
 		if (!input.startsWith("/")) {
+			// Only re-enable auto-mention if it was disabled by slash command
+			// (don't override manual user disable)
+			const shouldReEnableAutoMention =
+				wasShowingSlashDropdown &&
+				this.state.isAutoMentionTemporarilyDisabled;
+
 			this.setState({
 				showSlashCommandDropdown: false,
 				slashCommandSuggestions: [],
 				selectedSlashCommandIndex: 0,
-				// Re-enable auto-mention when slash command is removed
-				isAutoMentionTemporarilyDisabled: false,
+				// Re-enable auto-mention only if it was disabled by slash command
+				isAutoMentionTemporarilyDisabled: shouldReEnableAutoMention
+					? false
+					: this.state.isAutoMentionTemporarilyDisabled,
 			});
 			return;
 		}
