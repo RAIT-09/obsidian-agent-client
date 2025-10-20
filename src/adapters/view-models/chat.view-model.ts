@@ -19,6 +19,7 @@ import type {
 import type {
 	ChatSession,
 	SessionState,
+	SlashCommand,
 } from "../../core/domain/models/chat-session";
 import type { ErrorInfo } from "../../core/domain/models/agent-error";
 import type { NoteMetadata } from "../../core/domain/ports/vault-access.port";
@@ -69,6 +70,16 @@ export interface ChatViewModelState {
 
 	/** Whether auto-mention is temporarily disabled */
 	isAutoMentionTemporarilyDisabled: boolean;
+
+	// Slash command dropdown state
+	/** Whether the slash command dropdown is currently shown */
+	showSlashCommandDropdown: boolean;
+
+	/** Available slash commands filtered by current query */
+	slashCommandSuggestions: SlashCommand[];
+
+	/** Currently selected index in slash command dropdown */
+	selectedSlashCommandIndex: number;
 
 	/** Last user message that can be restored after cancel */
 	lastUserMessage: string | null;
@@ -243,6 +254,10 @@ export class ChatViewModel {
 			selectedMentionIndex: 0,
 			mentionContext: null,
 			isAutoMentionTemporarilyDisabled: false,
+			// Slash command dropdown state
+			showSlashCommandDropdown: false,
+			slashCommandSuggestions: [],
+			selectedSlashCommandIndex: 0,
 			lastUserMessage: null,
 		};
 	}
@@ -678,6 +693,19 @@ export class ChatViewModel {
 		this.setState({ errorInfo: null });
 	}
 
+	/**
+	 * Update available slash commands from the agent.
+	 * Called by AcpAdapter when receiving available_commands_update notification.
+	 */
+	updateAvailableCommands = (commands: SlashCommand[]): void => {
+		this.setState({
+			session: {
+				...this.state.session,
+				availableCommands: commands,
+			},
+		});
+	};
+
 	// ========================================
 	// Actions: Permission Handling
 	// ========================================
@@ -865,6 +893,116 @@ export class ChatViewModel {
 	toggleAutoMention(disabled: boolean): void {
 		this.setState({
 			isAutoMentionTemporarilyDisabled: disabled,
+		});
+	}
+
+	// ========================================
+	// Actions: Slash Command Dropdown
+	// ========================================
+
+	/**
+	 * Update slash command suggestions based on user input.
+	 * Filters available commands by the query after '/'.
+	 *
+	 * Slash commands are only triggered when the input starts with '/'.
+	 * They do not trigger in the middle of text or after newlines.
+	 *
+	 * @param input - Current input text
+	 * @param cursorPosition - Current cursor position
+	 */
+	updateSlashCommandSuggestions(input: string, cursorPosition: number): void {
+		// Slash commands only trigger at the very beginning of input
+		if (!input.startsWith("/")) {
+			this.setState({
+				showSlashCommandDropdown: false,
+				slashCommandSuggestions: [],
+				selectedSlashCommandIndex: 0,
+				// Re-enable auto-mention when slash command is removed
+				isAutoMentionTemporarilyDisabled: false,
+			});
+			return;
+		}
+
+		// Extract query after '/' (up to first space or end of input)
+		const textUpToCursor = input.slice(0, cursorPosition);
+		const spaceIndex = textUpToCursor.indexOf(" ");
+		const query =
+			spaceIndex === -1
+				? textUpToCursor.slice(1).toLowerCase()
+				: textUpToCursor.slice(1, spaceIndex).toLowerCase();
+
+		// Filter available commands
+		const availableCommands = this.state.session.availableCommands || [];
+		const suggestions = availableCommands.filter((cmd) =>
+			cmd.name.toLowerCase().includes(query),
+		);
+
+		this.setState({
+			showSlashCommandDropdown: suggestions.length > 0,
+			slashCommandSuggestions: suggestions,
+			selectedSlashCommandIndex: 0,
+			// Disable auto-mention when slash command is detected
+			// (ACP requires slash commands to be at the very beginning)
+			isAutoMentionTemporarilyDisabled: true,
+		});
+	}
+
+	/**
+	 * Select a slash command from the dropdown.
+	 * Returns the updated input text with just the command (not the hint).
+	 *
+	 * The hint will be displayed as an overlay in the UI, not as actual text.
+	 *
+	 * @param input - Current input text
+	 * @param suggestion - Selected slash command
+	 * @returns Updated input text with command only
+	 */
+	selectSlashCommand(input: string, suggestion: SlashCommand): string {
+		// Return only the command text (hint will be shown as overlay)
+		const commandText = `/${suggestion.name} `;
+
+		// Close dropdown
+		this.setState({
+			showSlashCommandDropdown: false,
+			slashCommandSuggestions: [],
+			selectedSlashCommandIndex: 0,
+		});
+
+		return commandText;
+	}
+
+	/**
+	 * Close the slash command dropdown.
+	 */
+	closeSlashCommandDropdown(): void {
+		this.setState({
+			showSlashCommandDropdown: false,
+			slashCommandSuggestions: [],
+			selectedSlashCommandIndex: 0,
+		});
+	}
+
+	/**
+	 * Navigate through slash command dropdown options.
+	 *
+	 * @param direction - Navigation direction ('up' or 'down')
+	 */
+	navigateSlashCommandDropdown(direction: "up" | "down"): void {
+		if (!this.state.showSlashCommandDropdown) {
+			return;
+		}
+
+		const maxIndex = this.state.slashCommandSuggestions.length - 1;
+		let newIndex = this.state.selectedSlashCommandIndex;
+
+		if (direction === "down") {
+			newIndex = Math.min(newIndex + 1, maxIndex);
+		} else {
+			newIndex = Math.max(newIndex - 1, 0);
+		}
+
+		this.setState({
+			selectedSlashCommandIndex: newIndex,
 		});
 	}
 

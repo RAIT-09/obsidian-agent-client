@@ -18,6 +18,7 @@ import { AcpTypeConverter } from "./acp-type-converter";
 import { TerminalManager } from "../../infrastructure/terminal/terminal-manager";
 import { Logger } from "../../shared/logger";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
+import type { SlashCommand } from "src/core/domain/models/chat-session";
 
 /**
  * Extended ACP Client interface for UI layer.
@@ -61,6 +62,9 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	private errorCallback: ((error: AgentError) => void) | null = null;
 	private permissionCallback: ((request: PermissionRequest) => void) | null =
 		null;
+	private updateAvailableCommandsCallback:
+		| ((commands: SlashCommand[]) => void)
+		| null = null;
 
 	// Message update callbacks (for ViewModel integration)
 	private addMessage: (message: ChatMessage) => void;
@@ -112,15 +116,18 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	 * @param addMessage - Callback to add a new message to chat
 	 * @param updateLastMessage - Callback to update the last message
 	 * @param updateMessage - Callback to update a specific message by toolCallId
+	 * @param updateAvailableCommandsCallback - Callback to update available commands
 	 */
 	setMessageCallbacks(
 		addMessage: (message: ChatMessage) => void,
 		updateLastMessage: (content: MessageContent) => void,
 		updateMessage: (toolCallId: string, content: MessageContent) => boolean,
+		updateAvailableCommandsCallback: (commands: SlashCommand[]) => void,
 	): void {
 		this.addMessage = addMessage;
 		this.updateLastMessage = updateLastMessage;
 		this.updateMessage = updateMessage;
+		this.updateAvailableCommandsCallback = updateAvailableCommandsCallback;
 	}
 
 	/**
@@ -801,6 +808,26 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					entries: update.entries,
 				});
 				break;
+
+			case "available_commands_update": {
+				this.logger.log(
+					`[AcpAdapter] available_commands_update, commands:`,
+					update.availableCommands,
+				);
+
+				const commands: SlashCommand[] = (
+					update.availableCommands || []
+				).map((cmd) => ({
+					name: cmd.name,
+					description: cmd.description,
+					hint: cmd.input?.hint ?? null,
+				}));
+
+				if (this.updateAvailableCommandsCallback) {
+					this.updateAvailableCommandsCallback(commands);
+				}
+				break;
+			}
 		}
 	}
 

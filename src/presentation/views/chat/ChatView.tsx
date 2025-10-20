@@ -6,7 +6,7 @@ import { createRoot, Root } from "react-dom/client";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 
 // Component imports
-import { MentionDropdown } from "../../components/chat/MentionDropdown";
+import { SuggestionDropdown } from "../../components/chat/SuggestionDropdown";
 import { MessageRenderer } from "../../components/chat/MessageRenderer";
 import { HeaderButton } from "../../components/shared/HeaderButton";
 
@@ -19,6 +19,7 @@ import { ChatExporter } from "../../../shared/chat-exporter";
 
 // Type imports
 import type { NoteMetadata } from "../../../core/domain/ports/vault-access.port";
+import type { SlashCommand } from "../../../core/domain/models/chat-session";
 
 // Adapter imports
 import { AcpAdapter, type IAcpClient } from "../../../adapters/acp/acp.adapter";
@@ -87,6 +88,9 @@ function ChatComponent({
 	const [lastActiveNote, setLastActiveNote] = useState<NoteMetadata | null>(
 		null,
 	);
+	// Hint overlay state for slash commands
+	const [hintText, setHintText] = useState<string | null>(null);
+	const [commandText, setCommandText] = useState<string>("");
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
@@ -173,6 +177,7 @@ function ChatComponent({
 			viewModel.addMessage,
 			viewModel.updateLastMessage,
 			viewModel.updateMessage,
+			viewModel.updateAvailableCommands,
 		);
 	}, [acpAdapter, viewModel]);
 
@@ -195,6 +200,11 @@ function ChatComponent({
 	const selectedMentionIndex = vmState.selectedMentionIndex;
 	const isAutoMentionTemporarilyDisabled =
 		vmState.isAutoMentionTemporarilyDisabled;
+
+	// Slash command dropdown state from ViewModel
+	const showSlashCommandDropdown = vmState.showSlashCommandDropdown;
+	const slashCommandSuggestions = vmState.slashCommandSuggestions;
+	const selectedSlashCommandIndex = vmState.selectedSlashCommandIndex;
 
 	// Helper to check if agent is currently processing a request
 	const isSending = isSendingFromVM; // Use ViewModel state
@@ -242,17 +252,53 @@ function ChatComponent({
 		}
 	};
 
-	// Mention handling - delegate to ViewModel
-	const selectMention = (suggestion: NoteMetadata) => {
-		const newText = viewModel.selectMention(inputValue, suggestion);
+	/**
+	 * Common logic for setting cursor position after text replacement.
+	 */
+	const setTextAndFocus = (newText: string) => {
 		setInputValue(newText);
 
-		// Set cursor position after replacement
+		// Set cursor position to end of text
 		window.setTimeout(() => {
 			const textarea = textareaRef.current;
 			if (textarea) {
-				// Calculate new cursor position (end of replaced mention)
 				const cursorPos = newText.length;
+				textarea.selectionStart = cursorPos;
+				textarea.selectionEnd = cursorPos;
+				textarea.focus();
+			}
+		}, 0);
+	};
+
+	// Mention handling - delegate to ViewModel
+	const selectMention = (suggestion: NoteMetadata) => {
+		const newText = viewModel.selectMention(inputValue, suggestion);
+		setTextAndFocus(newText);
+	};
+
+	// Slash command handling - delegate to ViewModel
+	const selectSlashCommand = (command: SlashCommand) => {
+		const newText = viewModel.selectSlashCommand(inputValue, command);
+		setInputValue(newText);
+
+		// Setup hint overlay if command has hint
+		if (command.hint) {
+			const cmdText = `/${command.name} `;
+			setCommandText(cmdText);
+			setHintText(command.hint);
+		} else {
+			// No hint - clear hint state
+			setHintText(null);
+			setCommandText("");
+		}
+
+		// Place cursor right after command name (before hint text)
+		window.setTimeout(() => {
+			const textarea = textareaRef.current;
+			if (textarea) {
+				const cursorPos = command.hint
+					? `/${command.name} `.length
+					: newText.length;
 				textarea.selectionStart = cursorPos;
 				textarea.selectionEnd = cursorPos;
 				textarea.focus();
@@ -443,8 +489,10 @@ function ChatComponent({
 		// Save input value before clearing
 		const messageToSend = inputValue;
 
-		// Clear input immediately (before sending)
+		// Clear input and hint state immediately (before sending)
 		setInputValue("");
+		setHintText(null);
+		setCommandText("");
 		setIsAtBottom(true);
 
 		// Send message via ViewModel
@@ -462,33 +510,77 @@ function ChatComponent({
 		}, 0);
 	};
 
-	const handleKeyPress = (e: React.KeyboardEvent) => {
-		// Handle mention dropdown navigation first
-		if (showMentionDropdown) {
-			if (e.key === "ArrowDown") {
-				e.preventDefault();
+	/**
+	 * Handle dropdown keyboard navigation.
+	 * Common logic for both mention and slash command dropdowns.
+	 */
+	const handleDropdownKeyPress = (e: React.KeyboardEvent): boolean => {
+		// Check which dropdown is active
+		const isSlashCommandActive = showSlashCommandDropdown;
+		const isMentionActive = showMentionDropdown;
+
+		if (!isSlashCommandActive && !isMentionActive) {
+			return false; // No dropdown active
+		}
+
+		// Arrow navigation
+		if (e.key === "ArrowDown") {
+			e.preventDefault();
+			if (isSlashCommandActive) {
+				viewModel.navigateSlashCommandDropdown("down");
+			} else {
 				viewModel.navigateMentionDropdown("down");
-				return;
 			}
-			if (e.key === "ArrowUp") {
-				e.preventDefault();
+			return true;
+		}
+
+		if (e.key === "ArrowUp") {
+			e.preventDefault();
+			if (isSlashCommandActive) {
+				viewModel.navigateSlashCommandDropdown("up");
+			} else {
 				viewModel.navigateMentionDropdown("up");
-				return;
 			}
-			if (e.key === "Enter" || e.key === "Tab") {
-				e.preventDefault();
+			return true;
+		}
+
+		// Select item (Enter or Tab)
+		if (e.key === "Enter" || e.key === "Tab") {
+			e.preventDefault();
+			if (isSlashCommandActive) {
+				const selectedCommand =
+					slashCommandSuggestions[selectedSlashCommandIndex];
+				if (selectedCommand) {
+					selectSlashCommand(selectedCommand);
+				}
+			} else {
 				const selectedSuggestion =
 					mentionSuggestions[selectedMentionIndex];
 				if (selectedSuggestion) {
 					selectMention(selectedSuggestion);
 				}
-				return;
 			}
-			if (e.key === "Escape") {
-				e.preventDefault();
+			return true;
+		}
+
+		// Close dropdown (Escape)
+		if (e.key === "Escape") {
+			e.preventDefault();
+			if (isSlashCommandActive) {
+				viewModel.closeSlashCommandDropdown();
+			} else {
 				viewModel.closeMentionDropdown();
-				return;
 			}
+			return true;
+		}
+
+		return false;
+	};
+
+	const handleKeyPress = (e: React.KeyboardEvent) => {
+		// Handle dropdown navigation first (both mention and slash command)
+		if (handleDropdownKeyPress(e)) {
+			return; // Handled by dropdown
 		}
 
 		// Normal input handling
@@ -516,8 +608,22 @@ function ChatComponent({
 
 		setInputValue(newValue);
 
+		// Hide hint overlay when user modifies the input
+		// (hint should only show right after command selection)
+		if (hintText) {
+			// Check if user changed the hint text
+			const expectedText = commandText + hintText;
+			if (newValue !== expectedText) {
+				setHintText(null);
+				setCommandText("");
+			}
+		}
+
 		// Update mention suggestions via ViewModel
 		viewModel.updateMentionSuggestions(newValue, cursorPosition);
+
+		// Update slash command suggestions via ViewModel
+		viewModel.updateSlashCommandSuggestions(newValue, cursorPosition);
 	};
 
 	const handleExportChat = async () => {
@@ -645,11 +751,25 @@ function ChatComponent({
 						return null;
 					})()}
 					{showMentionDropdown && (
-						<MentionDropdown
-							files={mentionSuggestions}
+						<SuggestionDropdown
+							type="mention"
+							items={mentionSuggestions}
 							selectedIndex={selectedMentionIndex}
 							onSelect={selectMention}
 							onClose={() => viewModel.closeMentionDropdown()}
+							plugin={plugin}
+							view={view}
+						/>
+					)}
+					{showSlashCommandDropdown && (
+						<SuggestionDropdown
+							type="slash-command"
+							items={slashCommandSuggestions}
+							selectedIndex={selectedSlashCommandIndex}
+							onSelect={selectSlashCommand}
+							onClose={() =>
+								viewModel.closeSlashCommandDropdown()
+							}
 							plugin={plugin}
 							view={view}
 						/>
@@ -691,15 +811,23 @@ function ChatComponent({
 							/>
 						</div>
 					)}
-					<textarea
-						ref={textareaRef}
-						value={inputValue}
-						onChange={handleInputChange}
-						onKeyDown={handleKeyPress}
-						placeholder={`Message ${activeAgentLabel} - @ to mention notes`}
-						className={`chat-input-textarea ${settings.autoMentionActiveNote && lastActiveNote ? "has-auto-mention" : ""}`}
-						rows={1}
-					/>
+					<div className="textarea-wrapper">
+						<textarea
+							ref={textareaRef}
+							value={inputValue}
+							onChange={handleInputChange}
+							onKeyDown={handleKeyPress}
+							placeholder={`Message ${activeAgentLabel} - @ to mention notes, / for commands`}
+							className={`chat-input-textarea ${settings.autoMentionActiveNote && lastActiveNote ? "has-auto-mention" : ""}`}
+							rows={1}
+						/>
+						{hintText && (
+							<div className="hint-overlay" aria-hidden="true">
+								<span className="invisible">{commandText}</span>
+								<span className="hint-text">{hintText}</span>
+							</div>
+						)}
+					</div>
 					<button
 						ref={sendButtonRef}
 						onClick={

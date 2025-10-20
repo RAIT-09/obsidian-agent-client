@@ -11,7 +11,10 @@
  */
 
 import type { IAgentClient } from "../domain/ports/agent-client.port";
-import type { IVaultAccess, NoteMetadata } from "../domain/ports/vault-access.port";
+import type {
+	IVaultAccess,
+	NoteMetadata,
+} from "../domain/ports/vault-access.port";
 import type { ISettingsAccess } from "../domain/ports/settings-access.port";
 import type { AgentError } from "../domain/models/agent-error";
 import type { AuthenticationMethod } from "../domain/models/chat-session";

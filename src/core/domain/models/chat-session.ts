@@ -52,6 +52,36 @@ export interface AuthenticationMethod {
 }
 
 // ============================================================================
+// Slash Commands
+// ============================================================================
+
+/**
+ * Represents a slash command available in the current session.
+ *
+ * Slash commands provide quick access to specific agent capabilities
+ * and workflows (e.g., /web, /test, /plan). They are advertised by
+ * the agent via the ACP protocol's `available_commands_update` notification.
+ *
+ * Commands can be invoked by users by typing `/` followed by the command
+ * name and optional input in the chat input field.
+ */
+export interface SlashCommand {
+	/** Command name (e.g., "web", "test", "plan") */
+	name: string;
+
+	/** Human-readable description of what the command does */
+	description: string;
+
+	/**
+	 * Hint text to display when the command expects additional input.
+	 * If null or undefined, the command does not require additional input.
+	 *
+	 * Example: "query to search for" for the /web command
+	 */
+	hint?: string | null;
+}
+
+// ============================================================================
 // Chat Session
 // ============================================================================
 
@@ -80,6 +110,12 @@ export interface ChatSession {
 
 	/** Available authentication methods for this session */
 	authMethods: AuthenticationMethod[];
+
+	/**
+	 * Slash commands available in this session.
+	 * Updated dynamically via ACP's `available_commands_update` notification.
+	 */
+	availableCommands?: SlashCommand[];
 
 	/** Timestamp when the session was created */
 	createdAt: Date;

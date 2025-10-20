@@ -428,8 +428,9 @@ If your plugin does not need CSS, delete this file.
 	background-color: transparent;
 	color: var(--interactive-accent-hover);
 	border-radius: 3px;
-	font-size: 0.9em;
+	font-size: inherit;
 	font-weight: 500;
+	line-height: inherit;
 	cursor: default;
 	user-select: none;
 	white-space: nowrap;
@@ -493,6 +494,8 @@ If your plugin does not need CSS, delete this file.
 	resize: none;
 	min-height: 80px;
 	font-family: inherit;
+	font-size: inherit;
+	line-height: inherit;
 	box-sizing: border-box;
 	outline: none;
 	overflow-y: auto;
@@ -521,6 +524,49 @@ If your plugin does not need CSS, delete this file.
 
 .chat-input-textarea.textarea-expanded {
 	height: var(--textarea-height, auto);
+}
+
+/* Textarea wrapper for hint overlay */
+.textarea-wrapper {
+	position: relative;
+	display: flex;
+	flex: 1;
+}
+
+/* Hint overlay for slash commands */
+.hint-overlay {
+	/* Positioning - exact overlay on textarea */
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	pointer-events: none;
+	/* Match textarea properties exactly */
+	padding: 12px 40px 12px 12px;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	box-sizing: border-box;
+	font-family: inherit;
+	font-size: inherit;
+	line-height: inherit;
+	/* Text wrapping */
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	overflow: hidden;
+}
+
+/* Adjust hint overlay padding when auto-mention is shown */
+.chat-input-textarea.has-auto-mention ~ .hint-overlay {
+	padding-top: 36px;
+}
+
+.hint-overlay .invisible {
+	visibility: hidden;
+}
+
+.hint-overlay .hint-text {
+	color: var(--text-faint);
 }
 
 /* Send button */
