@@ -428,9 +428,9 @@ If your plugin does not need CSS, delete this file.
 	background-color: transparent;
 	color: var(--interactive-accent-hover);
 	border-radius: 3px;
-	font-size: inherit;
+	font-size: var(--font-text-size);
 	font-weight: 500;
-	line-height: inherit;
+	line-height: var(--line-height-normal);
 	cursor: default;
 	user-select: none;
 	white-space: nowrap;
@@ -494,8 +494,8 @@ If your plugin does not need CSS, delete this file.
 	resize: none;
 	min-height: 80px;
 	font-family: inherit;
-	font-size: inherit;
-	line-height: inherit;
+	font-size: var(--font-text-size);
+	line-height: var(--line-height-normal);
 	box-sizing: border-box;
 	outline: none;
 	overflow-y: auto;
@@ -504,8 +504,10 @@ If your plugin does not need CSS, delete this file.
 }
 
 .chat-input-textarea.has-auto-mention {
-	padding-top: 36px;
-	min-height: 116px;
+	padding-top: calc(var(--font-text-size) * var(--line-height-normal) + 16px);
+	min-height: calc(
+		80px + var(--font-text-size) * var(--line-height-normal) + 16px
+	);
 }
 
 .chat-input-textarea::-webkit-scrollbar {
@@ -548,8 +550,8 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 8px;
 	box-sizing: border-box;
 	font-family: inherit;
-	font-size: inherit;
-	line-height: inherit;
+	font-size: var(--font-text-size);
+	line-height: var(--line-height-normal);
 	/* Text wrapping */
 	white-space: pre-wrap;
 	word-wrap: break-word;
@@ -558,7 +560,7 @@ If your plugin does not need CSS, delete this file.
 
 /* Adjust hint overlay padding when auto-mention is shown */
 .chat-input-textarea.has-auto-mention ~ .hint-overlay {
-	padding-top: 36px;
+	padding-top: calc(var(--font-text-size) * var(--line-height-normal) + 16px);
 }
 
 .hint-overlay .invisible {
