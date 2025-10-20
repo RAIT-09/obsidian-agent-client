@@ -933,13 +933,24 @@ export class ChatViewModel {
 			return;
 		}
 
-		// Extract query after '/' (up to first space or end of input)
+		// Extract query after '/'
 		const textUpToCursor = input.slice(0, cursorPosition);
-		const spaceIndex = textUpToCursor.indexOf(" ");
-		const query =
-			spaceIndex === -1
-				? textUpToCursor.slice(1).toLowerCase()
-				: textUpToCursor.slice(1, spaceIndex).toLowerCase();
+		const afterSlash = textUpToCursor.slice(1); // Remove leading '/'
+
+		// If there's a space, the command is complete and user is typing arguments
+		// Close dropdown (same behavior as mention system)
+		if (afterSlash.includes(" ")) {
+			this.setState({
+				showSlashCommandDropdown: false,
+				slashCommandSuggestions: [],
+				selectedSlashCommandIndex: 0,
+				// Keep auto-mention disabled (slash command is still active)
+				isAutoMentionTemporarilyDisabled: true,
+			});
+			return;
+		}
+
+		const query = afterSlash.toLowerCase();
 
 		// Filter available commands
 		const availableCommands = this.state.session.availableCommands || [];
