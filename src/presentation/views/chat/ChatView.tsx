@@ -817,7 +817,7 @@ function ChatComponent({
 							value={inputValue}
 							onChange={handleInputChange}
 							onKeyDown={handleKeyPress}
-							placeholder={`Message ${activeAgentLabel} - @ to mention notes, / for commands`}
+							placeholder={`Message ${activeAgentLabel} - @ to mention notes${session.availableCommands && session.availableCommands.length > 0 ? ", / for commands" : ""}`}
 							className={`chat-input-textarea ${settings.autoMentionActiveNote && lastActiveNote ? "has-auto-mention" : ""}`}
 							rows={1}
 						/>
