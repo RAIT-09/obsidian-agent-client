@@ -85,7 +85,10 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	private currentMessageId: string | null = null;
 	private pendingPermissionRequests = new Map<
 		string,
-		(response: acp.RequestPermissionResponse) => void
+		{
+			resolve: (response: acp.RequestPermissionResponse) => void;
+			toolCallId: string;
+		}
 	>();
 
 	constructor(
@@ -884,12 +887,12 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	 * Handle permission response from user.
 	 */
 	handlePermissionResponse(requestId: string, optionId: string): void {
-		const resolver = this.pendingPermissionRequests.get(requestId);
-		if (resolver) {
-			resolver({
+		const request = this.pendingPermissionRequests.get(requestId);
+		if (request) {
+			request.resolve({
 				outcome: {
 					outcome: "selected",
-					optionId: optionId,
+					optionId,
 				},
 			});
 			this.pendingPermissionRequests.delete(requestId);
@@ -998,7 +1001,10 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 		// Return a Promise that will be resolved when user clicks a button
 		return new Promise((resolve) => {
-			this.pendingPermissionRequests.set(requestId, resolve);
+			this.pendingPermissionRequests.set(requestId, {
+				resolve,
+				toolCallId,
+			});
 		});
 	}
 
@@ -1009,7 +1015,20 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.logger.log(
 			`[AcpAdapter] Cancelling ${this.pendingPermissionRequests.size} pending permission requests`,
 		);
-		this.pendingPermissionRequests.forEach((resolve, requestId) => {
+		this.pendingPermissionRequests.forEach(({ resolve, toolCallId }, requestId) => {
+			// Update UI to show cancelled state
+			this.updateMessage(toolCallId, {
+				type: "tool_call",
+				toolCallId,
+				status: "completed",
+				permissionRequest: {
+					requestId,
+					options: [], // Not used when isCancelled=true
+					isCancelled: true,
+				},
+			} as MessageContent);
+
+			// Resolve the promise with cancelled outcome
 			resolve({
 				outcome: {
 					outcome: "cancelled",
