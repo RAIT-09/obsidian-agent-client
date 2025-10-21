@@ -224,6 +224,11 @@ function ChatComponent({
 				plugin.settings.gemini.displayName || plugin.settings.gemini.id
 			);
 		}
+		if (activeId === plugin.settings.codex.id) {
+			return (
+				plugin.settings.codex.displayName || plugin.settings.codex.id
+			);
+		}
 		const custom = plugin.settings.customAgents.find(
 			(agent) => agent.id === activeId,
 		);

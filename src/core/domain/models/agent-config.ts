@@ -74,6 +74,16 @@ export interface ClaudeAgentSettings extends BaseAgentSettings {
 }
 
 /**
+ * Configuration for Codex CLI agent.
+ *
+ * Extends base settings with Codex-specific requirements.
+ */
+export interface CodexAgentSettings extends BaseAgentSettings {
+	/** OpenAI API key for Codex (OPENAI_API_KEY) */
+	apiKey: string;
+}
+
+/**
  * Configuration for custom ACP-compatible agents.
  *
  * Uses only the base settings, allowing users to configure

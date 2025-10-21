@@ -18,6 +18,7 @@ import {
 	AgentEnvVar,
 	GeminiAgentSettings,
 	ClaudeAgentSettings,
+	CodexAgentSettings,
 	CustomAgentSettings,
 } from "../../core/domain/models/agent-config";
 
@@ -27,6 +28,7 @@ export type { AgentEnvVar, CustomAgentSettings };
 export interface AgentClientPluginSettings {
 	gemini: GeminiAgentSettings;
 	claude: ClaudeAgentSettings;
+	codex: CodexAgentSettings;
 	customAgents: CustomAgentSettings[];
 	activeAgentId: string;
 	autoAllowPermissions: boolean;
@@ -51,6 +53,14 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	claude: {
 		id: "claude-code-acp",
 		displayName: "Claude Code",
+		apiKey: "",
+		command: "",
+		args: [],
+		env: [],
+	},
+	codex: {
+		id: "codex-acp",
+		displayName: "Codex",
 		apiKey: "",
 		command: "",
 		args: [],
@@ -145,11 +155,17 @@ export default class AgentClientPlugin extends Plugin {
 			rawSettings.claude !== null
 				? (rawSettings.claude as Record<string, unknown>)
 				: {};
+		const codexFromRaw =
+			typeof rawSettings.codex === "object" && rawSettings.codex !== null
+				? (rawSettings.codex as Record<string, unknown>)
+				: {};
 
 		const resolvedGeminiArgs = sanitizeArgs(geminiFromRaw.args);
 		const resolvedGeminiEnv = normalizeEnvVars(geminiFromRaw.env);
 		const resolvedClaudeArgs = sanitizeArgs(claudeFromRaw.args);
 		const resolvedClaudeEnv = normalizeEnvVars(claudeFromRaw.env);
+		const resolvedCodexArgs = sanitizeArgs(codexFromRaw.args);
+		const resolvedCodexEnv = normalizeEnvVars(codexFromRaw.env);
 		const customAgents = Array.isArray(rawSettings.customAgents)
 			? ensureUniqueCustomAgentIds(
 					rawSettings.customAgents.map((agent: unknown) => {
@@ -165,6 +181,7 @@ export default class AgentClientPlugin extends Plugin {
 		const availableAgentIds = [
 			DEFAULT_SETTINGS.claude.id,
 			DEFAULT_SETTINGS.gemini.id,
+			DEFAULT_SETTINGS.codex.id,
 			...customAgents.map((agent) => agent.id),
 		];
 		const rawActiveId =
@@ -228,6 +245,25 @@ export default class AgentClientPlugin extends Plugin {
 							: DEFAULT_SETTINGS.claude.command,
 				args: resolvedClaudeArgs.length > 0 ? resolvedClaudeArgs : [],
 				env: resolvedClaudeEnv.length > 0 ? resolvedClaudeEnv : [],
+			},
+			codex: {
+				id: DEFAULT_SETTINGS.codex.id,
+				displayName:
+					typeof codexFromRaw.displayName === "string" &&
+					codexFromRaw.displayName.trim().length > 0
+						? codexFromRaw.displayName.trim()
+						: DEFAULT_SETTINGS.codex.displayName,
+				apiKey:
+					typeof codexFromRaw.apiKey === "string"
+						? codexFromRaw.apiKey
+						: DEFAULT_SETTINGS.codex.apiKey,
+				command:
+					typeof codexFromRaw.command === "string" &&
+					codexFromRaw.command.trim().length > 0
+						? codexFromRaw.command.trim()
+						: DEFAULT_SETTINGS.codex.command,
+				args: resolvedCodexArgs.length > 0 ? resolvedCodexArgs : [],
+				env: resolvedCodexEnv.length > 0 ? resolvedCodexEnv : [],
 			},
 			customAgents: customAgents,
 			activeAgentId,
@@ -312,6 +348,7 @@ export default class AgentClientPlugin extends Plugin {
 		const ids = new Set<string>();
 		ids.add(this.settings.claude.id);
 		ids.add(this.settings.gemini.id);
+		ids.add(this.settings.codex.id);
 		for (const agent of this.settings.customAgents) {
 			if (agent.id && agent.id.length > 0) {
 				ids.add(agent.id);

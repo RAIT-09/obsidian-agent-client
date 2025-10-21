@@ -1,6 +1,9 @@
 import { App, PluginSettingTab, Setting, DropdownComponent } from "obsidian";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
-import type { CustomAgentSettings, AgentEnvVar } from "../../../infrastructure/obsidian-plugin/plugin";
+import type {
+	CustomAgentSettings,
+	AgentEnvVar,
+} from "../../../infrastructure/obsidian-plugin/plugin";
 import { normalizeEnvVars } from "../../../shared/settings-utils";
 
 export class AgentClientSettingTab extends PluginSettingTab {
@@ -66,6 +69,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		this.renderGeminiSettings(containerEl);
 		this.renderClaudeSettings(containerEl);
+		this.renderCodexSettings(containerEl);
 
 		new Setting(containerEl).setName("Custom agents").setHeading();
 
@@ -173,6 +177,11 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				this.plugin.settings.gemini.id,
 				this.plugin.settings.gemini.displayName ||
 					this.plugin.settings.gemini.id,
+			),
+			toOption(
+				this.plugin.settings.codex.id,
+				this.plugin.settings.codex.displayName ||
+					this.plugin.settings.codex.id,
 			),
 		];
 		for (const agent of this.plugin.settings.customAgents) {
@@ -324,6 +333,73 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.setValue(this.formatEnv(claude.env))
 					.onChange(async (value) => {
 						this.plugin.settings.claude.env = this.parseEnv(value);
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.rows = 3;
+			});
+	}
+
+	private renderCodexSettings(sectionEl: HTMLElement) {
+		const codex = this.plugin.settings.codex;
+
+		new Setting(sectionEl)
+			.setName(codex.displayName || "Codex")
+			.setHeading();
+
+		new Setting(sectionEl)
+			.setName("API key")
+			.setDesc(
+				"OpenAI API key. Required if not logging in with a OpenAI account. (Stored as plain text)",
+			)
+			.addText((text) => {
+				text.setPlaceholder("Enter your OpenAI API key")
+					.setValue(codex.apiKey)
+					.onChange(async (value) => {
+						this.plugin.settings.codex.apiKey = value.trim();
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.type = "password";
+			});
+
+		new Setting(sectionEl)
+			.setName("Path")
+			.setDesc(
+				'Absolute path to the codex-acp. On macOS/Linux, use "which codex-acp", and on Windows, use "where codex-acp" to find it.',
+			)
+			.addText((text) => {
+				text.setPlaceholder("Absolute path to codex-acp")
+					.setValue(codex.command)
+					.onChange(async (value) => {
+						this.plugin.settings.codex.command = value.trim();
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(sectionEl)
+			.setName("Arguments")
+			.setDesc(
+				"Enter one argument per line. Leave empty to run without arguments.",
+			)
+			.addTextArea((text) => {
+				text.setPlaceholder("")
+					.setValue(this.formatArgs(codex.args))
+					.onChange(async (value) => {
+						this.plugin.settings.codex.args = this.parseArgs(value);
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.rows = 3;
+			});
+
+		new Setting(sectionEl)
+			.setName("Environment variables")
+			.setDesc(
+				"Enter KEY=VALUE pairs, one per line. OPENAI_API_KEY is derived from the field above.",
+			)
+			.addTextArea((text) => {
+				text.setPlaceholder("")
+					.setValue(this.formatEnv(codex.env))
+					.onChange(async (value) => {
+						this.plugin.settings.codex.env = this.parseEnv(value);
 						await this.plugin.saveSettings();
 					});
 				text.inputEl.rows = 3;
@@ -482,6 +558,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		existing.add(
 			this.plugin.settings.gemini.displayName ||
 				this.plugin.settings.gemini.id,
+		);
+		existing.add(
+			this.plugin.settings.codex.displayName ||
+				this.plugin.settings.codex.id,
 		);
 		for (const item of this.plugin.settings.customAgents) {
 			existing.add(item.displayName || item.id);

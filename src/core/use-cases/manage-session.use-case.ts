@@ -16,6 +16,7 @@ import type {
 	BaseAgentSettings,
 	ClaudeAgentSettings,
 	GeminiAgentSettings,
+	CodexAgentSettings,
 } from "../domain/models/agent-config";
 import { toAgentConfig } from "../../shared/settings-utils";
 
@@ -116,6 +117,8 @@ export class ManageSessionUseCase {
 				agentSettings = settings.claude;
 			} else if (input.agentId === settings.gemini.id) {
 				agentSettings = settings.gemini;
+			} else if (input.agentId === settings.codex.id) {
+				agentSettings = settings.codex;
 			} else {
 				// Search in custom agents
 				const customAgent = settings.customAgents.find(
@@ -148,7 +151,7 @@ export class ManageSessionUseCase {
 				input.workingDirectory,
 			);
 
-			// Add API keys to environment for Claude and Gemini
+			// Add API keys to environment for Claude, Gemini, and Codex
 			let agentConfig = baseConfig;
 			if (input.agentId === settings.claude.id) {
 				const claudeSettings = agentSettings as ClaudeAgentSettings;
@@ -166,6 +169,15 @@ export class ManageSessionUseCase {
 					env: {
 						...baseConfig.env,
 						GOOGLE_API_KEY: geminiSettings.apiKey,
+					},
+				};
+			} else if (input.agentId === settings.codex.id) {
+				const codexSettings = agentSettings as CodexAgentSettings;
+				agentConfig = {
+					...baseConfig,
+					env: {
+						...baseConfig.env,
+						OPENAI_API_KEY: codexSettings.apiKey,
 					},
 				};
 			}
