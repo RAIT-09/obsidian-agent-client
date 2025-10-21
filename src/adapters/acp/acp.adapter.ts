@@ -768,23 +768,36 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				break;
 
 			case "tool_call":
-				this.addMessage({
-					id: crypto.randomUUID(),
-					role: "assistant",
-					content: [
-						{
-							type: "tool_call",
-							toolCallId: update.toolCallId,
-							title: update.title,
-							status: update.status || "pending",
-							kind: update.kind,
-							content: AcpTypeConverter.toToolCallContent(
-								update.content,
-							),
-						},
-					],
-					timestamp: new Date(),
+				// Try to update existing tool call first
+				const updated = this.updateMessage(update.toolCallId, {
+					type: "tool_call",
+					toolCallId: update.toolCallId,
+					title: update.title,
+					status: update.status || "pending",
+					kind: update.kind,
+					content: AcpTypeConverter.toToolCallContent(update.content),
 				});
+
+				// Create new message only if no existing tool call was found
+				if (!updated) {
+					this.addMessage({
+						id: crypto.randomUUID(),
+						role: "assistant",
+						content: [
+							{
+								type: "tool_call",
+								toolCallId: update.toolCallId,
+								title: update.title,
+								status: update.status || "pending",
+								kind: update.kind,
+								content: AcpTypeConverter.toToolCallContent(
+									update.content,
+								),
+							},
+						],
+						timestamp: new Date(),
+					});
+				}
 				break;
 
 			case "tool_call_update":
