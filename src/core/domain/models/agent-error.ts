@@ -20,6 +20,7 @@
  * - communication: Protocol-level communication errors
  * - permission: Permission denied or access control issues
  * - timeout: Operation exceeded time limit
+ * - rate_limit: API rate limit exceeded
  * - unknown: Uncategorized or unexpected errors
  */
 export type AgentErrorCategory =
@@ -29,6 +30,7 @@ export type AgentErrorCategory =
 	| "communication"
 	| "permission"
 	| "timeout"
+	| "rate_limit"
 	| "unknown";
 
 /**

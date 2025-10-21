@@ -453,18 +453,47 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Authentication Error:", error);
 
-			const agentError: AgentError = {
-				id: crypto.randomUUID(),
-				category: "authentication",
-				severity: "error",
-				title: "Authentication Failed",
-				message: `Authentication failed: ${error instanceof Error ? error.message : String(error)}`,
-				suggestion:
-					"Please check your API key or authentication credentials in settings.",
-				occurredAt: new Date(),
-				agentId: this.currentConfig?.id,
-				originalError: error,
-			};
+			// Check if this is a rate limit error
+			const isRateLimitError =
+				error &&
+				typeof error === "object" &&
+				"code" in error &&
+				error.code === 429;
+
+			let agentError: AgentError;
+
+			if (isRateLimitError) {
+				// Rate limit error
+				agentError = {
+					id: crypto.randomUUID(),
+					category: "rate_limit",
+					severity: "error",
+					title: "Rate Limit Exceeded",
+					message:
+						"message" in error && typeof error.message === "string"
+							? `Rate limit exceeded: ${error.message}`
+							: "Rate limit exceeded. Too many requests. Please try again later.",
+					suggestion:
+						"You have exceeded the API rate limit. Please wait a few moments before trying again.",
+					occurredAt: new Date(),
+					agentId: this.currentConfig?.id,
+					originalError: error,
+				};
+			} else {
+				// Authentication error
+				agentError = {
+					id: crypto.randomUUID(),
+					category: "authentication",
+					severity: "error",
+					title: "Authentication Failed",
+					message: `Authentication failed: ${error instanceof Error ? error.message : String(error)}`,
+					suggestion:
+						"Please check your API key or authentication credentials in settings.",
+					occurredAt: new Date(),
+					agentId: this.currentConfig?.id,
+					originalError: error,
+				};
+			}
 
 			this.errorCallback?.(agentError);
 			return false;

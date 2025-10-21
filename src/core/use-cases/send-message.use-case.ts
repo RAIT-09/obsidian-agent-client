@@ -268,6 +268,39 @@ export class SendMessageUseCase {
 			};
 		}
 
+		// Check if this is a rate limit error - don't retry with authentication
+		const isRateLimitError =
+			error &&
+			typeof error === "object" &&
+			"code" in error &&
+			(error as { code: unknown }).code === 429;
+
+		if (isRateLimitError) {
+			const errorMessage =
+				"message" in error &&
+				typeof (error as { message: unknown }).message === "string"
+					? (error as { message: string }).message
+					: "Too many requests. Please try again later.";
+
+			return {
+				success: false,
+				displayMessage,
+				agentMessage,
+				error: {
+					id: crypto.randomUUID(),
+					category: "rate_limit",
+					severity: "error",
+					title: "Rate Limit Exceeded",
+					message: `Rate limit exceeded: ${errorMessage}`,
+					suggestion:
+						"You have exceeded the API rate limit. Please wait a few moments before trying again.",
+					occurredAt: new Date(),
+					sessionId,
+					originalError: error,
+				},
+			};
+		}
+
 		// Check if authentication is required
 		if (!authMethods || authMethods.length === 0) {
 			return {
