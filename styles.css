@@ -658,6 +658,7 @@ If your plugin does not need CSS, delete this file.
 	word-wrap: break-word;
 	word-break: break-word;
 	max-width: 100%;
+	margin-top: 8px;
 }
 
 .collapsible-thought-header {
