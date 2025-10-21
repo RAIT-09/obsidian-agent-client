@@ -42,14 +42,6 @@ export interface AgentClientPluginSettings {
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
-	gemini: {
-		id: "gemini-cli",
-		displayName: "Gemini CLI",
-		apiKey: "",
-		command: "",
-		args: ["--experimental-acp"],
-		env: [],
-	},
 	claude: {
 		id: "claude-code-acp",
 		displayName: "Claude Code",
@@ -64,6 +56,14 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		apiKey: "",
 		command: "",
 		args: [],
+		env: [],
+	},
+	gemini: {
+		id: "gemini-cli",
+		displayName: "Gemini CLI",
+		apiKey: "",
+		command: "",
+		args: ["--experimental-acp"],
 		env: [],
 	},
 	customAgents: [],
@@ -145,11 +145,6 @@ export default class AgentClientPlugin extends Plugin {
 		// Type guard: treat raw as a record of unknown values
 		const rawSettings = raw as Record<string, unknown>;
 
-		const geminiFromRaw =
-			typeof rawSettings.gemini === "object" &&
-			rawSettings.gemini !== null
-				? (rawSettings.gemini as Record<string, unknown>)
-				: {};
 		const claudeFromRaw =
 			typeof rawSettings.claude === "object" &&
 			rawSettings.claude !== null
@@ -159,13 +154,18 @@ export default class AgentClientPlugin extends Plugin {
 			typeof rawSettings.codex === "object" && rawSettings.codex !== null
 				? (rawSettings.codex as Record<string, unknown>)
 				: {};
+		const geminiFromRaw =
+			typeof rawSettings.gemini === "object" &&
+			rawSettings.gemini !== null
+				? (rawSettings.gemini as Record<string, unknown>)
+				: {};
 
-		const resolvedGeminiArgs = sanitizeArgs(geminiFromRaw.args);
-		const resolvedGeminiEnv = normalizeEnvVars(geminiFromRaw.env);
 		const resolvedClaudeArgs = sanitizeArgs(claudeFromRaw.args);
 		const resolvedClaudeEnv = normalizeEnvVars(claudeFromRaw.env);
 		const resolvedCodexArgs = sanitizeArgs(codexFromRaw.args);
 		const resolvedCodexEnv = normalizeEnvVars(codexFromRaw.env);
+		const resolvedGeminiArgs = sanitizeArgs(geminiFromRaw.args);
+		const resolvedGeminiEnv = normalizeEnvVars(geminiFromRaw.env);
 		const customAgents = Array.isArray(rawSettings.customAgents)
 			? ensureUniqueCustomAgentIds(
 					rawSettings.customAgents.map((agent: unknown) => {
@@ -180,8 +180,8 @@ export default class AgentClientPlugin extends Plugin {
 
 		const availableAgentIds = [
 			DEFAULT_SETTINGS.claude.id,
-			DEFAULT_SETTINGS.gemini.id,
 			DEFAULT_SETTINGS.codex.id,
+			DEFAULT_SETTINGS.gemini.id,
 			...customAgents.map((agent) => agent.id),
 		];
 		const rawActiveId =
@@ -197,31 +197,6 @@ export default class AgentClientPlugin extends Plugin {
 				: fallbackActiveId;
 
 		this.settings = {
-			gemini: {
-				id: DEFAULT_SETTINGS.gemini.id,
-				displayName:
-					typeof geminiFromRaw.displayName === "string" &&
-					geminiFromRaw.displayName.trim().length > 0
-						? geminiFromRaw.displayName.trim()
-						: DEFAULT_SETTINGS.gemini.displayName,
-				apiKey:
-					typeof geminiFromRaw.apiKey === "string"
-						? geminiFromRaw.apiKey
-						: DEFAULT_SETTINGS.gemini.apiKey,
-				command:
-					typeof geminiFromRaw.command === "string" &&
-					geminiFromRaw.command.trim().length > 0
-						? geminiFromRaw.command.trim()
-						: typeof rawSettings.geminiCommandPath === "string" &&
-							  rawSettings.geminiCommandPath.trim().length > 0
-							? rawSettings.geminiCommandPath.trim()
-							: DEFAULT_SETTINGS.gemini.command,
-				args:
-					resolvedGeminiArgs.length > 0
-						? resolvedGeminiArgs
-						: DEFAULT_SETTINGS.gemini.args,
-				env: resolvedGeminiEnv.length > 0 ? resolvedGeminiEnv : [],
-			},
 			claude: {
 				id: DEFAULT_SETTINGS.claude.id,
 				displayName:
@@ -264,6 +239,31 @@ export default class AgentClientPlugin extends Plugin {
 						: DEFAULT_SETTINGS.codex.command,
 				args: resolvedCodexArgs.length > 0 ? resolvedCodexArgs : [],
 				env: resolvedCodexEnv.length > 0 ? resolvedCodexEnv : [],
+			},
+			gemini: {
+				id: DEFAULT_SETTINGS.gemini.id,
+				displayName:
+					typeof geminiFromRaw.displayName === "string" &&
+					geminiFromRaw.displayName.trim().length > 0
+						? geminiFromRaw.displayName.trim()
+						: DEFAULT_SETTINGS.gemini.displayName,
+				apiKey:
+					typeof geminiFromRaw.apiKey === "string"
+						? geminiFromRaw.apiKey
+						: DEFAULT_SETTINGS.gemini.apiKey,
+				command:
+					typeof geminiFromRaw.command === "string" &&
+					geminiFromRaw.command.trim().length > 0
+						? geminiFromRaw.command.trim()
+						: typeof rawSettings.geminiCommandPath === "string" &&
+							  rawSettings.geminiCommandPath.trim().length > 0
+							? rawSettings.geminiCommandPath.trim()
+							: DEFAULT_SETTINGS.gemini.command,
+				args:
+					resolvedGeminiArgs.length > 0
+						? resolvedGeminiArgs
+						: DEFAULT_SETTINGS.gemini.args,
+				env: resolvedGeminiEnv.length > 0 ? resolvedGeminiEnv : [],
 			},
 			customAgents: customAgents,
 			activeAgentId,
@@ -347,8 +347,8 @@ export default class AgentClientPlugin extends Plugin {
 	private collectAvailableAgentIds(): string[] {
 		const ids = new Set<string>();
 		ids.add(this.settings.claude.id);
-		ids.add(this.settings.gemini.id);
 		ids.add(this.settings.codex.id);
+		ids.add(this.settings.gemini.id);
 		for (const agent of this.settings.customAgents) {
 			if (agent.id && agent.id.length > 0) {
 				ids.add(agent.id);

@@ -66,12 +66,12 @@ export class SwitchAgentUseCase {
 				displayName: settings.claude.displayName || settings.claude.id,
 			},
 			{
-				id: settings.gemini.id,
-				displayName: settings.gemini.displayName || settings.gemini.id,
-			},
-			{
 				id: settings.codex.id,
 				displayName: settings.codex.displayName || settings.codex.id,
+			},
+			{
+				id: settings.gemini.id,
+				displayName: settings.gemini.displayName || settings.gemini.id,
 			},
 			...settings.customAgents.map((agent) => ({
 				id: agent.id,

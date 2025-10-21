@@ -67,9 +67,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl).setName("Built-in agents").setHeading();
 
-		this.renderGeminiSettings(containerEl);
 		this.renderClaudeSettings(containerEl);
 		this.renderCodexSettings(containerEl);
+		this.renderGeminiSettings(containerEl);
 
 		new Setting(containerEl).setName("Custom agents").setHeading();
 
@@ -174,14 +174,14 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					this.plugin.settings.claude.id,
 			),
 			toOption(
-				this.plugin.settings.gemini.id,
-				this.plugin.settings.gemini.displayName ||
-					this.plugin.settings.gemini.id,
-			),
-			toOption(
 				this.plugin.settings.codex.id,
 				this.plugin.settings.codex.displayName ||
 					this.plugin.settings.codex.id,
+			),
+			toOption(
+				this.plugin.settings.gemini.id,
+				this.plugin.settings.gemini.displayName ||
+					this.plugin.settings.gemini.id,
 			),
 		];
 		for (const agent of this.plugin.settings.customAgents) {
@@ -556,12 +556,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				this.plugin.settings.claude.id,
 		);
 		existing.add(
-			this.plugin.settings.gemini.displayName ||
-				this.plugin.settings.gemini.id,
-		);
-		existing.add(
 			this.plugin.settings.codex.displayName ||
 				this.plugin.settings.codex.id,
+		);
+		existing.add(
+			this.plugin.settings.gemini.displayName ||
+				this.plugin.settings.gemini.id,
 		);
 		for (const item of this.plugin.settings.customAgents) {
 			existing.add(item.displayName || item.id);

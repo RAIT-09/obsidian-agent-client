@@ -115,10 +115,10 @@ export class ManageSessionUseCase {
 			// Find the agent by ID
 			if (input.agentId === settings.claude.id) {
 				agentSettings = settings.claude;
-			} else if (input.agentId === settings.gemini.id) {
-				agentSettings = settings.gemini;
 			} else if (input.agentId === settings.codex.id) {
 				agentSettings = settings.codex;
+			} else if (input.agentId === settings.gemini.id) {
+				agentSettings = settings.gemini;
 			} else {
 				// Search in custom agents
 				const customAgent = settings.customAgents.find(
@@ -151,7 +151,7 @@ export class ManageSessionUseCase {
 				input.workingDirectory,
 			);
 
-			// Add API keys to environment for Claude, Gemini, and Codex
+			// Add API keys to environment for Claude, Codex, and Gemini
 			let agentConfig = baseConfig;
 			if (input.agentId === settings.claude.id) {
 				const claudeSettings = agentSettings as ClaudeAgentSettings;
@@ -162,15 +162,6 @@ export class ManageSessionUseCase {
 						ANTHROPIC_API_KEY: claudeSettings.apiKey,
 					},
 				};
-			} else if (input.agentId === settings.gemini.id) {
-				const geminiSettings = agentSettings as GeminiAgentSettings;
-				agentConfig = {
-					...baseConfig,
-					env: {
-						...baseConfig.env,
-						GOOGLE_API_KEY: geminiSettings.apiKey,
-					},
-				};
 			} else if (input.agentId === settings.codex.id) {
 				const codexSettings = agentSettings as CodexAgentSettings;
 				agentConfig = {
@@ -178,6 +169,15 @@ export class ManageSessionUseCase {
 					env: {
 						...baseConfig.env,
 						OPENAI_API_KEY: codexSettings.apiKey,
+					},
+				};
+			} else if (input.agentId === settings.gemini.id) {
+				const geminiSettings = agentSettings as GeminiAgentSettings;
+				agentConfig = {
+					...baseConfig,
+					env: {
+						...baseConfig.env,
+						GOOGLE_API_KEY: geminiSettings.apiKey,
 					},
 				};
 			}
