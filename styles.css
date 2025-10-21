@@ -135,17 +135,27 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 4px;
 	font-size: 12px;
 	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
+	max-width: 100%;
 }
 
 .message-tool-call-title {
 	font-weight: bold;
 	margin-bottom: 4px;
 	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
 }
 
 .message-tool-call-status {
 	color: var(--text-muted);
 	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
 }
 
 /* Plan */
@@ -156,12 +166,19 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 4px;
 	font-size: 12px;
 	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
+	max-width: 100%;
 }
 
 .message-plan-title {
 	font-weight: bold;
 	margin-bottom: 4px;
 	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
 }
 
 .message-plan-entry {
@@ -169,6 +186,9 @@ If your plugin does not need CSS, delete this file.
 	padding: 2px 4px;
 	border-left: 2px solid var(--text-muted);
 	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
 }
 
 .message-plan-entry-icon.status-completed {
@@ -193,6 +213,10 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--background-secondary);
 	font-size: 14px;
 	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
+	max-width: 100%;
 }
 
 .message-permission-request-title {
@@ -202,12 +226,18 @@ If your plugin does not need CSS, delete this file.
 	align-items: center;
 	gap: 8px;
 	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
 }
 
 .message-permission-request-description {
 	margin-bottom: 12px;
 	color: var(--text-normal);
 	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
 }
 
 .message-permission-request-options {
@@ -624,6 +654,10 @@ If your plugin does not need CSS, delete this file.
 	background-color: transparent;
 	font-size: 0.9em;
 	cursor: pointer;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
+	max-width: 100%;
 }
 
 .collapsible-thought-header {
@@ -642,6 +676,9 @@ If your plugin does not need CSS, delete this file.
 	margin-top: 8px;
 	padding-left: 16px;
 	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
 }
 
 /* Mention Dropdown */
@@ -763,6 +800,12 @@ If your plugin does not need CSS, delete this file.
 	padding: 0px 16px;
 	width: 100%;
 	margin: 4px 0;
+	/* Prevent long strings from overflowing */
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
+	max-width: 100%;
+	box-sizing: border-box;
 }
 
 .message-renderer.message-user {
@@ -782,8 +825,11 @@ If your plugin does not need CSS, delete this file.
 	user-select: text;
 	white-space: pre-wrap;
 	word-wrap: break-word;
+	word-break: break-word;
+	overflow-wrap: break-word;
 	margin: 1em 0;
 	font-size: var(--font-text-size);
+	max-width: 100%;
 }
 
 .text-mention {
@@ -799,10 +845,17 @@ If your plugin does not need CSS, delete this file.
 .markdown-text-renderer {
 	user-select: text;
 	font-size: var(--font-text-size);
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
+	max-width: 100%;
 }
 
 .markdown-text-renderer .markdown-rendered {
 	font-size: inherit;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
 }
 
 /* Tool Call Diff Renderer */
@@ -881,17 +934,30 @@ If your plugin does not need CSS, delete this file.
 	padding: 4px 0;
 	font-size: 12px;
 	color: var(--text-muted);
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
+	max-width: 100%;
 }
 
 .tool-call-location {
 	padding: 2px 0;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
 }
 
 .tool-call-line {
 	color: var(--text-accent);
 	font-weight: 500;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
 }
 
 .tool-call-content {
 	padding: 8px 0;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
 }
