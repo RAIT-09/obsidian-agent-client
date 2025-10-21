@@ -761,11 +761,13 @@ export class ChatViewModel {
 	async switchAgent(agentId: string): Promise<void> {
 		await this.switchAgentUseCase.switchAgent(agentId);
 
-		// Update session with new agent ID
+		// Update session with new agent ID and clear availableCommands
+		// (new agent will send its own commands via available_commands_update)
 		this.setState({
 			session: {
 				...this.state.session,
 				agentId,
+				availableCommands: undefined,
 			},
 		});
 	}
