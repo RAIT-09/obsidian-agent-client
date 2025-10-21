@@ -2,7 +2,7 @@
 
 <a href="https://www.buymeacoffee.com/rait09" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="180" height="50" ></a>
 
-Bring your AI agents directly into Obsidian! This plugin lets you chat with Claude Code, Gemini CLI, and other AI agents right from your vault. Your AI assistant is now just a side panel away. ✨
+Bring your AI agents directly into Obsidian! This plugin lets you chat with Claude Code, Codex, Gemini CLI, and other AI agents right from your vault. Your AI assistant is now just a side panel away. ✨
 
 Built on [Agent Client Protocol (ACP)](https://github.com/zed-industries/agent-client-protocol) by Zed.
 
@@ -12,8 +12,9 @@ https://github.com/user-attachments/assets/37a3c78e-cb68-4eef-b284-86850f1830e8
 
 - 🔗 **Direct Agent Integration**: Chat with AI coding agents in a dedicated right-side panel
 - 📝 **Note Mention Support**: Automatically include the active note in conversations, or manually use `@notename` to reference specific notes
-- 🔄 **Multi-Agent Support**: Switch between Claude Code, Gemini CLI, and custom agents
-- 💻 **Terminal Integration**: Execute commands and see results directly in the chat
+- ⚡ **Slash Command Support**: Use `/` commands to browse and trigger actions provided by your current agent
+- 🔄 **Multi-Agent Support**: Switch between Claude Code, Codex, Gemini CLI, and custom agents
+- 💻 **Terminal Integration**: Let your agent execute terminal commands and return the results in chat
 - 🔐 **Permission Management**: Fine-grained control over agent actions
 
 ## 📦 Installation
@@ -44,6 +45,11 @@ https://github.com/user-attachments/assets/37a3c78e-cb68-4eef-b284-86850f1830e8
   npm install -g @zed-industries/claude-code-acp
   ```
 
+- For **Codex**:
+  ```bash
+  npm install -g @zed-industries/codex-acp
+  ```
+
 - For **Gemini CLI**:
   ```bash
   npm install -g @google/gemini-cli
@@ -63,6 +69,10 @@ which node
 which claude-code-acp
 # Example output: /usr/local/bin/claude-code-acp
 
+# Find Codex path
+which codex-acp
+# Example output: /usr/local/bin/codex-acp
+
 # Find Gemini CLI path
 which gemini
 # Example output: /usr/local/bin/gemini
@@ -78,6 +88,10 @@ where.exe node
 where.exe claude-code-acp
 # Example output: C:\Users\Username\AppData\Roaming\npm\claude-code-acp.cmd
 
+# Find Codex path
+where.exe codex-acp
+# Example output: C:\Users\Username\AppData\Roaming\npm\codex-acp.cmd
+
 # Find Gemini CLI path
 where.exe gemini
 # Example output: C:\Users\Username\AppData\Roaming\npm\gemini.cmd
@@ -86,12 +100,15 @@ where.exe gemini
 ### Step 3: 🛠️ Configure Plugin Settings
 
 1. Open **Settings → Agent Client**
-2. In **General Settings**:
+2. Configure your node path:
    - **Node.js path**: Enter the absolute path found above (e.g., `/usr/local/bin/node` or `C:\Program Files\nodejs\node.exe`)
 3. Configure your preferred agents:
    - **Claude Code**:
      - **Path**: Enter absolute path (e.g., `/usr/local/bin/claude-code-acp`)
      - **API key**: Optional if logged in to Anthropic account
+   - **Codex**
+	   - **Path**: Enter absolute path (e.g., `/usr/local/bin/codex-acp`)
+	   - **API key**: Optional if logged in to OpenAI account
    - **Gemini CLI**:
      - **Path**: Enter absolute path (e.g., `/usr/local/bin/gemini`)
      - **API key**: Optional if logged in to Google account
@@ -101,12 +118,15 @@ where.exe gemini
 
 **macOS/Linux Example:**
 ```
-General Settings:
+Settings:
 ├── Node.js path: /usr/local/bin/node
 
 Built-in agents:
 ├── Claude Code
 │   ├── Path: /usr/local/bin/claude-code-acp
+│   └── API key: (optional)
+├── Codex
+│   ├── Path: /usr/local/bin/codex-acp
 │   └── API key: (optional)
 └── Gemini CLI
     ├── Path: /usr/local/bin/gemini
@@ -115,25 +135,24 @@ Built-in agents:
 
 **Windows Example:**
 ```
-General Settings:
+Settings:
 ├── Node.js path: C:\Program Files\nodejs\node.exe
 
 Built-in agents:
 ├── Claude Code
 │   ├── Path: C:\Users\Username\AppData\Roaming\npm\claude-code-acp.cmd
 │   └── API key: (optional)
+├── Codex
+│   ├── Path: C:\Users\Username\AppData\Roaming\npm\codex-acp.cmd
+│   └── API key: (optional)
 └── Gemini CLI
     ├── Path: C:\Users\Username\AppData\Roaming\npm\gemini.cmd
     └── API key: (optional)
 ```
 
-## ⚠️ Known Issues
-
-- Windows: Gemini CLI is currently not supported. See [this issue](https://github.com/zed-industries/zed/issues/37675) for details.
-
 ## 🚀 Usage
 
-- 🎯 Use the command palette: "Open Agent Chat"
+- 🎯 Use the command palette: "Open agent chat"
 - 🤖 Click the robot icon in the ribbon
 - 💬 Chat with your configured agent in the right panel
 - 📝 Reference notes using `@notename` syntax
@@ -153,7 +172,8 @@ npm run build
 
 ## 🗺️ Roadmap
 
-- **Slash Command Support**: Quick actions and shortcuts using `/` commands within the chat interface
+- **Model Switching Support**: Change the active model for each agent directly from the chat interface
+- **Edit Tracking**: Automatically follow the agent’s edits — open affected notes and move the cursor as they edit
 - **Chat History Access**: Browse, search, and restore previous chat sessions with agents
 
 Have ideas or feature requests? Feel free to [open an issue](https://github.com/RAIT-09/obsidian-agent-client/issues) on GitHub!
