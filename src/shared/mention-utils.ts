@@ -48,17 +48,7 @@ export function detectMention(
 	let query = "";
 	let endPos = cursorPosition;
 
-	// Check if there's a space, tab, or newline - these end the mention
-	if (
-		afterAt.includes(" ") ||
-		afterAt.includes("\t") ||
-		afterAt.includes("\n")
-	) {
-		logger.log("[DEBUG] Mention ended by whitespace");
-		return null;
-	}
-
-	// If already in @[[...]] format, handle it
+	// If already in @[[...]] format, handle it (allow spaces inside brackets)
 	if (afterAt.startsWith("[[")) {
 		const closingBrackets = afterAt.indexOf("]]");
 		if (closingBrackets === -1) {
@@ -81,6 +71,15 @@ export function detectMention(
 		}
 	} else {
 		// Simple @query format - use everything after @
+		// But end at whitespace (space, tab, newline)
+		if (
+			afterAt.includes(" ") ||
+			afterAt.includes("\t") ||
+			afterAt.includes("\n")
+		) {
+			logger.log("[DEBUG] Mention ended by whitespace (simple format)");
+			return null;
+		}
 		query = afterAt;
 		endPos = cursorPosition;
 	}
