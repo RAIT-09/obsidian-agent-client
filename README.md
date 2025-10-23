@@ -1,6 +1,6 @@
 # 🤖 Agent Client Plugin for Obsidian
 
-[日本語](README.ja.md)
+[日本語はこちら](README.ja.md)
 
 <a href="https://www.buymeacoffee.com/rait09" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="180" height="50" ></a>
 
