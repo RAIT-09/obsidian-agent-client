@@ -1,5 +1,7 @@
 # 🤖 Agent Client Plugin for Obsidian
 
+[日本語](README.ja.md)
+
 <a href="https://www.buymeacoffee.com/rait09" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="180" height="50" ></a>
 
 Bring your AI agents directly into Obsidian! This plugin lets you chat with Claude Code, Codex, Gemini CLI, and other AI agents right from your vault. Your AI assistant is now just a side panel away. ✨
