@@ -421,6 +421,9 @@ export class ChatViewModel {
 			this.state.session.sessionId,
 		);
 
+		// Disconnect from agent (kill process) via Use Case
+		await this.manageSessionUseCase.disconnect();
+
 		this.setState({
 			session: {
 				...this.state.session,

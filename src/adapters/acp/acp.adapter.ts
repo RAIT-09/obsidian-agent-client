@@ -142,6 +142,24 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			"[AcpAdapter] Starting initialization with config:",
 			config,
 		);
+		this.logger.log(
+			`[AcpAdapter] Current state - process: ${!!this.agentProcess}, PID: ${this.agentProcess?.pid}`,
+		);
+
+		// Clean up existing process if any (e.g., when switching agents)
+		if (this.agentProcess) {
+			this.logger.log(
+				`[AcpAdapter] Killing existing process (PID: ${this.agentProcess.pid})`,
+			);
+			this.agentProcess.kill();
+			this.agentProcess = null;
+		}
+
+		// Clean up existing connection
+		if (this.connection) {
+			this.logger.log("[AcpAdapter] Cleaning up existing connection");
+			this.connection = null;
+		}
 
 		this.currentConfig = config;
 
@@ -631,7 +649,9 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 		// Kill the agent process
 		if (this.agentProcess) {
-			this.logger.log("[AcpAdapter] Killing agent process...");
+			this.logger.log(
+				`[AcpAdapter] Killing agent process (PID: ${this.agentProcess.pid})`,
+			);
 			this.agentProcess.kill();
 			this.agentProcess = null;
 		}
@@ -1015,26 +1035,28 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.logger.log(
 			`[AcpAdapter] Cancelling ${this.pendingPermissionRequests.size} pending permission requests`,
 		);
-		this.pendingPermissionRequests.forEach(({ resolve, toolCallId }, requestId) => {
-			// Update UI to show cancelled state
-			this.updateMessage(toolCallId, {
-				type: "tool_call",
-				toolCallId,
-				status: "completed",
-				permissionRequest: {
-					requestId,
-					options: [], // Not used when isCancelled=true
-					isCancelled: true,
-				},
-			} as MessageContent);
+		this.pendingPermissionRequests.forEach(
+			({ resolve, toolCallId }, requestId) => {
+				// Update UI to show cancelled state
+				this.updateMessage(toolCallId, {
+					type: "tool_call",
+					toolCallId,
+					status: "completed",
+					permissionRequest: {
+						requestId,
+						options: [], // Not used when isCancelled=true
+						isCancelled: true,
+					},
+				} as MessageContent);
 
-			// Resolve the promise with cancelled outcome
-			resolve({
-				outcome: {
-					outcome: "cancelled",
-				},
-			});
-		});
+				// Resolve the promise with cancelled outcome
+				resolve({
+					outcome: {
+						outcome: "cancelled",
+					},
+				});
+			},
+		);
 		this.pendingPermissionRequests.clear();
 	}
 

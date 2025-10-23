@@ -170,6 +170,14 @@ function ChatComponent({
 		vaultPath,
 	]);
 
+	// Store ViewModel reference in ChatView for cleanup on close
+	useEffect(() => {
+		view.viewModel = viewModel;
+		return () => {
+			view.viewModel = null;
+		};
+	}, [view, viewModel]);
+
 	// Set AcpAdapter callbacks to ViewModel methods
 	// This connects the adapter's message updates to the ViewModel's state management
 	useEffect(() => {
@@ -350,15 +358,13 @@ function ChatComponent({
 		}
 	};
 
-	// Initialize session on mount or agent change
+	// Initialize session on mount or when agent changes
 	useEffect(() => {
 		logger.log("[Debug] Starting connection setup via ViewModel...");
 		viewModel.createNewSession();
 
-		return () => {
-			// Cleanup will be handled by ViewModel.dispose()
-			viewModel.disconnect();
-		};
+		// Note: No cleanup here - disconnect() during agent switching would kill
+		// the new process. Final cleanup is handled by dispose() on unmount.
 	}, [session.agentId, viewModel]);
 
 	// Cleanup ViewModel on unmount
@@ -860,6 +866,7 @@ function ChatComponent({
 export class ChatView extends ItemView {
 	private root: Root | null = null;
 	private plugin: AgentClientPlugin;
+	public viewModel: ChatViewModel | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: AgentClientPlugin) {
 		super(leaf);
@@ -887,6 +894,16 @@ export class ChatView extends ItemView {
 	}
 
 	async onClose() {
+		console.log("[ChatView] onClose() called");
+		// Cleanup ViewModel and disconnect agent before unmounting
+		if (this.viewModel) {
+			console.log("[ChatView] Disposing ViewModel...");
+			await this.viewModel.dispose();
+			this.viewModel = null;
+		} else {
+			console.log("[ChatView] No ViewModel to dispose");
+		}
+
 		if (this.root) {
 			this.root.unmount();
 			this.root = null;

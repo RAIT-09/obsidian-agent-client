@@ -277,4 +277,13 @@ export class ManageSessionUseCase {
 			console.warn("Failed to close session:", error);
 		}
 	}
+
+	/**
+	 * Disconnect from the agent
+	 *
+	 * Terminates the agent process and cleans up resources.
+	 */
+	async disconnect(): Promise<void> {
+		await this.agentClient.disconnect();
+	}
 }
