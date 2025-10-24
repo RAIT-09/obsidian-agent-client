@@ -42,6 +42,9 @@ export interface PrepareMessageInput {
 
 	/** Whether auto-mention is temporarily disabled */
 	isAutoMentionDisabled?: boolean;
+
+	/** Whether to convert paths to WSL format (Windows + WSL mode) */
+	convertToWsl?: boolean;
 }
 
 /**
@@ -93,6 +96,9 @@ export interface SendMessageInput {
 
 	/** Whether auto-mention is temporarily disabled */
 	isAutoMentionDisabled?: boolean;
+
+	/** Whether to convert paths to WSL format (Windows + WSL mode) */
+	convertToWsl?: boolean;
 }
 
 /**
@@ -152,6 +158,7 @@ export class SendMessageUseCase {
 			displayMessage,
 			this.mentionService,
 			input.vaultBasePath,
+			input.convertToWsl ?? false,
 		);
 
 		return {
@@ -204,6 +211,7 @@ export class SendMessageUseCase {
 			activeNote: input.activeNote,
 			vaultBasePath: input.vaultBasePath,
 			isAutoMentionDisabled: input.isAutoMentionDisabled,
+			convertToWsl: input.convertToWsl,
 		});
 
 		// Step 2: Send prepared message

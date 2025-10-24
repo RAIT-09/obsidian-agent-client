@@ -116,6 +116,7 @@ export function convertMentionsToPath(
 	text: string,
 	noteMentionService: IMentionService,
 	vaultPath: string,
+	convertToWsl?: boolean,
 ): string {
 	// Find all @mentions in the text (@[[filename]] format only)
 	const mentionRegex = /@\[\[([^\]]+)\]\]/g;
@@ -130,9 +131,18 @@ export function convertMentionsToPath(
 			.find((f: TFile) => f.basename === noteTitle);
 		if (file) {
 			// Calculate absolute path by combining vault path with file path
-			const absolutePath = vaultPath
+			let absolutePath = vaultPath
 				? `${vaultPath}/${file.path}`
 				: file.path;
+
+			// Convert to WSL path format if requested (Windows + WSL mode)
+			if (convertToWsl) {
+				// Import at runtime to avoid circular dependency
+				// eslint-disable-next-line @typescript-eslint/no-var-requires
+				const { convertWindowsPathToWsl } = require("./wsl-utils");
+				absolutePath = convertWindowsPathToWsl(absolutePath);
+			}
+
 			// TODO: Fix logger usage in utility functions
 			// logger.log(
 			// 	`[DEBUG] Converting @${noteTitle} to absolute path: ${absolutePath}`,

@@ -457,6 +457,7 @@ export class ChatViewModel {
 			activeNote: options.activeNote,
 			vaultBasePath: options.vaultBasePath,
 			isAutoMentionDisabled: options.isAutoMentionDisabled,
+			convertToWsl: this.shouldConvertToWsl(),
 		});
 
 		// Phase 2: Add user message to UI immediately
@@ -1030,6 +1031,20 @@ export class ChatViewModel {
 		this.setState({
 			selectedSlashCommandIndex: newIndex,
 		});
+	}
+
+	// ========================================
+	// Helper Methods
+	// ========================================
+
+	/**
+	 * Check if paths should be converted to WSL format.
+	 * Returns true only when running on Windows with WSL mode enabled.
+	 */
+	private shouldConvertToWsl(): boolean {
+		// Import Platform at runtime to avoid issues with Obsidian API
+		const { Platform } = require("obsidian");
+		return Platform.isWin && this.plugin.settings.windowsWslMode;
 	}
 
 	// ========================================

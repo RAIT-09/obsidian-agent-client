@@ -3,6 +3,8 @@ import * as acp from "@agentclientprotocol/sdk";
 import type AgentClientPlugin from "../obsidian-plugin/plugin";
 import { Logger } from "../../shared/logger";
 import { Platform } from "obsidian";
+import { wrapCommandForWsl } from "../../shared/wsl-utils";
+import { resolveCommandDirectory } from "../../shared/path-utils";
 
 interface TerminalProcess {
 	id: string;
@@ -19,9 +21,11 @@ interface TerminalProcess {
 export class TerminalManager {
 	private terminals = new Map<string, TerminalProcess>();
 	private logger: Logger;
+	private plugin: AgentClientPlugin;
 
 	constructor(plugin: AgentClientPlugin) {
 		this.logger = new Logger(plugin);
+		this.plugin = plugin;
 	}
 
 	createTerminal(params: acp.CreateTerminalRequest): string {
@@ -70,8 +74,31 @@ export class TerminalManager {
 			}
 		}
 
+		// WSL mode for Windows (wrap command to run inside WSL)
+		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+			// Extract node directory from settings for PATH (if available)
+			const nodeDir = this.plugin.settings.nodePath
+				? resolveCommandDirectory(
+						this.plugin.settings.nodePath.trim(),
+					) || undefined
+				: undefined;
+
+			const wslWrapped = wrapCommandForWsl(
+				command,
+				args,
+				params.cwd || process.cwd(),
+				this.plugin.settings.windowsWslDistribution,
+				nodeDir,
+			);
+			command = wslWrapped.command;
+			args = wslWrapped.args;
+			this.logger.log(
+				`[Terminal ${terminalId}] Using WSL mode:`,
+				this.plugin.settings.windowsWslDistribution || "default",
+			);
+		}
 		// On macOS and Linux, wrap the command in a login shell to inherit the user's environment
-		if (Platform.isMacOS || Platform.isLinux) {
+		else if (Platform.isMacOS || Platform.isLinux) {
 			const shell = Platform.isMacOS ? "/bin/zsh" : "/bin/bash";
 			const commandString = [command, ...args]
 				.map((arg) => "'" + arg.replace(/'/g, "'\\''") + "'")
