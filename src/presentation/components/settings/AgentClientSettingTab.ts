@@ -43,6 +43,34 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					});
 			});
 
+		new Setting(containerEl)
+			.setName("Auto-allow permissions")
+			.setDesc(
+				"Automatically allow all permission requests from agents. ⚠️ Use with caution - this gives agents full access to your system.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoAllowPermissions)
+					.onChange(async (value) => {
+						this.plugin.settings.autoAllowPermissions = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Auto-mention active note")
+			.setDesc(
+				"Include the current note in your messages automatically. The agent will have access to its content without typing @notename.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoMentionActiveNote)
+					.onChange(async (value) => {
+						this.plugin.settings.autoMentionActiveNote = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
 		// Windows WSL Settings (Windows only)
 		if (Platform.isWin) {
 			new Setting(containerEl).setName("Windows WSL").setHeading();
@@ -83,34 +111,6 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					);
 			}
 		}
-
-		new Setting(containerEl)
-			.setName("Auto-allow permissions")
-			.setDesc(
-				"Automatically allow all permission requests from agents. ⚠️ Use with caution - this gives agents full access to your system.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.autoAllowPermissions)
-					.onChange(async (value) => {
-						this.plugin.settings.autoAllowPermissions = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Auto-mention active note")
-			.setDesc(
-				"Include the current note in your messages automatically. The agent will have access to its content without typing @notename.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.autoMentionActiveNote)
-					.onChange(async (value) => {
-						this.plugin.settings.autoMentionActiveNote = value;
-						await this.plugin.saveSettings();
-					}),
-			);
 
 		new Setting(containerEl).setName("Built-in agents").setHeading();
 
