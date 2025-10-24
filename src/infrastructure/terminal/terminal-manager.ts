@@ -4,6 +4,7 @@ import type AgentClientPlugin from "../obsidian-plugin/plugin";
 import { Logger } from "../../shared/logger";
 import { Platform } from "obsidian";
 import { wrapCommandForWsl } from "../../shared/wsl-utils";
+import { resolveCommandDirectory } from "../../shared/path-utils";
 
 interface TerminalProcess {
 	id: string;
@@ -75,11 +76,19 @@ export class TerminalManager {
 
 		// WSL mode for Windows (wrap command to run inside WSL)
 		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+			// Extract node directory from settings for PATH (if available)
+			const nodeDir = this.plugin.settings.nodePath
+				? resolveCommandDirectory(
+						this.plugin.settings.nodePath.trim(),
+					) || undefined
+				: undefined;
+
 			const wslWrapped = wrapCommandForWsl(
 				command,
 				args,
 				params.cwd || process.cwd(),
 				this.plugin.settings.windowsWslDistribution,
+				nodeDir,
 			);
 			command = wslWrapped.command;
 			args = wslWrapped.args;

@@ -19,7 +19,11 @@ import { TerminalManager } from "../../infrastructure/terminal/terminal-manager"
 import { Logger } from "../../shared/logger";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
 import type { SlashCommand } from "src/core/domain/models/chat-session";
-import { wrapCommandForWsl } from "../../shared/wsl-utils";
+import {
+	wrapCommandForWsl,
+	convertWindowsPathToWsl,
+} from "../../shared/wsl-utils";
+import { resolveCommandDirectory } from "../../shared/path-utils";
 
 /**
  * Extended ACP Client interface for UI layer.
@@ -206,7 +210,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			this.plugin.settings.nodePath &&
 			this.plugin.settings.nodePath.trim().length > 0
 		) {
-			const nodeDir = this.resolveCommandDirectory(
+			const nodeDir = resolveCommandDirectory(
 				this.plugin.settings.nodePath.trim(),
 			);
 			if (nodeDir) {
@@ -228,11 +232,19 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 		// WSL mode for Windows (wrap command to run inside WSL)
 		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+			// Extract node directory from settings for PATH
+			const nodeDir = this.plugin.settings.nodePath
+				? resolveCommandDirectory(
+						this.plugin.settings.nodePath.trim(),
+					) || undefined
+				: undefined;
+
 			const wslWrapped = wrapCommandForWsl(
 				command,
 				args,
 				config.workingDirectory,
 				this.plugin.settings.windowsWslDistribution,
+				nodeDir,
 			);
 			spawnCommand = wslWrapped.command;
 			spawnArgs = wslWrapped.args;
@@ -261,8 +273,10 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			);
 		}
 
-		// Use shell on Windows for .cmd/.bat files
-		const needsShell = Platform.isWin;
+		// Use shell on Windows for .cmd/.bat files, but NOT in WSL mode
+		// When using WSL, wsl.exe is the command and doesn't need shell wrapper
+		const needsShell =
+			Platform.isWin && !this.plugin.settings.windowsWslMode;
 
 		// Spawn the agent process
 		const agentProcess = spawn(spawnCommand, spawnArgs, {
@@ -438,13 +452,20 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 		try {
 			this.logger.log("[AcpAdapter] Creating new session...");
+
+			// Convert Windows path to WSL path if in WSL mode
+			let sessionCwd = workingDirectory;
+			if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+				sessionCwd = convertWindowsPathToWsl(workingDirectory);
+			}
+
 			this.logger.log(
 				"[AcpAdapter] Using working directory:",
-				workingDirectory,
+				sessionCwd,
 			);
 
 			const sessionResult = await this.connection.newSession({
-				cwd: workingDirectory,
+				cwd: sessionCwd,
 				mcpServers: [],
 			});
 
@@ -752,23 +773,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	// Helper methods
-
-	/**
-	 * Resolve the directory containing a command (for PATH adjustments).
-	 */
-	private resolveCommandDirectory(command: string): string | null {
-		if (!command) {
-			return null;
-		}
-		const lastSlash = Math.max(
-			command.lastIndexOf("/"),
-			command.lastIndexOf("\\"),
-		);
-		if (lastSlash <= 0) {
-			return null;
-		}
-		return command.slice(0, lastSlash);
-	}
 
 	/**
 	 * Get error information for process spawn errors.
