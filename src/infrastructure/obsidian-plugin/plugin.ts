@@ -39,6 +39,9 @@ export interface AgentClientPluginSettings {
 		defaultFolder: string;
 		filenameTemplate: string;
 	};
+	// WSL settings (Windows only)
+	windowsWslMode: boolean;
+	windowsWslDistribution?: string;
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -76,6 +79,8 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		defaultFolder: "Agent Client",
 		filenameTemplate: "agent_client_{date}_{time}",
 	},
+	windowsWslMode: false,
+	windowsWslDistribution: undefined,
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -303,6 +308,14 @@ export default class AgentClientPlugin extends Plugin {
 				}
 				return DEFAULT_SETTINGS.exportSettings;
 			})(),
+			windowsWslMode:
+				typeof rawSettings.windowsWslMode === "boolean"
+					? rawSettings.windowsWslMode
+					: DEFAULT_SETTINGS.windowsWslMode,
+			windowsWslDistribution:
+				typeof rawSettings.windowsWslDistribution === "string"
+					? rawSettings.windowsWslDistribution
+					: DEFAULT_SETTINGS.windowsWslDistribution,
 		};
 
 		this.ensureActiveAgentId();

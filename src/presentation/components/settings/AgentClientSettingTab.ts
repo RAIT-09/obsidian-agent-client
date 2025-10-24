@@ -1,4 +1,10 @@
-import { App, PluginSettingTab, Setting, DropdownComponent } from "obsidian";
+import {
+	App,
+	PluginSettingTab,
+	Setting,
+	DropdownComponent,
+	Platform,
+} from "obsidian";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 import type {
 	CustomAgentSettings,
@@ -36,6 +42,47 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
+
+		// Windows WSL Settings (Windows only)
+		if (Platform.isWin) {
+			new Setting(containerEl).setName("Windows WSL").setHeading();
+
+			new Setting(containerEl)
+				.setName("Enable WSL mode")
+				.setDesc(
+					"Run agents inside Windows Subsystem for Linux. Recommended for agents like Codex that don't work well in native Windows environments.",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.windowsWslMode)
+						.onChange(async (value) => {
+							this.plugin.settings.windowsWslMode = value;
+							await this.plugin.saveSettings();
+							this.display(); // Refresh to show/hide distribution setting
+						}),
+				);
+
+			if (this.plugin.settings.windowsWslMode) {
+				new Setting(containerEl)
+					.setName("WSL distribution")
+					.setDesc(
+						"Specify WSL distribution name (leave empty for default). Example: Ubuntu, Debian",
+					)
+					.addText((text) =>
+						text
+							.setPlaceholder("Leave empty for default")
+							.setValue(
+								this.plugin.settings.windowsWslDistribution ||
+									"",
+							)
+							.onChange(async (value) => {
+								this.plugin.settings.windowsWslDistribution =
+									value.trim() || undefined;
+								await this.plugin.saveSettings();
+							}),
+					);
+			}
+		}
 
 		new Setting(containerEl)
 			.setName("Auto-allow permissions")

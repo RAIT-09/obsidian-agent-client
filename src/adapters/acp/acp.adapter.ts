@@ -19,6 +19,7 @@ import { TerminalManager } from "../../infrastructure/terminal/terminal-manager"
 import { Logger } from "../../shared/logger";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
 import type { SlashCommand } from "src/core/domain/models/chat-session";
+import { wrapCommandForWsl } from "../../shared/wsl-utils";
 
 /**
  * Extended ACP Client interface for UI layer.
@@ -225,9 +226,27 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		let spawnCommand = command;
 		let spawnArgs = args;
 
+		// WSL mode for Windows (wrap command to run inside WSL)
+		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+			const wslWrapped = wrapCommandForWsl(
+				command,
+				args,
+				config.workingDirectory,
+				this.plugin.settings.windowsWslDistribution,
+			);
+			spawnCommand = wslWrapped.command;
+			spawnArgs = wslWrapped.args;
+			this.logger.log(
+				"[AcpAdapter] Using WSL mode:",
+				this.plugin.settings.windowsWslDistribution || "default",
+				"with command:",
+				spawnCommand,
+				spawnArgs,
+			);
+		}
 		// On macOS and Linux, wrap the command in a login shell to inherit the user's environment
 		// This ensures that PATH modifications in .zshrc/.bash_profile are available
-		if (Platform.isMacOS || Platform.isLinux) {
+		else if (Platform.isMacOS || Platform.isLinux) {
 			const shell = Platform.isMacOS ? "/bin/zsh" : "/bin/bash";
 			const commandString = [command, ...args]
 				.map((arg) => "'" + arg.replace(/'/g, "'\\''") + "'")
