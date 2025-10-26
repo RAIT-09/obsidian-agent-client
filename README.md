@@ -183,3 +183,7 @@ Have ideas or feature requests? Feel free to [open an issue](https://github.com/
 ## 📄 License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+## ⭐️ Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=RAIT-09/obsidian-agent-client&type=Date)](https://www.star-history.com/#RAIT-09/obsidian-agent-client&Date)
