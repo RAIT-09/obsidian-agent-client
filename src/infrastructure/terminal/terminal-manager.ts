@@ -45,6 +45,25 @@ export class TerminalManager {
 			}
 		}
 
+		// Add fallback paths for Linux to handle common installation locations
+		if (Platform.isLinux) {
+			const commonPaths = ["/usr/local/bin", "/usr/bin", "/bin"];
+			const currentPaths = (env.PATH || "").split(":");
+			const missingPaths = commonPaths.filter(
+				(p) => p.length > 0 && !currentPaths.includes(p),
+			);
+
+			if (missingPaths.length > 0) {
+				const separator = env.PATH && env.PATH.length > 0 ? ":" : "";
+				env.PATH =
+					missingPaths.join(":") + separator + (env.PATH || "");
+				this.logger.log(
+					`[Terminal ${terminalId}] Added fallback paths:`,
+					missingPaths.join(":"),
+				);
+			}
+		}
+
 		// Handle command parsing
 		let command = params.command;
 		let args = params.args || [];
@@ -98,13 +117,17 @@ export class TerminalManager {
 			);
 		}
 		// On macOS and Linux, wrap the command in a login shell to inherit the user's environment
+		// Linux uses -i (interactive) to load .bashrc, macOS (zsh) loads .zshrc with -l alone
 		else if (Platform.isMacOS || Platform.isLinux) {
 			const shell = Platform.isMacOS ? "/bin/zsh" : "/bin/bash";
 			const commandString = [command, ...args]
 				.map((arg) => "'" + arg.replace(/'/g, "'\\''") + "'")
 				.join(" ");
 			command = shell;
-			args = ["-l", "-c", commandString];
+			// Linux needs -i to load .bashrc, macOS (zsh) loads .zshrc with -l alone
+			args = Platform.isLinux
+				? ["-l", "-i", "-c", commandString]
+				: ["-l", "-c", commandString];
 		}
 
 		this.logger.log(`[Terminal ${terminalId}] Creating terminal:`, {

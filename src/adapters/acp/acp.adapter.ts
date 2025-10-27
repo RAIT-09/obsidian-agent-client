@@ -221,6 +221,27 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			}
 		}
 
+		// Add fallback paths for Linux to handle common installation locations
+		// This helps when commands are installed in /usr/local/bin but not in the user's PATH
+		if (Platform.isLinux) {
+			const commonPaths = ["/usr/local/bin", "/usr/bin", "/bin"];
+			const currentPaths = (baseEnv.PATH || "").split(":");
+			const missingPaths = commonPaths.filter(
+				(p) => p.length > 0 && !currentPaths.includes(p),
+			);
+
+			if (missingPaths.length > 0) {
+				const separator =
+					baseEnv.PATH && baseEnv.PATH.length > 0 ? ":" : "";
+				baseEnv.PATH =
+					missingPaths.join(":") + separator + (baseEnv.PATH || "");
+				this.logger.log(
+					"[AcpAdapter] Added fallback paths to Linux environment:",
+					missingPaths.join(":"),
+				);
+			}
+		}
+
 		this.logger.log(
 			"[AcpAdapter] Starting agent process in directory:",
 			config.workingDirectory,
@@ -257,17 +278,22 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			);
 		}
 		// On macOS and Linux, wrap the command in a login shell to inherit the user's environment
-		// This ensures that PATH modifications in .zshrc/.bash_profile are available
+		// This ensures that PATH modifications in .zshrc/.bash_profile/.bashrc are available
+		// Linux uses -i (interactive) to load .bashrc, macOS (zsh) loads .zshrc with -l alone
 		else if (Platform.isMacOS || Platform.isLinux) {
 			const shell = Platform.isMacOS ? "/bin/zsh" : "/bin/bash";
 			const commandString = [command, ...args]
 				.map((arg) => "'" + arg.replace(/'/g, "'\\''") + "'")
 				.join(" ");
 			spawnCommand = shell;
-			spawnArgs = ["-l", "-c", commandString];
+			// Linux needs -i to load .bashrc, macOS (zsh) loads .zshrc with -l alone
+			spawnArgs = Platform.isLinux
+				? ["-l", "-i", "-c", commandString]
+				: ["-l", "-c", commandString];
 			this.logger.log(
 				"[AcpAdapter] Using login shell:",
 				shell,
+				Platform.isLinux ? "(interactive mode for .bashrc)" : "",
 				"with command:",
 				commandString,
 			);
