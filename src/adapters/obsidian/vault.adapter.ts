@@ -6,7 +6,10 @@
  * wraps Obsidian's file access APIs with domain-friendly interface.
  */
 
-import type { IVaultAccess, NoteMetadata } from "../../core/domain/ports/vault-access.port";
+import type {
+	IVaultAccess,
+	NoteMetadata,
+} from "../../core/domain/ports/vault-access.port";
 import { NoteMentionService } from "./mention-service";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
 import { TFile } from "obsidian";

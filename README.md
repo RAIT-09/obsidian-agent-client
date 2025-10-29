@@ -172,6 +172,15 @@ For production builds:
 npm run build
 ```
 
+Code formatting with Prettier:
+```bash
+# Check code formatting
+npm run format:check
+
+# Auto-fix formatting issues
+npm run format
+```
+
 ## 🗺️ Roadmap
 
 - **Model Switching Support**: Change the active model for each agent directly from the chat interface

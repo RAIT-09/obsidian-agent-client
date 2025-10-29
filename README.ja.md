@@ -170,6 +170,15 @@ npm run dev
 npm run build
 ```
 
+コードフォーマット（Prettier）:
+```bash
+# コードのフォーマットをチェック
+npm run format:check
+
+# フォーマットを自動修正
+npm run format
+```
+
 ## 🗺️ ロードマップ
 
 - **モデル切り替え機能**: チャット画面から各エージェントのモデルを直接変更する

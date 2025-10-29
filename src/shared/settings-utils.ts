@@ -1,4 +1,7 @@
-import type { AgentEnvVar, CustomAgentSettings } from "../infrastructure/obsidian-plugin/plugin";
+import type {
+	AgentEnvVar,
+	CustomAgentSettings,
+} from "../infrastructure/obsidian-plugin/plugin";
 import type { BaseAgentSettings } from "../core/domain/models/agent-config";
 import type { AgentConfig } from "../core/domain/ports/agent-client.port";
 

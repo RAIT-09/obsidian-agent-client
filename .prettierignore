@@ -1,0 +1,10 @@
+node_modules/
+.git/
+.github/
+.serena/
+.claude/
+main.js
+*.json
+*.md
+*.css
+data.json

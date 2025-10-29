@@ -91,7 +91,9 @@ export class HandlePermissionUseCase {
 	/**
 	 * Deny a permission request by selecting the reject option
 	 */
-	async denyPermission(requestId: string): Promise<RespondToPermissionResult> {
+	async denyPermission(
+		requestId: string,
+	): Promise<RespondToPermissionResult> {
 		// For denial, we typically select a "reject" option
 		// The actual option ID would need to be determined from the permission request
 		// This is a simplified implementation
@@ -146,8 +148,8 @@ export class HandlePermissionUseCase {
 		}
 
 		// Fall back to any option with "allow" in the name
-		const allowByName = request.options.find(
-			(option) => option.name.toLowerCase().includes("allow"),
+		const allowByName = request.options.find((option) =>
+			option.name.toLowerCase().includes("allow"),
 		);
 		if (allowByName) {
 			return allowByName;
