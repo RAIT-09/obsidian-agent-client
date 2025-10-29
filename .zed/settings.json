@@ -31,6 +31,12 @@
 				"source.fixAll.eslint": false
 			},
 			"format_on_save": "on"
+		},
+		"CSS": {
+			"tab_size": 4,
+			"hard_tabs": true,
+			"formatter": "prettier",
+			"format_on_save": "on"
 		}
 	}
 }
