@@ -1,5 +1,13 @@
 # vscode
-.vscode
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+.vscode/launch.json
+
+# Zed
+.zed/*
+!.zed/settings.json
 
 # Intellij
 *.iml
