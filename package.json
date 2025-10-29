@@ -27,7 +27,7 @@
 		"typescript": "4.7.4"
 	},
 	"dependencies": {
-		"@agentclientprotocol/sdk": "^0.4.8",
+		"@agentclientprotocol/sdk": "^0.5.1",
 		"react": "^19.1.1",
 		"react-dom": "^19.1.1"
 	}

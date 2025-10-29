@@ -961,11 +961,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	): Promise<acp.RequestPermissionResponse> {
 		this.logger.log("[AcpAdapter] Permission request received:", params);
 
-		// Type guard: check if params has extended toolCall property
-		const extendedParams = params as unknown as {
-			toolCall?: acp.ToolCallUpdate;
-		};
-
 		// If auto-allow is enabled, automatically approve the first allow option
 		if (this.autoAllowPermissions) {
 			const allowOption =
@@ -1015,8 +1010,8 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		} as MessageContent);
 
 		// If no existing tool_call was found, create a new tool_call message with permission
-		if (!updated && extendedParams.toolCall?.title) {
-			const toolCallInfo = extendedParams.toolCall;
+		if (!updated && params.toolCall?.title) {
+			const toolCallInfo = params.toolCall;
 			const status = (toolCallInfo.status ||
 				"pending") as acp.ToolCallStatus;
 			const kind = toolCallInfo.kind as acp.ToolKind | undefined;
