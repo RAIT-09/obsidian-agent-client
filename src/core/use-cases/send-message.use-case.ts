@@ -20,7 +20,8 @@ import type { AgentError } from "../domain/models/agent-error";
 import type { AuthenticationMethod } from "../domain/models/chat-session";
 import {
 	buildAutoMentionContext,
-	convertMentionsToPath,
+	extractMentionedNotes,
+	removeMentions,
 	type IMentionService,
 } from "../../shared/mention-utils";
 
@@ -138,35 +139,88 @@ export class SendMessageUseCase {
 	) {}
 
 	/**
-	 * Phase 1: Prepare message (synchronous)
+	 * Phase 1: Prepare message (asynchronous)
 	 *
 	 * Processes the message by:
 	 * - Adding auto-mention if enabled (for display only)
-	 * - Converting @mentions to file paths (for agent)
+	 * - Converting @mentions to context blocks with note content (for agent)
 	 * - Building context from active note (for agent only)
 	 *
-	 * This is synchronous so the ViewModel can add the user message to UI immediately.
+	 * Note: This is now asynchronous to read note content for mentions.
 	 */
-	prepareMessage(input: PrepareMessageInput): PrepareMessageResult {
-		// Step 1: Convert @mentions to file paths for agent consumption
-		let agentMessage = convertMentionsToPath(
+	async prepareMessage(
+		input: PrepareMessageInput,
+	): Promise<PrepareMessageResult> {
+		// Step 1: Extract all mentioned notes from the message
+		const mentionedNotes = extractMentionedNotes(
 			input.message,
 			this.mentionService,
-			input.vaultBasePath,
-			input.convertToWsl ?? false,
 		);
 
-		// Step 2: Build context from active note (for agent only, not shown in UI)
+		// Step 2: Build context blocks for each mentioned note
+		const contextBlocks: string[] = [];
+		const MAX_NOTE_LENGTH = 10000; // Maximum characters per note
+
+		for (const { noteTitle, file } of mentionedNotes) {
+			if (!file) {
+				// File not found, skip
+				continue;
+			}
+
+			try {
+				// Read note content
+				const content = await this.vaultAccess.readNote(file.path);
+
+				// Truncate content if too long
+				let processedContent = content;
+				let truncationNote = "";
+
+				if (content.length > MAX_NOTE_LENGTH) {
+					processedContent = content.substring(0, MAX_NOTE_LENGTH);
+					truncationNote = `\n\n[Note: This note was truncated. Original length: ${content.length} characters, showing first ${MAX_NOTE_LENGTH} characters]`;
+				}
+
+				// Calculate absolute path
+				let absolutePath = input.vaultBasePath
+					? `${input.vaultBasePath}/${file.path}`
+					: file.path;
+
+				// Convert to WSL path format if requested
+				if (input.convertToWsl) {
+					// eslint-disable-next-line @typescript-eslint/no-var-requires
+					const {
+						convertWindowsPathToWsl,
+					} = require("../../shared/wsl-utils");
+					absolutePath = convertWindowsPathToWsl(absolutePath);
+				}
+
+				// Build context block
+				const contextBlock = `<obsidian_mentioned_note ref="${absolutePath}">\n${processedContent}${truncationNote}\n</obsidian_mentioned_note>`;
+				contextBlocks.push(contextBlock);
+			} catch (error) {
+				// If reading fails, skip this note
+				console.error(`Failed to read note ${file.path}:`, error);
+			}
+		}
+
+		// Step 3: Build context from active note (for agent only, not shown in UI)
 		if (input.activeNote && !input.isAutoMentionDisabled) {
 			const autoMentionContext = buildAutoMentionContext(
 				input.activeNote.path,
 				input.vaultBasePath,
 				input.convertToWsl ?? false,
 			);
-			agentMessage = autoMentionContext + "\n" + agentMessage;
+			contextBlocks.push(autoMentionContext);
 		}
 
-		// Step 3: Add auto-mention for display (shown in UI as @[[note]])
+		// Step 4: Build agent message (context blocks + clean message)
+		const cleanMessage = removeMentions(input.message);
+		const agentMessage =
+			contextBlocks.length > 0
+				? contextBlocks.join("\n") + "\n\n" + cleanMessage
+				: cleanMessage;
+
+		// Step 5: Add auto-mention for display (shown in UI as @[[note]])
 		const displayMessage = this.addAutoMention(
 			input.message,
 			input.activeNote,
@@ -175,7 +229,7 @@ export class SendMessageUseCase {
 
 		return {
 			displayMessage, // For UI: contains @[[note]] syntax
-			agentMessage, // For agent: contains file paths + context
+			agentMessage, // For agent: contains context blocks + clean message
 		};
 	}
 
@@ -217,8 +271,8 @@ export class SendMessageUseCase {
 	 * This combines prepareMessage + sendPreparedMessage for backward compatibility.
 	 */
 	async execute(input: SendMessageInput): Promise<SendMessageResult> {
-		// Step 1: Prepare message
-		const { displayMessage, agentMessage } = this.prepareMessage({
+		// Step 1: Prepare message (now async)
+		const { displayMessage, agentMessage } = await this.prepareMessage({
 			message: input.message,
 			activeNote: input.activeNote,
 			vaultBasePath: input.vaultBasePath,

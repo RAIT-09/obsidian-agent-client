@@ -133,49 +133,38 @@ export function buildAutoMentionContext(
 	return context;
 }
 
-// Convert @mentions to relative paths for agent
-export function convertMentionsToPath(
+// Extract all @mentions from text
+export function extractMentionedNotes(
 	text: string,
 	noteMentionService: IMentionService,
-	vaultPath: string,
-	convertToWsl?: boolean,
-): string {
-	// Find all @mentions in the text (@[[filename]] format only)
+): Array<{ noteTitle: string; file: TFile | undefined }> {
 	const mentionRegex = /@\[\[([^\]]+)\]\]/g;
-	let convertedText = text;
+	const matches = Array.from(text.matchAll(mentionRegex));
+	const result: Array<{ noteTitle: string; file: TFile | undefined }> = [];
+	const seen = new Set<string>(); // Avoid duplicates
 
-	convertedText = convertedText.replace(mentionRegex, (match, noteTitle) => {
-		// Extract filename from [[brackets]]
+	for (const match of matches) {
+		const noteTitle = match[1];
+		if (seen.has(noteTitle)) {
+			continue;
+		}
+		seen.add(noteTitle);
 
 		// Find the file by basename
 		const file = noteMentionService
 			.getAllFiles()
 			.find((f: TFile) => f.basename === noteTitle);
-		if (file) {
-			// Calculate absolute path by combining vault path with file path
-			let absolutePath = vaultPath
-				? `${vaultPath}/${file.path}`
-				: file.path;
 
-			// Convert to WSL path format if requested (Windows + WSL mode)
-			if (convertToWsl) {
-				// Import at runtime to avoid circular dependency
-				// eslint-disable-next-line @typescript-eslint/no-var-requires
-				const { convertWindowsPathToWsl } = require("./wsl-utils");
-				absolutePath = convertWindowsPathToWsl(absolutePath);
-			}
+		result.push({ noteTitle, file });
+	}
 
-			// TODO: Fix logger usage in utility functions
-			// logger.log(
-			// 	`[DEBUG] Converting @${noteTitle} to absolute path: ${absolutePath}`,
-			// );
-			return absolutePath;
-		}
-		// If file not found, keep original @mention
-		return match;
-	});
+	return result;
+}
 
-	return convertedText;
+// Remove @mentions from text (for clean display to agent)
+export function removeMentions(text: string): string {
+	const mentionRegex = /@\[\[([^\]]+)\]\]/g;
+	return text.replace(mentionRegex, "").trim();
 }
 
 // Extract @mentions from text for display purposes

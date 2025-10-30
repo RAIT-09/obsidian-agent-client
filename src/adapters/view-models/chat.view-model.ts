@@ -451,8 +451,8 @@ export class ChatViewModel {
 			return;
 		}
 
-		// Phase 1: Prepare message (synchronous)
-		const prepared = this.sendMessageUseCase.prepareMessage({
+		// Phase 1: Prepare message (now asynchronous)
+		const prepared = await this.sendMessageUseCase.prepareMessage({
 			message: content,
 			activeNote: options.activeNote,
 			vaultBasePath: options.vaultBasePath,
