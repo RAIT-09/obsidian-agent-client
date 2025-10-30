@@ -111,6 +111,28 @@ export function replaceMention(
 	return { newText, newCursorPos };
 }
 
+// Build context from auto-mentioned note
+export function buildAutoMentionContext(
+	notePath: string,
+	vaultPath: string,
+	convertToWsl?: boolean,
+): string {
+	// Calculate absolute path by combining vault path with note path
+	let absolutePath = vaultPath ? `${vaultPath}/${notePath}` : notePath;
+
+	// Convert to WSL path format if requested (Windows + WSL mode)
+	if (convertToWsl) {
+		// Import at runtime to avoid circular dependency
+		// eslint-disable-next-line @typescript-eslint/no-var-requires
+		const { convertWindowsPathToWsl } = require("./wsl-utils");
+		absolutePath = convertWindowsPathToWsl(absolutePath);
+	}
+
+	const context = `<obsidian_opened_note>The user opened the note ${absolutePath} in Obsidian. This may or may not be related to the current conversation.</obsidian_opened_note>`;
+
+	return context;
+}
+
 // Convert @mentions to relative paths for agent
 export function convertMentionsToPath(
 	text: string,

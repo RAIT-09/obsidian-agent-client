@@ -19,6 +19,7 @@ import type { ISettingsAccess } from "../domain/ports/settings-access.port";
 import type { AgentError } from "../domain/models/agent-error";
 import type { AuthenticationMethod } from "../domain/models/chat-session";
 import {
+	buildAutoMentionContext,
 	convertMentionsToPath,
 	type IMentionService,
 } from "../../shared/mention-utils";
@@ -140,30 +141,41 @@ export class SendMessageUseCase {
 	 * Phase 1: Prepare message (synchronous)
 	 *
 	 * Processes the message by:
-	 * - Adding auto-mention if enabled
-	 * - Converting @mentions to file paths
+	 * - Adding auto-mention if enabled (for display only)
+	 * - Converting @mentions to file paths (for agent)
+	 * - Building context from active note (for agent only)
 	 *
 	 * This is synchronous so the ViewModel can add the user message to UI immediately.
 	 */
 	prepareMessage(input: PrepareMessageInput): PrepareMessageResult {
-		// Step 1: Add auto-mention if needed
+		// Step 1: Convert @mentions to file paths for agent consumption
+		let agentMessage = convertMentionsToPath(
+			input.message,
+			this.mentionService,
+			input.vaultBasePath,
+			input.convertToWsl ?? false,
+		);
+
+		// Step 2: Build context from active note (for agent only, not shown in UI)
+		if (input.activeNote && !input.isAutoMentionDisabled) {
+			const autoMentionContext = buildAutoMentionContext(
+				input.activeNote.path,
+				input.vaultBasePath,
+				input.convertToWsl ?? false,
+			);
+			agentMessage = autoMentionContext + "\n" + agentMessage;
+		}
+
+		// Step 3: Add auto-mention for display (shown in UI as @[[note]])
 		const displayMessage = this.addAutoMention(
 			input.message,
 			input.activeNote,
 			input.isAutoMentionDisabled ?? false,
 		);
 
-		// Step 2: Convert @mentions to file paths for agent consumption
-		const agentMessage = convertMentionsToPath(
-			displayMessage,
-			this.mentionService,
-			input.vaultBasePath,
-			input.convertToWsl ?? false,
-		);
-
 		return {
-			displayMessage,
-			agentMessage,
+			displayMessage, // For UI: contains @[[note]] syntax
+			agentMessage, // For agent: contains file paths + context
 		};
 	}
 
