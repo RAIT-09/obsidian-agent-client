@@ -13,7 +13,14 @@ import type {
 } from "../../core/domain/ports/vault-access.port";
 import { NoteMentionService } from "./mention-service";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
-import { TFile, MarkdownView } from "obsidian";
+import {
+	TFile,
+	MarkdownView,
+	type EventRef,
+	type EditorSelection,
+} from "obsidian";
+import { EditorView } from "@codemirror/view";
+import { Compartment, StateEffect } from "@codemirror/state";
 
 /**
  * Adapter for accessing Obsidian vault notes.
@@ -28,6 +35,11 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 		filePath: string;
 		selection: { from: EditorPosition; to: EditorPosition };
 	} | null = null;
+	private selectionListeners = new Set<() => void>();
+	private activeLeafRef: EventRef | null = null;
+	private detachEditorListenerFn: (() => void) | null = null;
+	private selectionCompartment: Compartment | null = null;
+	private lastSelectionKey = "";
 
 	constructor(private plugin: AgentClientPlugin) {
 		this.mentionService = new NoteMentionService(plugin);
@@ -89,57 +101,178 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 	}
 
 	/**
-	 * Update the stored selection for the given file.
+	 * Subscribe to selection changes for the active markdown editor.
 	 *
-	 * This should be called whenever the editor selection changes.
-	 * Finds the MarkdownView for the file and stores the current selection.
-	 *
-	 * @param filePath - Path of the file whose selection changed
+	 * The adapter will monitor the currently active MarkdownView and
+	 * keep track of its selection, notifying subscribers whenever the
+	 * selection or active file changes.
 	 */
-	updateSelection(filePath: string): void {
-		// Find the MarkdownView for this file
-		const leaves = this.plugin.app.workspace.getLeavesOfType("markdown");
-		const leaf = leaves.find((l) => {
-			const view = l.view;
-			if (view instanceof MarkdownView && view.file) {
-				return view.file.path === filePath;
-			}
-			return false;
-		});
+	subscribeSelectionChanges(listener: () => void): () => void {
+		this.selectionListeners.add(listener);
+		this.ensureSelectionTracking();
 
-		if (!leaf || !(leaf.view instanceof MarkdownView)) {
+		return () => {
+			this.selectionListeners.delete(listener);
+			if (this.selectionListeners.size === 0) {
+				this.teardownSelectionTracking();
+			}
+		};
+	}
+
+	private ensureSelectionTracking(): void {
+		if (this.activeLeafRef) {
 			return;
 		}
 
-		const view = leaf.view;
-		const editor = view.editor;
+		const activeView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+		this.attachToView(activeView ?? null);
 
-		// Check if text is selected
-		if (editor.somethingSelected()) {
-			const selections = editor.listSelections();
-			if (selections.length > 0) {
-				const selection = selections[0]; // Use first selection
-				this.currentSelection = {
-					filePath,
-					selection: {
+		this.activeLeafRef = this.plugin.app.workspace.on(
+			"active-leaf-change",
+			(leaf) => {
+				const nextView =
+					leaf?.view instanceof MarkdownView
+						? leaf.view
+						: this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+				this.attachToView(nextView ?? null);
+			},
+		);
+	}
+
+	private teardownSelectionTracking(): void {
+		this.detachEditorListener();
+		if (this.activeLeafRef) {
+			this.plugin.app.workspace.offref(this.activeLeafRef);
+			this.activeLeafRef = null;
+		}
+		this.lastSelectionKey = "";
+	}
+
+	private detachEditorListener(): void {
+		if (this.detachEditorListenerFn) {
+			this.detachEditorListenerFn();
+			this.detachEditorListenerFn = null;
+		}
+		this.selectionCompartment = null;
+	}
+
+	private attachToView(view: MarkdownView | null): void {
+		this.detachEditorListener();
+
+		if (!view?.file) {
+			return;
+		}
+
+		const { editor, file } = view;
+		const filePath = file.path;
+
+		if (this.lastSelectionKey && !this.lastSelectionKey.startsWith(`${filePath}:`)) {
+			// Clear previous file selection when switching files
+			this.handleSelectionChange(filePath, null);
+		}
+
+		const emitSelection = () => {
+			if (editor.somethingSelected()) {
+				const selections = editor.listSelections();
+				if (selections.length > 0) {
+					const normalized = this.normalizeSelection(selections[0]);
+					this.handleSelectionChange(filePath, {
 						from: {
-							line: selection.anchor.line,
-							ch: selection.anchor.ch,
+							line: normalized.anchor.line,
+							ch: normalized.anchor.ch,
 						},
 						to: {
-							line: selection.head.line,
-							ch: selection.head.ch,
+							line: normalized.head.line,
+							ch: normalized.head.ch,
 						},
-					},
-				};
+					});
+					return;
+				}
 			}
-		} else {
-			// No selection - clear if it was for this file
-			if (
-				this.currentSelection &&
-				this.currentSelection.filePath === filePath
-			) {
-				this.currentSelection = null;
+
+			const editorHasFocus = editor.hasFocus();
+			if (editorHasFocus) {
+				this.handleSelectionChange(filePath, null);
+			}
+		};
+
+		const cm = (editor as unknown as { cm?: EditorView }).cm;
+		emitSelection();
+
+		if (cm) {
+			const compartment = new Compartment();
+			this.selectionCompartment = compartment;
+			cm.dispatch({
+				effects: StateEffect.appendConfig.of(
+					compartment.of(
+						EditorView.updateListener.of((update) => {
+							if (update.selectionSet) {
+								emitSelection();
+							}
+						}),
+					),
+				),
+			});
+			this.detachEditorListenerFn = () => {
+				if (this.selectionCompartment) {
+					cm.dispatch({
+						effects: this.selectionCompartment.reconfigure([]),
+					});
+				}
+				this.selectionCompartment = null;
+			};
+		}
+	}
+
+	private normalizeSelection(selection: EditorSelection) {
+		const anchor = selection.anchor;
+		const head = selection.head ?? selection.anchor;
+		const anchorFirst =
+			anchor.line < head.line ||
+			(anchor.line === head.line && anchor.ch <= head.ch);
+
+		return anchorFirst
+			? { anchor, head }
+			: { anchor: head, head: anchor };
+	}
+
+	private handleSelectionChange(
+		filePath: string | null,
+		selection: { from: EditorPosition; to: EditorPosition } | null,
+	): void {
+		const selectionKey = filePath
+			? selection
+				? `${filePath}:${selection.from.line}:${selection.from.ch}-${selection.to.line}:${selection.to.ch}`
+				: `${filePath}:none`
+			: "none";
+
+		if (selectionKey === this.lastSelectionKey) {
+			return;
+		}
+
+		this.lastSelectionKey = selectionKey;
+
+		if (filePath && selection) {
+			this.currentSelection = {
+				filePath,
+				selection,
+			};
+		} else if (
+			this.currentSelection &&
+			(filePath === null || this.currentSelection.filePath === filePath)
+		) {
+			this.currentSelection = null;
+		}
+
+		this.notifySelectionListeners();
+	}
+
+	private notifySelectionListeners(): void {
+		for (const listener of this.selectionListeners) {
+			try {
+				listener();
+			} catch (error) {
+				console.error("[ObsidianVaultAdapter] Selection listener error", error);
 			}
 		}
 	}

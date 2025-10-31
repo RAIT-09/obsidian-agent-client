@@ -4,10 +4,9 @@ import {
 	setIcon,
 	Platform,
 	Notice,
-	MarkdownView,
 } from "obsidian";
 import * as React from "react";
-const { useState, useRef, useEffect, useSyncExternalStore, useMemo } = React;
+const { useState, useRef, useEffect, useSyncExternalStore, useMemo, useCallback } = React;
 import { createRoot, Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
@@ -124,6 +123,11 @@ function ChatComponent({
 	const vaultAccessAdapter = useMemo(() => {
 		return new ObsidianVaultAdapter(plugin);
 	}, [plugin]);
+
+	const updateActiveNote = useCallback(async () => {
+		const activeNote = await vaultAccessAdapter.getActiveNote();
+		setLastActiveNote(activeNote);
+	}, [vaultAccessAdapter]);
 
 	// Create SendMessageUseCase
 	const sendMessageUseCase = useMemo(() => {
@@ -442,68 +446,24 @@ function ChatComponent({
 
 	// Show auto-mention notes and track selection
 	useEffect(() => {
-		let pollingInterval: number;
+		let isMounted = true;
 
-		const updateActiveNote = async () => {
-			const activeNote = await vaultAccessAdapter.getActiveNote();
-			console.log("[ChatView] updateActiveNote result:", activeNote);
-			if (activeNote) {
-				setLastActiveNote(activeNote);
-			}
+		const refreshActiveNote = async () => {
+			if (!isMounted) return;
+			await updateActiveNote();
 		};
 
-		// Track last selection to avoid unnecessary re-renders
-		let lastSelectionString = "";
+		const unsubscribe = vaultAccessAdapter.subscribeSelectionChanges(() => {
+			void refreshActiveNote();
+		});
 
-		// Poll for selection changes periodically
-		const pollSelection = () => {
-			const activeFile = plugin.app.workspace.getActiveFile();
-			if (activeFile) {
-				vaultAccessAdapter.updateSelection(activeFile.path);
-
-				// Only update UI if selection actually changed
-				const currentSelection = (vaultAccessAdapter as any)
-					.currentSelection;
-				const currentSelectionString = currentSelection
-					? `${currentSelection.selection.from.line}-${currentSelection.selection.to.line}`
-					: "";
-
-				if (currentSelectionString !== lastSelectionString) {
-					console.log(
-						"[ChatView] Selection changed:",
-						currentSelectionString,
-					);
-					lastSelectionString = currentSelectionString;
-					updateActiveNote();
-				}
-			}
-		};
-
-		// Initial update
-		updateActiveNote();
-
-		// Start polling every 500ms to track selection changes
-		// 500ms provides good responsiveness while minimizing CPU usage
-		pollingInterval = window.setInterval(pollSelection, 500);
-
-		// Handle note switching - update immediately
-		const handleActiveLeafChange = () => {
-			console.log("[ChatView] Active leaf changed");
-			lastSelectionString = ""; // Reset to force update on next poll
-			updateActiveNote();
-		};
-
-		view.registerEvent(
-			plugin.app.workspace.on(
-				"active-leaf-change",
-				handleActiveLeafChange,
-			),
-		);
+		void refreshActiveNote();
 
 		return () => {
-			window.clearInterval(pollingInterval);
+			isMounted = false;
+			unsubscribe();
 		};
-	}, [vaultAccessAdapter]);
+	}, [updateActiveNote, vaultAccessAdapter]);
 
 	const updateIconColor = (svg: SVGElement) => {
 		// Remove all state classes
