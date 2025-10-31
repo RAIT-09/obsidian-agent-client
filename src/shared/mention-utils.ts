@@ -136,11 +136,11 @@ export function buildAutoMentionContext(
 	if (selection) {
 		const fromLine = selection.from.line + 1; // Convert to 1-indexed
 		const toLine = selection.to.line + 1;
-		const context = `<obsidian_opened_note" selection="lines ${fromLine}-${toLine}">The user opened the note ${absolutePath} in Obsidian and is focusing on lines ${fromLine}-${toLine}. This may or may not be related to the current conversation.</obsidian_opened_note>`;
+		const context = `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">The user opened the note ${absolutePath} in Obsidian and is focusing on lines ${fromLine}-${toLine}. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the specific lines.</obsidian_opened_note>`;
 		return context;
 	}
 
-	const context = `<obsidian_opened_note>The user opened the note ${absolutePath} in Obsidian. This may or may not be related to the current conversation.</obsidian_opened_note>`;
+	const context = `<obsidian_opened_note>The user opened the note ${absolutePath} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the content.</obsidian_opened_note>`;
 
 	return context;
 }

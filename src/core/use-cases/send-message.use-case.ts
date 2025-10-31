@@ -21,7 +21,6 @@ import type { AuthenticationMethod } from "../domain/models/chat-session";
 import {
 	buildAutoMentionContext,
 	extractMentionedNotes,
-	removeMentions,
 	type IMentionService,
 } from "../../shared/mention-utils";
 
@@ -224,12 +223,11 @@ export class SendMessageUseCase {
 			contextBlocks.push(autoMentionContext);
 		}
 
-		// Step 4: Build agent message (context blocks + clean message)
-		const cleanMessage = removeMentions(input.message);
+		// Step 4: Build agent message (context blocks + original message with mentions)
 		const agentMessage =
 			contextBlocks.length > 0
-				? contextBlocks.join("\n") + "\n\n" + cleanMessage
-				: cleanMessage;
+				? contextBlocks.join("\n") + "\n\n" + input.message
+				: input.message;
 
 		// Step 5: Build auto-mention context metadata (not added to displayMessage text)
 		const autoMentionContext =
