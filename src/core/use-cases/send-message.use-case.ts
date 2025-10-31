@@ -53,11 +53,21 @@ export interface PrepareMessageInput {
  * Result of preparing a message
  */
 export interface PrepareMessageResult {
-	/** The processed message text (with auto-mention added if applicable) */
+	/** The processed message text (without auto-mention syntax in text) */
 	displayMessage: string;
 
 	/** The message text to send to agent (with mentions converted to paths) */
 	agentMessage: string;
+
+	/** Auto-mention context metadata (if auto-mention is active) */
+	autoMentionContext?: {
+		noteName: string;
+		notePath: string;
+		selection?: {
+			fromLine: number;
+			toLine: number;
+		};
+	};
 }
 
 /**
@@ -221,16 +231,28 @@ export class SendMessageUseCase {
 				? contextBlocks.join("\n") + "\n\n" + cleanMessage
 				: cleanMessage;
 
-		// Step 5: Add auto-mention for display (shown in UI as @[[note]])
-		const displayMessage = this.addAutoMention(
-			input.message,
-			input.activeNote,
-			input.isAutoMentionDisabled ?? false,
-		);
+		// Step 5: Build auto-mention context metadata (not added to displayMessage text)
+		const autoMentionContext =
+			input.activeNote && !input.isAutoMentionDisabled
+				? {
+						noteName: input.activeNote.name,
+						notePath: input.activeNote.path,
+						selection: input.activeNote.selection
+							? {
+									fromLine:
+										input.activeNote.selection.from.line +
+										1,
+									toLine:
+										input.activeNote.selection.to.line + 1,
+								}
+							: undefined,
+					}
+				: undefined;
 
 		return {
-			displayMessage, // For UI: contains @[[note]] syntax
+			displayMessage: input.message, // For UI: original message without modification
 			agentMessage, // For agent: contains context blocks + clean message
+			autoMentionContext, // For UI: metadata to render auto-mention badge
 		};
 	}
 
@@ -293,36 +315,6 @@ export class SendMessageUseCase {
 	// ========================================================================
 	// Private Helper Methods
 	// ========================================================================
-
-	/**
-	 * Add auto-mention for the active note if enabled
-	 */
-	private addAutoMention(
-		message: string,
-		activeNote: NoteMetadata | null | undefined,
-		isAutoMentionDisabled: boolean,
-	): string {
-		const settings = this.settingsAccess.getSnapshot();
-
-		// Check if auto-mention is enabled and conditions are met
-		if (
-			!settings.autoMentionActiveNote ||
-			!activeNote ||
-			isAutoMentionDisabled
-		) {
-			return message;
-		}
-
-		const autoMention = `@[[${activeNote.name}]]`;
-
-		// Don't add if already present
-		if (message.includes(autoMention)) {
-			return message;
-		}
-
-		// Add auto-mention at the beginning
-		return `${autoMention}\n${message}`;
-	}
 
 	/**
 	 * Handle errors that occur during message sending

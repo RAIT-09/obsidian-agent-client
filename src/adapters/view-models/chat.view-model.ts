@@ -464,12 +464,20 @@ export class ChatViewModel {
 		const userMessage: ChatMessage = {
 			id: crypto.randomUUID(),
 			role: "user",
-			content: [
-				{
-					type: "text",
-					text: prepared.displayMessage,
-				},
-			],
+			content: prepared.autoMentionContext
+				? [
+						{
+							type: "text_with_context",
+							text: prepared.displayMessage,
+							autoMentionContext: prepared.autoMentionContext,
+						},
+					]
+				: [
+						{
+							type: "text",
+							text: prepared.displayMessage,
+						},
+					],
 			timestamp: new Date(),
 		};
 		this.addMessage(userMessage);

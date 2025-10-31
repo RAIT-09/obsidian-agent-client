@@ -39,6 +39,16 @@ export function MessageContentRenderer({
 			}
 			return <MarkdownTextRenderer text={content.text} plugin={plugin} />;
 
+		case "text_with_context":
+			// User messages with auto-mention context
+			return (
+				<TextWithMentions
+					text={content.text}
+					autoMentionContext={content.autoMentionContext}
+					plugin={plugin}
+				/>
+			);
+
 		case "agent_thought":
 			return <CollapsibleThought text={content.text} plugin={plugin} />;
 

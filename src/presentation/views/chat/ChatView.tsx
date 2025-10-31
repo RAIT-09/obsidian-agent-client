@@ -1,12 +1,13 @@
-import {
-	ItemView,
-	WorkspaceLeaf,
-	setIcon,
-	Platform,
-	Notice,
-} from "obsidian";
+import { ItemView, WorkspaceLeaf, setIcon, Platform, Notice } from "obsidian";
 import * as React from "react";
-const { useState, useRef, useEffect, useSyncExternalStore, useMemo, useCallback } = React;
+const {
+	useState,
+	useRef,
+	useEffect,
+	useSyncExternalStore,
+	useMemo,
+	useCallback,
+} = React;
 import { createRoot, Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
@@ -802,10 +803,9 @@ function ChatComponent({
 								@{lastActiveNote.name}
 								{lastActiveNote.selection && (
 									<span className="selection-indicator">
-										{" "}
-										(L
+										{":"}
 										{lastActiveNote.selection.from.line + 1}
-										-{lastActiveNote.selection.to.line + 1})
+										-{lastActiveNote.selection.to.line + 1}
 									</span>
 								)}
 							</span>
