@@ -116,6 +116,10 @@ export function buildAutoMentionContext(
 	notePath: string,
 	vaultPath: string,
 	convertToWsl?: boolean,
+	selection?: {
+		from: { line: number; ch: number };
+		to: { line: number; ch: number };
+	},
 ): string {
 	// Calculate absolute path by combining vault path with note path
 	let absolutePath = vaultPath ? `${vaultPath}/${notePath}` : notePath;
@@ -126,6 +130,14 @@ export function buildAutoMentionContext(
 		// eslint-disable-next-line @typescript-eslint/no-var-requires
 		const { convertWindowsPathToWsl } = require("./wsl-utils");
 		absolutePath = convertWindowsPathToWsl(absolutePath);
+	}
+
+	// Include selection range if available
+	if (selection) {
+		const fromLine = selection.from.line + 1; // Convert to 1-indexed
+		const toLine = selection.to.line + 1;
+		const context = `<obsidian_opened_note" selection="lines ${fromLine}-${toLine}">The user opened the note ${absolutePath} in Obsidian and is focusing on lines ${fromLine}-${toLine}. This may or may not be related to the current conversation.</obsidian_opened_note>`;
+		return context;
 	}
 
 	const context = `<obsidian_opened_note>The user opened the note ${absolutePath} in Obsidian. This may or may not be related to the current conversation.</obsidian_opened_note>`;

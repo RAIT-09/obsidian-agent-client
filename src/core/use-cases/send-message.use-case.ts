@@ -209,6 +209,7 @@ export class SendMessageUseCase {
 				input.activeNote.path,
 				input.vaultBasePath,
 				input.convertToWsl ?? false,
+				input.activeNote.selection, // Pass selection range
 			);
 			contextBlocks.push(autoMentionContext);
 		}

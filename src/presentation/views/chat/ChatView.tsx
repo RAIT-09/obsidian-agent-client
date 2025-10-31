@@ -1,4 +1,11 @@
-import { ItemView, WorkspaceLeaf, setIcon, Platform, Notice } from "obsidian";
+import {
+	ItemView,
+	WorkspaceLeaf,
+	setIcon,
+	Platform,
+	Notice,
+	MarkdownView,
+} from "obsidian";
 import * as React from "react";
 const { useState, useRef, useEffect, useSyncExternalStore, useMemo } = React;
 import { createRoot, Root } from "react-dom/client";
@@ -433,18 +440,56 @@ function ChatComponent({
 		}
 	}, [inputValue, isSending]);
 
-	// Show auto-mention notes
+	// Show auto-mention notes and track selection
 	useEffect(() => {
+		let pollingInterval: number;
+
 		const updateActiveNote = async () => {
 			const activeNote = await vaultAccessAdapter.getActiveNote();
+			console.log("[ChatView] updateActiveNote result:", activeNote);
 			if (activeNote) {
 				setLastActiveNote(activeNote);
 			}
 		};
 
+		// Track last selection to avoid unnecessary re-renders
+		let lastSelectionString = "";
+
+		// Poll for selection changes periodically
+		const pollSelection = () => {
+			const activeFile = plugin.app.workspace.getActiveFile();
+			if (activeFile) {
+				vaultAccessAdapter.updateSelection(activeFile.path);
+
+				// Only update UI if selection actually changed
+				const currentSelection = (vaultAccessAdapter as any)
+					.currentSelection;
+				const currentSelectionString = currentSelection
+					? `${currentSelection.selection.from.line}-${currentSelection.selection.to.line}`
+					: "";
+
+				if (currentSelectionString !== lastSelectionString) {
+					console.log(
+						"[ChatView] Selection changed:",
+						currentSelectionString,
+					);
+					lastSelectionString = currentSelectionString;
+					updateActiveNote();
+				}
+			}
+		};
+
+		// Initial update
 		updateActiveNote();
 
+		// Start polling every 500ms to track selection changes
+		// 500ms provides good responsiveness while minimizing CPU usage
+		pollingInterval = window.setInterval(pollSelection, 500);
+
+		// Handle note switching - update immediately
 		const handleActiveLeafChange = () => {
+			console.log("[ChatView] Active leaf changed");
+			lastSelectionString = ""; // Reset to force update on next poll
 			updateActiveNote();
 		};
 
@@ -454,6 +499,10 @@ function ChatComponent({
 				handleActiveLeafChange,
 			),
 		);
+
+		return () => {
+			window.clearInterval(pollingInterval);
+		};
 	}, [vaultAccessAdapter]);
 
 	const updateIconColor = (svg: SVGElement) => {
@@ -791,6 +840,14 @@ function ChatComponent({
 								className={`mention-badge ${isAutoMentionTemporarilyDisabled ? "disabled" : ""}`}
 							>
 								@{lastActiveNote.name}
+								{lastActiveNote.selection && (
+									<span className="selection-indicator">
+										{" "}
+										(L
+										{lastActiveNote.selection.from.line + 1}
+										-{lastActiveNote.selection.to.line + 1})
+									</span>
+								)}
 							</span>
 							<button
 								className="auto-mention-toggle-btn"

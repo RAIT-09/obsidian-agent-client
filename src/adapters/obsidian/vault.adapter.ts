@@ -9,10 +9,11 @@
 import type {
 	IVaultAccess,
 	NoteMetadata,
+	EditorPosition,
 } from "../../core/domain/ports/vault-access.port";
 import { NoteMentionService } from "./mention-service";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
-import { TFile } from "obsidian";
+import { TFile, MarkdownView } from "obsidian";
 
 /**
  * Adapter for accessing Obsidian vault notes.
@@ -23,6 +24,10 @@ import { TFile } from "obsidian";
  */
 export class ObsidianVaultAdapter implements IVaultAccess {
 	private mentionService: NoteMentionService;
+	private currentSelection: {
+		filePath: string;
+		selection: { from: EditorPosition; to: EditorPosition };
+	} | null = null;
 
 	constructor(private plugin: AgentClientPlugin) {
 		this.mentionService = new NoteMentionService(plugin);
@@ -62,12 +67,81 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 	/**
 	 * Get the currently active note in the editor.
 	 *
+	 * Returns the active note with current selection if available.
+	 *
 	 * @returns Promise resolving to active note metadata, or null if no note is active
 	 */
 	async getActiveNote(): Promise<NoteMetadata | null> {
 		const activeFile = this.plugin.app.workspace.getActiveFile();
 		if (!activeFile) return null;
-		return this.convertToMetadata(activeFile);
+
+		const metadata = this.convertToMetadata(activeFile);
+
+		// Add selection if we have it stored for this file
+		if (
+			this.currentSelection &&
+			this.currentSelection.filePath === activeFile.path
+		) {
+			metadata.selection = this.currentSelection.selection;
+		}
+
+		return metadata;
+	}
+
+	/**
+	 * Update the stored selection for the given file.
+	 *
+	 * This should be called whenever the editor selection changes.
+	 * Finds the MarkdownView for the file and stores the current selection.
+	 *
+	 * @param filePath - Path of the file whose selection changed
+	 */
+	updateSelection(filePath: string): void {
+		// Find the MarkdownView for this file
+		const leaves = this.plugin.app.workspace.getLeavesOfType("markdown");
+		const leaf = leaves.find((l) => {
+			const view = l.view;
+			if (view instanceof MarkdownView && view.file) {
+				return view.file.path === filePath;
+			}
+			return false;
+		});
+
+		if (!leaf || !(leaf.view instanceof MarkdownView)) {
+			return;
+		}
+
+		const view = leaf.view;
+		const editor = view.editor;
+
+		// Check if text is selected
+		if (editor.somethingSelected()) {
+			const selections = editor.listSelections();
+			if (selections.length > 0) {
+				const selection = selections[0]; // Use first selection
+				this.currentSelection = {
+					filePath,
+					selection: {
+						from: {
+							line: selection.anchor.line,
+							ch: selection.anchor.ch,
+						},
+						to: {
+							line: selection.head.line,
+							ch: selection.head.ch,
+						},
+					},
+				};
+			}
+		} else {
+			// No selection - clear if it was for this file
+			if (
+				this.currentSelection &&
+				this.currentSelection.filePath === filePath
+			) {
+				this.currentSelection = null;
+			}
+		}
 	}
 
 	/**
