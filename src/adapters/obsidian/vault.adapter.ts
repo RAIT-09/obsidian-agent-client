@@ -124,7 +124,8 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 			return;
 		}
 
-		const activeView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+		const activeView =
+			this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
 		this.attachToView(activeView ?? null);
 
 		this.activeLeafRef = this.plugin.app.workspace.on(
@@ -133,7 +134,9 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 				const nextView =
 					leaf?.view instanceof MarkdownView
 						? leaf.view
-						: this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+						: this.plugin.app.workspace.getActiveViewOfType(
+								MarkdownView,
+							);
 				this.attachToView(nextView ?? null);
 			},
 		);
@@ -166,7 +169,10 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 		const { editor, file } = view;
 		const filePath = file.path;
 
-		if (this.lastSelectionKey && !this.lastSelectionKey.startsWith(`${filePath}:`)) {
+		if (
+			this.lastSelectionKey &&
+			!this.lastSelectionKey.startsWith(`${filePath}:`)
+		) {
 			// Clear previous file selection when switching files
 			this.handleSelectionChange(filePath, null);
 		}
@@ -196,10 +202,30 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 			}
 		};
 
+		// Access CodeMirror 6 instance from Obsidian's Editor
+		// WARNING: This uses Obsidian's internal API (editor.cm) which is not documented
+		// and may change or be removed in future versions.
+		// This is required for real-time selection change tracking via EditorView.updateListener.
+		// If this API becomes unavailable, selection tracking will silently fail.
 		const cm = (editor as unknown as { cm?: EditorView }).cm;
 		emitSelection();
 
-		if (cm) {
+		if (!cm) {
+			// Fallback: CodeMirror 6 API not available
+			// This may happen if:
+			// 1. Obsidian changes its internal implementation
+			// 2. A future Obsidian version removes the 'cm' property
+			// 3. The editor is in a different mode (e.g., legacy editor)
+			console.warn(
+				"[ObsidianVaultAdapter] CodeMirror 6 API not available. " +
+					"Selection change tracking will not work. " +
+					"This may be due to an Obsidian version change.",
+			);
+			return;
+		}
+
+		// Only proceed if cm is available
+		{
 			const compartment = new Compartment();
 			this.selectionCompartment = compartment;
 			cm.dispatch({
@@ -231,9 +257,7 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 			anchor.line < head.line ||
 			(anchor.line === head.line && anchor.ch <= head.ch);
 
-		return anchorFirst
-			? { anchor, head }
-			: { anchor: head, head: anchor };
+		return anchorFirst ? { anchor, head } : { anchor: head, head: anchor };
 	}
 
 	private handleSelectionChange(
@@ -272,7 +296,10 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 			try {
 				listener();
 			} catch (error) {
-				console.error("[ObsidianVaultAdapter] Selection listener error", error);
+				console.error(
+					"[ObsidianVaultAdapter] Selection listener error",
+					error,
+				);
 			}
 		}
 	}
