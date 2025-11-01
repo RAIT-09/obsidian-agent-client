@@ -23,6 +23,7 @@ import {
 	extractMentionedNotes,
 	type IMentionService,
 } from "../../shared/mention-utils";
+import { convertWindowsPathToWsl } from "../../shared/wsl-utils";
 
 // ============================================================================
 // Input/Output Types
@@ -196,10 +197,6 @@ export class SendMessageUseCase {
 
 				// Convert to WSL path format if requested
 				if (input.convertToWsl) {
-					// eslint-disable-next-line @typescript-eslint/no-var-requires
-					const {
-						convertWindowsPathToWsl,
-					} = require("../../shared/wsl-utils");
 					absolutePath = convertWindowsPathToWsl(absolutePath);
 				}
 

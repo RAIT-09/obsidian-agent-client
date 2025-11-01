@@ -1,6 +1,7 @@
 import { TFile } from "obsidian";
 import { Logger } from "./logger";
 import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
+import { convertWindowsPathToWsl } from "./wsl-utils";
 
 // Interface for mention service to avoid circular dependency
 export interface IMentionService {
@@ -126,9 +127,6 @@ export function buildAutoMentionContext(
 
 	// Convert to WSL path format if requested (Windows + WSL mode)
 	if (convertToWsl) {
-		// Import at runtime to avoid circular dependency
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const { convertWindowsPathToWsl } = require("./wsl-utils");
 		absolutePath = convertWindowsPathToWsl(absolutePath);
 	}
 
@@ -171,32 +169,4 @@ export function extractMentionedNotes(
 	}
 
 	return result;
-}
-
-// Remove @mentions from text (for clean display to agent)
-export function removeMentions(text: string): string {
-	const mentionRegex = /@\[\[([^\]]+)\]\]/g;
-	return text.replace(mentionRegex, "").trim();
-}
-
-// Extract @mentions from text for display purposes
-export function extractMentions(
-	text: string,
-): Array<{ text: string; start: number; end: number }> {
-	const mentions: Array<{ text: string; start: number; end: number }> = [];
-	// Match @[[filename]] format only
-	const mentionRegex = /@\[\[([^\]]+)\]\]/g;
-	let match;
-
-	while ((match = mentionRegex.exec(text)) !== null) {
-		// Extract filename from [[brackets]]
-		const noteTitle = match[1];
-		mentions.push({
-			text: noteTitle, // Note title without @ and brackets
-			start: match.index,
-			end: match.index + match[0].length,
-		});
-	}
-
-	return mentions;
 }
