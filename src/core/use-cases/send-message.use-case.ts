@@ -19,11 +19,11 @@ import type { ISettingsAccess } from "../domain/ports/settings-access.port";
 import type { AgentError } from "../domain/models/agent-error";
 import type { AuthenticationMethod } from "../domain/models/chat-session";
 import {
-	buildAutoMentionContext,
 	extractMentionedNotes,
 	type IMentionService,
 } from "../../shared/mention-utils";
 import { convertWindowsPathToWsl } from "../../shared/wsl-utils";
+import type { EditorPosition } from "../domain/ports/vault-access.port";
 
 // ============================================================================
 // Input/Output Types
@@ -211,7 +211,7 @@ export class SendMessageUseCase {
 
 		// Step 3: Build context from active note (for agent only, not shown in UI)
 		if (input.activeNote && !input.isAutoMentionDisabled) {
-			const autoMentionContext = buildAutoMentionContext(
+			const autoMentionContext = await this.buildAutoMentionContext(
 				input.activeNote.path,
 				input.vaultBasePath,
 				input.convertToWsl ?? false,
@@ -504,5 +504,84 @@ export class SendMessageUseCase {
 				},
 			};
 		}
+	}
+
+	/**
+	 * Build context from auto-mentioned note.
+	 *
+	 * Creates XML context block for the active note. If selection is provided,
+	 * includes the selected text content (up to 10000 characters).
+	 */
+	private async buildAutoMentionContext(
+		notePath: string,
+		vaultPath: string,
+		convertToWsl?: boolean,
+		selection?: {
+			from: EditorPosition;
+			to: EditorPosition;
+		},
+	): Promise<string> {
+		const MAX_SELECTION_LENGTH = 10000; // Maximum characters for selection
+
+		// Calculate absolute path by combining vault path with note path
+		let absolutePath = vaultPath ? `${vaultPath}/${notePath}` : notePath;
+
+		// Convert to WSL path format if requested (Windows + WSL mode)
+		if (convertToWsl) {
+			absolutePath = convertWindowsPathToWsl(absolutePath);
+		}
+
+		// Include selection text if available
+		if (selection) {
+			const fromLine = selection.from.line + 1; // Convert to 1-indexed
+			const toLine = selection.to.line + 1;
+
+			try {
+				// Read note content
+				const content = await this.vaultAccess.readNote(notePath);
+
+				// Extract selected lines
+				const lines = content.split("\n");
+				const selectedLines = lines.slice(
+					selection.from.line,
+					selection.to.line + 1,
+				);
+				let selectedText = selectedLines.join("\n");
+
+				// Truncate if too long
+				let truncationNote = "";
+				if (selectedText.length > MAX_SELECTION_LENGTH) {
+					selectedText = selectedText.substring(
+						0,
+						MAX_SELECTION_LENGTH,
+					);
+					truncationNote = `\n\n[Note: The selection was truncated. Original length: ${selectedLines.join("\n").length} characters, showing first ${MAX_SELECTION_LENGTH} characters]`;
+				}
+
+				// Build context with selection text
+				const context = `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">
+The user opened the note ${absolutePath} in Obsidian and selected the following text (lines ${fromLine}-${toLine}):
+
+${selectedText}${truncationNote}
+
+This is what the user is currently focusing on.
+</obsidian_opened_note>`;
+
+				return context;
+			} catch (error) {
+				// If reading fails, fall back to path-only context
+				console.error(
+					`Failed to read selection from ${notePath}:`,
+					error,
+				);
+				const context = `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">The user opened the note ${absolutePath} in Obsidian and is focusing on lines ${fromLine}-${toLine}. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the specific lines.</obsidian_opened_note>`;
+				return context;
+			}
+		}
+
+		// No selection - return path-only context
+		const context = `<obsidian_opened_note>The user opened the note ${absolutePath} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the content.</obsidian_opened_note>`;
+
+		return context;
 	}
 }

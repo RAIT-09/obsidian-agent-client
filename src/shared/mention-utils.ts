@@ -1,7 +1,6 @@
 import { TFile } from "obsidian";
 import { Logger } from "./logger";
 import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
-import { convertWindowsPathToWsl } from "./wsl-utils";
 
 // Interface for mention service to avoid circular dependency
 export interface IMentionService {
@@ -110,37 +109,6 @@ export function replaceMention(
 	const newCursorPos = mentionContext.start + replacement.length;
 
 	return { newText, newCursorPos };
-}
-
-// Build context from auto-mentioned note
-export function buildAutoMentionContext(
-	notePath: string,
-	vaultPath: string,
-	convertToWsl?: boolean,
-	selection?: {
-		from: { line: number; ch: number };
-		to: { line: number; ch: number };
-	},
-): string {
-	// Calculate absolute path by combining vault path with note path
-	let absolutePath = vaultPath ? `${vaultPath}/${notePath}` : notePath;
-
-	// Convert to WSL path format if requested (Windows + WSL mode)
-	if (convertToWsl) {
-		absolutePath = convertWindowsPathToWsl(absolutePath);
-	}
-
-	// Include selection range if available
-	if (selection) {
-		const fromLine = selection.from.line + 1; // Convert to 1-indexed
-		const toLine = selection.to.line + 1;
-		const context = `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">The user opened the note ${absolutePath} in Obsidian and is focusing on lines ${fromLine}-${toLine}. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the specific lines.</obsidian_opened_note>`;
-		return context;
-	}
-
-	const context = `<obsidian_opened_note>The user opened the note ${absolutePath} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the content.</obsidian_opened_note>`;
-
-	return context;
 }
 
 // Extract all @mentions from text
