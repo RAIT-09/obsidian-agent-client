@@ -1,10 +1,4 @@
-import {
-	ItemView,
-	WorkspaceLeaf,
-	setIcon,
-	Platform,
-	Notice,
-} from "obsidian";
+import { ItemView, WorkspaceLeaf, setIcon, Platform, Notice } from "obsidian";
 import type { EventRef } from "obsidian";
 import * as React from "react";
 const {
@@ -662,12 +656,14 @@ function ChatComponent({
 
 		try {
 			const exporter = new ChatExporter(plugin);
+			const openFile = plugin.settings.exportSettings.openFileAfterExport;
 			const filePath = await exporter.exportToMarkdown(
 				messages,
 				activeAgentLabel,
 				session.agentId,
 				session.sessionId || "unknown",
 				session.createdAt,
+				openFile,
 			);
 			new Notice(`[Agent Client] Chat exported to ${filePath}`);
 		} catch (error) {
@@ -964,20 +960,14 @@ export class ChatView extends ItemView {
 		};
 
 		this.registerEvent(
-			workspace.on(
-				"agent-client:approve-active-permission",
-				() => {
-					void approveHandler();
-				},
-			),
+			workspace.on("agent-client:approve-active-permission", () => {
+				void approveHandler();
+			}),
 		);
 		this.registerEvent(
-			workspace.on(
-				"agent-client:reject-active-permission",
-				() => {
-					void rejectHandler();
-				},
-			),
+			workspace.on("agent-client:reject-active-permission", () => {
+				void rejectHandler();
+			}),
 		);
 	}
 }

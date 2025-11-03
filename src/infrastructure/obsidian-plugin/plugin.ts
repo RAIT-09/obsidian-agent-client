@@ -38,6 +38,9 @@ export interface AgentClientPluginSettings {
 	exportSettings: {
 		defaultFolder: string;
 		filenameTemplate: string;
+		autoExportOnNewChat: boolean;
+		autoExportOnCloseChat: boolean;
+		openFileAfterExport: boolean;
 	};
 	// WSL settings (Windows only)
 	windowsWslMode: boolean;
@@ -78,6 +81,9 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	exportSettings: {
 		defaultFolder: "Agent Client",
 		filenameTemplate: "agent_client_{date}_{time}",
+		autoExportOnNewChat: false,
+		autoExportOnCloseChat: false,
+		openFileAfterExport: true,
 	},
 	windowsWslMode: false,
 	windowsWslDistribution: undefined,
@@ -404,6 +410,21 @@ export default class AgentClientPlugin extends Plugin {
 								? rawExport.filenameTemplate
 								: DEFAULT_SETTINGS.exportSettings
 										.filenameTemplate,
+						autoExportOnNewChat:
+							typeof rawExport.autoExportOnNewChat === "boolean"
+								? rawExport.autoExportOnNewChat
+								: DEFAULT_SETTINGS.exportSettings
+										.autoExportOnNewChat,
+						autoExportOnCloseChat:
+							typeof rawExport.autoExportOnCloseChat === "boolean"
+								? rawExport.autoExportOnCloseChat
+								: DEFAULT_SETTINGS.exportSettings
+										.autoExportOnCloseChat,
+						openFileAfterExport:
+							typeof rawExport.openFileAfterExport === "boolean"
+								? rawExport.openFileAfterExport
+								: DEFAULT_SETTINGS.exportSettings
+										.openFileAfterExport,
 					};
 				}
 				return DEFAULT_SETTINGS.exportSettings;
