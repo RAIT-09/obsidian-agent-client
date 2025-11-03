@@ -12,6 +12,7 @@ interface PermissionRequestSectionProps {
 		options: acp.PermissionOption[];
 		selectedOptionId?: string;
 		isCancelled?: boolean;
+		isActive?: boolean;
 	};
 	toolCallId: string;
 	acpClient?: IAcpClient;
@@ -32,13 +33,14 @@ export function PermissionRequestSection({
 
 	const isSelected = permissionRequest.selectedOptionId !== undefined;
 	const isCancelled = permissionRequest.isCancelled === true;
+	const isActive = permissionRequest.isActive !== false;
 	const selectedOption = permissionRequest.options.find(
 		(opt) => opt.optionId === permissionRequest.selectedOptionId,
 	);
 
 	return (
 		<div className="message-permission-request">
-			{!isSelected && !isCancelled && (
+			{isActive && !isSelected && !isCancelled && (
 				<div className="message-permission-request-options">
 					{permissionRequest.options.map((option) => (
 						<button
