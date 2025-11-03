@@ -7,6 +7,17 @@
  */
 
 /**
+ * Position in the editor (line and character).
+ * Line numbers are 0-indexed.
+ */
+export interface EditorPosition {
+	/** Line number (0-indexed) */
+	line: number;
+	/** Character position within the line */
+	ch: number;
+}
+
+/**
  * Metadata for a note in the vault.
  *
  * Contains essential information about a note file without
@@ -30,6 +41,12 @@ export interface NoteMetadata {
 
 	/** Optional aliases from frontmatter */
 	aliases?: string[];
+
+	/** Optional text selection range in the editor */
+	selection?: {
+		from: EditorPosition;
+		to: EditorPosition;
+	};
 }
 
 /**

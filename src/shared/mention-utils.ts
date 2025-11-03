@@ -111,69 +111,30 @@ export function replaceMention(
 	return { newText, newCursorPos };
 }
 
-// Convert @mentions to relative paths for agent
-export function convertMentionsToPath(
+// Extract all @mentions from text
+export function extractMentionedNotes(
 	text: string,
 	noteMentionService: IMentionService,
-	vaultPath: string,
-	convertToWsl?: boolean,
-): string {
-	// Find all @mentions in the text (@[[filename]] format only)
+): Array<{ noteTitle: string; file: TFile | undefined }> {
 	const mentionRegex = /@\[\[([^\]]+)\]\]/g;
-	let convertedText = text;
+	const matches = Array.from(text.matchAll(mentionRegex));
+	const result: Array<{ noteTitle: string; file: TFile | undefined }> = [];
+	const seen = new Set<string>(); // Avoid duplicates
 
-	convertedText = convertedText.replace(mentionRegex, (match, noteTitle) => {
-		// Extract filename from [[brackets]]
+	for (const match of matches) {
+		const noteTitle = match[1];
+		if (seen.has(noteTitle)) {
+			continue;
+		}
+		seen.add(noteTitle);
 
 		// Find the file by basename
 		const file = noteMentionService
 			.getAllFiles()
 			.find((f: TFile) => f.basename === noteTitle);
-		if (file) {
-			// Calculate absolute path by combining vault path with file path
-			let absolutePath = vaultPath
-				? `${vaultPath}/${file.path}`
-				: file.path;
 
-			// Convert to WSL path format if requested (Windows + WSL mode)
-			if (convertToWsl) {
-				// Import at runtime to avoid circular dependency
-				// eslint-disable-next-line @typescript-eslint/no-var-requires
-				const { convertWindowsPathToWsl } = require("./wsl-utils");
-				absolutePath = convertWindowsPathToWsl(absolutePath);
-			}
-
-			// TODO: Fix logger usage in utility functions
-			// logger.log(
-			// 	`[DEBUG] Converting @${noteTitle} to absolute path: ${absolutePath}`,
-			// );
-			return absolutePath;
-		}
-		// If file not found, keep original @mention
-		return match;
-	});
-
-	return convertedText;
-}
-
-// Extract @mentions from text for display purposes
-export function extractMentions(
-	text: string,
-): Array<{ text: string; start: number; end: number }> {
-	const mentions: Array<{ text: string; start: number; end: number }> = [];
-	// Match @[[filename]] format only
-	const mentionRegex = /@\[\[([^\]]+)\]\]/g;
-	let match;
-
-	while ((match = mentionRegex.exec(text)) !== null) {
-		// Extract filename from [[brackets]]
-		const noteTitle = match[1];
-		mentions.push({
-			text: noteTitle, // Note title without @ and brackets
-			start: match.index,
-			end: match.index + match[0].length,
-		});
+		result.push({ noteTitle, file });
 	}
 
-	return mentions;
+	return result;
 }

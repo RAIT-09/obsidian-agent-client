@@ -4,16 +4,49 @@ import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plug
 interface TextWithMentionsProps {
 	text: string;
 	plugin: AgentClientPlugin;
+	autoMentionContext?: {
+		noteName: string;
+		notePath: string;
+		selection?: {
+			fromLine: number;
+			toLine: number;
+		};
+	};
 }
 
-// Function to render text with @mentions
+// Function to render text with @mentions and optional auto-mention
 export function TextWithMentions({
 	text,
 	plugin,
+	autoMentionContext,
 }: TextWithMentionsProps): React.ReactElement {
 	// Match @[[filename]] format only
 	const mentionRegex = /@\[\[([^\]]+)\]\]/g;
 	const parts: React.ReactNode[] = [];
+
+	// Add auto-mention badge first if provided
+	if (autoMentionContext) {
+		const displayText = autoMentionContext.selection
+			? `@${autoMentionContext.noteName}:${autoMentionContext.selection.fromLine}-${autoMentionContext.selection.toLine}`
+			: `@${autoMentionContext.noteName}`;
+
+		parts.push(
+			<span
+				key="auto-mention"
+				className="text-mention"
+				onClick={() => {
+					plugin.app.workspace.openLinkText(
+						autoMentionContext.notePath,
+						"",
+					);
+				}}
+			>
+				{displayText}
+			</span>,
+		);
+		parts.push("\n");
+	}
+
 	let lastIndex = 0;
 	let match;
 

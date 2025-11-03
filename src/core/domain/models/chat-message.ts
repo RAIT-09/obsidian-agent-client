@@ -146,6 +146,18 @@ export type MessageContent =
 			text: string;
 	  }
 	| {
+			type: "text_with_context";
+			text: string;
+			autoMentionContext?: {
+				noteName: string;
+				notePath: string;
+				selection?: {
+					fromLine: number;
+					toLine: number;
+				};
+			};
+	  }
+	| {
 			type: "agent_thought";
 			text: string;
 	  }

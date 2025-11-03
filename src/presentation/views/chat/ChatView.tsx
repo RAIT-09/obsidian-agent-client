@@ -1,6 +1,13 @@
 import { ItemView, WorkspaceLeaf, setIcon, Platform, Notice } from "obsidian";
 import * as React from "react";
-const { useState, useRef, useEffect, useSyncExternalStore, useMemo } = React;
+const {
+	useState,
+	useRef,
+	useEffect,
+	useSyncExternalStore,
+	useMemo,
+	useCallback,
+} = React;
 import { createRoot, Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
@@ -117,6 +124,11 @@ function ChatComponent({
 	const vaultAccessAdapter = useMemo(() => {
 		return new ObsidianVaultAdapter(plugin);
 	}, [plugin]);
+
+	const updateActiveNote = useCallback(async () => {
+		const activeNote = await vaultAccessAdapter.getActiveNote();
+		setLastActiveNote(activeNote);
+	}, [vaultAccessAdapter]);
 
 	// Create SendMessageUseCase
 	const sendMessageUseCase = useMemo(() => {
@@ -433,28 +445,26 @@ function ChatComponent({
 		}
 	}, [inputValue, isSending]);
 
-	// Show auto-mention notes
+	// Show auto-mention notes and track selection
 	useEffect(() => {
-		const updateActiveNote = async () => {
-			const activeNote = await vaultAccessAdapter.getActiveNote();
-			if (activeNote) {
-				setLastActiveNote(activeNote);
-			}
+		let isMounted = true;
+
+		const refreshActiveNote = async () => {
+			if (!isMounted) return;
+			await updateActiveNote();
 		};
 
-		updateActiveNote();
+		const unsubscribe = vaultAccessAdapter.subscribeSelectionChanges(() => {
+			void refreshActiveNote();
+		});
 
-		const handleActiveLeafChange = () => {
-			updateActiveNote();
+		void refreshActiveNote();
+
+		return () => {
+			isMounted = false;
+			unsubscribe();
 		};
-
-		view.registerEvent(
-			plugin.app.workspace.on(
-				"active-leaf-change",
-				handleActiveLeafChange,
-			),
-		);
-	}, [vaultAccessAdapter]);
+	}, [updateActiveNote, vaultAccessAdapter]);
 
 	const updateIconColor = (svg: SVGElement) => {
 		// Remove all state classes
@@ -791,6 +801,13 @@ function ChatComponent({
 								className={`mention-badge ${isAutoMentionTemporarilyDisabled ? "disabled" : ""}`}
 							>
 								@{lastActiveNote.name}
+								{lastActiveNote.selection && (
+									<span className="selection-indicator">
+										{":"}
+										{lastActiveNote.selection.from.line + 1}
+										-{lastActiveNote.selection.to.line + 1}
+									</span>
+								)}
 							</span>
 							<button
 								className="auto-mention-toggle-btn"

@@ -19,9 +19,11 @@ import type { ISettingsAccess } from "../domain/ports/settings-access.port";
 import type { AgentError } from "../domain/models/agent-error";
 import type { AuthenticationMethod } from "../domain/models/chat-session";
 import {
-	convertMentionsToPath,
+	extractMentionedNotes,
 	type IMentionService,
 } from "../../shared/mention-utils";
+import { convertWindowsPathToWsl } from "../../shared/wsl-utils";
+import type { EditorPosition } from "../domain/ports/vault-access.port";
 
 // ============================================================================
 // Input/Output Types
@@ -51,11 +53,21 @@ export interface PrepareMessageInput {
  * Result of preparing a message
  */
 export interface PrepareMessageResult {
-	/** The processed message text (with auto-mention added if applicable) */
+	/** The processed message text (without auto-mention syntax in text) */
 	displayMessage: string;
 
 	/** The message text to send to agent (with mentions converted to paths) */
 	agentMessage: string;
+
+	/** Auto-mention context metadata (if auto-mention is active) */
+	autoMentionContext?: {
+		noteName: string;
+		notePath: string;
+		selection?: {
+			fromLine: number;
+			toLine: number;
+		};
+	};
 }
 
 /**
@@ -137,33 +149,105 @@ export class SendMessageUseCase {
 	) {}
 
 	/**
-	 * Phase 1: Prepare message (synchronous)
+	 * Phase 1: Prepare message (asynchronous)
 	 *
 	 * Processes the message by:
-	 * - Adding auto-mention if enabled
-	 * - Converting @mentions to file paths
+	 * - Adding auto-mention if enabled (for display only)
+	 * - Converting @mentions to context blocks with note content (for agent)
+	 * - Building context from active note (for agent only)
 	 *
-	 * This is synchronous so the ViewModel can add the user message to UI immediately.
+	 * Note: This is now asynchronous to read note content for mentions.
 	 */
-	prepareMessage(input: PrepareMessageInput): PrepareMessageResult {
-		// Step 1: Add auto-mention if needed
-		const displayMessage = this.addAutoMention(
+	async prepareMessage(
+		input: PrepareMessageInput,
+	): Promise<PrepareMessageResult> {
+		// Step 1: Extract all mentioned notes from the message
+		const mentionedNotes = extractMentionedNotes(
 			input.message,
-			input.activeNote,
-			input.isAutoMentionDisabled ?? false,
+			this.mentionService,
 		);
 
-		// Step 2: Convert @mentions to file paths for agent consumption
-		const agentMessage = convertMentionsToPath(
-			displayMessage,
-			this.mentionService,
-			input.vaultBasePath,
-			input.convertToWsl ?? false,
-		);
+		// Step 2: Build context blocks for each mentioned note
+		const contextBlocks: string[] = [];
+		const MAX_NOTE_LENGTH = 10000; // Maximum characters per note
+
+		for (const { noteTitle, file } of mentionedNotes) {
+			if (!file) {
+				// File not found, skip
+				continue;
+			}
+
+			try {
+				// Read note content
+				const content = await this.vaultAccess.readNote(file.path);
+
+				// Truncate content if too long
+				let processedContent = content;
+				let truncationNote = "";
+
+				if (content.length > MAX_NOTE_LENGTH) {
+					processedContent = content.substring(0, MAX_NOTE_LENGTH);
+					truncationNote = `\n\n[Note: This note was truncated. Original length: ${content.length} characters, showing first ${MAX_NOTE_LENGTH} characters]`;
+				}
+
+				// Calculate absolute path
+				let absolutePath = input.vaultBasePath
+					? `${input.vaultBasePath}/${file.path}`
+					: file.path;
+
+				// Convert to WSL path format if requested
+				if (input.convertToWsl) {
+					absolutePath = convertWindowsPathToWsl(absolutePath);
+				}
+
+				// Build context block
+				const contextBlock = `<obsidian_mentioned_note ref="${absolutePath}">\n${processedContent}${truncationNote}\n</obsidian_mentioned_note>`;
+				contextBlocks.push(contextBlock);
+			} catch (error) {
+				// If reading fails, skip this note
+				console.error(`Failed to read note ${file.path}:`, error);
+			}
+		}
+
+		// Step 3: Build context from active note (for agent only, not shown in UI)
+		if (input.activeNote && !input.isAutoMentionDisabled) {
+			const autoMentionContext = await this.buildAutoMentionContext(
+				input.activeNote.path,
+				input.vaultBasePath,
+				input.convertToWsl ?? false,
+				input.activeNote.selection, // Pass selection range
+			);
+			contextBlocks.push(autoMentionContext);
+		}
+
+		// Step 4: Build agent message (context blocks + original message with mentions)
+		const agentMessage =
+			contextBlocks.length > 0
+				? contextBlocks.join("\n") + "\n\n" + input.message
+				: input.message;
+
+		// Step 5: Build auto-mention context metadata (not added to displayMessage text)
+		const autoMentionContext =
+			input.activeNote && !input.isAutoMentionDisabled
+				? {
+						noteName: input.activeNote.name,
+						notePath: input.activeNote.path,
+						selection: input.activeNote.selection
+							? {
+									fromLine:
+										input.activeNote.selection.from.line +
+										1,
+									toLine:
+										input.activeNote.selection.to.line + 1,
+								}
+							: undefined,
+					}
+				: undefined;
 
 		return {
-			displayMessage,
-			agentMessage,
+			displayMessage: input.message, // For UI: original message without modification
+			agentMessage, // For agent: contains context blocks + clean message
+			autoMentionContext, // For UI: metadata to render auto-mention badge
 		};
 	}
 
@@ -205,8 +289,8 @@ export class SendMessageUseCase {
 	 * This combines prepareMessage + sendPreparedMessage for backward compatibility.
 	 */
 	async execute(input: SendMessageInput): Promise<SendMessageResult> {
-		// Step 1: Prepare message
-		const { displayMessage, agentMessage } = this.prepareMessage({
+		// Step 1: Prepare message (now async)
+		const { displayMessage, agentMessage } = await this.prepareMessage({
 			message: input.message,
 			activeNote: input.activeNote,
 			vaultBasePath: input.vaultBasePath,
@@ -226,36 +310,6 @@ export class SendMessageUseCase {
 	// ========================================================================
 	// Private Helper Methods
 	// ========================================================================
-
-	/**
-	 * Add auto-mention for the active note if enabled
-	 */
-	private addAutoMention(
-		message: string,
-		activeNote: NoteMetadata | null | undefined,
-		isAutoMentionDisabled: boolean,
-	): string {
-		const settings = this.settingsAccess.getSnapshot();
-
-		// Check if auto-mention is enabled and conditions are met
-		if (
-			!settings.autoMentionActiveNote ||
-			!activeNote ||
-			isAutoMentionDisabled
-		) {
-			return message;
-		}
-
-		const autoMention = `@[[${activeNote.name}]]`;
-
-		// Don't add if already present
-		if (message.includes(autoMention)) {
-			return message;
-		}
-
-		// Add auto-mention at the beginning
-		return `${autoMention}\n${message}`;
-	}
 
 	/**
 	 * Handle errors that occur during message sending
@@ -450,5 +504,84 @@ export class SendMessageUseCase {
 				},
 			};
 		}
+	}
+
+	/**
+	 * Build context from auto-mentioned note.
+	 *
+	 * Creates XML context block for the active note. If selection is provided,
+	 * includes the selected text content (up to 10000 characters).
+	 */
+	private async buildAutoMentionContext(
+		notePath: string,
+		vaultPath: string,
+		convertToWsl?: boolean,
+		selection?: {
+			from: EditorPosition;
+			to: EditorPosition;
+		},
+	): Promise<string> {
+		const MAX_SELECTION_LENGTH = 10000; // Maximum characters for selection
+
+		// Calculate absolute path by combining vault path with note path
+		let absolutePath = vaultPath ? `${vaultPath}/${notePath}` : notePath;
+
+		// Convert to WSL path format if requested (Windows + WSL mode)
+		if (convertToWsl) {
+			absolutePath = convertWindowsPathToWsl(absolutePath);
+		}
+
+		// Include selection text if available
+		if (selection) {
+			const fromLine = selection.from.line + 1; // Convert to 1-indexed
+			const toLine = selection.to.line + 1;
+
+			try {
+				// Read note content
+				const content = await this.vaultAccess.readNote(notePath);
+
+				// Extract selected lines
+				const lines = content.split("\n");
+				const selectedLines = lines.slice(
+					selection.from.line,
+					selection.to.line + 1,
+				);
+				let selectedText = selectedLines.join("\n");
+
+				// Truncate if too long
+				let truncationNote = "";
+				if (selectedText.length > MAX_SELECTION_LENGTH) {
+					selectedText = selectedText.substring(
+						0,
+						MAX_SELECTION_LENGTH,
+					);
+					truncationNote = `\n\n[Note: The selection was truncated. Original length: ${selectedLines.join("\n").length} characters, showing first ${MAX_SELECTION_LENGTH} characters]`;
+				}
+
+				// Build context with selection text
+				const context = `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">
+The user opened the note ${absolutePath} in Obsidian and selected the following text (lines ${fromLine}-${toLine}):
+
+${selectedText}${truncationNote}
+
+This is what the user is currently focusing on.
+</obsidian_opened_note>`;
+
+				return context;
+			} catch (error) {
+				// If reading fails, fall back to path-only context
+				console.error(
+					`Failed to read selection from ${notePath}:`,
+					error,
+				);
+				const context = `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">The user opened the note ${absolutePath} in Obsidian and is focusing on lines ${fromLine}-${toLine}. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the specific lines.</obsidian_opened_note>`;
+				return context;
+			}
+		}
+
+		// No selection - return path-only context
+		const context = `<obsidian_opened_note>The user opened the note ${absolutePath} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the content.</obsidian_opened_note>`;
+
+		return context;
 	}
 }
