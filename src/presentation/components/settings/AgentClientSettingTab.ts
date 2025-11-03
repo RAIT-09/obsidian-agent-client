@@ -171,6 +171,56 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		new Setting(containerEl)
+			.setName("Auto-export on new chat")
+			.setDesc(
+				"Automatically export the current chat when starting a new chat",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(
+						this.plugin.settings.exportSettings.autoExportOnNewChat,
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.exportSettings.autoExportOnNewChat =
+							value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Auto-export on close chat")
+			.setDesc(
+				"Automatically export the current chat when closing the chat view",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(
+						this.plugin.settings.exportSettings
+							.autoExportOnCloseChat,
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.exportSettings.autoExportOnCloseChat =
+							value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Open note after export")
+			.setDesc("Automatically open the exported note after exporting")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(
+						this.plugin.settings.exportSettings.openFileAfterExport,
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.exportSettings.openFileAfterExport =
+							value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
 		new Setting(containerEl).setName("Developer").setHeading();
 
 		new Setting(containerEl)

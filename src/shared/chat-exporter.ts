@@ -19,6 +19,7 @@ export class ChatExporter {
 		agentId: string,
 		sessionId: string,
 		sessionCreatedAt: Date,
+		openFile: boolean = true,
 	): Promise<string> {
 		const settings = this.plugin.settings.exportSettings;
 		const fileName = this.generateFileName(sessionCreatedAt);
@@ -61,9 +62,11 @@ export class ChatExporter {
 				);
 			}
 
-			// Open the exported file
-			const leaf = this.plugin.app.workspace.getLeaf(false);
-			await leaf.openFile(file);
+			// Open the exported file if requested
+			if (openFile) {
+				const leaf = this.plugin.app.workspace.getLeaf(false);
+				await leaf.openFile(file);
+			}
 
 			this.logger.log(`Chat exported to: ${filePath}`);
 			return filePath;

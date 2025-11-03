@@ -32,6 +32,9 @@ import type { SwitchAgentUseCase } from "../../core/use-cases/switch-agent.use-c
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
 import type { MentionContext } from "../../shared/mention-utils";
 import { detectMention, replaceMention } from "../../shared/mention-utils";
+import { ChatExporter } from "../../shared/chat-exporter";
+import { Logger } from "../../shared/logger";
+import { Notice } from "obsidian";
 
 // ============================================================================
 // ViewModel State
@@ -297,7 +300,74 @@ export class ChatViewModel {
 	 *
 	 * Initializes connection to the active agent and prepares for messaging.
 	 */
+	/**
+	 * Auto-export current chat if enabled in settings.
+	 *
+	 * This method will silently fail if export fails to avoid interrupting
+	 * the user's workflow.
+	 *
+	 * @param trigger - The trigger type: "newChat" or "closeChat"
+	 */
+	private async autoExportIfEnabled(
+		trigger: "newChat" | "closeChat",
+	): Promise<void> {
+		// Check the appropriate setting based on trigger
+		const isEnabled =
+			trigger === "newChat"
+				? this.plugin.settings.exportSettings.autoExportOnNewChat
+				: this.plugin.settings.exportSettings.autoExportOnCloseChat;
+
+		// Skip if auto-export is disabled for this trigger
+		if (!isEnabled) {
+			return;
+		}
+
+		// Skip if no messages to export
+		if (this.state.messages.length === 0) {
+			return;
+		}
+
+		// Skip if no session ID (shouldn't happen, but safety check)
+		if (!this.state.session.sessionId) {
+			return;
+		}
+
+		try {
+			const exporter = new ChatExporter(this.plugin);
+			const currentAgent = this.switchAgentUseCase.getCurrentAgent();
+			const openFile =
+				this.plugin.settings.exportSettings.openFileAfterExport;
+
+			const filePath = await exporter.exportToMarkdown(
+				this.state.messages,
+				currentAgent.displayName,
+				this.state.session.agentId,
+				this.state.session.sessionId,
+				this.state.session.createdAt,
+				openFile,
+			);
+
+			// Show success notification
+			new Notice(`[Agent Client] Chat exported to ${filePath}`);
+
+			// Log success
+			const logger = new Logger(this.plugin);
+			const context =
+				trigger === "newChat" ? "new session" : "closing chat";
+			logger.log(`Chat auto-exported before ${context}`);
+		} catch (error) {
+			// Show error notification
+			new Notice("[Agent Client] Failed to export chat");
+			// Log error
+			const logger = new Logger(this.plugin);
+			logger.error("Auto-export failed:", error);
+		}
+	}
+
 	async createNewSession(): Promise<void> {
+		// Auto-export current chat before starting new one
+		await this.autoExportIfEnabled("newChat");
+
 		// Get active agent ID before async operations
 		const activeAgentId = this.switchAgentUseCase.getActiveAgentId();
 
@@ -417,6 +487,9 @@ export class ChatViewModel {
 	 * Disconnect from the current session.
 	 */
 	async disconnect(): Promise<void> {
+		// Auto-export current chat before closing
+		await this.autoExportIfEnabled("closeChat");
+
 		// Close session via Use Case
 		await this.manageSessionUseCase.closeSession(
 			this.state.session.sessionId,
@@ -830,7 +903,9 @@ export class ChatViewModel {
 		const option = this.selectOption(
 			active.options,
 			["reject_once", "reject_always"],
-			(opt) => opt.name.toLowerCase().includes("reject") || opt.name.toLowerCase().includes("deny"),
+			(opt) =>
+				opt.name.toLowerCase().includes("reject") ||
+				opt.name.toLowerCase().includes("deny"),
 		);
 
 		if (!option) {
