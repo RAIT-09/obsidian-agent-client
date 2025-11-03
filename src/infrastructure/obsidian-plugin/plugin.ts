@@ -3,7 +3,6 @@ import {
 	ChatView,
 	VIEW_TYPE_CHAT,
 } from "../../presentation/views/chat/ChatView";
-import { ChatViewModel } from "../../adapters/view-models/chat.view-model";
 import {
 	createSettingsStore,
 	type SettingsStore,
@@ -221,30 +220,15 @@ export default class AgentClientPlugin extends Plugin {
 		}
 	}
 
-	private getActiveChatViewModel(): ChatViewModel | null {
-		const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)[0];
-		if (leaf?.view instanceof ChatView) {
-			return leaf.view.viewModel;
-		}
-		return null;
-	}
-
 	private registerPermissionCommands(): void {
 		this.addCommand({
 			id: "agent-client-approve-active-permission",
 			name: "Approve active permission",
 			callback: async () => {
-				const viewModel = this.getActiveChatViewModel();
-				if (!viewModel) {
-					new Notice(
-						"[Agent Client] Open the chat view to approve permissions",
-					);
-					return;
-				}
-				const success = await viewModel.approveActivePermission();
-				if (!success) {
-					new Notice("[Agent Client] No active permission request");
-				}
+				await this.activateView();
+				this.app.workspace.trigger(
+					"agent-client:approve-active-permission",
+				);
 			},
 		});
 
@@ -252,17 +236,10 @@ export default class AgentClientPlugin extends Plugin {
 			id: "agent-client-reject-active-permission",
 			name: "Reject active permission",
 			callback: async () => {
-				const viewModel = this.getActiveChatViewModel();
-				if (!viewModel) {
-					new Notice(
-						"[Agent Client] Open the chat view to reject permissions",
-					);
-					return;
-				}
-				const success = await viewModel.rejectActivePermission();
-				if (!success) {
-					new Notice("[Agent Client] No active permission request");
-				}
+				await this.activateView();
+				this.app.workspace.trigger(
+					"agent-client:reject-active-permission",
+				);
 			},
 		});
 	}
