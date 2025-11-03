@@ -116,6 +116,10 @@ export default class AgentClientPlugin extends Plugin {
 			},
 		});
 
+		// Register agent-specific commands
+		this.registerAgentCommands();
+		this.registerPermissionCommands();
+
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
 	}
 
@@ -142,6 +146,102 @@ export default class AgentClientPlugin extends Plugin {
 		if (leaf) {
 			workspace.revealLeaf(leaf);
 		}
+	}
+
+	/**
+	 * Get all available agents (claude, codex, gemini, custom)
+	 */
+	private getAvailableAgents(): Array<{ id: string; displayName: string }> {
+		return [
+			{
+				id: this.settings.claude.id,
+				displayName:
+					this.settings.claude.displayName || this.settings.claude.id,
+			},
+			{
+				id: this.settings.codex.id,
+				displayName:
+					this.settings.codex.displayName || this.settings.codex.id,
+			},
+			{
+				id: this.settings.gemini.id,
+				displayName:
+					this.settings.gemini.displayName || this.settings.gemini.id,
+			},
+			...this.settings.customAgents.map((agent) => ({
+				id: agent.id,
+				displayName: agent.displayName || agent.id,
+			})),
+		];
+	}
+
+	/**
+	 * Open chat view and switch to specified agent
+	 */
+	private async openChatWithAgent(agentId: string): Promise<void> {
+		// 1. Switch agent in settings (if different from current)
+		if (this.settings.activeAgentId !== agentId) {
+			await this.settingsStore.updateSettings({ activeAgentId: agentId });
+		}
+
+		// 2. Activate view (create new or focus existing)
+		await this.activateView();
+
+		// 3. Get ChatView and trigger new session if needed
+		const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)[0];
+		if (leaf?.view instanceof ChatView && leaf.view.viewModel) {
+			const viewModel = leaf.view.viewModel;
+			const currentState = viewModel.getSnapshot();
+
+			// If messages exist or agent is different, start new session
+			if (
+				currentState.messages.length > 0 ||
+				currentState.session.agentId !== agentId
+			) {
+				await viewModel.restartSession();
+			}
+		}
+	}
+
+	/**
+	 * Register commands for each configured agent
+	 */
+	private registerAgentCommands(): void {
+		const agents = this.getAvailableAgents();
+
+		for (const agent of agents) {
+			this.addCommand({
+				id: `open-agent-client-chat-with-${agent.id}`,
+				name: `New chat with ${agent.displayName}`,
+				callback: async () => {
+					await this.openChatWithAgent(agent.id);
+				},
+			});
+		}
+	}
+
+	private registerPermissionCommands(): void {
+		this.addCommand({
+			id: "agent-client-approve-active-permission",
+			name: "Approve active permission",
+			callback: async () => {
+				await this.activateView();
+				this.app.workspace.trigger(
+					"agent-client:approve-active-permission",
+				);
+			},
+		});
+
+		this.addCommand({
+			id: "agent-client-reject-active-permission",
+			name: "Reject active permission",
+			callback: async () => {
+				await this.activateView();
+				this.app.workspace.trigger(
+					"agent-client:reject-active-permission",
+				);
+			},
+		});
 	}
 
 	async loadSettings() {

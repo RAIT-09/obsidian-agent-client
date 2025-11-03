@@ -177,13 +177,14 @@ export type MessageContent =
 			locations?: ToolCallLocation[];
 			rawInput?: { [k: string]: unknown };
 			rawOutput?: { [k: string]: unknown };
-			permissionRequest?: {
-				requestId: string;
-				options: PermissionOption[];
-				selectedOptionId?: string;
-				isCancelled?: boolean;
-			};
-	  }
+		permissionRequest?: {
+			requestId: string;
+			options: PermissionOption[];
+			selectedOptionId?: string;
+			isCancelled?: boolean;
+			isActive?: boolean;
+		};
+	}
 	| {
 			type: "plan";
 			entries: PlanEntry[];
@@ -194,7 +195,8 @@ export type MessageContent =
 			options: PermissionOption[];
 			selectedOptionId?: string;
 			isCancelled?: boolean;
-	  }
+			isActive?: boolean;
+		}
 	| {
 			type: "terminal";
 			terminalId: string;

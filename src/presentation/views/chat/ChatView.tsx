@@ -1,4 +1,11 @@
-import { ItemView, WorkspaceLeaf, setIcon, Platform, Notice } from "obsidian";
+import {
+	ItemView,
+	WorkspaceLeaf,
+	setIcon,
+	Platform,
+	Notice,
+} from "obsidian";
+import type { EventRef } from "obsidian";
 import * as React from "react";
 const {
 	useState,
@@ -908,6 +915,7 @@ export class ChatView extends ItemView {
 
 		this.root = createRoot(container);
 		this.root.render(<ChatComponent plugin={this.plugin} view={this} />);
+		this.registerPermissionEvents();
 	}
 
 	async onClose() {
@@ -920,10 +928,56 @@ export class ChatView extends ItemView {
 		} else {
 			console.log("[ChatView] No ViewModel to dispose");
 		}
-
 		if (this.root) {
 			this.root.unmount();
 			this.root = null;
 		}
+	}
+
+	private registerPermissionEvents(): void {
+		const approveHandler = async () => {
+			const viewModel = this.viewModel;
+			if (!viewModel) {
+				new Notice("[Agent Client] Chat view is not ready");
+				return;
+			}
+			const success = await viewModel.approveActivePermission();
+			if (!success) {
+				new Notice("[Agent Client] No active permission request");
+			}
+		};
+
+		const rejectHandler = async () => {
+			const viewModel = this.viewModel;
+			if (!viewModel) {
+				new Notice("[Agent Client] Chat view is not ready");
+				return;
+			}
+			const success = await viewModel.rejectActivePermission();
+			if (!success) {
+				new Notice("[Agent Client] No active permission request");
+			}
+		};
+
+		const workspace = this.app.workspace as unknown as {
+			on: (event: string, callback: () => void) => EventRef;
+		};
+
+		this.registerEvent(
+			workspace.on(
+				"agent-client:approve-active-permission",
+				() => {
+					void approveHandler();
+				},
+			),
+		);
+		this.registerEvent(
+			workspace.on(
+				"agent-client:reject-active-permission",
+				() => {
+					void rejectHandler();
+				},
+			),
+		);
 	}
 }

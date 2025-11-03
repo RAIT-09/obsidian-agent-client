@@ -15,6 +15,7 @@ import { normalizeEnvVars } from "../../../shared/settings-utils";
 export class AgentClientSettingTab extends PluginSettingTab {
 	plugin: AgentClientPlugin;
 	private agentSelector: DropdownComponent | null = null;
+	private unsubscribe: (() => void) | null = null;
 
 	constructor(app: App, plugin: AgentClientPlugin) {
 		super(app, plugin);
@@ -27,7 +28,21 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		this.agentSelector = null;
 
+		// Cleanup previous subscription if exists
+		if (this.unsubscribe) {
+			this.unsubscribe();
+			this.unsubscribe = null;
+		}
+
 		this.renderAgentSelector(containerEl);
+
+		// Subscribe to settings changes to update agent dropdown
+		this.unsubscribe = this.plugin.settingsStore.subscribe(() => {
+			this.updateAgentDropdown();
+		});
+
+		// Also update immediately on display to sync with current settings
+		this.updateAgentDropdown();
 
 		new Setting(containerEl)
 			.setName("Node.js path")
@@ -171,6 +186,36 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}),
 			);
+	}
+
+	/**
+	 * Update the agent dropdown when settings change.
+	 * Only updates if the value is different to avoid infinite loops.
+	 */
+	private updateAgentDropdown(): void {
+		if (!this.agentSelector) {
+			return;
+		}
+
+		// Get latest settings from store snapshot
+		const settings = this.plugin.settingsStore.getSnapshot();
+		const currentValue = this.agentSelector.getValue();
+
+		// Only update if different to avoid triggering onChange
+		if (settings.activeAgentId !== currentValue) {
+			this.agentSelector.setValue(settings.activeAgentId);
+		}
+	}
+
+	/**
+	 * Called when the settings tab is hidden.
+	 * Clean up subscriptions to prevent memory leaks.
+	 */
+	hide(): void {
+		if (this.unsubscribe) {
+			this.unsubscribe();
+			this.unsubscribe = null;
+		}
 	}
 
 	private renderAgentSelector(containerEl: HTMLElement) {

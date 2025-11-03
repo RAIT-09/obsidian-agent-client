@@ -15,6 +15,7 @@
 import type {
 	ChatMessage,
 	MessageContent,
+	PermissionOption,
 } from "../../core/domain/models/chat-message";
 import type {
 	ChatSession,
@@ -759,6 +760,85 @@ export class ChatViewModel {
 				},
 			});
 		}
+	}
+
+	private findActivePermission(): {
+		requestId: string;
+		options: PermissionOption[];
+	} | null {
+		for (const message of this.state.messages) {
+			for (const content of message.content) {
+				if (content.type === "tool_call") {
+					const permission = content.permissionRequest;
+					if (permission?.isActive) {
+						return {
+							requestId: permission.requestId,
+							options: permission.options,
+						};
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	private selectOption(
+		options: PermissionOption[],
+		preferredKinds: PermissionOption["kind"][],
+		fallback?: (option: PermissionOption) => boolean,
+	): PermissionOption | undefined {
+		for (const kind of preferredKinds) {
+			const match = options.find((opt) => opt.kind === kind);
+			if (match) {
+				return match;
+			}
+		}
+		if (fallback) {
+			const fallbackOption = options.find(fallback);
+			if (fallbackOption) {
+				return fallbackOption;
+			}
+		}
+		return options[0];
+	}
+
+	async approveActivePermission(): Promise<boolean> {
+		const active = this.findActivePermission();
+		if (!active || active.options.length === 0) {
+			return false;
+		}
+
+		const option = this.selectOption(active.options, [
+			"allow_once",
+			"allow_always",
+		]);
+
+		if (!option) {
+			return false;
+		}
+
+		await this.approvePermission(active.requestId, option.optionId);
+		return true;
+	}
+
+	async rejectActivePermission(): Promise<boolean> {
+		const active = this.findActivePermission();
+		if (!active || active.options.length === 0) {
+			return false;
+		}
+
+		const option = this.selectOption(
+			active.options,
+			["reject_once", "reject_always"],
+			(opt) => opt.name.toLowerCase().includes("reject") || opt.name.toLowerCase().includes("deny"),
+		);
+
+		if (!option) {
+			return false;
+		}
+
+		await this.approvePermission(active.requestId, option.optionId);
+		return true;
 	}
 
 	// ========================================
