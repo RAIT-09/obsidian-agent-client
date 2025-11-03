@@ -3,6 +3,7 @@ import {
 	ChatView,
 	VIEW_TYPE_CHAT,
 } from "../../presentation/views/chat/ChatView";
+import { ChatViewModel } from "../../adapters/view-models/chat.view-model";
 import {
 	createSettingsStore,
 	type SettingsStore,
@@ -118,6 +119,7 @@ export default class AgentClientPlugin extends Plugin {
 
 		// Register agent-specific commands
 		this.registerAgentCommands();
+		this.registerPermissionCommands();
 
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
 	}
@@ -210,13 +212,59 @@ export default class AgentClientPlugin extends Plugin {
 
 		for (const agent of agents) {
 			this.addCommand({
-				id: `open-chat-with-${agent.id}`,
+				id: `open-agent-client-chat-with-${agent.id}`,
 				name: `New chat with ${agent.displayName}`,
 				callback: async () => {
 					await this.openChatWithAgent(agent.id);
 				},
 			});
 		}
+	}
+
+	private getActiveChatViewModel(): ChatViewModel | null {
+		const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)[0];
+		if (leaf?.view instanceof ChatView) {
+			return leaf.view.viewModel;
+		}
+		return null;
+	}
+
+	private registerPermissionCommands(): void {
+		this.addCommand({
+			id: "agent-client-approve-active-permission",
+			name: "Approve active permission",
+			callback: async () => {
+				const viewModel = this.getActiveChatViewModel();
+				if (!viewModel) {
+					new Notice(
+						"[Agent Client] Open the chat view to approve permissions",
+					);
+					return;
+				}
+				const success = await viewModel.approveActivePermission();
+				if (!success) {
+					new Notice("[Agent Client] No active permission request");
+				}
+			},
+		});
+
+		this.addCommand({
+			id: "agent-client-reject-active-permission",
+			name: "Reject active permission",
+			callback: async () => {
+				const viewModel = this.getActiveChatViewModel();
+				if (!viewModel) {
+					new Notice(
+						"[Agent Client] Open the chat view to reject permissions",
+					);
+					return;
+				}
+				const success = await viewModel.rejectActivePermission();
+				if (!success) {
+					new Notice("[Agent Client] No active permission request");
+				}
+			},
+		});
 	}
 
 	async loadSettings() {
