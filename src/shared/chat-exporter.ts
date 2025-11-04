@@ -139,8 +139,19 @@ tags: [agent-client]
 
 			case "text_with_context":
 				// User messages with auto-mention context
-				// Export the text content (context is already resolved in the text)
-				return content.text + "\n\n";
+				// Add auto-mention in @[[note]] format at the beginning
+				let exportText = "";
+				if (content.autoMentionContext) {
+					const { noteName, selection } = content.autoMentionContext;
+					if (selection) {
+						exportText += `@[[${noteName}]]:${selection.fromLine}-${selection.toLine}\n`;
+					} else {
+						exportText += `@[[${noteName}]]\n`;
+					}
+				}
+				// Add the message text (which may contain additional @[[note]] mentions)
+				exportText += content.text + "\n\n";
+				return exportText;
 
 			case "agent_thought":
 				return `> [!info]- Thinking\n> ${content.text.split("\n").join("\n> ")}\n\n`;
