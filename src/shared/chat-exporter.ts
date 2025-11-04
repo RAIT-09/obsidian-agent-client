@@ -137,6 +137,11 @@ tags: [agent-client]
 			case "text":
 				return content.text + "\n\n";
 
+			case "text_with_context":
+				// User messages with auto-mention context
+				// Export the text content (context is already resolved in the text)
+				return content.text + "\n\n";
+
 			case "agent_thought":
 				return `> [!info]- Thinking\n> ${content.text.split("\n").join("\n> ")}\n\n`;
 
