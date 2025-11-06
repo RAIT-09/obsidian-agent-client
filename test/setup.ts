@@ -28,3 +28,17 @@ global.console = {
 if (!process.cwd) {
 	process.cwd = () => '/test/vault';
 }
+
+// Mock require() for dynamic Obsidian imports
+const Module = require('module');
+const path = require('path');
+const originalRequire = Module.prototype.require;
+
+Module.prototype.require = function (id: string) {
+	if (id === 'obsidian') {
+		// Return mocked Obsidian module using absolute path
+		const mockPath = path.join(__dirname, 'mocks', 'obsidian.ts');
+		return originalRequire.call(this, mockPath);
+	}
+	return originalRequire.apply(this, arguments);
+};
