@@ -26,11 +26,26 @@ The project uses [Vitest](https://vitest.dev/) as the testing framework, chosen 
 
 ### Current Test Coverage
 
+**Overall Project Coverage**: 50.47% (142 tests total)
+
 - **Use Cases**: 95.92% coverage (58 tests)
   - `SendMessageUseCase`: 15 tests
   - `ManageSessionUseCase`: 15 tests
   - `HandlePermissionUseCase`: 16 tests
   - `SwitchAgentUseCase`: 12 tests
+
+- **ViewModels**: 98.31% coverage (84 tests)
+  - `ChatViewModel`: 84 tests covering all 27 public methods
+    - Observer Pattern (5 tests)
+    - State Initialization (5 tests)
+    - Computed Properties (4 tests)
+    - Session Management (6 tests)
+    - Message Operations (10 tests)
+    - Permission Handling (3 tests)
+    - Agent Management (2 tests)
+    - Mention Management (12 tests)
+    - Slash Command Management (11 tests)
+    - Lifecycle (1 test)
 
 ### Technology Stack
 
@@ -99,6 +114,7 @@ Global test setup including:
 - Crypto API mock for UUID generation
 - Global test utilities
 - Environment configuration
+- **Dynamic require() interception**: Redirects runtime `require('obsidian')` calls to the mock module
 
 #### `test/mocks/obsidian.ts`
 
@@ -224,6 +240,427 @@ describe('SendMessageUseCase', () => {
     expect(result.agentMessage).toContain('obsidian_opened_note');
     expect(result.agentMessage).toContain('/vault/notes/test.md');
   });
+});
+```
+
+### ChatViewModel Tests
+
+The `ChatViewModel` is the presentation layer that manages UI state and coordinates between Use Cases, serving as the bridge between React components and business logic. With 1,069 lines of code and 27 public methods, comprehensive testing ensures reliability of the user-facing chat interface.
+
+**Location**: `src/adapters/view-models/chat.view-model.test.ts`
+
+**Coverage**: 98.31% (84 tests)
+
+#### Why Test ChatViewModel?
+
+1. **Central Coordinator**: Orchestrates multiple Use Cases and manages complex state transitions
+2. **React Integration**: Implements Observer pattern for `useSyncExternalStore` hook
+3. **Complex State Machine**: Manages session lifecycle (disconnected → initializing → ready → busy → error)
+4. **User-Facing**: Errors in ViewModel directly impact user experience
+5. **Streaming Responses**: Handles incremental message updates from agent
+
+#### Test Architecture
+
+ChatViewModel tests follow the **Arrange-Act-Assert** pattern with comprehensive mocking:
+
+```typescript
+describe('ChatViewModel', () => {
+  let viewModel: ChatViewModel;
+  let mockPlugin: AgentClientPlugin;
+  let mockSendMessageUseCase: SendMessageUseCase;
+  let mockManageSessionUseCase: ManageSessionUseCase;
+  let mockHandlePermissionUseCase: HandlePermissionUseCase;
+  let mockSwitchAgentUseCase: SwitchAgentUseCase;
+  let mockVaultAccess: IVaultAccess;
+
+  beforeEach(() => {
+    // Reset all mocks
+    vi.clearAllMocks();
+
+    // Create mock plugin with settings
+    mockPlugin = {
+      settings: {
+        activeAgentId: 'claude-code-acp',
+        autoMention: true,
+        autoAllowPermissions: false,
+        // ... other settings
+      },
+      saveSettings: vi.fn(),
+    } as unknown as AgentClientPlugin;
+
+    // Create mock Use Cases
+    mockSendMessageUseCase = {
+      prepareMessage: vi.fn(),
+      sendPreparedMessage: vi.fn(),
+    } as unknown as SendMessageUseCase;
+
+    // ... other mocks
+
+    // Instantiate ChatViewModel with all dependencies
+    viewModel = new ChatViewModel(
+      mockPlugin,
+      mockSendMessageUseCase,
+      mockManageSessionUseCase,
+      mockHandlePermissionUseCase,
+      mockSwitchAgentUseCase,
+      mockVaultAccess,
+      '/test/vault'
+    );
+  });
+
+  // Tests go here
+});
+```
+
+#### Test Categories
+
+##### 1. Observer Pattern (5 tests)
+
+Tests verify React integration via `useSyncExternalStore`:
+
+```typescript
+describe('Observer Pattern', () => {
+  it('should notify listeners when state changes', () => {
+    const listener = vi.fn();
+    viewModel.subscribe(listener);
+
+    viewModel.clearError(); // Trigger state change
+
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('should allow unsubscribing', () => {
+    const listener = vi.fn();
+    const unsubscribe = viewModel.subscribe(listener);
+
+    unsubscribe();
+    viewModel.clearError();
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('should support multiple listeners', () => {
+    const listener1 = vi.fn();
+    const listener2 = vi.fn();
+
+    viewModel.subscribe(listener1);
+    viewModel.subscribe(listener2);
+    viewModel.clearError();
+
+    expect(listener1).toHaveBeenCalledTimes(1);
+    expect(listener2).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+**Why This Matters**: Ensures memory leak prevention and proper React component re-rendering.
+
+##### 2. State Management (6 tests)
+
+Tests verify session lifecycle and state transitions:
+
+```typescript
+describe('Session Management', () => {
+  it('should create new session', async () => {
+    vi.mocked(mockManageSessionUseCase.createSession)
+      .mockResolvedValue({
+        sessionId: 'test-session-123',
+        state: 'ready',
+        agentId: 'claude-code-acp',
+        authMethods: [],
+        availableCommands: [],
+        createdAt: new Date(),
+        lastActivityAt: new Date(),
+        workingDirectory: '/test/vault',
+      });
+
+    await viewModel.createNewSession();
+
+    const state = viewModel.getSnapshot();
+    expect(state.session.sessionId).toBe('test-session-123');
+    expect(state.session.state).toBe('ready');
+  });
+
+  it('should transition through states correctly', async () => {
+    // State: disconnected → initializing → ready
+    let state = viewModel.getSnapshot();
+    expect(state.session.state).toBe('disconnected');
+
+    const createPromise = viewModel.createNewSession();
+
+    // Check intermediate state (if needed)
+    state = viewModel.getSnapshot();
+    // May be 'initializing' depending on timing
+
+    await createPromise;
+
+    state = viewModel.getSnapshot();
+    expect(state.session.state).toBe('ready');
+  });
+});
+```
+
+##### 3. Message Operations (10 tests)
+
+Tests verify message sending, streaming, and error handling:
+
+```typescript
+describe('Message Operations', () => {
+  it('should prepare message and add to UI immediately', async () => {
+    vi.mocked(mockSendMessageUseCase.prepareMessage)
+      .mockResolvedValue({
+        displayMessage: 'Test message',
+        agentMessage: 'Test message',
+      });
+    vi.mocked(mockSendMessageUseCase.sendPreparedMessage)
+      .mockResolvedValue();
+
+    await viewModel.sendMessage('Test message');
+
+    const state = viewModel.getSnapshot();
+    expect(state.messages).toHaveLength(1);
+    expect(state.messages[0].content[0].text).toBe('Test message');
+  });
+
+  it('should update last message incrementally (streaming)', () => {
+    // Add initial assistant message
+    viewModel.addMessage({
+      id: 'msg-1',
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Hello' }],
+      timestamp: new Date(),
+    });
+
+    // Simulate streaming update
+    viewModel.updateLastMessage({
+      type: 'text',
+      text: ' world',
+    });
+
+    const state = viewModel.getSnapshot();
+    expect(state.messages[0].content[0].text).toBe('Hello world');
+  });
+
+  it('should handle send errors gracefully', async () => {
+    vi.mocked(mockSendMessageUseCase.prepareMessage)
+      .mockResolvedValue({
+        displayMessage: 'Test',
+        agentMessage: 'Test',
+      });
+    vi.mocked(mockSendMessageUseCase.sendPreparedMessage)
+      .mockRejectedValue(new Error('Network error'));
+
+    await viewModel.sendMessage('Test');
+
+    const state = viewModel.getSnapshot();
+    expect(state.errorInfo).toBeTruthy();
+    expect(state.errorInfo?.title).toContain('Error');
+  });
+});
+```
+
+##### 4. Mention System (12 tests)
+
+Tests verify @[[note]] autocomplete and navigation:
+
+```typescript
+describe('Mention Management', () => {
+  it('should detect mention trigger and show suggestions', async () => {
+    vi.mocked(mockVaultAccess.searchNotes).mockResolvedValue([
+      {
+        path: 'notes/test.md',
+        name: 'test',
+        basename: 'test',
+        extension: 'md',
+      },
+    ]);
+
+    await viewModel.updateMentionSuggestions('test @', 6);
+
+    const state = viewModel.getSnapshot();
+    expect(state.mentionDropdown.isVisible).toBe(true);
+    expect(state.mentionDropdown.suggestions).toHaveLength(1);
+    expect(state.mentionDropdown.suggestions[0].name).toBe('test');
+  });
+
+  it('should insert mention with @[[syntax]] when selected', () => {
+    viewModel['mentionDropdown'] = {
+      isVisible: true,
+      query: 'test',
+      cursorPos: 6,
+      suggestions: [
+        {
+          path: 'notes/test.md',
+          name: 'test',
+          basename: 'test',
+          extension: 'md',
+        },
+      ],
+      selectedIndex: 0,
+    };
+
+    const result = viewModel.selectMention('Hello @', 6);
+
+    expect(result.newMessage).toBe('Hello @[[test]]');
+    expect(result.newCursorPos).toBe(15); // After @[[test]]
+  });
+});
+```
+
+##### 5. Slash Command System (11 tests)
+
+Tests verify ACP protocol slash command integration:
+
+```typescript
+describe('Slash Command Management', () => {
+  it('should detect slash command at message start', async () => {
+    const commands: SlashCommand[] = [
+      { name: 'web', description: 'Search the web', hint: 'query' },
+      { name: 'test', description: 'Run tests', hint: null },
+    ];
+
+    viewModel.updateAvailableCommands(commands);
+    await viewModel.updateSlashCommandSuggestions('/we', 3);
+
+    const state = viewModel.getSnapshot();
+    expect(state.slashCommandDropdown.isVisible).toBe(true);
+    expect(state.slashCommandDropdown.suggestions).toHaveLength(1);
+    expect(state.slashCommandDropdown.suggestions[0].name).toBe('web');
+  });
+
+  it('should insert slash command and show hint overlay', () => {
+    viewModel['slashCommandDropdown'] = {
+      isVisible: true,
+      query: 'we',
+      cursorPos: 3,
+      suggestions: [
+        { name: 'web', description: 'Search the web', hint: 'query' },
+      ],
+      selectedIndex: 0,
+    };
+
+    const result = viewModel.selectSlashCommand('/we', 3);
+
+    expect(result.newMessage).toBe('/web ');
+    expect(result.newCursorPos).toBe(5);
+    expect(result.showHintOverlay).toBe(true);
+    expect(result.hintText).toBe('query');
+  });
+});
+```
+
+#### Testing Async Operations
+
+**Pattern**: Use controlled promises for precise state capture:
+
+```typescript
+it('should set isSending to true during message send', async () => {
+  let resolvePrepare: (value: any) => void;
+  const preparePromise = new Promise((resolve) => {
+    resolvePrepare = resolve;
+  });
+
+  vi.mocked(mockSendMessageUseCase.prepareMessage)
+    .mockReturnValue(preparePromise as any);
+  vi.mocked(mockSendMessageUseCase.sendPreparedMessage)
+    .mockImplementation(() => new Promise(() => {})); // Never resolves
+
+  const sendPromise = viewModel.sendMessage('Test');
+
+  // Manually control when prepare completes
+  resolvePrepare!({
+    displayMessage: 'Test',
+    agentMessage: 'Test',
+  });
+  await new Promise(resolve => setTimeout(resolve, 10));
+
+  const state = viewModel.getSnapshot();
+  expect(state.isSending).toBe(true);
+  expect(state.session.state).toBe('busy');
+
+  // Clean up (don't wait forever)
+  vi.mocked(mockSendMessageUseCase.sendPreparedMessage)
+    .mockResolvedValue();
+  await sendPromise;
+});
+```
+
+**Alternative**: Test final states for simpler scenarios:
+
+```typescript
+it('should reset isSending after message sent', async () => {
+  vi.mocked(mockSendMessageUseCase.prepareMessage)
+    .mockResolvedValue({ displayMessage: 'Test', agentMessage: 'Test' });
+  vi.mocked(mockSendMessageUseCase.sendPreparedMessage)
+    .mockResolvedValue();
+
+  await viewModel.sendMessage('Test');
+
+  const state = viewModel.getSnapshot();
+  expect(state.isSending).toBe(false);
+  expect(state.session.state).toBe('ready');
+});
+```
+
+#### Testing Streaming Responses
+
+The ViewModel handles incremental updates from the agent:
+
+```typescript
+it('should concatenate text content', () => {
+  viewModel.addMessage({
+    id: 'msg-1',
+    role: 'assistant',
+    content: [{ type: 'text', text: 'Hello' }],
+    timestamp: new Date(),
+  });
+
+  viewModel.updateLastMessage({ type: 'text', text: ' world' });
+
+  expect(viewModel.getSnapshot().messages[0].content[0].text)
+    .toBe('Hello world');
+});
+
+it('should add newlines between thoughts', () => {
+  viewModel.addMessage({
+    id: 'msg-1',
+    role: 'assistant',
+    content: [{ type: 'agent_thought', text: 'Thinking' }],
+    timestamp: new Date(),
+  });
+
+  viewModel.updateLastMessage({ type: 'agent_thought', text: 'More' });
+
+  expect(viewModel.getSnapshot().messages[0].content[0].text)
+    .toBe('Thinking\nMore');
+});
+
+it('should replace tool calls by ID', () => {
+  viewModel.addMessage({
+    id: 'msg-1',
+    role: 'assistant',
+    content: [{
+      type: 'tool_call',
+      id: 'tool-1',
+      name: 'read_file',
+      input: { path: '/test.md' },
+      status: 'pending',
+    }],
+    timestamp: new Date(),
+  });
+
+  viewModel.updateLastMessage({
+    type: 'tool_call',
+    id: 'tool-1',
+    name: 'read_file',
+    input: { path: '/test.md' },
+    status: 'success',
+    output: 'File content',
+  });
+
+  const content = viewModel.getSnapshot().messages[0].content[0];
+  expect(content.status).toBe('success');
+  expect(content.output).toBe('File content');
 });
 ```
 
@@ -456,9 +893,9 @@ beforeEach(() => {
 
 ### Coverage Goals
 
-- **Use Cases**: Target 90%+ (currently 95.92%)
+- **Use Cases**: Target 90%+ (✅ currently 95.92%)
+- **ViewModels**: Target 85%+ (✅ currently 98.31%)
 - **Adapters**: Target 80%+
-- **ViewModels**: Target 85%+
 - **Utilities**: Target 70%+
 
 ### Viewing Coverage
@@ -474,12 +911,14 @@ Output:
 -------------------|---------|----------|---------|---------|-------------------
 File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
 -------------------|---------|----------|---------|---------|-------------------
-All files          |   26.64 |    80.14 |    55.1 |   26.64 |
+All files          |   50.47 |    82.15 |   67.25 |   50.47 |
  core/use-cases    |   95.92 |     85.6 |     100 |   95.92 |
   ...n.use-case.ts |     100 |    91.66 |     100 |     100 | 86,111
   ...n.use-case.ts |     100 |    96.96 |     100 |     100 | 220
   ...e.use-case.ts |   91.99 |    76.36 |     100 |   91.99 | ...89-506,572-579
   ...t.use-case.ts |     100 |    84.61 |     100 |     100 | 70-74
+ adapters/view-models |   98.31 |    94.12 |     100 |   98.31 |
+  ...view-model.ts |   98.31 |    94.12 |     100 |   98.31 | 245,287
 -------------------|---------|----------|---------|---------|-------------------
 ```
 
@@ -535,6 +974,45 @@ export class Vault {
   newMethod = vi.fn();
 }
 ```
+
+#### 3.5. Dynamic require('obsidian') Fails in Tests
+
+**Problem**: Tests fail with "Cannot find module 'obsidian'" when code uses `require('obsidian')` at runtime (not static import).
+
+**Example Error**:
+```
+Error: Cannot find module 'obsidian'
+Require stack:
+- /home/user/obsidian-agent-client/src/adapters/view-models/chat.view-model.ts
+```
+
+**Root Cause**: Vitest's module alias configuration only works for static imports (`import ... from 'obsidian'`), not dynamic `require('obsidian')` calls at runtime. This happens when code needs to conditionally import Obsidian (e.g., platform detection).
+
+**Solution**: The `test/setup.ts` file now intercepts Node.js's require mechanism globally:
+
+```typescript
+// Mock require() for dynamic Obsidian imports
+const Module = require('module');
+const path = require('path');
+const originalRequire = Module.prototype.require;
+
+Module.prototype.require = function (id: string) {
+  if (id === 'obsidian') {
+    // Return mocked Obsidian module using absolute path
+    const mockPath = path.join(__dirname, 'mocks', 'obsidian.ts');
+    return originalRequire.call(this, mockPath);
+  }
+  return originalRequire.apply(this, arguments);
+};
+```
+
+This solution:
+- Intercepts all `require()` calls globally
+- Redirects `require('obsidian')` to the mock file
+- Uses absolute path to ensure reliable resolution
+- Preserves original behavior for other modules
+
+**When to Use**: If you add code that uses `require('obsidian')` at runtime, this setup will automatically handle it. No additional configuration needed.
 
 #### 4. Tests Pass Locally but Fail in CI
 
@@ -696,20 +1174,28 @@ it('should handle concurrent requests correctly', async () => {
 
 ## Next Steps
 
+### Completed Test Coverage
+
+1. ✅ **Use Cases** (95.92% coverage, 58 tests)
+   - SendMessageUseCase, ManageSessionUseCase, HandlePermissionUseCase, SwitchAgentUseCase
+
+2. ✅ **ViewModels** (98.31% coverage, 84 tests)
+   - ChatViewModel: All 27 public methods tested with comprehensive coverage
+
 ### Planned Test Coverage
 
 1. **Adapters** (currently 0%)
    - VaultAdapter: Obsidian API integration
    - AcpAdapter: Agent communication protocol
    - SettingsStore: Settings persistence
+   - ObsidianVaultAdapter: File operations and search
 
-2. **ViewModels** (currently 0%)
-   - ChatViewModel: UI state management
-
-3. **Utilities** (currently 20.54%)
+2. **Utilities** (currently 20.54%)
+   - mention-utils: Mention detection and conversion
    - chat-exporter: Export chat to markdown
    - path-utils: Path manipulation
    - wsl-utils: WSL integration
+   - settings-utils: Settings normalization
 
 ### Contributing
 
@@ -733,4 +1219,6 @@ When adding tests:
 
 **Last Updated**: November 2025
 **Test Framework**: Vitest 1.6.1
-**Coverage**: 95.92% (Use Cases)
+**Overall Coverage**: 50.47% (142 tests)
+- **Use Cases**: 95.92% (58 tests)
+- **ViewModels**: 98.31% (84 tests)
