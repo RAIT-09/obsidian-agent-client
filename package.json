@@ -6,6 +6,10 @@
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"test": "vitest",
+		"test:ui": "vitest --ui",
+		"test:run": "vitest run",
+		"test:coverage": "vitest run --coverage",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.css\"",
 		"format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"*.css\""
@@ -14,17 +18,23 @@
 	"author": "",
 	"license": "Apache-2.0",
 	"devDependencies": {
+		"@testing-library/jest-dom": "^6.9.1",
+		"@testing-library/react": "^16.3.0",
+		"@testing-library/user-event": "^14.6.1",
 		"@types/node": "^16.11.6",
 		"@types/react": "^19.1.13",
 		"@types/react-dom": "^19.1.9",
 		"@typescript-eslint/eslint-plugin": "5.29.0",
 		"@typescript-eslint/parser": "5.29.0",
+		"@vitest/ui": "^1.6.1",
 		"builtin-modules": "3.3.0",
 		"esbuild": "0.17.3",
+		"happy-dom": "^20.0.10",
 		"obsidian": "latest",
 		"prettier": "^3.4.2",
 		"tslib": "2.4.0",
-		"typescript": "4.7.4"
+		"typescript": "4.7.4",
+		"vitest": "^1.6.1"
 	},
 	"dependencies": {
 		"@agentclientprotocol/sdk": "^0.5.1",
