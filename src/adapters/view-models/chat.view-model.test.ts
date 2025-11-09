@@ -387,7 +387,7 @@ describe('ChatViewModel', () => {
 				const promise = viewModel.createNewSession();
 
 				// Wait for auto-export to complete (autoExportOnNewChat is false, so it returns immediately)
-				await new Promise(resolve => setTimeout(resolve, 10));
+				await Promise.resolve(); // Wait for microtask queue
 
 				// State should be updated after auto-export check
 				expect(viewModel.getSnapshot().session.state).toBe('initializing');
@@ -395,7 +395,7 @@ describe('ChatViewModel', () => {
 				expect(viewModel.getSnapshot().errorInfo).toBeNull();
 
 				// Cleanup
-				await Promise.race([promise, new Promise((resolve) => setTimeout(resolve, 10))]);
+				// Cleanup - promise will never resolve in this test
 			});
 
 			it('should create session and transition to ready state on success', async () => {
@@ -656,7 +656,9 @@ describe('ChatViewModel', () => {
 				});
 
 				// Wait for prepare to complete and state to update
-				await new Promise((resolve) => setTimeout(resolve, 10));
+				// Wait for prepareMessage to resolve and state to update
+				// Using setTimeout as Promise.resolve() is insufficient for multi-step async state updates
+				await new Promise(resolve => setTimeout(resolve, 10));
 
 				const state = viewModel.getSnapshot();
 				expect(state.isSending).toBe(true);
@@ -665,7 +667,7 @@ describe('ChatViewModel', () => {
 				// Cleanup - don't wait for the never-resolving promise
 				await Promise.race([
 					sendPromise,
-					new Promise((resolve) => setTimeout(resolve, 10)),
+					Promise.resolve(),
 				]);
 			});
 
