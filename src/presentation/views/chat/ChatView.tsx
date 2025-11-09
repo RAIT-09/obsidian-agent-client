@@ -1,4 +1,5 @@
 import { ItemView, WorkspaceLeaf, setIcon, Platform, Notice } from "obsidian";
+import type { EventRef } from "obsidian";
 import * as React from "react";
 const {
 	useState,
@@ -655,12 +656,14 @@ function ChatComponent({
 
 		try {
 			const exporter = new ChatExporter(plugin);
+			const openFile = plugin.settings.exportSettings.openFileAfterExport;
 			const filePath = await exporter.exportToMarkdown(
 				messages,
 				activeAgentLabel,
 				session.agentId,
 				session.sessionId || "unknown",
 				session.createdAt,
+				openFile,
 			);
 			new Notice(`[Agent Client] Chat exported to ${filePath}`);
 		} catch (error) {
@@ -883,11 +886,13 @@ function ChatComponent({
 export class ChatView extends ItemView {
 	private root: Root | null = null;
 	private plugin: AgentClientPlugin;
+	private logger: Logger;
 	public viewModel: ChatViewModel | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: AgentClientPlugin) {
 		super(leaf);
 		this.plugin = plugin;
+		this.logger = new Logger(plugin);
 	}
 
 	getViewType() {
@@ -908,22 +913,63 @@ export class ChatView extends ItemView {
 
 		this.root = createRoot(container);
 		this.root.render(<ChatComponent plugin={this.plugin} view={this} />);
+		this.registerPermissionEvents();
 	}
 
 	async onClose() {
-		console.log("[ChatView] onClose() called");
+		this.logger.log("[ChatView] onClose() called");
 		// Cleanup ViewModel and disconnect agent before unmounting
 		if (this.viewModel) {
-			console.log("[ChatView] Disposing ViewModel...");
+			this.logger.log("[ChatView] Disposing ViewModel...");
 			await this.viewModel.dispose();
 			this.viewModel = null;
 		} else {
-			console.log("[ChatView] No ViewModel to dispose");
+			this.logger.log("[ChatView] No ViewModel to dispose");
 		}
-
 		if (this.root) {
 			this.root.unmount();
 			this.root = null;
 		}
+	}
+
+	private registerPermissionEvents(): void {
+		const approveHandler = async () => {
+			const viewModel = this.viewModel;
+			if (!viewModel) {
+				new Notice("[Agent Client] Chat view is not ready");
+				return;
+			}
+			const success = await viewModel.approveActivePermission();
+			if (!success) {
+				new Notice("[Agent Client] No active permission request");
+			}
+		};
+
+		const rejectHandler = async () => {
+			const viewModel = this.viewModel;
+			if (!viewModel) {
+				new Notice("[Agent Client] Chat view is not ready");
+				return;
+			}
+			const success = await viewModel.rejectActivePermission();
+			if (!success) {
+				new Notice("[Agent Client] No active permission request");
+			}
+		};
+
+		const workspace = this.app.workspace as unknown as {
+			on: (event: string, callback: () => void) => EventRef;
+		};
+
+		this.registerEvent(
+			workspace.on("agent-client:approve-active-permission", () => {
+				void approveHandler();
+			}),
+		);
+		this.registerEvent(
+			workspace.on("agent-client:reject-active-permission", () => {
+				void rejectHandler();
+			}),
+		);
 	}
 }
