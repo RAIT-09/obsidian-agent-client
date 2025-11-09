@@ -9,6 +9,21 @@ import type AgentClientPlugin from '../../infrastructure/obsidian-plugin/plugin'
 import type { ChatMessage, MessageContent } from '../../core/domain/models/chat-message';
 import type { NoteMetadata } from '../../core/domain/ports/vault-access.port';
 
+// Mock chat-exporter
+vi.mock('../../shared/chat-exporter', () => ({
+	ChatExporter: vi.fn().mockImplementation(() => ({
+		exportToMarkdown: vi.fn().mockResolvedValue('/path/to/export.md'),
+	})),
+}));
+
+// Mock logger
+vi.mock('../../shared/logger', () => ({
+	Logger: vi.fn().mockImplementation(() => ({
+		log: vi.fn(),
+		error: vi.fn(),
+	})),
+}));
+
 describe('ChatViewModel', () => {
 	let viewModel: ChatViewModel;
 	let mockPlugin: AgentClientPlugin;
@@ -50,8 +65,13 @@ describe('ChatViewModel', () => {
 				windowsWslDistribution: '',
 				exportSettings: {
 					defaultFolder: 'Agent Client',
+					filenameTemplate: 'agent_client_{date}_{time}',
+					autoExportOnNewChat: false,
+					autoExportOnCloseChat: false,
+					openFileAfterExport: true,
 				},
 				debugMode: false,
+				nodePath: '',
 			},
 			saveSettings: vi.fn(),
 		} as unknown as AgentClientPlugin;
@@ -81,6 +101,10 @@ describe('ChatViewModel', () => {
 				{ id: 'gemini-cli', displayName: 'Gemini CLI' },
 			]),
 			getActiveAgentId: vi.fn(() => 'claude-code-acp'),
+			getCurrentAgent: vi.fn(() => ({
+				id: 'claude-code-acp',
+				displayName: 'Claude Code',
+			})),
 		} as unknown as SwitchAgentUseCase;
 
 		mockVaultAccess = {
@@ -323,7 +347,7 @@ describe('ChatViewModel', () => {
 
 	describe('Session Management', () => {
 		describe('createNewSession', () => {
-			it('should transition to initializing state immediately', async () => {
+			it('should transition to initializing state after auto-export check', async () => {
 				const listener = vi.fn();
 				viewModel.subscribe(listener);
 
@@ -334,7 +358,10 @@ describe('ChatViewModel', () => {
 
 				const promise = viewModel.createNewSession();
 
-				// State should be updated immediately (synchronously)
+				// Wait for auto-export to complete (autoExportOnNewChat is false, so it returns immediately)
+				await new Promise(resolve => setTimeout(resolve, 10));
+
+				// State should be updated after auto-export check
 				expect(viewModel.getSnapshot().session.state).toBe('initializing');
 				expect(viewModel.getSnapshot().messages).toEqual([]);
 				expect(viewModel.getSnapshot().errorInfo).toBeNull();
@@ -1122,6 +1149,156 @@ describe('ChatViewModel', () => {
 			);
 		});
 	});
+
+		describe('approveActivePermission', () => {
+			it('should approve active permission with allow option', async () => {
+				// Add a message with an active permission request
+				viewModel.addMessage({
+					id: 'msg-1',
+					role: 'assistant',
+					content: [{
+						type: 'tool_call',
+						id: 'tool-1',
+						name: 'read_file',
+						input: { path: '/test.md' },
+						status: 'pending',
+						permissionRequest: {
+							requestId: 'perm-123',
+							options: [
+								{ optionId: 'opt-1', name: 'Allow Once', kind: 'allow_once' },
+								{ optionId: 'opt-2', name: 'Deny', kind: 'reject_once' },
+							],
+							isActive: true,
+						},
+					}],
+					timestamp: new Date(),
+				});
+
+				vi.mocked(mockHandlePermissionUseCase.approvePermission).mockResolvedValue({
+					success: true,
+				});
+
+				const result = await viewModel.approveActivePermission();
+
+				expect(result).toBe(true);
+				expect(mockHandlePermissionUseCase.approvePermission).toHaveBeenCalledWith({
+					requestId: 'perm-123',
+					optionId: 'opt-1', // allow_once option
+				});
+			});
+
+			it('should return false when no active permission exists', async () => {
+				// No messages with active permissions
+				const result = await viewModel.approveActivePermission();
+
+				expect(result).toBe(false);
+				expect(mockHandlePermissionUseCase.approvePermission).not.toHaveBeenCalled();
+			});
+
+			it('should return false when permission has no options', async () => {
+				viewModel.addMessage({
+					id: 'msg-1',
+					role: 'assistant',
+					content: [{
+						type: 'tool_call',
+						id: 'tool-1',
+						name: 'read_file',
+						input: { path: '/test.md' },
+						status: 'pending',
+						permissionRequest: {
+							requestId: 'perm-123',
+							options: [],
+							isActive: true,
+						},
+					}],
+					timestamp: new Date(),
+				});
+
+				const result = await viewModel.approveActivePermission();
+
+				expect(result).toBe(false);
+				expect(mockHandlePermissionUseCase.approvePermission).not.toHaveBeenCalled();
+			});
+		});
+
+		describe('rejectActivePermission', () => {
+			it('should reject active permission with reject option', async () => {
+				viewModel.addMessage({
+					id: 'msg-1',
+					role: 'assistant',
+					content: [{
+						type: 'tool_call',
+						id: 'tool-1',
+						name: 'read_file',
+						input: { path: '/test.md' },
+						status: 'pending',
+						permissionRequest: {
+							requestId: 'perm-456',
+							options: [
+								{ optionId: 'opt-1', name: 'Allow', kind: 'allow_once' },
+								{ optionId: 'opt-2', name: 'Reject', kind: 'reject_once' },
+							],
+							isActive: true,
+						},
+					}],
+					timestamp: new Date(),
+				});
+
+				vi.mocked(mockHandlePermissionUseCase.approvePermission).mockResolvedValue({
+					success: true,
+				});
+
+				const result = await viewModel.rejectActivePermission();
+
+				expect(result).toBe(true);
+				expect(mockHandlePermissionUseCase.approvePermission).toHaveBeenCalledWith({
+					requestId: 'perm-456',
+					optionId: 'opt-2', // reject_once option
+				});
+			});
+
+			it('should use fallback matching for reject option', async () => {
+				viewModel.addMessage({
+					id: 'msg-1',
+					role: 'assistant',
+					content: [{
+						type: 'tool_call',
+						id: 'tool-1',
+						name: 'read_file',
+						input: { path: '/test.md' },
+						status: 'pending',
+						permissionRequest: {
+							requestId: 'perm-789',
+							options: [
+								{ optionId: 'opt-1', name: 'Allow', kind: 'allow_once' },
+								{ optionId: 'opt-2', name: 'Deny Access', kind: 'other' },
+							],
+							isActive: true,
+						},
+					}],
+					timestamp: new Date(),
+				});
+
+				vi.mocked(mockHandlePermissionUseCase.approvePermission).mockResolvedValue({
+					success: true,
+				});
+
+				const result = await viewModel.rejectActivePermission();
+
+				expect(result).toBe(true);
+				expect(mockHandlePermissionUseCase.approvePermission).toHaveBeenCalledWith({
+					requestId: 'perm-789',
+					optionId: 'opt-2', // Matches "deny" in name
+				});
+			});
+
+			it('should return false when no active permission exists', async () => {
+				const result = await viewModel.rejectActivePermission();
+
+				expect(result).toBe(false);
+				expect(mockHandlePermissionUseCase.approvePermission).not.toHaveBeenCalled();
+			});
+		});
 
 	// ========================================
 	// Agent Management Tests
