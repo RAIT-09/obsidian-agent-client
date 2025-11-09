@@ -28,6 +28,8 @@
 	},
 	"dependencies": {
 		"@agentclientprotocol/sdk": "^0.5.1",
+		"@codemirror/state": "^6.5.2",
+		"@codemirror/view": "^6.38.6",
 		"react": "^19.1.1",
 		"react-dom": "^19.1.1"
 	}

@@ -12,6 +12,7 @@ import type {
 import type {
 	ChatMessage,
 	MessageContent,
+	PermissionOption,
 } from "../../core/domain/models/chat-message";
 import type { AgentError } from "../../core/domain/models/agent-error";
 import { AcpTypeConverter } from "./acp-type-converter";
@@ -93,8 +94,14 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		{
 			resolve: (response: acp.RequestPermissionResponse) => void;
 			toolCallId: string;
+			options: PermissionOption[];
 		}
 	>();
+	private pendingPermissionQueue: Array<{
+		requestId: string;
+		toolCallId: string;
+		options: PermissionOption[];
+	}> = [];
 
 	constructor(
 		private plugin: AgentClientPlugin,
@@ -681,7 +688,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	/**
 	 * Disconnect from the agent and clean up resources.
 	 */
-	async disconnect(): Promise<void> {
+	disconnect(): Promise<void> {
 		this.logger.log("[AcpAdapter] Disconnecting...");
 
 		// Cancel all pending operations
@@ -705,6 +712,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.currentAgentId = null;
 
 		this.logger.log("[AcpAdapter] Disconnected");
+		return Promise.resolve();
 	}
 
 	/**
@@ -753,7 +761,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	/**
 	 * Respond to a permission request from the agent.
 	 */
-	async respondToPermission(
+	respondToPermission(
 		requestId: string,
 		optionId: string,
 	): Promise<void> {
@@ -770,6 +778,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			optionId,
 		);
 		this.handlePermissionResponse(requestId, optionId);
+		return Promise.resolve();
 	}
 
 	// Helper methods
@@ -819,12 +828,12 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	 * Handle session updates from the ACP protocol.
 	 * This is called by ClientSideConnection when the agent sends updates.
 	 */
-	async sessionUpdate(params: acp.SessionNotification): Promise<void> {
+	sessionUpdate(params: acp.SessionNotification): Promise<void> {
 		const update = params.update;
 		this.logger.log("[AcpAdapter] sessionUpdate:", update);
 
 		switch (update.sessionUpdate) {
-			case "agent_message_chunk":
+			case "agent_message_chunk": {
 				if (update.content.type === "text") {
 					this.updateLastMessage({
 						type: "text",
@@ -832,8 +841,9 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					});
 				}
 				break;
+			}
 
-			case "agent_thought_chunk":
+			case "agent_thought_chunk": {
 				if (update.content.type === "text") {
 					this.updateLastMessage({
 						type: "agent_thought",
@@ -841,8 +851,9 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					});
 				}
 				break;
+			}
 
-			case "tool_call":
+			case "tool_call": {
 				// Try to update existing tool call first
 				const updated = this.updateMessage(update.toolCallId, {
 					type: "tool_call",
@@ -874,8 +885,9 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					});
 				}
 				break;
+			}
 
-			case "tool_call_update":
+			case "tool_call_update": {
 				this.logger.log(
 					`[AcpAdapter] tool_call_update for ${update.toolCallId}, content:`,
 					update.content,
@@ -889,13 +901,15 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					content: AcpTypeConverter.toToolCallContent(update.content),
 				});
 				break;
+			}
 
-			case "plan":
+			case "plan": {
 				this.updateLastMessage({
 					type: "plan",
 					entries: update.entries,
 				});
 				break;
+			}
 
 			case "available_commands_update": {
 				this.logger.log(
@@ -917,6 +931,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				break;
 			}
 		}
+		return Promise.resolve();
 	}
 
 	/**
@@ -931,15 +946,35 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	 */
 	handlePermissionResponse(requestId: string, optionId: string): void {
 		const request = this.pendingPermissionRequests.get(requestId);
-		if (request) {
-			request.resolve({
-				outcome: {
-					outcome: "selected",
-					optionId,
-				},
-			});
-			this.pendingPermissionRequests.delete(requestId);
+		if (!request) {
+			return;
 		}
+
+		const { resolve, toolCallId, options } = request;
+
+		// Reflect the selection in the UI immediately
+		this.updateMessage(toolCallId, {
+			type: "tool_call",
+			toolCallId,
+			permissionRequest: {
+				requestId,
+				options,
+				selectedOptionId: optionId,
+				isActive: false,
+			},
+		} as MessageContent);
+
+		resolve({
+			outcome: {
+				outcome: "selected",
+				optionId,
+			},
+		});
+		this.pendingPermissionRequests.delete(requestId);
+		this.pendingPermissionQueue = this.pendingPermissionQueue.filter(
+			(entry) => entry.requestId !== requestId,
+		);
+		this.activateNextPermission();
 	}
 
 	/**
@@ -951,6 +986,28 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 		// Kill all running terminals
 		this.terminalManager.killAllTerminals();
+	}
+
+	private activateNextPermission(): void {
+		if (this.pendingPermissionQueue.length === 0) {
+			return;
+		}
+
+		const next = this.pendingPermissionQueue[0];
+		const pending = this.pendingPermissionRequests.get(next.requestId);
+		if (!pending) {
+			return;
+		}
+
+		this.updateMessage(next.toolCallId, {
+			type: "tool_call",
+			toolCallId: next.toolCallId,
+			permissionRequest: {
+				requestId: next.requestId,
+				options: pending.options,
+				isActive: true,
+			},
+		} as MessageContent);
 	}
 
 	/**
@@ -989,18 +1046,40 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		const requestId = crypto.randomUUID();
 		const toolCallId = params.toolCall?.toolCallId || crypto.randomUUID();
 
+		const normalizedOptions: PermissionOption[] = params.options.map(
+			(option) => {
+				const normalizedKind =
+					option.kind === "reject_always"
+						? "reject_once"
+						: option.kind;
+				const kind: PermissionOption["kind"] = normalizedKind
+					? normalizedKind
+					: option.name.toLowerCase().includes("allow")
+						? "allow_once"
+						: "reject_once";
+
+				return {
+					optionId: option.optionId,
+					name: option.name,
+					kind,
+				};
+			},
+		);
+
+		const isFirstRequest = this.pendingPermissionQueue.length === 0;
+
 		// Prepare permission request data
 		const permissionRequestData = {
 			requestId: requestId,
-			options: params.options.map((option) => ({
-				optionId: option.optionId,
-				name: option.name,
-				kind:
-					option.kind === "reject_always"
-						? "reject_once"
-						: option.kind,
-			})),
+			options: normalizedOptions,
+			isActive: isFirstRequest,
 		};
+
+		this.pendingPermissionQueue.push({
+			requestId,
+			toolCallId,
+			options: normalizedOptions,
+		});
 
 		// Try to update existing tool_call with permission request
 		const updated = this.updateMessage(toolCallId, {
@@ -1042,6 +1121,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			this.pendingPermissionRequests.set(requestId, {
 				resolve,
 				toolCallId,
+				options: normalizedOptions,
 			});
 		});
 	}
@@ -1053,19 +1133,20 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.logger.log(
 			`[AcpAdapter] Cancelling ${this.pendingPermissionRequests.size} pending permission requests`,
 		);
-		this.pendingPermissionRequests.forEach(
-			({ resolve, toolCallId }, requestId) => {
+	this.pendingPermissionRequests.forEach(
+		({ resolve, toolCallId, options }, requestId) => {
 				// Update UI to show cancelled state
-				this.updateMessage(toolCallId, {
-					type: "tool_call",
-					toolCallId,
-					status: "completed",
-					permissionRequest: {
-						requestId,
-						options: [], // Not used when isCancelled=true
-						isCancelled: true,
-					},
-				} as MessageContent);
+			this.updateMessage(toolCallId, {
+				type: "tool_call",
+				toolCallId,
+				status: "completed",
+				permissionRequest: {
+					requestId,
+					options,
+					isCancelled: true,
+					isActive: false,
+				},
+			} as MessageContent);
 
 				// Resolve the promise with cancelled outcome
 				resolve({
@@ -1075,22 +1156,23 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				});
 			},
 		);
-		this.pendingPermissionRequests.clear();
+	this.pendingPermissionRequests.clear();
+	this.pendingPermissionQueue = [];
 	}
 
 	// ========================================================================
 	// Terminal Operations (IAcpClient)
 	// ========================================================================
 
-	async readTextFile(params: acp.ReadTextFileRequest) {
-		return { content: "" };
+	readTextFile(params: acp.ReadTextFileRequest): Promise<acp.ReadTextFileResponse> {
+		return Promise.resolve({ content: "" });
 	}
 
-	async writeTextFile(params: acp.WriteTextFileRequest) {
-		return {};
+	writeTextFile(params: acp.WriteTextFileRequest): Promise<acp.WriteTextFileResponse> {
+		return Promise.resolve({});
 	}
 
-	async createTerminal(
+	createTerminal(
 		params: acp.CreateTerminalRequest,
 	): Promise<acp.CreateTerminalResponse> {
 		this.logger.log(
@@ -1106,19 +1188,19 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.logger.log("[AcpAdapter] Using modified params:", modifiedParams);
 
 		const terminalId = this.terminalManager.createTerminal(modifiedParams);
-		return {
+		return Promise.resolve({
 			terminalId,
-		};
+		});
 	}
 
-	async terminalOutput(
+	terminalOutput(
 		params: acp.TerminalOutputRequest,
 	): Promise<acp.TerminalOutputResponse> {
 		const result = this.terminalManager.getOutput(params.terminalId);
 		if (!result) {
 			throw new Error(`Terminal ${params.terminalId} not found`);
 		}
-		return result;
+		return Promise.resolve(result);
 	}
 
 	async waitForTerminalExit(
@@ -1127,17 +1209,17 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		return await this.terminalManager.waitForExit(params.terminalId);
 	}
 
-	async killTerminal(
+	killTerminal(
 		params: acp.KillTerminalCommandRequest,
 	): Promise<acp.KillTerminalResponse> {
 		const success = this.terminalManager.killTerminal(params.terminalId);
 		if (!success) {
 			throw new Error(`Terminal ${params.terminalId} not found`);
 		}
-		return {};
+		return Promise.resolve({});
 	}
 
-	async releaseTerminal(
+	releaseTerminal(
 		params: acp.ReleaseTerminalRequest,
 	): Promise<acp.ReleaseTerminalResponse> {
 		const success = this.terminalManager.releaseTerminal(params.terminalId);
@@ -1147,6 +1229,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				`[AcpAdapter] releaseTerminal: Terminal ${params.terminalId} not found (may have been already cleaned up)`,
 			);
 		}
-		return {};
+		return Promise.resolve({});
 	}
 }
