@@ -50,6 +50,9 @@ describe('ManageSessionUseCase', () => {
 		exportSettings: {
 			defaultFolder: 'Agent Client',
 			filenameTemplate: 'agent_client_{date}_{time}',
+				autoExportOnNewChat: false,
+				autoExportOnCloseChat: false,
+				openFileAfterExport: true,
 		},
 		windowsWslMode: false,
 	};

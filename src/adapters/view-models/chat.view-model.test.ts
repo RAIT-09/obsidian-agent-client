@@ -24,6 +24,34 @@ vi.mock('../../shared/logger', () => ({
 	})),
 }));
 
+// ============================================================================
+// Test Helper Factories
+// ============================================================================
+
+function createMockAgentError(overrides?: Partial<import('../../core/domain/models/agent-error').AgentError>): import('../../core/domain/models/agent-error').AgentError {
+	return {
+		id: 'error-123',
+		title: 'Test Error',
+		message: 'Test error message',
+		suggestion: 'Test suggestion',
+		category: 'unknown' as const,
+		severity: 'error' as const,
+		occurredAt: new Date(),
+		...overrides,
+	};
+}
+
+function createMockNoteMetadata(overrides?: Partial<NoteMetadata>): NoteMetadata {
+	return {
+		path: 'notes/test.md',
+		name: 'test',
+		extension: 'md',
+		created: Date.now(),
+		modified: Date.now(),
+		...overrides,
+	};
+}
+
 describe('ChatViewModel', () => {
 	let viewModel: ChatViewModel;
 	let mockPlugin: AgentClientPlugin;
@@ -394,22 +422,22 @@ describe('ChatViewModel', () => {
 			it('should handle session creation failure', async () => {
 				vi.mocked(mockManageSessionUseCase.createSession).mockResolvedValue({
 					success: false,
-					error: {
+					error: createMockAgentError({
 						title: 'Connection Failed',
 						message: 'Could not connect to agent',
 						suggestion: 'Check your network connection',
-					},
+					}),
 				});
 
 				await viewModel.createNewSession();
 
 				const state = viewModel.getSnapshot();
 				expect(state.session.state).toBe('error');
-				expect(state.errorInfo).toEqual({
+				expect(state.errorInfo).toEqual(expect.objectContaining({
 					title: 'Connection Failed',
 					message: 'Could not connect to agent',
 					suggestion: 'Check your network connection',
-				});
+				}));
 			});
 
 			it('should handle unexpected errors', async () => {
@@ -582,7 +610,7 @@ describe('ChatViewModel', () => {
 				vi.mocked(
 					mockSendMessageUseCase.sendPreparedMessage
 				).mockResolvedValue({
-					success: true,
+					success: true, displayMessage: 'Test', agentMessage: 'Test',
 				});
 
 				// Wait for sendMessage to complete
@@ -650,7 +678,7 @@ describe('ChatViewModel', () => {
 				vi.mocked(
 					mockSendMessageUseCase.sendPreparedMessage
 				).mockResolvedValue({
-					success: true,
+					success: true, displayMessage: 'Test', agentMessage: 'Test',
 				});
 
 				await viewModel.sendMessage('Test message', {
@@ -672,7 +700,7 @@ describe('ChatViewModel', () => {
 				vi.mocked(
 					mockSendMessageUseCase.sendPreparedMessage
 				).mockResolvedValue({
-					success: true,
+					success: true, displayMessage: 'Test', agentMessage: 'Test',
 				});
 
 				await viewModel.sendMessage('Hello', {
@@ -695,10 +723,12 @@ describe('ChatViewModel', () => {
 					mockSendMessageUseCase.sendPreparedMessage
 				).mockResolvedValue({
 					success: false,
-					error: {
+					displayMessage: 'Test',
+					agentMessage: 'Test',
+					error: createMockAgentError({
 						title: 'Send Failed',
 						message: 'Network error',
-					},
+					}),
 				});
 
 				await viewModel.sendMessage('Hello', {
@@ -709,10 +739,10 @@ describe('ChatViewModel', () => {
 				const state = viewModel.getSnapshot();
 				expect(state.isSending).toBe(false);
 				expect(state.session.state).toBe('ready');
-				expect(state.errorInfo).toEqual({
+				expect(state.errorInfo).toEqual(expect.objectContaining({
 					title: 'Send Failed',
 					message: 'Network error',
-				});
+				}));
 			});
 
 			it('should handle unexpected errors', async () => {
@@ -761,16 +791,13 @@ describe('ChatViewModel', () => {
 				vi.mocked(mockSendMessageUseCase.prepareMessage).mockResolvedValue({
 					displayMessage: 'Check this',
 					agentMessage: 'Check this',
-					autoMentionContext: {
-						path: '/vault/note.md',
-						content: 'Note content',
-					},
+					autoMentionContext: { noteName: '/vault/note.md', notePath: '/vault/note.md' },
 				});
 
 				vi.mocked(
 					mockSendMessageUseCase.sendPreparedMessage
 				).mockResolvedValue({
-					success: true,
+					success: true, displayMessage: 'Test', agentMessage: 'Test',
 				});
 
 				await viewModel.sendMessage('Check this', {
@@ -783,10 +810,7 @@ describe('ChatViewModel', () => {
 				expect(userMessage.content[0]).toEqual({
 					type: 'text_with_context',
 					text: 'Check this',
-					autoMentionContext: {
-						path: '/vault/note.md',
-						content: 'Note content',
-					},
+					autoMentionContext: { noteName: '/vault/note.md', notePath: '/vault/note.md' },
 				});
 			});
 		});
@@ -1127,10 +1151,10 @@ describe('ChatViewModel', () => {
 			await viewModel.approvePermission('req-123', 'allow_once');
 
 			const state = viewModel.getSnapshot();
-			expect(state.errorInfo).toEqual({
+			expect(state.errorInfo).toEqual(expect.objectContaining({
 				title: 'Permission Error',
 				message: 'Permission denied by agent',
-			});
+			}));
 		});
 
 		it('should handle unexpected errors', async () => {
@@ -1158,9 +1182,9 @@ describe('ChatViewModel', () => {
 					role: 'assistant',
 					content: [{
 						type: 'tool_call',
-						id: 'tool-1',
-						name: 'read_file',
-						input: { path: '/test.md' },
+						toolCallId: 'tool-1',
+						title: 'read_file',
+						rawInput: { path: '/test.md' },
 						status: 'pending',
 						permissionRequest: {
 							requestId: 'perm-123',
@@ -1201,9 +1225,9 @@ describe('ChatViewModel', () => {
 					role: 'assistant',
 					content: [{
 						type: 'tool_call',
-						id: 'tool-1',
-						name: 'read_file',
-						input: { path: '/test.md' },
+						toolCallId: 'tool-1',
+						title: 'read_file',
+						rawInput: { path: '/test.md' },
 						status: 'pending',
 						permissionRequest: {
 							requestId: 'perm-123',
@@ -1228,9 +1252,9 @@ describe('ChatViewModel', () => {
 					role: 'assistant',
 					content: [{
 						type: 'tool_call',
-						id: 'tool-1',
-						name: 'read_file',
-						input: { path: '/test.md' },
+						toolCallId: 'tool-1',
+						title: 'read_file',
+						rawInput: { path: '/test.md' },
 						status: 'pending',
 						permissionRequest: {
 							requestId: 'perm-456',
@@ -1263,15 +1287,15 @@ describe('ChatViewModel', () => {
 					role: 'assistant',
 					content: [{
 						type: 'tool_call',
-						id: 'tool-1',
-						name: 'read_file',
-						input: { path: '/test.md' },
+						toolCallId: 'tool-1',
+						title: 'read_file',
+						rawInput: { path: '/test.md' },
 						status: 'pending',
 						permissionRequest: {
 							requestId: 'perm-789',
 							options: [
 								{ optionId: 'opt-1', name: 'Allow', kind: 'allow_once' },
-								{ optionId: 'opt-2', name: 'Deny Access', kind: 'other' },
+								{ optionId: 'opt-2', name: 'Deny Access', kind: 'allow_once' },
 							],
 							isActive: true,
 						},
@@ -1355,12 +1379,8 @@ describe('ChatViewModel', () => {
 		describe('updateMentionSuggestions', () => {
 			it('should show dropdown when @ is detected', async () => {
 				const mockNotes: NoteMetadata[] = [
-					{
-						path: 'notes/test.md',
-						name: 'test',
-						basename: 'test',
-						extension: 'md',
-					},
+					createMockNoteMetadata({ path: 'notes/test.md', name: 'test', extension: 'md',
+					 }),
 				];
 				vi.mocked(mockVaultAccess.searchNotes).mockResolvedValue(mockNotes);
 
@@ -1380,12 +1400,8 @@ describe('ChatViewModel', () => {
 			it('should close dropdown when no mention context', async () => {
 				// First show dropdown
 				vi.mocked(mockVaultAccess.searchNotes).mockResolvedValue([
-					{
-						path: 'test.md',
-						name: 'test',
-						basename: 'test',
-						extension: 'md',
-					},
+					createMockNoteMetadata({ path: 'test.md', name: 'test', extension: 'md',
+					 }),
 				]);
 				await viewModel.updateMentionSuggestions('Check @test', 11);
 
@@ -1409,12 +1425,8 @@ describe('ChatViewModel', () => {
 			it('should replace mention with selected note', async () => {
 				// Set up mention context
 				const mockNotes: NoteMetadata[] = [
-					{
-						path: 'notes/selected.md',
-						name: 'selected',
-						basename: 'selected',
-						extension: 'md',
-					},
+					createMockNoteMetadata({ path: 'notes/selected.md', name: 'selected', extension: 'md',
+					 }),
 				];
 				vi.mocked(mockVaultAccess.searchNotes).mockResolvedValue(mockNotes);
 				await viewModel.updateMentionSuggestions('Check @sel', 10);
@@ -1425,12 +1437,8 @@ describe('ChatViewModel', () => {
 			});
 
 			it('should close dropdown after selection', async () => {
-				const mockNote: NoteMetadata = {
-					path: 'test.md',
-					name: 'test',
-					basename: 'test',
-					extension: 'md',
-				};
+				const mockNote: NoteMetadata = createMockNoteMetadata({ path: 'test.md', name: 'test', extension: 'md',
+				 });
 				vi.mocked(mockVaultAccess.searchNotes).mockResolvedValue([mockNote]);
 				await viewModel.updateMentionSuggestions('Check @t', 8);
 
@@ -1442,12 +1450,8 @@ describe('ChatViewModel', () => {
 			});
 
 			it('should return original text when no mention context', () => {
-				const mockNote: NoteMetadata = {
-					path: 'test.md',
-					name: 'test',
-					basename: 'test',
-					extension: 'md',
-				};
+				const mockNote: NoteMetadata = createMockNoteMetadata({ path: 'test.md', name: 'test', extension: 'md',
+				 });
 
 				const result = viewModel.selectMention('No mention here', mockNote);
 
@@ -1459,12 +1463,8 @@ describe('ChatViewModel', () => {
 			it('should close dropdown and clear state', async () => {
 				// First show dropdown
 				vi.mocked(mockVaultAccess.searchNotes).mockResolvedValue([
-					{
-						path: 'test.md',
-						name: 'test',
-						basename: 'test',
-						extension: 'md',
-					},
+					createMockNoteMetadata({ path: 'test.md', name: 'test', extension: 'md',
+					 }),
 				]);
 				await viewModel.updateMentionSuggestions('Check @test', 11);
 
@@ -1482,9 +1482,9 @@ describe('ChatViewModel', () => {
 			beforeEach(async () => {
 				// Set up dropdown with 3 items
 				const mockNotes: NoteMetadata[] = [
-					{ path: '1.md', name: 'one', basename: 'one', extension: 'md' },
-					{ path: '2.md', name: 'two', basename: 'two', extension: 'md' },
-					{ path: '3.md', name: 'three', basename: 'three', extension: 'md' },
+					createMockNoteMetadata({ path: '1.md', name: 'one', extension: 'md'  }),
+					createMockNoteMetadata({ path: '2.md', name: 'two', extension: 'md'  }),
+					createMockNoteMetadata({ path: '3.md', name: 'three', extension: 'md'  }),
 				];
 				vi.mocked(mockVaultAccess.searchNotes).mockResolvedValue(mockNotes);
 				await viewModel.updateMentionSuggestions('Check @', 7);

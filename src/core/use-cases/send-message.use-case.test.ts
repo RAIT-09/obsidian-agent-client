@@ -72,6 +72,9 @@ describe('SendMessageUseCase', () => {
 				exportSettings: {
 					defaultFolder: 'Agent Client',
 					filenameTemplate: 'agent_client_{date}_{time}',
+				autoExportOnNewChat: false,
+				autoExportOnCloseChat: false,
+				openFileAfterExport: true,
 				},
 				windowsWslMode: false,
 			})),
@@ -80,9 +83,7 @@ describe('SendMessageUseCase', () => {
 		};
 
 		mockMentionService = {
-			searchNotes: vi.fn(() => []),
 			getAllFiles: vi.fn(() => []),
-			findNoteByTitle: vi.fn(),
 		};
 
 		useCase = new SendMessageUseCase(
