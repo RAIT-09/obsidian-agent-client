@@ -659,7 +659,7 @@ function ChatComponent({
 			const openFile = plugin.settings.exportSettings.openFileAfterExport;
 			const filePath = await exporter.exportToMarkdown(
 				messages,
-				activeAgentLabel,
+				session.agentDisplayName,
 				session.agentId,
 				session.sessionId || "unknown",
 				session.createdAt,

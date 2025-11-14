@@ -238,6 +238,7 @@ export class ChatViewModel {
 	 */
 	private createInitialState(): ChatViewModelState {
 		const activeAgentId = this.switchAgentUseCase.getActiveAgentId();
+		const currentAgent = this.switchAgentUseCase.getCurrentAgent();
 
 		return {
 			messages: [],
@@ -245,6 +246,7 @@ export class ChatViewModel {
 				sessionId: null,
 				state: "disconnected" as SessionState,
 				agentId: activeAgentId,
+				agentDisplayName: currentAgent.displayName,
 				authMethods: [],
 				createdAt: new Date(),
 				lastActivityAt: new Date(),
@@ -334,13 +336,12 @@ export class ChatViewModel {
 
 		try {
 			const exporter = new ChatExporter(this.plugin);
-			const currentAgent = this.switchAgentUseCase.getCurrentAgent();
 			const openFile =
 				this.plugin.settings.exportSettings.openFileAfterExport;
 
 			const filePath = await exporter.exportToMarkdown(
 				this.state.messages,
-				currentAgent.displayName,
+				this.state.session.agentDisplayName,
 				this.state.session.agentId,
 				this.state.session.sessionId,
 				this.state.session.createdAt,
@@ -368,8 +369,9 @@ export class ChatViewModel {
 		// Auto-export current chat before starting new one
 		await this.autoExportIfEnabled("newChat");
 
-		// Get active agent ID before async operations
+		// Get active agent ID and display name before async operations
 		const activeAgentId = this.switchAgentUseCase.getActiveAgentId();
+		const currentAgent = this.switchAgentUseCase.getCurrentAgent();
 
 		// Reset UI immediately (synchronous) - same as plugin startup flow
 		this.setState({
@@ -377,6 +379,7 @@ export class ChatViewModel {
 			session: {
 				...this.state.session,
 				agentId: activeAgentId,
+				agentDisplayName: currentAgent.displayName,
 				state: "initializing",
 				sessionId: null,
 				authMethods: [],
