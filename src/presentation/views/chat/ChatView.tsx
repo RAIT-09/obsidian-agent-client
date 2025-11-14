@@ -970,6 +970,20 @@ export class ChatView extends ItemView {
 			on: (event: string, callback: () => void) => EventRef;
 		};
 
+		const toggleAutoMentionHandler = () => {
+			const viewModel = this.viewModel;
+			if (!viewModel) {
+				new Notice("[Agent Client] Chat view is not ready");
+				return;
+			}
+			const currentState = viewModel.getSnapshot();
+			const newState = !currentState.isAutoMentionTemporarilyDisabled;
+			viewModel.toggleAutoMention(newState);
+			new Notice(
+				`[Agent Client] Auto-mention ${newState ? "disabled" : "enabled"}`,
+			);
+		};
+
 		this.registerEvent(
 			workspace.on("agent-client:approve-active-permission", () => {
 				void approveHandler();
@@ -978,6 +992,11 @@ export class ChatView extends ItemView {
 		this.registerEvent(
 			workspace.on("agent-client:reject-active-permission", () => {
 				void rejectHandler();
+			}),
+		);
+		this.registerEvent(
+			workspace.on("agent-client:toggle-auto-mention", () => {
+				toggleAutoMentionHandler();
 			}),
 		);
 	}

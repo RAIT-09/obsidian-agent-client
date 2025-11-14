@@ -260,6 +260,15 @@ export default class AgentClientPlugin extends Plugin {
 				);
 			},
 		});
+
+		this.addCommand({
+			id: "agent-client-toggle-auto-mention",
+			name: "Toggle auto-mention",
+			callback: async () => {
+				await this.activateView();
+				this.app.workspace.trigger("agent-client:toggle-auto-mention");
+			},
+		});
 	}
 
 	async loadSettings() {
