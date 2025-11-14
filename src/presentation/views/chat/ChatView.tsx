@@ -421,6 +421,15 @@ function ChatComponent({
 		checkIfAtBottom();
 	}, []);
 
+	// Auto-focus textarea on mount
+	useEffect(() => {
+		window.setTimeout(() => {
+			if (textareaRef.current) {
+				textareaRef.current.focus();
+			}
+		}, 0);
+	}, []);
+
 	useEffect(() => {
 		adjustTextareaHeight();
 	}, [inputValue]);

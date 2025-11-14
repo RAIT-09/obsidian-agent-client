@@ -151,6 +151,18 @@ export default class AgentClientPlugin extends Plugin {
 
 		if (leaf) {
 			workspace.revealLeaf(leaf);
+			// Focus textarea after revealing the leaf
+			const viewContainerEl = leaf.view?.containerEl;
+			if (viewContainerEl) {
+				window.setTimeout(() => {
+					const textarea = viewContainerEl.querySelector(
+						"textarea.chat-input-textarea",
+					);
+					if (textarea instanceof HTMLTextAreaElement) {
+						textarea.focus();
+					}
+				}, 0);
+			}
 		}
 	}
 
