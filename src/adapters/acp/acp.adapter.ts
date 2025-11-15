@@ -849,7 +849,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				}
 				break;
 
-			case "tool_call":
+			case "tool_call": {
 				// Try to update existing tool call first
 				const updated = this.updateMessage(update.toolCallId, {
 					type: "tool_call",
@@ -881,6 +881,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					});
 				}
 				break;
+			}
 
 			case "tool_call_update":
 				this.logger.log(
@@ -1125,20 +1126,20 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.logger.log(
 			`[AcpAdapter] Cancelling ${this.pendingPermissionRequests.size} pending permission requests`,
 		);
-	this.pendingPermissionRequests.forEach(
-		({ resolve, toolCallId, options }, requestId) => {
+		this.pendingPermissionRequests.forEach(
+			({ resolve, toolCallId, options }, requestId) => {
 				// Update UI to show cancelled state
-			this.updateMessage(toolCallId, {
-				type: "tool_call",
-				toolCallId,
-				status: "completed",
-				permissionRequest: {
-					requestId,
-					options,
-					isCancelled: true,
-					isActive: false,
-				},
-			} as MessageContent);
+				this.updateMessage(toolCallId, {
+					type: "tool_call",
+					toolCallId,
+					status: "completed",
+					permissionRequest: {
+						requestId,
+						options,
+						isCancelled: true,
+						isActive: false,
+					},
+				} as MessageContent);
 
 				// Resolve the promise with cancelled outcome
 				resolve({
@@ -1148,8 +1149,8 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				});
 			},
 		);
-	this.pendingPermissionRequests.clear();
-	this.pendingPermissionQueue = [];
+		this.pendingPermissionRequests.clear();
+		this.pendingPermissionQueue = [];
 	}
 
 	// ========================================================================

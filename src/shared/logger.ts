@@ -5,7 +5,7 @@ export class Logger {
 
 	log(...args: unknown[]): void {
 		if (this.plugin.settings.debugMode) {
-			console.log(...args);
+			console.debug(...args);
 		}
 	}
 
@@ -23,7 +23,7 @@ export class Logger {
 
 	info(...args: unknown[]): void {
 		if (this.plugin.settings.debugMode) {
-			console.info(...args);
+			console.debug(...args);
 		}
 	}
 }

@@ -115,7 +115,7 @@ export default class AgentClientPlugin extends Plugin {
 		ribbonIconEl.addClass("agent-client-ribbon-icon");
 
 		this.addCommand({
-			id: "open-agent-client-chat-view",
+			id: "open-chat-view",
 			name: "Open agent chat",
 			callback: () => {
 				this.activateView();
@@ -229,7 +229,7 @@ export default class AgentClientPlugin extends Plugin {
 
 		for (const agent of agents) {
 			this.addCommand({
-				id: `open-agent-client-chat-with-${agent.id}`,
+				id: `open-chat-with-${agent.id}`,
 				name: `New chat with ${agent.displayName}`,
 				callback: async () => {
 					await this.openChatWithAgent(agent.id);
@@ -240,7 +240,7 @@ export default class AgentClientPlugin extends Plugin {
 
 	private registerPermissionCommands(): void {
 		this.addCommand({
-			id: "agent-client-approve-active-permission",
+			id: "approve-active-permission",
 			name: "Approve active permission",
 			callback: async () => {
 				await this.activateView();
@@ -251,7 +251,7 @@ export default class AgentClientPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: "agent-client-reject-active-permission",
+			id: "reject-active-permission",
 			name: "Reject active permission",
 			callback: async () => {
 				await this.activateView();
@@ -262,7 +262,7 @@ export default class AgentClientPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: "agent-client-toggle-auto-mention",
+			id: "toggle-auto-mention",
 			name: "Toggle auto-mention",
 			callback: async () => {
 				await this.activateView();
@@ -346,7 +346,7 @@ export default class AgentClientPlugin extends Plugin {
 						? claudeFromRaw.command.trim()
 						: typeof rawSettings.claudeCodeAcpCommandPath ===
 									"string" &&
-							  rawSettings.claudeCodeAcpCommandPath.trim()
+									rawSettings.claudeCodeAcpCommandPath.trim()
 									.length > 0
 							? rawSettings.claudeCodeAcpCommandPath.trim()
 							: DEFAULT_SETTINGS.claude.command,
@@ -388,7 +388,7 @@ export default class AgentClientPlugin extends Plugin {
 					geminiFromRaw.command.trim().length > 0
 						? geminiFromRaw.command.trim()
 						: typeof rawSettings.geminiCommandPath === "string" &&
-							  rawSettings.geminiCommandPath.trim().length > 0
+									rawSettings.geminiCommandPath.trim().length > 0
 							? rawSettings.geminiCommandPath.trim()
 							: DEFAULT_SETTINGS.gemini.command,
 				args:

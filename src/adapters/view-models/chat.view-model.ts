@@ -34,7 +34,7 @@ import type { MentionContext } from "../../shared/mention-utils";
 import { detectMention, replaceMention } from "../../shared/mention-utils";
 import { ChatExporter } from "../../shared/chat-exporter";
 import { Logger } from "../../shared/logger";
-import { Notice } from "obsidian";
+import { Notice, Platform } from "obsidian";
 
 // ============================================================================
 // ViewModel State
@@ -1208,8 +1208,6 @@ export class ChatViewModel {
 	 * Returns true only when running on Windows with WSL mode enabled.
 	 */
 	private shouldConvertToWsl(): boolean {
-		// Import Platform at runtime to avoid issues with Obsidian API
-		const { Platform } = require("obsidian");
 		return Platform.isWin && this.plugin.settings.windowsWslMode;
 	}
 

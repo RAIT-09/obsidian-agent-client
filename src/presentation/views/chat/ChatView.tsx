@@ -89,7 +89,12 @@ function ChatComponent({
 	// Check for updates asynchronously
 	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
 	useEffect(() => {
-		plugin.checkForUpdates().then(setIsUpdateAvailable);
+		plugin
+			.checkForUpdates()
+			.then(setIsUpdateAvailable)
+			.catch((error) => {
+				console.error("Failed to check for updates:", error);
+			});
 	}, []);
 
 	const [inputValue, setInputValue] = useState("");
