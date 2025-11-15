@@ -365,20 +365,28 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		});
 
 		// Create stream for ACP communication
+		// stdio is configured as ["pipe", "pipe", "pipe"] so stdin/stdout are guaranteed to exist
+		if (!agentProcess.stdin || !agentProcess.stdout) {
+			throw new Error("Agent process stdin/stdout not available");
+		}
+
+		const stdin = agentProcess.stdin;
+		const stdout = agentProcess.stdout;
+
 		const input = new WritableStream({
 			write(chunk) {
-				agentProcess.stdin!.write(chunk);
+				stdin.write(chunk);
 			},
 			close() {
-				agentProcess.stdin!.end();
+				stdin.end();
 			},
 		});
 		const output = new ReadableStream({
 			start(controller) {
-				agentProcess.stdout!.on("data", (chunk) => {
+				stdout.on("data", (chunk) => {
 					controller.enqueue(chunk);
 				});
-				agentProcess.stdout!.on("end", () => {
+				stdout.on("end", () => {
 					controller.close();
 				});
 			},

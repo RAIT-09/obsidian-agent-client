@@ -137,11 +137,10 @@ export class TerminalManager {
 				error.message,
 			);
 			// Set exit status to indicate failure
-			terminal.exitStatus = { exitCode: 127, signal: null }; // 127 = command not found
+			const exitStatus = { exitCode: 127, signal: null }; // 127 = command not found
+			terminal.exitStatus = exitStatus;
 			// Resolve all waiting promises
-			terminal.waitPromises.forEach((resolve) =>
-				resolve(terminal.exitStatus!),
-			);
+			terminal.waitPromises.forEach((resolve) => resolve(exitStatus));
 			terminal.waitPromises = [];
 		});
 
@@ -163,11 +162,10 @@ export class TerminalManager {
 			this.logger.log(
 				`[Terminal ${terminalId}] Process exited with code: ${code}, signal: ${signal}`,
 			);
-			terminal.exitStatus = { exitCode: code, signal };
+			const exitStatus = { exitCode: code, signal };
+			terminal.exitStatus = exitStatus;
 			// Resolve all waiting promises
-			terminal.waitPromises.forEach((resolve) =>
-				resolve(terminal.exitStatus!),
-			);
+			terminal.waitPromises.forEach((resolve) => resolve(exitStatus));
 			terminal.waitPromises = [];
 		});
 
