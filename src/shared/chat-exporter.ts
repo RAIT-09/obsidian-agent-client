@@ -19,7 +19,7 @@ export class ChatExporter {
 		agentId: string,
 		sessionId: string,
 		sessionCreatedAt: Date,
-		openFile: boolean = true,
+		openFile = true,
 	): Promise<string> {
 		const settings = this.plugin.settings.exportSettings;
 		const fileName = this.generateFileName(sessionCreatedAt);
@@ -156,7 +156,7 @@ tags: [agent-client]
 			case "text":
 				return content.text + "\n\n";
 
-			case "text_with_context":
+			case "text_with_context": {
 				// User messages with auto-mention context
 				// Add auto-mention in @[[note]] format at the beginning
 				let exportText = "";
@@ -171,6 +171,7 @@ tags: [agent-client]
 				// Add the message text (which may contain additional @[[note]] mentions)
 				exportText += content.text + "\n\n";
 				return exportText;
+			}
 
 			case "agent_thought":
 				return `> [!info]- Thinking\n> ${content.text.split("\n").join("\n> ")}\n\n`;
