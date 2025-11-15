@@ -985,9 +985,6 @@ export class ChatView extends ItemView {
 			const currentState = viewModel.getSnapshot();
 			const newState = !currentState.isAutoMentionTemporarilyDisabled;
 			viewModel.toggleAutoMention(newState);
-			new Notice(
-				`[Agent Client] Auto-mention ${newState ? "disabled" : "enabled"}`,
-			);
 		};
 
 		this.registerEvent(
