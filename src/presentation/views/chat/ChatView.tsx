@@ -89,7 +89,12 @@ function ChatComponent({
 	// Check for updates asynchronously
 	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
 	useEffect(() => {
-		plugin.checkForUpdates().then(setIsUpdateAvailable);
+		plugin
+			.checkForUpdates()
+			.then(setIsUpdateAvailable)
+			.catch((error) => {
+				console.error("Failed to check for updates:", error);
+			});
 	}, []);
 
 	const [inputValue, setInputValue] = useState("");
@@ -421,6 +426,15 @@ function ChatComponent({
 		checkIfAtBottom();
 	}, []);
 
+	// Auto-focus textarea on mount
+	useEffect(() => {
+		window.setTimeout(() => {
+			if (textareaRef.current) {
+				textareaRef.current.focus();
+			}
+		}, 0);
+	}, []);
+
 	useEffect(() => {
 		adjustTextareaHeight();
 	}, [inputValue]);
@@ -659,7 +673,7 @@ function ChatComponent({
 			const openFile = plugin.settings.exportSettings.openFileAfterExport;
 			const filePath = await exporter.exportToMarkdown(
 				messages,
-				activeAgentLabel,
+				session.agentDisplayName,
 				session.agentId,
 				session.sessionId || "unknown",
 				session.createdAt,
@@ -907,13 +921,14 @@ export class ChatView extends ItemView {
 		return "bot-message-square";
 	}
 
-	async onOpen() {
+	onOpen() {
 		const container = this.containerEl.children[1];
 		container.empty();
 
 		this.root = createRoot(container);
 		this.root.render(<ChatComponent plugin={this.plugin} view={this} />);
 		this.registerPermissionEvents();
+		return Promise.resolve();
 	}
 
 	async onClose() {
@@ -961,6 +976,17 @@ export class ChatView extends ItemView {
 			on: (event: string, callback: () => void) => EventRef;
 		};
 
+		const toggleAutoMentionHandler = () => {
+			const viewModel = this.viewModel;
+			if (!viewModel) {
+				new Notice("[Agent Client] Chat view is not ready");
+				return;
+			}
+			const currentState = viewModel.getSnapshot();
+			const newState = !currentState.isAutoMentionTemporarilyDisabled;
+			viewModel.toggleAutoMention(newState);
+		};
+
 		this.registerEvent(
 			workspace.on("agent-client:approve-active-permission", () => {
 				void approveHandler();
@@ -969,6 +995,11 @@ export class ChatView extends ItemView {
 		this.registerEvent(
 			workspace.on("agent-client:reject-active-permission", () => {
 				void rejectHandler();
+			}),
+		);
+		this.registerEvent(
+			workspace.on("agent-client:toggle-auto-mention", () => {
+				toggleAutoMentionHandler();
 			}),
 		);
 	}

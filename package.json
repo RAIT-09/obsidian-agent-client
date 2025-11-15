@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-agent-client",
-	"version": "0.3.0-preview.2",
+	"version": "0.3.0",
 	"description": "Use AI coding agents via the Agent Client Protocol directly inside Obsidian",
 	"main": "main.js",
 	"scripts": {
@@ -39,6 +39,8 @@
 	},
 	"dependencies": {
 		"@agentclientprotocol/sdk": "^0.5.1",
+		"@codemirror/state": "^6.5.2",
+		"@codemirror/view": "^6.38.7",
 		"react": "^19.1.1",
 		"react-dom": "^19.1.1"
 	}

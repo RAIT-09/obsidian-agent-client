@@ -89,4 +89,5 @@ export interface CodexAgentSettings extends BaseAgentSettings {
  * Uses only the base settings, allowing users to configure
  * any agent that implements the Agent Client Protocol.
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface CustomAgentSettings extends BaseAgentSettings {}
