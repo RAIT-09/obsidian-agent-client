@@ -70,10 +70,12 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 	 * @param query - Search query string (can be empty for recent files)
 	 * @returns Promise resolving to array of matching note metadata
 	 */
-	async searchNotes(query: string): Promise<NoteMetadata[]> {
+	searchNotes(query: string): Promise<NoteMetadata[]> {
 		// Use existing NoteMentionService for fuzzy search
 		const files = this.mentionService.searchNotes(query);
-		return files.map((file) => this.convertToMetadata(file));
+		return Promise.resolve(
+			files.map((file) => this.convertToMetadata(file)),
+		);
 	}
 
 	/**
@@ -83,9 +85,9 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 	 *
 	 * @returns Promise resolving to active note metadata, or null if no note is active
 	 */
-	async getActiveNote(): Promise<NoteMetadata | null> {
+	getActiveNote(): Promise<NoteMetadata | null> {
 		const activeFile = this.plugin.app.workspace.getActiveFile();
-		if (!activeFile) return null;
+		if (!activeFile) return Promise.resolve(null);
 
 		const metadata = this.convertToMetadata(activeFile);
 
@@ -97,7 +99,7 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 			metadata.selection = this.currentSelection.selection;
 		}
 
-		return metadata;
+		return Promise.resolve(metadata);
 	}
 
 	/**
@@ -309,10 +311,12 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 	 *
 	 * @returns Promise resolving to array of all note metadata
 	 */
-	async listNotes(): Promise<NoteMetadata[]> {
+	listNotes(): Promise<NoteMetadata[]> {
 		// Use existing NoteMentionService to get all files
 		const files = this.mentionService.getAllFiles();
-		return files.map((file) => this.convertToMetadata(file));
+		return Promise.resolve(
+			files.map((file) => this.convertToMetadata(file)),
+		);
 	}
 
 	/**

@@ -696,7 +696,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	/**
 	 * Disconnect from the agent and clean up resources.
 	 */
-	async disconnect(): Promise<void> {
+	disconnect(): Promise<void> {
 		this.logger.log("[AcpAdapter] Disconnecting...");
 
 		// Cancel all pending operations
@@ -720,6 +720,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.currentAgentId = null;
 
 		this.logger.log("[AcpAdapter] Disconnected");
+		return Promise.resolve();
 	}
 
 	/**
@@ -768,10 +769,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	/**
 	 * Respond to a permission request from the agent.
 	 */
-	async respondToPermission(
-		requestId: string,
-		optionId: string,
-	): Promise<void> {
+	respondToPermission(requestId: string, optionId: string): Promise<void> {
 		if (!this.connection) {
 			throw new Error(
 				"ACP connection not initialized. Call initialize() first.",
@@ -785,6 +783,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			optionId,
 		);
 		this.handlePermissionResponse(requestId, optionId);
+		return Promise.resolve();
 	}
 
 	// Helper methods
@@ -834,7 +833,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	 * Handle session updates from the ACP protocol.
 	 * This is called by ClientSideConnection when the agent sends updates.
 	 */
-	async sessionUpdate(params: acp.SessionNotification): Promise<void> {
+	sessionUpdate(params: acp.SessionNotification): Promise<void> {
 		const update = params.update;
 		this.logger.log("[AcpAdapter] sessionUpdate:", update);
 
@@ -933,6 +932,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				break;
 			}
 		}
+		return Promise.resolve();
 	}
 
 	/**
@@ -1165,15 +1165,15 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	// Terminal Operations (IAcpClient)
 	// ========================================================================
 
-	async readTextFile(params: acp.ReadTextFileRequest) {
-		return { content: "" };
+	readTextFile(params: acp.ReadTextFileRequest) {
+		return Promise.resolve({ content: "" });
 	}
 
-	async writeTextFile(params: acp.WriteTextFileRequest) {
-		return {};
+	writeTextFile(params: acp.WriteTextFileRequest) {
+		return Promise.resolve({});
 	}
 
-	async createTerminal(
+	createTerminal(
 		params: acp.CreateTerminalRequest,
 	): Promise<acp.CreateTerminalResponse> {
 		this.logger.log(
@@ -1189,19 +1189,19 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.logger.log("[AcpAdapter] Using modified params:", modifiedParams);
 
 		const terminalId = this.terminalManager.createTerminal(modifiedParams);
-		return {
+		return Promise.resolve({
 			terminalId,
-		};
+		});
 	}
 
-	async terminalOutput(
+	terminalOutput(
 		params: acp.TerminalOutputRequest,
 	): Promise<acp.TerminalOutputResponse> {
 		const result = this.terminalManager.getOutput(params.terminalId);
 		if (!result) {
 			throw new Error(`Terminal ${params.terminalId} not found`);
 		}
-		return result;
+		return Promise.resolve(result);
 	}
 
 	async waitForTerminalExit(
@@ -1210,17 +1210,17 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		return await this.terminalManager.waitForExit(params.terminalId);
 	}
 
-	async killTerminal(
+	killTerminal(
 		params: acp.KillTerminalCommandRequest,
 	): Promise<acp.KillTerminalResponse> {
 		const success = this.terminalManager.killTerminal(params.terminalId);
 		if (!success) {
 			throw new Error(`Terminal ${params.terminalId} not found`);
 		}
-		return {};
+		return Promise.resolve({});
 	}
 
-	async releaseTerminal(
+	releaseTerminal(
 		params: acp.ReleaseTerminalRequest,
 	): Promise<acp.ReleaseTerminalResponse> {
 		const success = this.terminalManager.releaseTerminal(params.terminalId);
@@ -1230,6 +1230,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				`[AcpAdapter] releaseTerminal: Terminal ${params.terminalId} not found (may have been already cleaned up)`,
 			);
 		}
-		return {};
+		return Promise.resolve({});
 	}
 }

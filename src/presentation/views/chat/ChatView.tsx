@@ -921,13 +921,14 @@ export class ChatView extends ItemView {
 		return "bot-message-square";
 	}
 
-	async onOpen() {
+	onOpen() {
 		const container = this.containerEl.children[1];
 		container.empty();
 
 		this.root = createRoot(container);
 		this.root.render(<ChatComponent plugin={this.plugin} view={this} />);
 		this.registerPermissionEvents();
+		return Promise.resolve();
 	}
 
 	async onClose() {
