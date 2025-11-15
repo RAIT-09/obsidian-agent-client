@@ -1,5 +1,4 @@
 import * as React from "react";
-const { useMemo } = React;
 import type { MessageContent } from "../../../core/domain/models/chat-message";
 import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
@@ -9,7 +8,6 @@ import { CollapsibleThought } from "./CollapsibleThought";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { TextWithMentions } from "./TextWithMentions";
 import { ToolCallRenderer } from "./ToolCallRenderer";
-import { Logger } from "../../../shared/logger";
 
 interface MessageContentRendererProps {
 	content: MessageContent;
@@ -28,8 +26,6 @@ export function MessageContentRenderer({
 	acpClient,
 	handlePermissionUseCase,
 }: MessageContentRendererProps) {
-	const logger = useMemo(() => new Logger(plugin), [plugin]);
-
 	switch (content.type) {
 		case "text":
 			// User messages: render with mention support

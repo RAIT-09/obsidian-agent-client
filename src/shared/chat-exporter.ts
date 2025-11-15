@@ -19,7 +19,7 @@ export class ChatExporter {
 		agentId: string,
 		sessionId: string,
 		sessionCreatedAt: Date,
-		openFile: boolean = true,
+		openFile = true,
 	): Promise<string> {
 		const settings = this.plugin.settings.exportSettings;
 		const fileName = this.generateFileName(sessionCreatedAt);
@@ -88,10 +88,17 @@ export class ChatExporter {
 		const template =
 			settings.filenameTemplate || "agent_client_{date}_{time}";
 
-		// Format: 20251009
-		const dateStr = timestamp.toISOString().split("T")[0].replace(/-/g, "");
-		// Format: 224900
-		const timeStr = timestamp.toTimeString().slice(0, 8).replace(/:/g, "");
+		// Format date in local timezone: 20251115
+		const year = timestamp.getFullYear();
+		const month = String(timestamp.getMonth() + 1).padStart(2, "0");
+		const day = String(timestamp.getDate()).padStart(2, "0");
+		const dateStr = `${year}${month}${day}`;
+
+		// Format time in local timezone: 012345
+		const hours = String(timestamp.getHours()).padStart(2, "0");
+		const minutes = String(timestamp.getMinutes()).padStart(2, "0");
+		const seconds = String(timestamp.getSeconds()).padStart(2, "0");
+		const timeStr = `${hours}${minutes}${seconds}`;
 
 		return template.replace("{date}", dateStr).replace("{time}", timeStr);
 	}
@@ -102,8 +109,17 @@ export class ChatExporter {
 		sessionId: string,
 		timestamp: Date,
 	): string {
+		// Format timestamp in local timezone: YYYY-MM-DDTHH:mm:ss
+		const year = timestamp.getFullYear();
+		const month = String(timestamp.getMonth() + 1).padStart(2, "0");
+		const day = String(timestamp.getDate()).padStart(2, "0");
+		const hours = String(timestamp.getHours()).padStart(2, "0");
+		const minutes = String(timestamp.getMinutes()).padStart(2, "0");
+		const seconds = String(timestamp.getSeconds()).padStart(2, "0");
+		const localTimestamp = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+
 		return `---
-created: ${timestamp.toISOString()}
+created: ${localTimestamp}
 agentDisplayName: ${agentLabel}
 agentId: ${agentId}
 session_id: ${sessionId}
@@ -140,7 +156,7 @@ tags: [agent-client]
 			case "text":
 				return content.text + "\n\n";
 
-			case "text_with_context":
+			case "text_with_context": {
 				// User messages with auto-mention context
 				// Add auto-mention in @[[note]] format at the beginning
 				let exportText = "";
@@ -155,6 +171,7 @@ tags: [agent-client]
 				// Add the message text (which may contain additional @[[note]] mentions)
 				exportText += content.text + "\n\n";
 				return exportText;
+			}
 
 			case "agent_thought":
 				return `> [!info]- Thinking\n> ${content.text.split("\n").join("\n> ")}\n\n`;

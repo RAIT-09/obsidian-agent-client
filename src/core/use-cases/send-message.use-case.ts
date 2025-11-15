@@ -171,7 +171,7 @@ export class SendMessageUseCase {
 		const contextBlocks: string[] = [];
 		const MAX_NOTE_LENGTH = 10000; // Maximum characters per note
 
-		for (const { noteTitle, file } of mentionedNotes) {
+		for (const { file } of mentionedNotes) {
 			if (!file) {
 				// File not found, skip
 				continue;
