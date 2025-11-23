@@ -108,6 +108,9 @@ export interface ChatSession {
 	/** ID of the active agent (claude, gemini, or custom agent ID) */
 	agentId: string;
 
+	/** Display name of the agent at session creation time */
+	agentDisplayName: string;
+
 	/** Available authentication methods for this session */
 	authMethods: AuthenticationMethod[];
 

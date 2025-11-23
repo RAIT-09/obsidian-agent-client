@@ -1,4 +1,5 @@
 import { ItemView, WorkspaceLeaf, setIcon, Platform, Notice } from "obsidian";
+import type { EventRef } from "obsidian";
 import * as React from "react";
 const {
 	useState,
@@ -88,7 +89,12 @@ function ChatComponent({
 	// Check for updates asynchronously
 	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
 	useEffect(() => {
-		plugin.checkForUpdates().then(setIsUpdateAvailable);
+		plugin
+			.checkForUpdates()
+			.then(setIsUpdateAvailable)
+			.catch((error) => {
+				console.error("Failed to check for updates:", error);
+			});
 	}, []);
 
 	const [inputValue, setInputValue] = useState("");
@@ -420,6 +426,15 @@ function ChatComponent({
 		checkIfAtBottom();
 	}, []);
 
+	// Auto-focus textarea on mount
+	useEffect(() => {
+		window.setTimeout(() => {
+			if (textareaRef.current) {
+				textareaRef.current.focus();
+			}
+		}, 0);
+	}, []);
+
 	useEffect(() => {
 		adjustTextareaHeight();
 	}, [inputValue]);
@@ -655,12 +670,14 @@ function ChatComponent({
 
 		try {
 			const exporter = new ChatExporter(plugin);
+			const openFile = plugin.settings.exportSettings.openFileAfterExport;
 			const filePath = await exporter.exportToMarkdown(
 				messages,
-				activeAgentLabel,
+				session.agentDisplayName,
 				session.agentId,
 				session.sessionId || "unknown",
 				session.createdAt,
+				openFile,
 			);
 			new Notice(`[Agent Client] Chat exported to ${filePath}`);
 		} catch (error) {
@@ -883,11 +900,13 @@ function ChatComponent({
 export class ChatView extends ItemView {
 	private root: Root | null = null;
 	private plugin: AgentClientPlugin;
+	private logger: Logger;
 	public viewModel: ChatViewModel | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: AgentClientPlugin) {
 		super(leaf);
 		this.plugin = plugin;
+		this.logger = new Logger(plugin);
 	}
 
 	getViewType() {
@@ -902,28 +921,86 @@ export class ChatView extends ItemView {
 		return "bot-message-square";
 	}
 
-	async onOpen() {
+	onOpen() {
 		const container = this.containerEl.children[1];
 		container.empty();
 
 		this.root = createRoot(container);
 		this.root.render(<ChatComponent plugin={this.plugin} view={this} />);
+		this.registerPermissionEvents();
+		return Promise.resolve();
 	}
 
 	async onClose() {
-		console.log("[ChatView] onClose() called");
+		this.logger.log("[ChatView] onClose() called");
 		// Cleanup ViewModel and disconnect agent before unmounting
 		if (this.viewModel) {
-			console.log("[ChatView] Disposing ViewModel...");
+			this.logger.log("[ChatView] Disposing ViewModel...");
 			await this.viewModel.dispose();
 			this.viewModel = null;
 		} else {
-			console.log("[ChatView] No ViewModel to dispose");
+			this.logger.log("[ChatView] No ViewModel to dispose");
 		}
-
 		if (this.root) {
 			this.root.unmount();
 			this.root = null;
 		}
+	}
+
+	private registerPermissionEvents(): void {
+		const approveHandler = async () => {
+			const viewModel = this.viewModel;
+			if (!viewModel) {
+				new Notice("[Agent Client] Chat view is not ready");
+				return;
+			}
+			const success = await viewModel.approveActivePermission();
+			if (!success) {
+				new Notice("[Agent Client] No active permission request");
+			}
+		};
+
+		const rejectHandler = async () => {
+			const viewModel = this.viewModel;
+			if (!viewModel) {
+				new Notice("[Agent Client] Chat view is not ready");
+				return;
+			}
+			const success = await viewModel.rejectActivePermission();
+			if (!success) {
+				new Notice("[Agent Client] No active permission request");
+			}
+		};
+
+		const workspace = this.app.workspace as unknown as {
+			on: (event: string, callback: () => void) => EventRef;
+		};
+
+		const toggleAutoMentionHandler = () => {
+			const viewModel = this.viewModel;
+			if (!viewModel) {
+				new Notice("[Agent Client] Chat view is not ready");
+				return;
+			}
+			const currentState = viewModel.getSnapshot();
+			const newState = !currentState.isAutoMentionTemporarilyDisabled;
+			viewModel.toggleAutoMention(newState);
+		};
+
+		this.registerEvent(
+			workspace.on("agent-client:approve-active-permission", () => {
+				void approveHandler();
+			}),
+		);
+		this.registerEvent(
+			workspace.on("agent-client:reject-active-permission", () => {
+				void rejectHandler();
+			}),
+		);
+		this.registerEvent(
+			workspace.on("agent-client:toggle-auto-mention", () => {
+				toggleAutoMentionHandler();
+			}),
+		);
 	}
 }

@@ -45,6 +45,9 @@ export interface CreateSessionResult {
 	/** New session ID */
 	sessionId?: string;
 
+	/** Display name of the agent */
+	agentDisplayName?: string;
+
 	/** Authentication methods supported by the agent */
 	authMethods?: AuthenticationMethod[];
 
@@ -75,6 +78,9 @@ export interface RestartSessionResult {
 
 	/** New session ID */
 	sessionId?: string;
+
+	/** Display name of the agent */
+	agentDisplayName?: string;
 
 	/** Authentication methods supported by the agent */
 	authMethods?: AuthenticationMethod[];
@@ -207,6 +213,7 @@ export class ManageSessionUseCase {
 			return {
 				success: true,
 				sessionId: sessionResult.sessionId,
+				agentDisplayName: agentSettings.displayName,
 				authMethods: authMethods,
 			};
 		} catch (error) {
@@ -255,6 +262,7 @@ export class ManageSessionUseCase {
 		return {
 			success: result.success,
 			sessionId: result.sessionId,
+			agentDisplayName: result.agentDisplayName,
 			authMethods: result.authMethods,
 			error: result.error,
 		};

@@ -144,7 +144,7 @@ export type MessageContent =
 	| {
 			type: "text";
 			text: string;
-	  }
+	}
 	| {
 			type: "text_with_context";
 			text: string;
@@ -156,17 +156,17 @@ export type MessageContent =
 					toLine: number;
 				};
 			};
-	  }
+	}
 	| {
 			type: "agent_thought";
 			text: string;
-	  }
+	}
 	| {
 			type: "image";
 			data: string; // Base64 encoded image data
 			mimeType: string; // e.g., "image/png"
 			uri?: string; // Optional source URI
-	  }
+	}
 	| {
 			type: "tool_call";
 			toolCallId: string;
@@ -182,20 +182,22 @@ export type MessageContent =
 				options: PermissionOption[];
 				selectedOptionId?: string;
 				isCancelled?: boolean;
+				isActive?: boolean;
 			};
-	  }
+	}
 	| {
 			type: "plan";
 			entries: PlanEntry[];
-	  }
+	}
 	| {
 			type: "permission_request";
 			toolCall: ToolCallUpdate;
 			options: PermissionOption[];
 			selectedOptionId?: string;
 			isCancelled?: boolean;
-	  }
+			isActive?: boolean;
+	}
 	| {
 			type: "terminal";
 			terminalId: string;
-	  };
+	};

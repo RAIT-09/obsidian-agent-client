@@ -43,7 +43,7 @@ export function wrapCommandForWsl(
 
 	// Verify path conversion succeeded (if it was a Windows path with drive letter)
 	// If conversion failed, wslCwd will be the same as cwd but still match Windows path pattern
-	if (wslCwd === cwd && /^[A-Za-z]:[\\\/]/.test(cwd)) {
+	if (wslCwd === cwd && /^[A-Za-z]:[\\/]/.test(cwd)) {
 		throw new Error(`Failed to convert Windows path to WSL format: ${cwd}`);
 	}
 
