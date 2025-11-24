@@ -21,9 +21,6 @@ import { ChatExporter } from "../../../shared/chat-exporter";
 import { AcpAdapter, type IAcpClient } from "../../../adapters/acp/acp.adapter";
 import { ObsidianVaultAdapter } from "../../../adapters/obsidian/vault.adapter";
 
-// Use Case imports
-import { SendMessageUseCase } from "../../../core/use-cases/send-message.use-case";
-
 // Hooks imports
 import { useSettings } from "../../../hooks/useSettings";
 import { useMentions } from "../../../hooks/useMentions";
@@ -87,18 +84,6 @@ function ChatComponent({
 	}, [plugin]);
 
 	// ============================================================
-	// Use Cases (temporary - will be inlined into hooks)
-	// ============================================================
-	const sendMessageUseCase = useMemo(() => {
-		return new SendMessageUseCase(
-			acpAdapter,
-			vaultAccessAdapter,
-			plugin.settingsStore,
-			noteMentionService,
-		);
-	}, [acpAdapter, vaultAccessAdapter, plugin, noteMentionService]);
-
-	// ============================================================
 	// Custom Hooks
 	// ============================================================
 	const settings = useSettings(plugin);
@@ -116,7 +101,9 @@ function ChatComponent({
 	} = agentSession;
 
 	const chat = useChat(
-		sendMessageUseCase,
+		acpAdapter,
+		vaultAccessAdapter,
+		noteMentionService,
 		{
 			sessionId: session.sessionId,
 			authMethods: session.authMethods,
@@ -479,7 +466,7 @@ function ChatComponent({
 			<ChatHeader
 				agentLabel={activeAgentLabel}
 				isUpdateAvailable={isUpdateAvailable}
-				onNewChat={handleNewChat}
+				onNewChat={() => handleNewChat()}
 				onExportChat={handleExportChat}
 				onOpenSettings={handleOpenSettings}
 			/>

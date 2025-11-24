@@ -3,10 +3,13 @@ import type {
 	ChatMessage,
 	MessageContent,
 } from "../core/domain/models/chat-message";
-import type { SendMessageUseCase } from "../core/use-cases/send-message.use-case";
+import type { IAgentClient } from "../core/domain/ports/agent-client.port";
+import type { IVaultAccess } from "../core/domain/ports/vault-access.port";
 import type { NoteMetadata } from "../core/domain/ports/vault-access.port";
 import type { AuthenticationMethod } from "../core/domain/models/chat-session";
 import type { ErrorInfo } from "../core/domain/models/agent-error";
+import type { IMentionService } from "../shared/mention-utils";
+import { prepareMessage, sendPreparedMessage } from "../shared/message-service";
 import { Platform } from "obsidian";
 
 // ============================================================================
@@ -43,7 +46,10 @@ export interface UseChatReturn {
 	 * @param content - Message content
 	 * @param options - Message options (activeNote, vaultBasePath, etc.)
 	 */
-	sendMessage: (content: string, options: SendMessageOptions) => Promise<void>;
+	sendMessage: (
+		content: string,
+		options: SendMessageOptions,
+	) => Promise<void>;
 
 	/**
 	 * Clear all messages (e.g., when starting a new session).
@@ -106,12 +112,16 @@ export interface SettingsContext {
  * should be passed to AcpAdapter.setMessageCallbacks() for receiving
  * agent responses.
  *
- * @param sendMessageUseCase - Use case for message preparation and sending
+ * @param agentClient - Agent client for sending messages
+ * @param vaultAccess - Vault access for reading notes
+ * @param mentionService - Mention service for parsing mentions
  * @param sessionContext - Session information (sessionId, authMethods)
  * @param settingsContext - Settings information (windowsWslMode)
  */
 export function useChat(
-	sendMessageUseCase: SendMessageUseCase,
+	agentClient: IAgentClient,
+	vaultAccess: IVaultAccess,
+	mentionService: IMentionService,
 	sessionContext: SessionContext,
 	settingsContext: SettingsContext,
 ): UseChatReturn {
@@ -135,7 +145,10 @@ export function useChat(
 	const updateLastMessage = useCallback((content: MessageContent): void => {
 		setMessages((prev) => {
 			// If no messages or last message is not assistant, create new assistant message
-			if (prev.length === 0 || prev[prev.length - 1].role !== "assistant") {
+			if (
+				prev.length === 0 ||
+				prev[prev.length - 1].role !== "assistant"
+			) {
 				const newMessage: ChatMessage = {
 					id: crypto.randomUUID(),
 					role: "assistant",
@@ -155,7 +168,8 @@ export function useChat(
 					(c) => c.type === content.type,
 				);
 				if (existingContentIndex >= 0) {
-					const existingContent = updatedMessage.content[existingContentIndex];
+					const existingContent =
+						updatedMessage.content[existingContentIndex];
 					// Type guard: we know it's text or agent_thought from findIndex condition
 					if (
 						existingContent.type === "text" ||
@@ -212,22 +226,36 @@ export function useChat(
 								const newContent = content.content || [];
 
 								// If new content contains diff, replace all old diffs
-								const hasDiff = newContent.some((item) => item.type === "diff");
+								const hasDiff = newContent.some(
+									(item) => item.type === "diff",
+								);
 								if (hasDiff) {
 									mergedContent = mergedContent.filter(
 										(item) => item.type !== "diff",
 									);
 								}
 
-								mergedContent = [...mergedContent, ...newContent];
+								mergedContent = [
+									...mergedContent,
+									...newContent,
+								];
 							}
 
 							return {
 								...c,
 								toolCallId: content.toolCallId,
-								title: content.title !== undefined ? content.title : c.title,
-								kind: content.kind !== undefined ? content.kind : c.kind,
-								status: content.status !== undefined ? content.status : c.status,
+								title:
+									content.title !== undefined
+										? content.title
+										: c.title,
+								kind:
+									content.kind !== undefined
+										? content.kind
+										: c.kind,
+								status:
+									content.status !== undefined
+										? content.status
+										: c.status,
 								content: mergedContent,
 								permissionRequest:
 									content.permissionRequest !== undefined
@@ -285,14 +313,18 @@ export function useChat(
 				return;
 			}
 
-			// Phase 1: Prepare message
-			const prepared = await sendMessageUseCase.prepareMessage({
-				message: content,
-				activeNote: options.activeNote,
-				vaultBasePath: options.vaultBasePath,
-				isAutoMentionDisabled: options.isAutoMentionDisabled,
-				convertToWsl: shouldConvertToWsl,
-			});
+			// Phase 1: Prepare message using message-service
+			const prepared = await prepareMessage(
+				{
+					message: content,
+					activeNote: options.activeNote,
+					vaultBasePath: options.vaultBasePath,
+					isAutoMentionDisabled: options.isAutoMentionDisabled,
+					convertToWsl: shouldConvertToWsl,
+				},
+				vaultAccess,
+				mentionService,
+			);
 
 			// Phase 2: Add user message to UI immediately
 			const userMessage: ChatMessage = {
@@ -320,21 +352,24 @@ export function useChat(
 			setIsSending(true);
 			setLastUserMessage(content);
 
-			// Phase 4: Send prepared message to agent
+			// Phase 4: Send prepared message to agent using message-service
 			try {
-				const result = await sendMessageUseCase.sendPreparedMessage({
-					sessionId: sessionContext.sessionId,
-					agentMessage: prepared.agentMessage,
-					displayMessage: prepared.displayMessage,
-					authMethods: sessionContext.authMethods,
-				});
+				const result = await sendPreparedMessage(
+					{
+						sessionId: sessionContext.sessionId,
+						agentMessage: prepared.agentMessage,
+						displayMessage: prepared.displayMessage,
+						authMethods: sessionContext.authMethods,
+					},
+					agentClient,
+				);
 
 				if (result.success) {
 					// Success - clear stored message
 					setIsSending(false);
 					setLastUserMessage(null);
 				} else {
-					// Error from use case
+					// Error from message-service
 					setIsSending(false);
 					setErrorInfo(
 						result.error
@@ -359,7 +394,9 @@ export function useChat(
 			}
 		},
 		[
-			sendMessageUseCase,
+			agentClient,
+			vaultAccess,
+			mentionService,
 			sessionContext.sessionId,
 			sessionContext.authMethods,
 			shouldConvertToWsl,
