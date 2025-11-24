@@ -204,6 +204,17 @@ tags: [agent-client]
 		content: Extract<MessageContent, { type: "tool_call" }>,
 	): string {
 		let md = `### 🔧 ${content.title || "Tool"}\n\n`;
+
+		// Add locations if present
+		if (content.locations && content.locations.length > 0) {
+			const locationStrs = content.locations.map((loc) =>
+				loc.line != null
+					? `\`${loc.path}:${loc.line}\``
+					: `\`${loc.path}\``,
+			);
+			md += `**Locations**: ${locationStrs.join(", ")}\n\n`;
+		}
+
 		md += `**Status**: ${content.status}\n\n`;
 
 		// Only export diffs
