@@ -16,15 +16,13 @@ import type {
 	ChatMessage,
 	MessageContent,
 	PermissionOption,
-} from "../../core/domain/models/chat-message";
-import type {
 	ChatSession,
 	SessionState,
 	SlashCommand,
-} from "../../core/domain/models/chat-session";
-import type { ErrorInfo } from "../../core/domain/models/agent-error";
-import type { NoteMetadata } from "../../core/domain/ports/vault-access.port";
-import type { IVaultAccess } from "../../core/domain/ports/vault-access.port";
+	ErrorInfo,
+	NoteMetadata,
+	IVaultAccess,
+} from "../../types";
 import type { SendMessageUseCase } from "../../core/use-cases/send-message.use-case";
 import type { ManageSessionUseCase } from "../../core/use-cases/manage-session.use-case";
 import type { HandlePermissionUseCase } from "../../core/use-cases/handle-permission.use-case";

@@ -8,9 +8,11 @@
  * - Manage permission request lifecycle
  */
 
-import type { IAgentClient } from "../domain/ports/agent-client.port";
-import type { ISettingsAccess } from "../domain/ports/settings-access.port";
-import type { PermissionOption } from "../domain/models/chat-message";
+import type {
+	IAgentClient,
+	ISettingsAccess,
+	PermissionOption,
+} from "../../types";
 
 // ============================================================================
 // Input/Output Types

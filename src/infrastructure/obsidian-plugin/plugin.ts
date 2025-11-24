@@ -15,79 +15,14 @@ import {
 	ensureUniqueCustomAgentIds,
 } from "../../shared/settings-utils";
 import {
-	AgentEnvVar,
-	GeminiAgentSettings,
-	ClaudeAgentSettings,
-	CodexAgentSettings,
-	CustomAgentSettings,
-} from "../../core/domain/models/agent-config";
+	type AgentEnvVar,
+	type CustomAgentSettings,
+	type AgentClientPluginSettings,
+	DEFAULT_SETTINGS,
+} from "../../types";
 
 // Re-export for backward compatibility
-export type { AgentEnvVar, CustomAgentSettings };
-
-export interface AgentClientPluginSettings {
-	gemini: GeminiAgentSettings;
-	claude: ClaudeAgentSettings;
-	codex: CodexAgentSettings;
-	customAgents: CustomAgentSettings[];
-	activeAgentId: string;
-	autoAllowPermissions: boolean;
-	autoMentionActiveNote: boolean;
-	debugMode: boolean;
-	nodePath: string;
-	exportSettings: {
-		defaultFolder: string;
-		filenameTemplate: string;
-		autoExportOnNewChat: boolean;
-		autoExportOnCloseChat: boolean;
-		openFileAfterExport: boolean;
-	};
-	// WSL settings (Windows only)
-	windowsWslMode: boolean;
-	windowsWslDistribution?: string;
-}
-
-const DEFAULT_SETTINGS: AgentClientPluginSettings = {
-	claude: {
-		id: "claude-code-acp",
-		displayName: "Claude Code",
-		apiKey: "",
-		command: "",
-		args: [],
-		env: [],
-	},
-	codex: {
-		id: "codex-acp",
-		displayName: "Codex",
-		apiKey: "",
-		command: "",
-		args: [],
-		env: [],
-	},
-	gemini: {
-		id: "gemini-cli",
-		displayName: "Gemini CLI",
-		apiKey: "",
-		command: "",
-		args: ["--experimental-acp"],
-		env: [],
-	},
-	customAgents: [],
-	activeAgentId: "claude-code-acp",
-	autoAllowPermissions: false,
-	autoMentionActiveNote: true,
-	debugMode: false,
-	nodePath: "",
-	exportSettings: {
-		defaultFolder: "Agent Client",
-		filenameTemplate: "agent_client_{date}_{time}",
-		autoExportOnNewChat: false,
-		autoExportOnCloseChat: false,
-		openFileAfterExport: true,
-	},
-	windowsWslMode: false,
-	windowsWslDistribution: undefined,
-};
+export type { AgentEnvVar, CustomAgentSettings, AgentClientPluginSettings };
 
 export default class AgentClientPlugin extends Plugin {
 	settings: AgentClientPluginSettings;

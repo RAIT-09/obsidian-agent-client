@@ -10,20 +10,20 @@
  * - Handle authentication errors with retry logic
  */
 
-import type { IAgentClient } from "../domain/ports/agent-client.port";
 import type {
+	IAgentClient,
 	IVaultAccess,
+	ISettingsAccess,
 	NoteMetadata,
-} from "../domain/ports/vault-access.port";
-import type { ISettingsAccess } from "../domain/ports/settings-access.port";
-import type { AgentError } from "../domain/models/agent-error";
-import type { AuthenticationMethod } from "../domain/models/chat-session";
+	AgentError,
+	AuthenticationMethod,
+	EditorPosition,
+} from "../../types";
 import {
 	extractMentionedNotes,
 	type IMentionService,
 } from "../../shared/mention-utils";
 import { convertWindowsPathToWsl } from "../../shared/wsl-utils";
-import type { EditorPosition } from "../domain/ports/vault-access.port";
 
 // ============================================================================
 // Input/Output Types

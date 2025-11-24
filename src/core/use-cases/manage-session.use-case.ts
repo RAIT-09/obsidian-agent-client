@@ -8,16 +8,16 @@
  * - Close sessions and cleanup resources
  */
 
-import type { IAgentClient } from "../domain/ports/agent-client.port";
-import type { ISettingsAccess } from "../domain/ports/settings-access.port";
-import type { AgentError } from "../domain/models/agent-error";
-import type { AuthenticationMethod } from "../domain/models/chat-session";
 import type {
+	IAgentClient,
+	ISettingsAccess,
+	AgentError,
+	AuthenticationMethod,
 	BaseAgentSettings,
 	ClaudeAgentSettings,
 	GeminiAgentSettings,
 	CodexAgentSettings,
-} from "../domain/models/agent-config";
+} from "../../types";
 import { toAgentConfig } from "../../shared/settings-utils";
 
 // ============================================================================

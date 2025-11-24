@@ -46,3 +46,12 @@ export type { EditorPosition, NoteMetadata, MentionContext } from "./vault";
 // Settings types
 export type { PluginSettings, AgentClientPluginSettings } from "./settings";
 export { DEFAULT_SETTINGS } from "./settings";
+
+// Port interfaces
+export type {
+	InitializeResult,
+	NewSessionResult,
+	IAgentClient,
+	IVaultAccess,
+	ISettingsAccess,
+} from "./ports";

@@ -1,9 +1,9 @@
 import type {
 	AgentEnvVar,
 	CustomAgentSettings,
-} from "../infrastructure/obsidian-plugin/plugin";
-import type { BaseAgentSettings } from "../core/domain/models/agent-config";
-import type { AgentConfig } from "../core/domain/ports/agent-client.port";
+	BaseAgentSettings,
+	AgentConfig,
+} from "../types";
 
 export const sanitizeArgs = (value: unknown): string[] => {
 	if (Array.isArray(value)) {
