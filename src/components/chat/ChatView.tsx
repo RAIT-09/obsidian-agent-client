@@ -316,7 +316,6 @@ function ChatComponent({
 			})();
 		};
 		// Empty dependency array - only run on unmount
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	// Monitor agent changes from settings when messages are empty
