@@ -26,7 +26,7 @@ import type { NoteMetadata } from "../../core/domain/ports/vault-access.port";
 import type { IVaultAccess } from "../../core/domain/ports/vault-access.port";
 import type { SendMessageUseCase } from "../../core/use-cases/send-message.use-case";
 import type { ManageSessionUseCase } from "../../core/use-cases/manage-session.use-case";
-import type { SwitchAgentUseCase } from "../../core/use-cases/switch-agent.use-case";
+import type { ISettingsAccess } from "../../core/domain/ports/settings-access.port";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
 import type { MentionContext } from "../../shared/mention-utils";
 import { detectMention, replaceMention } from "../../shared/mention-utils";
@@ -132,7 +132,7 @@ export class ChatViewModel {
 
 	private sendMessageUseCase: SendMessageUseCase;
 	private manageSessionUseCase: ManageSessionUseCase;
-	private switchAgentUseCase: SwitchAgentUseCase;
+	private settingsAccess: ISettingsAccess;
 
 	// ========================================
 	// Other Dependencies
@@ -150,7 +150,7 @@ export class ChatViewModel {
 	 * @param plugin - Plugin instance
 	 * @param sendMessageUseCase - Use case for sending messages
 	 * @param manageSessionUseCase - Use case for session management
-	 * @param switchAgentUseCase - Use case for agent switching
+	 * @param settingsAccess - Settings access for agent configuration
 	 * @param vaultAccess - Vault access port for note searching (mention functionality)
 	 * @param workingDirectory - Working directory for the agent
 	 */
@@ -158,14 +158,14 @@ export class ChatViewModel {
 		plugin: AgentClientPlugin,
 		sendMessageUseCase: SendMessageUseCase,
 		manageSessionUseCase: ManageSessionUseCase,
-		switchAgentUseCase: SwitchAgentUseCase,
+		settingsAccess: ISettingsAccess,
 		vaultAccess: IVaultAccess,
 		private workingDirectory: string,
 	) {
 		this.plugin = plugin;
 		this.sendMessageUseCase = sendMessageUseCase;
 		this.manageSessionUseCase = manageSessionUseCase;
-		this.switchAgentUseCase = switchAgentUseCase;
+		this.settingsAccess = settingsAccess;
 		this.vaultAccess = vaultAccess;
 
 		// Initialize state
@@ -222,6 +222,60 @@ export class ChatViewModel {
 	}
 
 	// ========================================
+	// Agent Helper Methods (Inlined from SwitchAgentUseCase)
+	// ========================================
+
+	/**
+	 * Get the currently active agent ID from settings.
+	 */
+	private getActiveAgentId(): string {
+		const settings = this.settingsAccess.getSnapshot();
+		return settings.activeAgentId || settings.claude.id;
+	}
+
+	/**
+	 * Get list of all available agents from settings.
+	 */
+	private getAvailableAgentsFromSettings(): Array<{
+		id: string;
+		displayName: string;
+	}> {
+		const settings = this.settingsAccess.getSnapshot();
+		return [
+			{
+				id: settings.claude.id,
+				displayName: settings.claude.displayName || settings.claude.id,
+			},
+			{
+				id: settings.codex.id,
+				displayName: settings.codex.displayName || settings.codex.id,
+			},
+			{
+				id: settings.gemini.id,
+				displayName: settings.gemini.displayName || settings.gemini.id,
+			},
+			...settings.customAgents.map((agent) => ({
+				id: agent.id,
+				displayName: agent.displayName || agent.id,
+			})),
+		];
+	}
+
+	/**
+	 * Get the currently active agent information from settings.
+	 */
+	private getCurrentAgent(): { id: string; displayName: string } {
+		const activeId = this.getActiveAgentId();
+		const agents = this.getAvailableAgentsFromSettings();
+		return (
+			agents.find((agent) => agent.id === activeId) || {
+				id: activeId,
+				displayName: activeId,
+			}
+		);
+	}
+
+	// ========================================
 	// State Initialization
 	// ========================================
 
@@ -231,8 +285,8 @@ export class ChatViewModel {
 	 * @returns Initial state with empty messages and disconnected session
 	 */
 	private createInitialState(): ChatViewModelState {
-		const activeAgentId = this.switchAgentUseCase.getActiveAgentId();
-		const currentAgent = this.switchAgentUseCase.getCurrentAgent();
+		const activeAgentId = this.getActiveAgentId();
+		const currentAgent = this.getCurrentAgent();
 
 		return {
 			messages: [],
@@ -364,8 +418,8 @@ export class ChatViewModel {
 		await this.autoExportIfEnabled("newChat");
 
 		// Get active agent ID and display name before async operations
-		const activeAgentId = this.switchAgentUseCase.getActiveAgentId();
-		const currentAgent = this.switchAgentUseCase.getCurrentAgent();
+		const activeAgentId = this.getActiveAgentId();
+		const currentAgent = this.getCurrentAgent();
 
 		// Reset UI immediately (synchronous) - same as plugin startup flow
 		this.setState({
@@ -799,7 +853,8 @@ export class ChatViewModel {
 	 * @param agentId - ID of the agent to switch to
 	 */
 	async switchAgent(agentId: string): Promise<void> {
-		await this.switchAgentUseCase.switchAgent(agentId);
+		// Update settings (persists the change)
+		await this.settingsAccess.updateSettings({ activeAgentId: agentId });
 
 		// Update session with new agent ID and clear availableCommands
 		// (new agent will send its own commands via available_commands_update)
@@ -818,7 +873,7 @@ export class ChatViewModel {
 	 * @returns Array of agent information
 	 */
 	getAvailableAgents(): Array<{ id: string; displayName: string }> {
-		return this.switchAgentUseCase.getAvailableAgents();
+		return this.getAvailableAgentsFromSettings();
 	}
 
 	// ========================================

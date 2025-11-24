@@ -25,7 +25,6 @@ import { ObsidianVaultAdapter } from "../../../adapters/obsidian/vault.adapter";
 import { SendMessageUseCase } from "../../../core/use-cases/send-message.use-case";
 import { ManageSessionUseCase } from "../../../core/use-cases/manage-session.use-case";
 import { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";
-import { SwitchAgentUseCase } from "../../../core/use-cases/switch-agent.use-case";
 
 // Hooks imports
 import { useSettings } from "../../../hooks/useSettings";
@@ -111,10 +110,6 @@ function ChatComponent({
 		return new HandlePermissionUseCase(acpAdapter, plugin.settingsStore);
 	}, [acpAdapter, plugin]);
 
-	const switchAgentUseCase = useMemo(() => {
-		return new SwitchAgentUseCase(plugin.settingsStore);
-	}, [plugin]);
-
 	// ============================================================
 	// Custom Hooks
 	// ============================================================
@@ -122,7 +117,7 @@ function ChatComponent({
 
 	const agentSession = useAgentSession(
 		manageSessionUseCase,
-		switchAgentUseCase,
+		plugin.settingsStore,
 		vaultPath,
 	);
 
@@ -166,7 +161,7 @@ function ChatComponent({
 			plugin,
 			sendMessageUseCase,
 			manageSessionUseCase,
-			switchAgentUseCase,
+			plugin.settingsStore,
 			vaultAccessAdapter,
 			vaultPath,
 		);
@@ -174,7 +169,6 @@ function ChatComponent({
 		plugin,
 		sendMessageUseCase,
 		manageSessionUseCase,
-		switchAgentUseCase,
 		vaultAccessAdapter,
 		vaultPath,
 	]);

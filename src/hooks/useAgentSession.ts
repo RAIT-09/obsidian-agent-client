@@ -5,11 +5,23 @@ import type {
 	SlashCommand,
 } from "../core/domain/models/chat-session";
 import type { ManageSessionUseCase } from "../core/use-cases/manage-session.use-case";
-import type { SwitchAgentUseCase } from "../core/use-cases/switch-agent.use-case";
+import type { ISettingsAccess } from "../core/domain/ports/settings-access.port";
+import type { AgentClientPluginSettings } from "../infrastructure/obsidian-plugin/plugin";
 
 // ============================================================================
 // Types
 // ============================================================================
+
+/**
+ * Agent information for display.
+ * (Inlined from SwitchAgentUseCase)
+ */
+export interface AgentInfo {
+	/** Unique agent ID */
+	id: string;
+	/** Display name for UI */
+	displayName: string;
+}
 
 /**
  * Error information specific to session operations.
@@ -60,13 +72,64 @@ export interface UseAgentSessionReturn {
 	 * Get list of available agents.
 	 * @returns Array of agent info with id and displayName
 	 */
-	getAvailableAgents: () => Array<{ id: string; displayName: string }>;
+	getAvailableAgents: () => AgentInfo[];
 
 	/**
 	 * Callback to update available slash commands.
 	 * Called by AcpAdapter when agent sends available_commands_update.
 	 */
 	updateAvailableCommands: (commands: SlashCommand[]) => void;
+}
+
+// ============================================================================
+// Helper Functions (Inlined from SwitchAgentUseCase)
+// ============================================================================
+
+/**
+ * Get the currently active agent ID from settings.
+ */
+function getActiveAgentId(settings: AgentClientPluginSettings): string {
+	return settings.activeAgentId || settings.claude.id;
+}
+
+/**
+ * Get list of all available agents from settings.
+ */
+function getAvailableAgentsFromSettings(
+	settings: AgentClientPluginSettings,
+): AgentInfo[] {
+	return [
+		{
+			id: settings.claude.id,
+			displayName: settings.claude.displayName || settings.claude.id,
+		},
+		{
+			id: settings.codex.id,
+			displayName: settings.codex.displayName || settings.codex.id,
+		},
+		{
+			id: settings.gemini.id,
+			displayName: settings.gemini.displayName || settings.gemini.id,
+		},
+		...settings.customAgents.map((agent) => ({
+			id: agent.id,
+			displayName: agent.displayName || agent.id,
+		})),
+	];
+}
+
+/**
+ * Get the currently active agent information from settings.
+ */
+function getCurrentAgent(settings: AgentClientPluginSettings): AgentInfo {
+	const activeId = getActiveAgentId(settings);
+	const agents = getAvailableAgentsFromSettings(settings);
+	return (
+		agents.find((agent) => agent.id === activeId) || {
+			id: activeId,
+			displayName: activeId,
+		}
+	);
 }
 
 // ============================================================================
@@ -102,20 +165,21 @@ function createInitialSession(
  * Hook for managing agent session lifecycle.
  *
  * Handles session creation, restart, cancellation, and agent switching.
- * This hook owns the session state independently from ChatViewModel.
+ * This hook owns the session state independently.
  *
  * @param manageSessionUseCase - Use case for session lifecycle operations
- * @param switchAgentUseCase - Use case for agent switching operations
+ * @param settingsAccess - Settings access for agent configuration
  * @param workingDirectory - Working directory for the session
  */
 export function useAgentSession(
 	manageSessionUseCase: ManageSessionUseCase,
-	switchAgentUseCase: SwitchAgentUseCase,
+	settingsAccess: ISettingsAccess,
 	workingDirectory: string,
 ): UseAgentSessionReturn {
-	// Get initial agent info
-	const initialAgentId = switchAgentUseCase.getActiveAgentId();
-	const initialAgent = switchAgentUseCase.getCurrentAgent();
+	// Get initial agent info from settings
+	const initialSettings = settingsAccess.getSnapshot();
+	const initialAgentId = getActiveAgentId(initialSettings);
+	const initialAgent = getCurrentAgent(initialSettings);
 
 	// Session state
 	const [session, setSession] = useState<ChatSession>(() =>
@@ -136,9 +200,10 @@ export function useAgentSession(
 	 * Create a new session with the active agent.
 	 */
 	const createSession = useCallback(async () => {
-		// Get current active agent info
-		const activeAgentId = switchAgentUseCase.getActiveAgentId();
-		const currentAgent = switchAgentUseCase.getCurrentAgent();
+		// Get current active agent info from settings
+		const settings = settingsAccess.getSnapshot();
+		const activeAgentId = getActiveAgentId(settings);
+		const currentAgent = getCurrentAgent(settings);
 
 		// Reset to initializing state immediately
 		setSession((prev) => ({
@@ -203,7 +268,7 @@ export function useAgentSession(
 					"Please check the agent configuration and try again.",
 			});
 		}
-	}, [manageSessionUseCase, switchAgentUseCase, workingDirectory]);
+	}, [manageSessionUseCase, settingsAccess, workingDirectory]);
 
 	/**
 	 * Restart the current session.
@@ -243,10 +308,12 @@ export function useAgentSession(
 
 	/**
 	 * Switch to a different agent.
+	 * Updates settings and local session state.
 	 */
 	const switchAgent = useCallback(
 		async (agentId: string) => {
-			await switchAgentUseCase.switchAgent(agentId);
+			// Update settings (persists the change)
+			await settingsAccess.updateSettings({ activeAgentId: agentId });
 
 			// Update session with new agent ID
 			// Clear availableCommands (new agent will send its own)
@@ -256,15 +323,16 @@ export function useAgentSession(
 				availableCommands: undefined,
 			}));
 		},
-		[switchAgentUseCase],
+		[settingsAccess],
 	);
 
 	/**
 	 * Get list of available agents.
 	 */
 	const getAvailableAgents = useCallback(() => {
-		return switchAgentUseCase.getAvailableAgents();
-	}, [switchAgentUseCase]);
+		const settings = settingsAccess.getSnapshot();
+		return getAvailableAgentsFromSettings(settings);
+	}, [settingsAccess]);
 
 	/**
 	 * Update available slash commands.
