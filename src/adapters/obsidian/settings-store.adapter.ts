@@ -6,7 +6,7 @@
  * via useSyncExternalStore, and handles persistence to Obsidian's data.json.
  */
 
-import type { ISettingsAccess } from "../../core/domain/ports/settings-access.port";
+import type { ISettingsAccess } from "../../types";
 import type { AgentClientPluginSettings } from "../../infrastructure/obsidian-plugin/plugin";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
 

@@ -16,22 +16,472 @@ import type {
 	SlashCommand,
 	NoteMetadata,
 	PermissionOption,
+	BaseAgentSettings,
+	ClaudeAgentSettings,
+	GeminiAgentSettings,
+	CodexAgentSettings,
+	AuthenticationMethod,
+	AgentError,
+	EditorPosition,
+	IVaultAccess,
 } from "../types";
 import type { IAcpClient } from "../adapters/acp/acp.adapter";
+import { toAgentConfig } from "../shared/settings-utils";
+import { extractMentionedNotes, type IMentionService } from "../shared/mention-utils";
+import { convertWindowsPathToWsl } from "../shared/wsl-utils";
 
 import { useMessages } from "./useMessages";
 import { useSession } from "./useSession";
-
-// Import use cases
-import { SendMessageUseCase } from "../core/use-cases/send-message.use-case";
-import { ManageSessionUseCase } from "../core/use-cases/manage-session.use-case";
-import { HandlePermissionUseCase } from "../core/use-cases/handle-permission.use-case";
-import { SwitchAgentUseCase } from "../core/use-cases/switch-agent.use-case";
 
 // Import adapters
 import { AcpAdapter } from "../adapters/acp/acp.adapter";
 import { ObsidianVaultAdapter } from "../adapters/obsidian/vault.adapter";
 import { NoteMentionService } from "../adapters/obsidian/mention-service";
+
+// ============================================================================
+// Agent Helper Types & Functions (inlined from SwitchAgentUseCase)
+// ============================================================================
+
+interface AgentInfo {
+	id: string;
+	displayName: string;
+}
+
+function getActiveAgentId(plugin: AgentClientPlugin): string {
+	const settings = plugin.settings;
+	return settings.activeAgentId || settings.claude.id;
+}
+
+function getAvailableAgentsFromSettings(plugin: AgentClientPlugin): AgentInfo[] {
+	const settings = plugin.settings;
+	return [
+		{
+			id: settings.claude.id,
+			displayName: settings.claude.displayName || settings.claude.id,
+		},
+		{
+			id: settings.codex.id,
+			displayName: settings.codex.displayName || settings.codex.id,
+		},
+		{
+			id: settings.gemini.id,
+			displayName: settings.gemini.displayName || settings.gemini.id,
+		},
+		...settings.customAgents.map((agent) => ({
+			id: agent.id,
+			displayName: agent.displayName || agent.id,
+		})),
+	];
+}
+
+function getCurrentAgentInfo(plugin: AgentClientPlugin): AgentInfo {
+	const activeId = getActiveAgentId(plugin);
+	const agents = getAvailableAgentsFromSettings(plugin);
+	return (
+		agents.find((agent) => agent.id === activeId) || {
+			id: activeId,
+			displayName: activeId,
+		}
+	);
+}
+
+/**
+ * Get agent settings by ID (inlined from ManageSessionUseCase)
+ */
+function getAgentSettingsById(
+	plugin: AgentClientPlugin,
+	agentId: string,
+): BaseAgentSettings | null {
+	const settings = plugin.settings;
+	if (agentId === settings.claude.id) return settings.claude;
+	if (agentId === settings.codex.id) return settings.codex;
+	if (agentId === settings.gemini.id) return settings.gemini;
+	const customAgent = settings.customAgents.find((a) => a.id === agentId);
+	return customAgent || null;
+}
+
+/**
+ * Build agent config with API keys (inlined from ManageSessionUseCase)
+ */
+function buildAgentConfig(
+	plugin: AgentClientPlugin,
+	agentId: string,
+	agentSettings: BaseAgentSettings,
+	workingDirectory: string,
+) {
+	const settings = plugin.settings;
+	const baseConfig = toAgentConfig(agentSettings, workingDirectory);
+
+	// Add API keys to environment for known agents
+	if (agentId === settings.claude.id) {
+		const claudeSettings = agentSettings as ClaudeAgentSettings;
+		return {
+			...baseConfig,
+			env: { ...baseConfig.env, ANTHROPIC_API_KEY: claudeSettings.apiKey },
+		};
+	}
+	if (agentId === settings.codex.id) {
+		const codexSettings = agentSettings as CodexAgentSettings;
+		return {
+			...baseConfig,
+			env: { ...baseConfig.env, OPENAI_API_KEY: codexSettings.apiKey },
+		};
+	}
+	if (agentId === settings.gemini.id) {
+		const geminiSettings = agentSettings as GeminiAgentSettings;
+		return {
+			...baseConfig,
+			env: { ...baseConfig.env, GOOGLE_API_KEY: geminiSettings.apiKey },
+		};
+	}
+	return baseConfig;
+}
+
+// ============================================================================
+// Message Preparation Helper Types & Functions (inlined from SendMessageUseCase)
+// ============================================================================
+
+interface PrepareMessageInput {
+	message: string;
+	activeNote?: NoteMetadata | null;
+	vaultBasePath: string;
+	isAutoMentionDisabled?: boolean;
+	convertToWsl?: boolean;
+}
+
+interface PrepareMessageResult {
+	displayMessage: string;
+	agentMessage: string;
+	autoMentionContext?: {
+		noteName: string;
+		notePath: string;
+		selection?: {
+			fromLine: number;
+			toLine: number;
+		};
+	};
+}
+
+interface SendPreparedMessageInput {
+	sessionId: string;
+	agentMessage: string;
+	displayMessage: string;
+	authMethods: AuthenticationMethod[];
+}
+
+interface SendMessageResult {
+	success: boolean;
+	displayMessage: string;
+	agentMessage: string;
+	error?: AgentError;
+	requiresAuth?: boolean;
+	retriedSuccessfully?: boolean;
+}
+
+const MAX_NOTE_LENGTH = 10000;
+const MAX_SELECTION_LENGTH = 10000;
+
+/**
+ * Check if error is the "empty response text" error that should be ignored
+ */
+function isEmptyResponseError(error: unknown): boolean {
+	if (!error || typeof error !== "object") return false;
+	if (!("code" in error) || (error as { code: unknown }).code !== -32603) return false;
+	if (!("data" in error)) return false;
+
+	const errorData = (error as { data: unknown }).data;
+	if (
+		errorData &&
+		typeof errorData === "object" &&
+		"details" in errorData &&
+		typeof (errorData as { details: unknown }).details === "string" &&
+		(errorData as { details: string }).details.includes("empty response text")
+	) {
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Build context from auto-mentioned note.
+ */
+async function buildAutoMentionContext(
+	notePath: string,
+	vaultPath: string,
+	vaultAccess: IVaultAccess,
+	convertToWsl?: boolean,
+	selection?: { from: EditorPosition; to: EditorPosition },
+): Promise<string> {
+	let absolutePath = vaultPath ? `${vaultPath}/${notePath}` : notePath;
+	if (convertToWsl) {
+		absolutePath = convertWindowsPathToWsl(absolutePath);
+	}
+
+	if (selection) {
+		const fromLine = selection.from.line + 1;
+		const toLine = selection.to.line + 1;
+
+		try {
+			const content = await vaultAccess.readNote(notePath);
+			const lines = content.split("\n");
+			const selectedLines = lines.slice(selection.from.line, selection.to.line + 1);
+			let selectedText = selectedLines.join("\n");
+
+			let truncationNote = "";
+			if (selectedText.length > MAX_SELECTION_LENGTH) {
+				selectedText = selectedText.substring(0, MAX_SELECTION_LENGTH);
+				truncationNote = `\n\n[Note: The selection was truncated. Original length: ${selectedLines.join("\n").length} characters, showing first ${MAX_SELECTION_LENGTH} characters]`;
+			}
+
+			return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">
+The user opened the note ${absolutePath} in Obsidian and selected the following text (lines ${fromLine}-${toLine}):
+
+${selectedText}${truncationNote}
+
+This is what the user is currently focusing on.
+</obsidian_opened_note>`;
+		} catch (error) {
+			console.error(`Failed to read selection from ${notePath}:`, error);
+			return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">The user opened the note ${absolutePath} in Obsidian and is focusing on lines ${fromLine}-${toLine}. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the specific lines.</obsidian_opened_note>`;
+		}
+	}
+
+	return `<obsidian_opened_note>The user opened the note ${absolutePath} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the content.</obsidian_opened_note>`;
+}
+
+/**
+ * Prepare message with mentions and auto-mention context
+ */
+async function prepareMessage(
+	input: PrepareMessageInput,
+	mentionService: IMentionService,
+	vaultAccess: IVaultAccess,
+): Promise<PrepareMessageResult> {
+	const mentionedNotes = extractMentionedNotes(input.message, mentionService);
+	const contextBlocks: string[] = [];
+
+	for (const { file } of mentionedNotes) {
+		if (!file) continue;
+
+		try {
+			const content = await vaultAccess.readNote(file.path);
+			let processedContent = content;
+			let truncationNote = "";
+
+			if (content.length > MAX_NOTE_LENGTH) {
+				processedContent = content.substring(0, MAX_NOTE_LENGTH);
+				truncationNote = `\n\n[Note: This note was truncated. Original length: ${content.length} characters, showing first ${MAX_NOTE_LENGTH} characters]`;
+			}
+
+			let absolutePath = input.vaultBasePath
+				? `${input.vaultBasePath}/${file.path}`
+				: file.path;
+			if (input.convertToWsl) {
+				absolutePath = convertWindowsPathToWsl(absolutePath);
+			}
+
+			const contextBlock = `<obsidian_mentioned_note ref="${absolutePath}">\n${processedContent}${truncationNote}\n</obsidian_mentioned_note>`;
+			contextBlocks.push(contextBlock);
+		} catch (error) {
+			console.error(`Failed to read note ${file.path}:`, error);
+		}
+	}
+
+	if (input.activeNote && !input.isAutoMentionDisabled) {
+		const autoContext = await buildAutoMentionContext(
+			input.activeNote.path,
+			input.vaultBasePath,
+			vaultAccess,
+			input.convertToWsl ?? false,
+			input.activeNote.selection,
+		);
+		contextBlocks.push(autoContext);
+	}
+
+	const agentMessage =
+		contextBlocks.length > 0
+			? contextBlocks.join("\n") + "\n\n" + input.message
+			: input.message;
+
+	const autoMentionContext =
+		input.activeNote && !input.isAutoMentionDisabled
+			? {
+					noteName: input.activeNote.name,
+					notePath: input.activeNote.path,
+					selection: input.activeNote.selection
+						? {
+								fromLine: input.activeNote.selection.from.line + 1,
+								toLine: input.activeNote.selection.to.line + 1,
+							}
+						: undefined,
+				}
+			: undefined;
+
+	return {
+		displayMessage: input.message,
+		agentMessage,
+		autoMentionContext,
+	};
+}
+
+/**
+ * Retry sending message after authentication
+ */
+async function retryWithAuthentication(
+	acpAdapter: AcpAdapter,
+	sessionId: string,
+	agentMessage: string,
+	displayMessage: string,
+	authMethodId: string,
+): Promise<SendMessageResult | null> {
+	try {
+		const authSuccess = await acpAdapter.authenticate(authMethodId);
+		if (!authSuccess) return null;
+
+		await acpAdapter.sendMessage(sessionId, agentMessage);
+		return {
+			success: true,
+			displayMessage,
+			agentMessage,
+			retriedSuccessfully: true,
+		};
+	} catch (retryError) {
+		return {
+			success: false,
+			displayMessage,
+			agentMessage,
+			error: {
+				id: crypto.randomUUID(),
+				category: "communication",
+				severity: "error",
+				title: "Message Send Failed",
+				message: `Failed to send message after authentication: ${retryError instanceof Error ? retryError.message : String(retryError)}`,
+				suggestion: "Please try again or check your connection.",
+				occurredAt: new Date(),
+				sessionId,
+				originalError: retryError,
+			},
+		};
+	}
+}
+
+/**
+ * Handle errors that occur during message sending
+ */
+async function handleSendError(
+	error: unknown,
+	acpAdapter: AcpAdapter,
+	sessionId: string,
+	agentMessage: string,
+	displayMessage: string,
+	authMethods: AuthenticationMethod[],
+): Promise<SendMessageResult> {
+	if (isEmptyResponseError(error)) {
+		return { success: true, displayMessage, agentMessage };
+	}
+
+	const isRateLimitError =
+		error && typeof error === "object" && "code" in error && (error as { code: unknown }).code === 429;
+
+	if (isRateLimitError) {
+		const errorMessage =
+			"message" in error && typeof (error as { message: unknown }).message === "string"
+				? (error as { message: string }).message
+				: "Too many requests. Please try again later.";
+
+		return {
+			success: false,
+			displayMessage,
+			agentMessage,
+			error: {
+				id: crypto.randomUUID(),
+				category: "rate_limit",
+				severity: "error",
+				title: "Rate Limit Exceeded",
+				message: `Rate limit exceeded: ${errorMessage}`,
+				suggestion: "You have exceeded the API rate limit. Please wait a few moments before trying again.",
+				occurredAt: new Date(),
+				sessionId,
+				originalError: error,
+			},
+		};
+	}
+
+	if (!authMethods || authMethods.length === 0) {
+		return {
+			success: false,
+			displayMessage,
+			agentMessage,
+			error: {
+				id: crypto.randomUUID(),
+				category: "authentication",
+				severity: "error",
+				title: "No Authentication Methods",
+				message: "No authentication methods available for this agent.",
+				suggestion: "Please check your agent configuration in settings.",
+				occurredAt: new Date(),
+				sessionId,
+				originalError: error,
+			},
+		};
+	}
+
+	if (authMethods.length === 1) {
+		const retryResult = await retryWithAuthentication(
+			acpAdapter,
+			sessionId,
+			agentMessage,
+			displayMessage,
+			authMethods[0].id,
+		);
+		if (retryResult) return retryResult;
+	}
+
+	return {
+		success: false,
+		displayMessage,
+		agentMessage,
+		requiresAuth: true,
+		error: {
+			id: crypto.randomUUID(),
+			category: "authentication",
+			severity: "error",
+			title: "Authentication Required",
+			message:
+				"Authentication failed. Please check if you are logged into the agent or if your API key is correctly set.",
+			suggestion: "Check your agent configuration in settings and ensure API keys are valid.",
+			occurredAt: new Date(),
+			sessionId,
+			originalError: error,
+		},
+	};
+}
+
+/**
+ * Send prepared message to agent
+ */
+async function sendPreparedMessage(
+	input: SendPreparedMessageInput,
+	acpAdapter: AcpAdapter,
+): Promise<SendMessageResult> {
+	try {
+		await acpAdapter.sendMessage(input.sessionId, input.agentMessage);
+		return {
+			success: true,
+			displayMessage: input.displayMessage,
+			agentMessage: input.agentMessage,
+		};
+	} catch (error) {
+		return await handleSendError(
+			error,
+			acpAdapter,
+			input.sessionId,
+			input.agentMessage,
+			input.displayMessage,
+			input.authMethods,
+		);
+	}
+}
 
 // ============================================================================
 // Types
@@ -108,40 +558,17 @@ export function useChat(options: UseChatOptions) {
 	// Initialize Adapters and Use Cases (memoized)
 	// ========================================
 
-	const { acpAdapter, vaultAdapter, mentionService, useCases } =
+	const { acpAdapter, vaultAdapter, mentionService } =
 		useMemo(() => {
-			// Create adapters
+			// Create adapters (all use cases have been inlined)
 			const mentionSvc = new NoteMentionService(plugin);
 			const vaultAdp = new ObsidianVaultAdapter(plugin);
 			const acpAdp = new AcpAdapter(plugin);
-
-			// Create use cases
-			const sendMessageUC = new SendMessageUseCase(
-				acpAdp,
-				vaultAdp,
-				plugin.settingsStore,
-				mentionSvc,
-			);
-			const manageSessionUC = new ManageSessionUseCase(
-				acpAdp,
-				plugin.settingsStore,
-			);
-			const handlePermissionUC = new HandlePermissionUseCase(
-				acpAdp,
-				plugin.settingsStore,
-			);
-			const switchAgentUC = new SwitchAgentUseCase(plugin.settingsStore);
 
 			return {
 				acpAdapter: acpAdp,
 				vaultAdapter: vaultAdp,
 				mentionService: mentionSvc,
-				useCases: {
-					sendMessage: sendMessageUC,
-					manageSession: manageSessionUC,
-					handlePermission: handlePermissionUC,
-					switchAgent: switchAgentUC,
-				},
 			};
 		}, [plugin]);
 
@@ -174,8 +601,8 @@ export function useChat(options: UseChatOptions) {
 	// ========================================
 
 	const createNewSession = useCallback(async () => {
-		const activeAgentId = useCases.switchAgent.getActiveAgentId();
-		const currentAgent = useCases.switchAgent.getCurrentAgent();
+		const activeAgentId = getActiveAgentId(plugin);
+		const currentAgent = getCurrentAgentInfo(plugin);
 
 		// Reset UI immediately
 		clearMessages();
@@ -183,26 +610,40 @@ export function useChat(options: UseChatOptions) {
 		setAvailableCommands([]);
 
 		try {
-			const result = await useCases.manageSession.createSession({
-				workingDirectory,
-				agentId: activeAgentId,
-			});
-
-			if (result.success && result.sessionId) {
-				sessionHook.markReady(
-					result.sessionId,
-					result.authMethods || [],
-				);
-			} else {
+			// Inlined from ManageSessionUseCase.createSession
+			const agentSettings = getAgentSettingsById(plugin, activeAgentId);
+			if (!agentSettings) {
 				sessionHook.setSessionState("error");
-				sessionHook.setError(
-					result.error || {
-						title: "Session Creation Failed",
-						message: "Failed to create new session",
-						suggestion: "Please try again.",
-					},
-				);
+				sessionHook.setError({
+					title: "Agent Not Found",
+					message: `Agent with ID "${activeAgentId}" not found in settings`,
+					suggestion: "Please check your agent configuration in settings.",
+				});
+				return;
 			}
+
+			const agentConfig = buildAgentConfig(
+				plugin,
+				activeAgentId,
+				agentSettings,
+				workingDirectory,
+			);
+
+			// Check if initialization is needed
+			const needsInitialize =
+				!acpAdapter.isInitialized() ||
+				acpAdapter.getCurrentAgentId() !== activeAgentId;
+
+			let authMethods: AuthenticationMethod[] = [];
+			if (needsInitialize) {
+				const initResult = await acpAdapter.initialize(agentConfig);
+				authMethods = initResult.authMethods;
+			}
+
+			// Create new session
+			const sessionResult = await acpAdapter.newSession(workingDirectory);
+
+			sessionHook.markReady(sessionResult.sessionId, authMethods);
 		} catch (error) {
 			sessionHook.setSessionState("error");
 			sessionHook.setError({
@@ -212,14 +653,15 @@ export function useChat(options: UseChatOptions) {
 					"Please check the agent configuration and try again.",
 			});
 		}
-	}, [useCases, workingDirectory, clearMessages, sessionHook]);
+	}, [plugin, acpAdapter, workingDirectory, clearMessages, sessionHook]);
 
 	const cancelCurrentOperation = useCallback(async () => {
 		const { session } = sessionHook;
 		if (!session.sessionId) return;
 
 		try {
-			await useCases.manageSession.closeSession(session.sessionId);
+			// Inlined from ManageSessionUseCase.closeSession
+			await acpAdapter.cancel(session.sessionId);
 			sessionHook.setSending(false);
 			sessionHook.setSessionState("ready");
 		} catch (error) {
@@ -227,15 +669,20 @@ export function useChat(options: UseChatOptions) {
 			sessionHook.setSending(false);
 			sessionHook.setSessionState("ready");
 		}
-	}, [useCases, sessionHook]);
+	}, [acpAdapter, sessionHook]);
 
 	const disconnect = useCallback(async () => {
-		await useCases.manageSession.closeSession(
-			sessionHook.session.sessionId,
-		);
-		await useCases.manageSession.disconnect();
+		// Inlined from ManageSessionUseCase
+		if (sessionHook.session.sessionId) {
+			try {
+				await acpAdapter.cancel(sessionHook.session.sessionId);
+			} catch (error) {
+				console.warn("Failed to close session:", error);
+			}
+		}
+		await acpAdapter.disconnect();
 		sessionHook.markDisconnected();
-	}, [useCases, sessionHook]);
+	}, [acpAdapter, sessionHook]);
 
 	/**
 	 * Restart session - cancel current and create new.
@@ -244,13 +691,14 @@ export function useChat(options: UseChatOptions) {
 		const { session } = sessionHook;
 		if (session.sessionId) {
 			try {
-				await useCases.manageSession.closeSession(session.sessionId);
+				// Inlined from ManageSessionUseCase.closeSession
+				await acpAdapter.cancel(session.sessionId);
 			} catch (error) {
 				console.warn("Failed to close session during restart:", error);
 			}
 		}
 		await createNewSession();
-	}, [useCases, sessionHook, createNewSession]);
+	}, [acpAdapter, sessionHook, createNewSession]);
 
 	/**
 	 * Dispose - cleanup all resources.
@@ -258,21 +706,22 @@ export function useChat(options: UseChatOptions) {
 	 */
 	const dispose = useCallback(async () => {
 		try {
+			// Inlined from ManageSessionUseCase
 			const { session } = sessionHook;
 			if (session.sessionId) {
-				await useCases.manageSession.closeSession(session.sessionId);
+				await acpAdapter.cancel(session.sessionId);
 			}
-			await useCases.manageSession.disconnect();
+			await acpAdapter.disconnect();
 		} catch (error) {
 			console.warn("Error during dispose:", error);
 		}
-	}, [useCases, sessionHook]);
+	}, [acpAdapter, sessionHook]);
 
 	// ========================================
 	// Message Actions
 	// ========================================
 
-	const sendMessage = useCallback(
+	const sendMessageFn = useCallback(
 		async (content: string, sendOptions: SendMessageOptions) => {
 			const { session, canSendMessage } = sessionHook;
 
@@ -280,14 +729,18 @@ export function useChat(options: UseChatOptions) {
 				return;
 			}
 
-			// Phase 1: Prepare message
-			const prepared = await useCases.sendMessage.prepareMessage({
-				message: content,
-				activeNote: sendOptions.activeNote,
-				vaultBasePath: sendOptions.vaultBasePath,
-				isAutoMentionDisabled: sendOptions.isAutoMentionDisabled,
-				convertToWsl: plugin.settings.windowsWslMode,
-			});
+			// Phase 1: Prepare message (inlined from SendMessageUseCase)
+			const prepared = await prepareMessage(
+				{
+					message: content,
+					activeNote: sendOptions.activeNote,
+					vaultBasePath: sendOptions.vaultBasePath,
+					isAutoMentionDisabled: sendOptions.isAutoMentionDisabled,
+					convertToWsl: plugin.settings.windowsWslMode,
+				},
+				mentionService,
+				vaultAdapter,
+			);
 
 			// Phase 2: Add user message to UI
 			const userMessage: ChatMessage = {
@@ -316,14 +769,17 @@ export function useChat(options: UseChatOptions) {
 			sessionHook.setSessionState("busy");
 			setLastUserMessage(content);
 
-			// Phase 4: Send to agent
+			// Phase 4: Send to agent (inlined from SendMessageUseCase)
 			try {
-				const result = await useCases.sendMessage.sendPreparedMessage({
-					sessionId: session.sessionId,
-					agentMessage: prepared.agentMessage,
-					displayMessage: prepared.displayMessage,
-					authMethods: session.authMethods,
-				});
+				const result = await sendPreparedMessage(
+					{
+						sessionId: session.sessionId,
+						agentMessage: prepared.agentMessage,
+						displayMessage: prepared.displayMessage,
+						authMethods: session.authMethods,
+					},
+					acpAdapter,
+				);
 
 				if (result.success) {
 					sessionHook.setSending(false);
@@ -351,8 +807,10 @@ export function useChat(options: UseChatOptions) {
 			}
 		},
 		[
-			useCases,
 			plugin.settings,
+			mentionService,
+			vaultAdapter,
+			acpAdapter,
 			sessionHook,
 			addMessage,
 			setLastUserMessage,
@@ -418,21 +876,9 @@ export function useChat(options: UseChatOptions) {
 			optionId: string,
 		): Promise<{ success: boolean; error?: string }> => {
 			try {
-				const result =
-					await useCases.handlePermission.approvePermission({
-						requestId,
-						optionId,
-					});
-
-				if (!result.success) {
-					sessionHook.setError({
-						title: "Permission Error",
-						message:
-							result.error ||
-							"Failed to respond to permission request",
-					});
-				}
-				return result;
+				// Inlined from HandlePermissionUseCase - directly call adapter
+				await acpAdapter.respondToPermission(requestId, optionId);
+				return { success: true };
 			} catch (error) {
 				const errorMessage = `Failed to respond to permission request: ${error instanceof Error ? error.message : String(error)}`;
 				sessionHook.setError({
@@ -442,7 +888,7 @@ export function useChat(options: UseChatOptions) {
 				return { success: false, error: errorMessage };
 			}
 		},
-		[useCases, sessionHook],
+		[acpAdapter, sessionHook],
 	);
 
 	/**
@@ -500,19 +946,22 @@ export function useChat(options: UseChatOptions) {
 
 	const switchAgent = useCallback(
 		async (agentId: string) => {
-			await useCases.switchAgent.switchAgent(agentId);
+			// Update settings directly (inlined from SwitchAgentUseCase)
+			await plugin.settingsStore.updateSettings({
+				activeAgentId: agentId,
+			});
 			sessionHook.setSession({
 				agentId,
 				availableCommands: undefined,
 			});
 			setAvailableCommands([]);
 		},
-		[useCases, sessionHook],
+		[plugin, sessionHook],
 	);
 
 	const getAvailableAgents = useCallback(() => {
-		return useCases.switchAgent.getAvailableAgents();
-	}, [useCases]);
+		return getAvailableAgentsFromSettings(plugin);
+	}, [plugin]);
 
 	// ========================================
 	// Return Combined API
@@ -539,7 +988,7 @@ export function useChat(options: UseChatOptions) {
 		dispose,
 
 		// Message actions
-		sendMessage,
+		sendMessage: sendMessageFn,
 		addMessage,
 		updateLastMessage,
 		updateMessage,

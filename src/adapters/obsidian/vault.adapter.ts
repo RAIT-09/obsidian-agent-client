@@ -10,7 +10,7 @@ import type {
 	IVaultAccess,
 	NoteMetadata,
 	EditorPosition,
-} from "../../core/domain/ports/vault-access.port";
+} from "../../types";
 import { NoteMentionService } from "./mention-service";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
 import {
