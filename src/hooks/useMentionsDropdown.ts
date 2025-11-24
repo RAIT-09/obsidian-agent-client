@@ -7,8 +7,8 @@
 
 import { useState, useCallback } from "react";
 import type { NoteMetadata, IVaultAccess } from "../types";
-import type { MentionContext } from "../shared/mention-utils";
-import { detectMention, replaceMention } from "../shared/mention-utils";
+import type { MentionContext } from "../utils/mention-utils";
+import { detectMention, replaceMention } from "../utils/mention-utils";
 import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
 
 // ============================================================================

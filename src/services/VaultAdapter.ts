@@ -10,9 +10,9 @@ import type {
 	IVaultAccess,
 	NoteMetadata,
 	EditorPosition,
-} from "../../types";
-import { NoteMentionService } from "./mention-service";
-import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
+} from "../types";
+import { NoteMentionService } from "./MentionService";
+import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
 import {
 	TFile,
 	MarkdownView,

@@ -6,9 +6,9 @@
  * via useSyncExternalStore, and handles persistence to Obsidian's data.json.
  */
 
-import type { ISettingsAccess } from "../../types";
-import type { AgentClientPluginSettings } from "../../infrastructure/obsidian-plugin/plugin";
-import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
+import type { ISettingsAccess } from "../types";
+import type { AgentClientPluginSettings } from "../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
 
 /** Listener callback invoked when settings change */
 type Listener = () => void;

@@ -10,7 +10,7 @@ import type {
 	CustomAgentSettings,
 	AgentEnvVar,
 } from "../../../infrastructure/obsidian-plugin/plugin";
-import { normalizeEnvVars } from "../../../shared/settings-utils";
+import { normalizeEnvVars } from "../../../utils/settings-utils";
 
 export class AgentClientSettingTab extends PluginSettingTab {
 	plugin: AgentClientPlugin;

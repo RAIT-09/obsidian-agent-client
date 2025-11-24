@@ -6,14 +6,14 @@ import {
 import {
 	createSettingsStore,
 	type SettingsStore,
-} from "../../adapters/obsidian/settings-store.adapter";
+} from "../../services/SettingsStore";
 import { AgentClientSettingTab } from "../../presentation/components/settings/AgentClientSettingTab";
 import {
 	sanitizeArgs,
 	normalizeEnvVars,
 	normalizeCustomAgent,
 	ensureUniqueCustomAgentIds,
-} from "../../shared/settings-utils";
+} from "../../utils/settings-utils";
 import {
 	type AgentEnvVar,
 	type CustomAgentSettings,
@@ -29,7 +29,7 @@ export default class AgentClientPlugin extends Plugin {
 	settingsStore!: SettingsStore;
 
 	// Active ACP adapter instance (shared across use cases)
-	acpAdapter: import("../../adapters/acp/acp.adapter").AcpAdapter | null =
+	acpAdapter: import("../../services/AcpAdapter").AcpAdapter | null =
 		null;
 
 	async onload() {

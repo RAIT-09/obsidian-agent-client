@@ -8,7 +8,7 @@ import * as React from "react";
 const { forwardRef } = React;
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 import type { ChatMessage, ErrorInfo } from "../../../types";
-import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
+import type { IAcpClient } from "../../../services/AcpAdapter";
 import { MessageRenderer } from "./MessageRenderer";
 
 interface ChatMessagesProps {

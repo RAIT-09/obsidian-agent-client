@@ -10,7 +10,7 @@ import { setIcon } from "obsidian";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 import type { NoteMetadata, SlashCommand } from "../../../types";
 import { SuggestionDropdown } from "./SuggestionDropdown";
-import { Logger } from "../../../shared/logger";
+import { Logger } from "../../../utils/logger";
 
 // Re-export ChatView type for SuggestionDropdown
 import type { ChatView } from "../../views/chat/ChatView";

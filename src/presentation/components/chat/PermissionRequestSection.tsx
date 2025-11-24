@@ -1,7 +1,7 @@
 import * as React from "react";
 const { useMemo } = React;
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
-import { Logger } from "../../../shared/logger";
+import { Logger } from "../../../utils/logger";
 import * as acp from "@agentclientprotocol/sdk";
 
 interface PermissionRequestSectionProps {

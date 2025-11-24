@@ -1,6 +1,6 @@
 import * as React from "react";
 import type { MessageContent } from "../../../types";
-import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
+import type { IAcpClient } from "../../../services/AcpAdapter";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 import { CollapsibleThought } from "./CollapsibleThought";

@@ -1,5 +1,5 @@
 import * as acp from "@agentclientprotocol/sdk";
-import type { ToolCallContent } from "../../types";
+import type { ToolCallContent } from "../types";
 
 /**
  * Type converter between ACP Protocol types and Domain types.

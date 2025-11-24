@@ -1,6 +1,6 @@
 import * as React from "react";
 import type { ChatMessage } from "../../../types";
-import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
+import type { IAcpClient } from "../../../services/AcpAdapter";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 import { MessageContentRenderer } from "./MessageContentRenderer";
 

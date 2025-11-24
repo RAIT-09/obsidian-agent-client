@@ -1,6 +1,6 @@
 import { TFile, prepareFuzzySearch } from "obsidian";
-import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
-import { Logger } from "../../shared/logger";
+import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
+import { Logger } from "../utils/logger";
 
 // Note mention service for @-mention functionality
 export class NoteMentionService {

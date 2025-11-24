@@ -10,7 +10,7 @@ import type { EventRef } from "obsidian";
 import { createRoot, Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
-import { Logger } from "../../../shared/logger";
+import { Logger } from "../../../utils/logger";
 import { ChatViewWrapper } from "./ChatViewComponent";
 import type { ChatBridge } from "./ChatBridge";
 

@@ -1,6 +1,6 @@
 import * as React from "react";
 const { useRef, useEffect, useMemo } = React;
-import { Logger } from "../../../shared/logger";
+import { Logger } from "../../../utils/logger";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 import type { ChatView } from "../../views/chat/ChatView";
 import type { NoteMetadata, SlashCommand } from "../../../types";

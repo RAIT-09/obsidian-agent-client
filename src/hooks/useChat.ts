@@ -25,18 +25,18 @@ import type {
 	EditorPosition,
 	IVaultAccess,
 } from "../types";
-import type { IAcpClient } from "../adapters/acp/acp.adapter";
-import { toAgentConfig } from "../shared/settings-utils";
-import { extractMentionedNotes, type IMentionService } from "../shared/mention-utils";
-import { convertWindowsPathToWsl } from "../shared/wsl-utils";
+import type { IAcpClient } from "../services/AcpAdapter";
+import { toAgentConfig } from "../utils/settings-utils";
+import { extractMentionedNotes, type IMentionService } from "../utils/mention-utils";
+import { convertWindowsPathToWsl } from "../utils/wsl-utils";
 
 import { useMessages } from "./useMessages";
 import { useSession } from "./useSession";
 
 // Import adapters
-import { AcpAdapter } from "../adapters/acp/acp.adapter";
-import { ObsidianVaultAdapter } from "../adapters/obsidian/vault.adapter";
-import { NoteMentionService } from "../adapters/obsidian/mention-service";
+import { AcpAdapter } from "../services/AcpAdapter";
+import { ObsidianVaultAdapter } from "../services/VaultAdapter";
+import { NoteMentionService } from "../services/MentionService";
 
 // ============================================================================
 // Agent Helper Types & Functions (inlined from SwitchAgentUseCase)

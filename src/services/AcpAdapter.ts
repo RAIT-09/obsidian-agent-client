@@ -13,16 +13,16 @@ import type {
 	PermissionOption,
 	AgentError,
 	SlashCommand,
-} from "../../types";
+} from "../types";
 import { AcpTypeConverter } from "./acp-type-converter";
-import { TerminalManager } from "../../infrastructure/terminal/terminal-manager";
-import { Logger } from "../../shared/logger";
-import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
+import { TerminalManager } from "../services/TerminalManager";
+import { Logger } from "../utils/logger";
+import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
 import {
 	wrapCommandForWsl,
 	convertWindowsPathToWsl,
-} from "../../shared/wsl-utils";
-import { resolveCommandDirectory } from "../../shared/path-utils";
+} from "../utils/wsl-utils";
+import { resolveCommandDirectory } from "../utils/path-utils";
 
 /**
  * Extended ACP Client interface for UI layer.

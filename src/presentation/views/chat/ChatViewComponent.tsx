@@ -9,7 +9,7 @@ import * as React from "react";
 import { Platform, Notice } from "obsidian";
 
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
-import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
+import type { IAcpClient } from "../../../services/AcpAdapter";
 import type { NoteMetadata } from "../../../types";
 
 import { PluginProvider } from "../../../contexts";
@@ -24,8 +24,8 @@ import { ChatHeader } from "../../components/chat/ChatHeader";
 import { ChatMessages } from "../../components/chat/ChatMessages";
 import { ChatInput } from "../../components/chat/ChatInput";
 
-import { Logger } from "../../../shared/logger";
-import { ChatExporter } from "../../../shared/chat-exporter";
+import { Logger } from "../../../utils/logger";
+import { ChatExporter } from "../../../utils/chat-exporter";
 
 import type { ChatBridge } from "./ChatBridge";
 import type { ChatView } from "./ChatView";
