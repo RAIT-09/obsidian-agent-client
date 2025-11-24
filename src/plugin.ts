@@ -1,8 +1,5 @@
 import { Plugin, WorkspaceLeaf, Notice, requestUrl } from "obsidian";
-import {
-	ChatView,
-	VIEW_TYPE_CHAT,
-} from "./components/chat/ChatView";
+import { ChatView, VIEW_TYPE_CHAT } from "./components/chat/ChatView";
 import {
 	createSettingsStore,
 	type SettingsStore,
@@ -94,8 +91,7 @@ export default class AgentClientPlugin extends Plugin {
 	settingsStore!: SettingsStore;
 
 	// Active ACP adapter instance (shared across use cases)
-	acpAdapter: import("./adapters/acp/acp.adapter").AcpAdapter | null =
-		null;
+	acpAdapter: import("./adapters/acp/acp.adapter").AcpAdapter | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -259,6 +255,14 @@ export default class AgentClientPlugin extends Plugin {
 			callback: async () => {
 				await this.activateView();
 				this.app.workspace.trigger("agent-client:toggle-auto-mention");
+			},
+		});
+
+		this.addCommand({
+			id: "cancel-current-message",
+			name: "Cancel current message",
+			callback: async () => {
+				this.app.workspace.trigger("agent-client:cancel-message");
 			},
 		});
 	}

@@ -448,14 +448,23 @@ function ChatComponent({
 			},
 		);
 
+		const cancelRef = workspace.on(
+			"agent-client:cancel-message" as "quit",
+			() => {
+				void handleStopGeneration();
+			},
+		);
+
 		return () => {
 			workspace.offref(approveRef);
 			workspace.offref(rejectRef);
+			workspace.offref(cancelRef);
 		};
 	}, [
 		plugin.app.workspace,
 		permission.approveActivePermission,
 		permission.rejectActivePermission,
+		handleStopGeneration,
 	]);
 
 	// ============================================================
