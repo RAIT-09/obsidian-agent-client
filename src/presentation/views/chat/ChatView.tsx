@@ -43,6 +43,7 @@ import { SwitchAgentUseCase } from "../../../core/use-cases/switch-agent.use-cas
 import { useSettings } from "../../../hooks/useSettings";
 import { useMentions } from "../../../hooks/useMentions";
 import { useSlashCommands } from "../../../hooks/useSlashCommands";
+import { useAutoMention } from "../../../hooks/useAutoMention";
 
 // ViewModel imports
 import { ChatViewModel } from "../../../adapters/view-models/chat.view-model";
@@ -99,9 +100,6 @@ function ChatComponent({
 	}, []);
 
 	const [inputValue, setInputValue] = useState("");
-	const [lastActiveNote, setLastActiveNote] = useState<NoteMetadata | null>(
-		null,
-	);
 	// Hint overlay state for slash commands
 	const [hintText, setHintText] = useState<string | null>(null);
 	const [commandText, setCommandText] = useState<string>("");
@@ -133,11 +131,7 @@ function ChatComponent({
 	}, [plugin]);
 
 	const mentions = useMentions(vaultAccessAdapter, plugin);
-
-	const updateActiveNote = useCallback(async () => {
-		const activeNote = await vaultAccessAdapter.getActiveNote();
-		setLastActiveNote(activeNote);
-	}, [vaultAccessAdapter]);
+	const autoMention = useAutoMention(vaultAccessAdapter);
 
 	// Create SendMessageUseCase
 	const sendMessageUseCase = useMemo(() => {
@@ -223,14 +217,10 @@ function ChatComponent({
 	const errorInfo = vmState.errorInfo;
 	const isSendingFromVM = vmState.isSending;
 
-	// Auto-mention state from ViewModel
-	const isAutoMentionTemporarilyDisabled =
-		vmState.isAutoMentionTemporarilyDisabled;
-
 	// Slash command dropdown via useSlashCommands hook
 	const slashCommands = useSlashCommands(
 		session.availableCommands || [],
-		(disabled) => viewModel.toggleAutoMention(disabled),
+		autoMention.toggle,
 	);
 
 	// Helper to check if agent is currently processing a request
@@ -467,7 +457,7 @@ function ChatComponent({
 
 		const refreshActiveNote = async () => {
 			if (!isMounted) return;
-			await updateActiveNote();
+			await autoMention.updateActiveNote();
 		};
 
 		const unsubscribe = vaultAccessAdapter.subscribeSelectionChanges(() => {
@@ -480,7 +470,26 @@ function ChatComponent({
 			isMounted = false;
 			unsubscribe();
 		};
-	}, [updateActiveNote, vaultAccessAdapter]);
+	}, [autoMention.updateActiveNote, vaultAccessAdapter]);
+
+	// Subscribe to workspace event for toggling auto-mention (e.g., from hotkey)
+	useEffect(() => {
+		const workspace = plugin.app.workspace;
+
+		// "as quit" is a type assertion to bypass TypeScript's strict event name checking.
+		// Obsidian's type definitions only allow official event names, but we use a custom event.
+		// At runtime, the actual string "agent-client:toggle-auto-mention" is used.
+		const eventRef = workspace.on(
+			"agent-client:toggle-auto-mention" as "quit",
+			() => {
+				autoMention.toggle();
+			},
+		);
+
+		return () => {
+			workspace.offref(eventRef);
+		};
+	}, [plugin.app.workspace, autoMention.toggle]);
 
 	const updateIconColor = (svg: SVGElement) => {
 		// Remove all state classes
@@ -504,7 +513,7 @@ function ChatComponent({
 
 		logger.log("[Debug] Creating new session via ViewModel...");
 		setInputValue("");
-		viewModel.toggleAutoMention(false);
+		autoMention.toggle(false);
 		await viewModel.restartSession();
 	};
 
@@ -534,11 +543,11 @@ function ChatComponent({
 
 		// Send message via ViewModel
 		await viewModel.sendMessage(messageToSend, {
-			activeNote: lastActiveNote,
+			activeNote: autoMention.activeNote,
 			vaultBasePath:
 				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
 					.basePath || "",
-			isAutoMentionDisabled: isAutoMentionTemporarilyDisabled,
+			isAutoMentionDisabled: autoMention.isDisabled,
 		});
 
 		// Scroll after sending
@@ -811,50 +820,52 @@ function ChatComponent({
 							view={view}
 						/>
 					)}
-					{settings.autoMentionActiveNote && lastActiveNote && (
-						<div className="auto-mention-inline">
-							<span
-								className={`mention-badge ${isAutoMentionTemporarilyDisabled ? "disabled" : ""}`}
-							>
-								@{lastActiveNote.name}
-								{lastActiveNote.selection && (
-									<span className="selection-indicator">
-										{":"}
-										{lastActiveNote.selection.from.line + 1}
-										-{lastActiveNote.selection.to.line + 1}
-									</span>
-								)}
-							</span>
-							<button
-								className="auto-mention-toggle-btn"
-								onClick={(e) => {
-									const newDisabledState =
-										!isAutoMentionTemporarilyDisabled;
-									viewModel.toggleAutoMention(
-										newDisabledState,
-									);
-									const iconName = newDisabledState
-										? "x"
-										: "plus";
-									setIcon(e.currentTarget, iconName);
-								}}
-								title={
-									isAutoMentionTemporarilyDisabled
-										? "Enable auto-mention"
-										: "Temporarily disable auto-mention"
-								}
-								ref={(el) => {
-									if (el) {
-										const iconName =
-											isAutoMentionTemporarilyDisabled
-												? "plus"
-												: "x";
-										setIcon(el, iconName);
+					{settings.autoMentionActiveNote &&
+						autoMention.activeNote && (
+							<div className="auto-mention-inline">
+								<span
+									className={`mention-badge ${autoMention.isDisabled ? "disabled" : ""}`}
+								>
+									@{autoMention.activeNote.name}
+									{autoMention.activeNote.selection && (
+										<span className="selection-indicator">
+											{":"}
+											{autoMention.activeNote.selection
+												.from.line + 1}
+											-
+											{autoMention.activeNote.selection.to
+												.line + 1}
+										</span>
+									)}
+								</span>
+								<button
+									className="auto-mention-toggle-btn"
+									onClick={(e) => {
+										const newDisabledState =
+											!autoMention.isDisabled;
+										autoMention.toggle(newDisabledState);
+										const iconName = newDisabledState
+											? "x"
+											: "plus";
+										setIcon(e.currentTarget, iconName);
+									}}
+									title={
+										autoMention.isDisabled
+											? "Enable auto-mention"
+											: "Temporarily disable auto-mention"
 									}
-								}}
-							/>
-						</div>
-					)}
+									ref={(el) => {
+										if (el) {
+											const iconName =
+												autoMention.isDisabled
+													? "plus"
+													: "x";
+											setIcon(el, iconName);
+										}
+									}}
+								/>
+							</div>
+						)}
 					<div className="textarea-wrapper">
 						<textarea
 							ref={textareaRef}
@@ -862,7 +873,7 @@ function ChatComponent({
 							onChange={handleInputChange}
 							onKeyDown={handleKeyPress}
 							placeholder={`Message ${activeAgentLabel} - @ to mention notes${session.availableCommands && session.availableCommands.length > 0 ? ", / for commands" : ""}`}
-							className={`chat-input-textarea ${settings.autoMentionActiveNote && lastActiveNote ? "has-auto-mention" : ""}`}
+							className={`chat-input-textarea ${settings.autoMentionActiveNote && autoMention.activeNote ? "has-auto-mention" : ""}`}
 							rows={1}
 						/>
 						{hintText && (
@@ -975,17 +986,6 @@ export class ChatView extends ItemView {
 			on: (event: string, callback: () => void) => EventRef;
 		};
 
-		const toggleAutoMentionHandler = () => {
-			const viewModel = this.viewModel;
-			if (!viewModel) {
-				new Notice("[Agent Client] Chat view is not ready");
-				return;
-			}
-			const currentState = viewModel.getSnapshot();
-			const newState = !currentState.isAutoMentionTemporarilyDisabled;
-			viewModel.toggleAutoMention(newState);
-		};
-
 		this.registerEvent(
 			workspace.on("agent-client:approve-active-permission", () => {
 				void approveHandler();
@@ -996,10 +996,6 @@ export class ChatView extends ItemView {
 				void rejectHandler();
 			}),
 		);
-		this.registerEvent(
-			workspace.on("agent-client:toggle-auto-mention", () => {
-				toggleAutoMentionHandler();
-			}),
-		);
+		// Note: agent-client:toggle-auto-mention is handled in React component via useEffect
 	}
 }
