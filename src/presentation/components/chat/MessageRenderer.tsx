@@ -1,5 +1,5 @@
 import * as React from "react";
-import type { ChatMessage } from "../../../core/domain/models/chat-message";
+import type { ChatMessage } from "../../../types";
 import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 import type { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";

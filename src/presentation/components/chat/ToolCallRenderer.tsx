@@ -1,6 +1,6 @@
 import * as React from "react";
 const { useState } = React;
-import type { MessageContent } from "../../../core/domain/models/chat-message";
+import type { MessageContent } from "../../../types";
 import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 import type { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";

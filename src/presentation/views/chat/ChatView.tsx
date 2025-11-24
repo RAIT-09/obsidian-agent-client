@@ -26,8 +26,7 @@ import { Logger } from "../../../shared/logger";
 import { ChatExporter } from "../../../shared/chat-exporter";
 
 // Type imports
-import type { NoteMetadata } from "../../../core/domain/ports/vault-access.port";
-import type { SlashCommand } from "../../../core/domain/models/chat-session";
+import type { NoteMetadata, SlashCommand } from "../../../types";
 
 // Adapter imports
 import { AcpAdapter, type IAcpClient } from "../../../adapters/acp/acp.adapter";
@@ -41,6 +40,12 @@ import { SwitchAgentUseCase } from "../../../core/use-cases/switch-agent.use-cas
 
 // ViewModel imports
 import { ChatViewModel } from "../../../adapters/view-models/chat.view-model";
+
+// Context imports
+import { PluginProvider } from "../../../contexts";
+
+// Hook imports
+import { useSettingsValue } from "../../../hooks";
 
 // Type definitions for Obsidian internal APIs
 interface VaultAdapterWithBasePath {
@@ -79,12 +84,8 @@ function ChatComponent({
 		);
 	}, [plugin]);
 
-	// Use the settings store to get reactive settings
-	const settings = useSyncExternalStore(
-		plugin.settingsStore.subscribe,
-		plugin.settingsStore.getSnapshot,
-		plugin.settingsStore.getSnapshot,
-	);
+	// Use the settings hook for reactive settings access
+	const settings = useSettingsValue();
 
 	// Check for updates asynchronously
 	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
@@ -926,7 +927,11 @@ export class ChatView extends ItemView {
 		container.empty();
 
 		this.root = createRoot(container);
-		this.root.render(<ChatComponent plugin={this.plugin} view={this} />);
+		this.root.render(
+			<PluginProvider plugin={this.plugin}>
+				<ChatComponent plugin={this.plugin} view={this} />
+			</PluginProvider>,
+		);
 		this.registerPermissionEvents();
 		return Promise.resolve();
 	}
