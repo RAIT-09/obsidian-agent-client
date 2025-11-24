@@ -205,20 +205,12 @@ export default class AgentClientPlugin extends Plugin {
 		// 2. Activate view (create new or focus existing)
 		await this.activateView();
 
-		// 3. Get ChatView and trigger new session if needed
-		const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)[0];
-		if (leaf?.view instanceof ChatView && leaf.view.viewModel) {
-			const viewModel = leaf.view.viewModel;
-			const currentState = viewModel.getSnapshot();
-
-			// If messages exist or agent is different, start new session
-			if (
-				currentState.messages.length > 0 ||
-				currentState.session.agentId !== agentId
-			) {
-				await viewModel.restartSession();
-			}
-		}
+		// Trigger new chat with specific agent
+		// Pass agentId so ChatComponent knows to force new session even if empty
+		this.app.workspace.trigger(
+			"agent-client:new-chat-requested" as "quit",
+			agentId,
+		);
 	}
 
 	/**
@@ -346,7 +338,7 @@ export default class AgentClientPlugin extends Plugin {
 						? claudeFromRaw.command.trim()
 						: typeof rawSettings.claudeCodeAcpCommandPath ===
 									"string" &&
-									rawSettings.claudeCodeAcpCommandPath.trim()
+							  rawSettings.claudeCodeAcpCommandPath.trim()
 									.length > 0
 							? rawSettings.claudeCodeAcpCommandPath.trim()
 							: DEFAULT_SETTINGS.claude.command,
@@ -388,7 +380,7 @@ export default class AgentClientPlugin extends Plugin {
 					geminiFromRaw.command.trim().length > 0
 						? geminiFromRaw.command.trim()
 						: typeof rawSettings.geminiCommandPath === "string" &&
-									rawSettings.geminiCommandPath.trim().length > 0
+							  rawSettings.geminiCommandPath.trim().length > 0
 							? rawSettings.geminiCommandPath.trim()
 							: DEFAULT_SETTINGS.gemini.command,
 				args:

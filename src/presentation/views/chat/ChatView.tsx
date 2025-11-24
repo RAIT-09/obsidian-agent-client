@@ -23,7 +23,6 @@ import { ObsidianVaultAdapter } from "../../../adapters/obsidian/vault.adapter";
 
 // Use Case imports
 import { SendMessageUseCase } from "../../../core/use-cases/send-message.use-case";
-import { ManageSessionUseCase } from "../../../core/use-cases/manage-session.use-case";
 
 // Hooks imports
 import { useSettings } from "../../../hooks/useSettings";
@@ -33,9 +32,7 @@ import { useAutoMention } from "../../../hooks/useAutoMention";
 import { useAgentSession } from "../../../hooks/useAgentSession";
 import { useChat } from "../../../hooks/useChat";
 import { usePermission } from "../../../hooks/usePermission";
-
-// ViewModel imports (temporary - will be removed)
-import { ChatViewModel } from "../../../adapters/view-models/chat.view-model";
+import { useAutoExport } from "../../../hooks/useAutoExport";
 
 // Type definitions for Obsidian internal APIs
 interface VaultAdapterWithBasePath {
@@ -101,17 +98,13 @@ function ChatComponent({
 		);
 	}, [acpAdapter, vaultAccessAdapter, plugin, noteMentionService]);
 
-	const manageSessionUseCase = useMemo(() => {
-		return new ManageSessionUseCase(acpAdapter, plugin.settingsStore);
-	}, [acpAdapter, plugin]);
-
 	// ============================================================
 	// Custom Hooks
 	// ============================================================
 	const settings = useSettings(plugin);
 
 	const agentSession = useAgentSession(
-		manageSessionUseCase,
+		acpAdapter,
 		plugin.settingsStore,
 		vaultPath,
 	);
@@ -144,36 +137,11 @@ function ChatComponent({
 		autoMention.toggle,
 	);
 
+	const autoExport = useAutoExport(plugin);
+
 	// Combined error info (session errors take precedence)
 	const errorInfo =
 		sessionErrorInfo || chat.errorInfo || permission.errorInfo;
-
-	// ============================================================
-	// ViewModel (temporary - for cleanup on close)
-	// ============================================================
-	const viewModel = useMemo(() => {
-		return new ChatViewModel(
-			plugin,
-			sendMessageUseCase,
-			manageSessionUseCase,
-			plugin.settingsStore,
-			vaultAccessAdapter,
-			vaultPath,
-		);
-	}, [
-		plugin,
-		sendMessageUseCase,
-		manageSessionUseCase,
-		vaultAccessAdapter,
-		vaultPath,
-	]);
-
-	useEffect(() => {
-		view.viewModel = viewModel;
-		return () => {
-			view.viewModel = null;
-		};
-	}, [view, viewModel]);
 
 	// ============================================================
 	// Local State
@@ -210,17 +178,53 @@ function ChatComponent({
 	// ============================================================
 	// Callbacks
 	// ============================================================
-	const handleNewChat = useCallback(async () => {
-		if (messages.length === 0) {
-			new Notice("[Agent Client] Already a new session");
-			return;
-		}
+	/**
+	 * Handle new chat request.
+	 * @param requestedAgentId - If provided, switch to this agent (from "New chat with [Agent]" command)
+	 */
+	const handleNewChat = useCallback(
+		async (requestedAgentId?: string) => {
+			const isAgentSwitch =
+				requestedAgentId && requestedAgentId !== session.agentId;
 
-		logger.log("[Debug] Creating new session via useAgentSession...");
-		autoMention.toggle(false);
-		chat.clearMessages();
-		await agentSession.restartSession();
-	}, [messages.length, logger, autoMention, chat, agentSession]);
+			// Skip if already empty AND not switching agents
+			if (messages.length === 0 && !isAgentSwitch) {
+				new Notice("[Agent Client] Already a new session");
+				return;
+			}
+
+			logger.log(
+				`[Debug] Creating new session${isAgentSwitch ? ` with agent: ${requestedAgentId}` : ""}...`,
+			);
+
+			// Auto-export current chat before starting new one (if has messages)
+			if (messages.length > 0) {
+				await autoExport.autoExportIfEnabled(
+					"newChat",
+					messages,
+					session,
+				);
+			}
+
+			// Switch agent if requested
+			if (isAgentSwitch) {
+				await agentSession.switchAgent(requestedAgentId);
+			}
+
+			autoMention.toggle(false);
+			chat.clearMessages();
+			await agentSession.restartSession();
+		},
+		[
+			messages,
+			session,
+			logger,
+			autoExport,
+			autoMention,
+			chat,
+			agentSession,
+		],
+	);
 
 	const handleExportChat = useCallback(async () => {
 		if (messages.length === 0) {
@@ -293,12 +297,33 @@ function ChatComponent({
 		void agentSession.createSession();
 	}, [session.agentId, agentSession.createSession]);
 
-	// Cleanup ViewModel on unmount
+	// Refs for cleanup (to access latest values in cleanup function)
+	const messagesRef = useRef(messages);
+	const sessionRef = useRef(session);
+	const autoExportRef = useRef(autoExport);
+	const closeSessionRef = useRef(agentSession.closeSession);
+	messagesRef.current = messages;
+	sessionRef.current = session;
+	autoExportRef.current = autoExport;
+	closeSessionRef.current = agentSession.closeSession;
+
+	// Cleanup on unmount only - auto-export and close session
 	useEffect(() => {
 		return () => {
-			viewModel.dispose();
+			logger.log("[ChatView] Cleanup: auto-export and close session");
+			// Use refs to get latest values (avoid stale closures)
+			void (async () => {
+				await autoExportRef.current.autoExportIfEnabled(
+					"closeChat",
+					messagesRef.current,
+					sessionRef.current,
+				);
+				await closeSessionRef.current();
+			})();
 		};
-	}, [viewModel]);
+		// Empty dependency array - only run on unmount
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Monitor agent changes from settings when messages are empty
 	useEffect(() => {
@@ -383,6 +408,27 @@ function ChatComponent({
 			workspace.offref(eventRef);
 		};
 	}, [plugin.app.workspace, autoMention.toggle]);
+
+	// Handle new chat request from plugin commands (e.g., "New chat with [Agent]")
+	useEffect(() => {
+		const workspace = plugin.app.workspace;
+
+		// Cast to any to bypass Obsidian's type constraints for custom events
+		const eventRef = (
+			workspace as unknown as {
+				on: (
+					name: string,
+					callback: (agentId?: string) => void,
+				) => ReturnType<typeof workspace.on>;
+			}
+		).on("agent-client:new-chat-requested", (agentId?: string) => {
+			void handleNewChat(agentId);
+		});
+
+		return () => {
+			workspace.offref(eventRef);
+		};
+	}, [plugin.app.workspace, handleNewChat]);
 
 	useEffect(() => {
 		const workspace = plugin.app.workspace;
@@ -475,7 +521,6 @@ export class ChatView extends ItemView {
 	private root: Root | null = null;
 	private plugin: AgentClientPlugin;
 	private logger: Logger;
-	public viewModel: ChatViewModel | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: AgentClientPlugin) {
 		super(leaf);
@@ -506,13 +551,8 @@ export class ChatView extends ItemView {
 
 	async onClose() {
 		this.logger.log("[ChatView] onClose() called");
-		if (this.viewModel) {
-			this.logger.log("[ChatView] Disposing ViewModel...");
-			await this.viewModel.dispose();
-			this.viewModel = null;
-		} else {
-			this.logger.log("[ChatView] No ViewModel to dispose");
-		}
+		// Cleanup is handled by React useEffect cleanup in ChatComponent
+		// which performs auto-export and closeSession
 		if (this.root) {
 			this.root.unmount();
 			this.root = null;

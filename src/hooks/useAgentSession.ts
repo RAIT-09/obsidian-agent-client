@@ -3,10 +3,18 @@ import type {
 	ChatSession,
 	SessionState,
 	SlashCommand,
+	AuthenticationMethod,
 } from "../core/domain/models/chat-session";
-import type { ManageSessionUseCase } from "../core/use-cases/manage-session.use-case";
+import type { IAgentClient } from "../core/domain/ports/agent-client.port";
 import type { ISettingsAccess } from "../core/domain/ports/settings-access.port";
 import type { AgentClientPluginSettings } from "../infrastructure/obsidian-plugin/plugin";
+import type {
+	BaseAgentSettings,
+	ClaudeAgentSettings,
+	GeminiAgentSettings,
+	CodexAgentSettings,
+} from "../core/domain/models/agent-config";
+import { toAgentConfig } from "../shared/settings-utils";
 
 // ============================================================================
 // Types
@@ -54,6 +62,12 @@ export interface UseAgentSessionReturn {
 	 * Alias for createSession (closes current and creates new).
 	 */
 	restartSession: () => Promise<void>;
+
+	/**
+	 * Close the current session and disconnect from agent.
+	 * Cancels any running operation and kills the agent process.
+	 */
+	closeSession: () => Promise<void>;
 
 	/**
 	 * Cancel the current agent operation.
@@ -133,6 +147,80 @@ function getCurrentAgent(settings: AgentClientPluginSettings): AgentInfo {
 }
 
 // ============================================================================
+// Helper Functions (Inlined from ManageSessionUseCase)
+// ============================================================================
+
+/**
+ * Find agent settings by ID from plugin settings.
+ */
+function findAgentSettings(
+	settings: AgentClientPluginSettings,
+	agentId: string,
+): BaseAgentSettings | null {
+	if (agentId === settings.claude.id) {
+		return settings.claude;
+	}
+	if (agentId === settings.codex.id) {
+		return settings.codex;
+	}
+	if (agentId === settings.gemini.id) {
+		return settings.gemini;
+	}
+	// Search in custom agents
+	const customAgent = settings.customAgents.find(
+		(agent) => agent.id === agentId,
+	);
+	return customAgent || null;
+}
+
+/**
+ * Build AgentConfig with API key injection for known agents.
+ */
+function buildAgentConfigWithApiKey(
+	settings: AgentClientPluginSettings,
+	agentSettings: BaseAgentSettings,
+	agentId: string,
+	workingDirectory: string,
+) {
+	const baseConfig = toAgentConfig(agentSettings, workingDirectory);
+
+	// Add API keys to environment for Claude, Codex, and Gemini
+	if (agentId === settings.claude.id) {
+		const claudeSettings = agentSettings as ClaudeAgentSettings;
+		return {
+			...baseConfig,
+			env: {
+				...baseConfig.env,
+				ANTHROPIC_API_KEY: claudeSettings.apiKey,
+			},
+		};
+	}
+	if (agentId === settings.codex.id) {
+		const codexSettings = agentSettings as CodexAgentSettings;
+		return {
+			...baseConfig,
+			env: {
+				...baseConfig.env,
+				OPENAI_API_KEY: codexSettings.apiKey,
+			},
+		};
+	}
+	if (agentId === settings.gemini.id) {
+		const geminiSettings = agentSettings as GeminiAgentSettings;
+		return {
+			...baseConfig,
+			env: {
+				...baseConfig.env,
+				GOOGLE_API_KEY: geminiSettings.apiKey,
+			},
+		};
+	}
+
+	// Custom agents - no API key injection
+	return baseConfig;
+}
+
+// ============================================================================
 // Initial State
 // ============================================================================
 
@@ -167,12 +255,12 @@ function createInitialSession(
  * Handles session creation, restart, cancellation, and agent switching.
  * This hook owns the session state independently.
  *
- * @param manageSessionUseCase - Use case for session lifecycle operations
+ * @param agentClient - Agent client for communication
  * @param settingsAccess - Settings access for agent configuration
  * @param workingDirectory - Working directory for the session
  */
 export function useAgentSession(
-	manageSessionUseCase: ManageSessionUseCase,
+	agentClient: IAgentClient,
 	settingsAccess: ISettingsAccess,
 	workingDirectory: string,
 ): UseAgentSessionReturn {
@@ -198,9 +286,10 @@ export function useAgentSession(
 
 	/**
 	 * Create a new session with the active agent.
+	 * (Inlined from ManageSessionUseCase.createSession)
 	 */
 	const createSession = useCallback(async () => {
-		// Get current active agent info from settings
+		// Get current settings and agent info
 		const settings = settingsAccess.getSnapshot();
 		const activeAgentId = getActiveAgentId(settings);
 		const currentAgent = getCurrentAgent(settings);
@@ -220,47 +309,57 @@ export function useAgentSession(
 		setErrorInfo(null);
 
 		try {
-			// Call use case to create session
-			const result = await manageSessionUseCase.createSession({
-				workingDirectory,
-				agentId: activeAgentId,
-			});
+			// Find agent settings
+			const agentSettings = findAgentSettings(settings, activeAgentId);
 
-			if (result.success && result.sessionId) {
-				// Success - update to ready state
-				setSession((prev) => ({
-					...prev,
-					sessionId: result.sessionId!,
-					state: "ready",
-					authMethods: result.authMethods || [],
-					lastActivityAt: new Date(),
-				}));
-			} else {
-				// Use case returned error
-				setSession((prev) => ({
-					...prev,
-					state: "error",
-				}));
-				setErrorInfo(
-					result.error
-						? {
-								title: result.error.title,
-								message: result.error.message,
-								suggestion: result.error.suggestion,
-							}
-						: {
-								title: "Session Creation Failed",
-								message: "Failed to create new session",
-								suggestion: "Please try again.",
-							},
-				);
+			if (!agentSettings) {
+				setSession((prev) => ({ ...prev, state: "error" }));
+				setErrorInfo({
+					title: "Agent Not Found",
+					message: `Agent with ID "${activeAgentId}" not found in settings`,
+					suggestion:
+						"Please check your agent configuration in settings.",
+				});
+				return;
 			}
-		} catch (error) {
-			// Unexpected error
+
+			// Build AgentConfig with API key injection
+			const agentConfig = buildAgentConfigWithApiKey(
+				settings,
+				agentSettings,
+				activeAgentId,
+				workingDirectory,
+			);
+
+			// Check if initialization is needed
+			// Only initialize if agent is not initialized OR agent ID has changed
+			const needsInitialize =
+				!agentClient.isInitialized() ||
+				agentClient.getCurrentAgentId() !== activeAgentId;
+
+			let authMethods: AuthenticationMethod[] = [];
+
+			if (needsInitialize) {
+				// Initialize connection to agent (spawn process + protocol handshake)
+				const initResult = await agentClient.initialize(agentConfig);
+				authMethods = initResult.authMethods;
+			}
+
+			// Create new session (lightweight operation)
+			const sessionResult =
+				await agentClient.newSession(workingDirectory);
+
+			// Success - update to ready state
 			setSession((prev) => ({
 				...prev,
-				state: "error",
+				sessionId: sessionResult.sessionId,
+				state: "ready",
+				authMethods: authMethods,
+				lastActivityAt: new Date(),
 			}));
+		} catch (error) {
+			// Error - update to error state
+			setSession((prev) => ({ ...prev, state: "error" }));
 			setErrorInfo({
 				title: "Session Creation Failed",
 				message: `Failed to create new session: ${error instanceof Error ? error.message : String(error)}`,
@@ -268,7 +367,7 @@ export function useAgentSession(
 					"Please check the agent configuration and try again.",
 			});
 		}
-	}, [manageSessionUseCase, settingsAccess, workingDirectory]);
+	}, [agentClient, settingsAccess, workingDirectory]);
 
 	/**
 	 * Restart the current session.
@@ -276,6 +375,36 @@ export function useAgentSession(
 	const restartSession = useCallback(async () => {
 		await createSession();
 	}, [createSession]);
+
+	/**
+	 * Close the current session and disconnect from agent.
+	 * Cancels any running operation and kills the agent process.
+	 */
+	const closeSession = useCallback(async () => {
+		// Cancel current session if active
+		if (session.sessionId) {
+			try {
+				await agentClient.cancel(session.sessionId);
+			} catch (error) {
+				// Ignore errors - session might already be closed
+				console.warn("Failed to cancel session:", error);
+			}
+		}
+
+		// Disconnect from agent (kill process)
+		try {
+			await agentClient.disconnect();
+		} catch (error) {
+			console.warn("Failed to disconnect:", error);
+		}
+
+		// Update to disconnected state
+		setSession((prev) => ({
+			...prev,
+			sessionId: null,
+			state: "disconnected",
+		}));
+	}, [agentClient, session.sessionId]);
 
 	/**
 	 * Cancel the current operation.
@@ -286,8 +415,8 @@ export function useAgentSession(
 		}
 
 		try {
-			// Cancel via use case
-			await manageSessionUseCase.closeSession(session.sessionId);
+			// Cancel via agent client
+			await agentClient.cancel(session.sessionId);
 
 			// Update to ready state
 			setSession((prev) => ({
@@ -304,7 +433,7 @@ export function useAgentSession(
 				state: "ready",
 			}));
 		}
-	}, [manageSessionUseCase, session.sessionId]);
+	}, [agentClient, session.sessionId]);
 
 	/**
 	 * Switch to a different agent.
@@ -351,6 +480,7 @@ export function useAgentSession(
 		errorInfo,
 		createSession,
 		restartSession,
+		closeSession,
 		cancelOperation,
 		switchAgent,
 		getAvailableAgents,
