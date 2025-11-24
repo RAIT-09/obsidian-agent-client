@@ -39,6 +39,9 @@ import { ManageSessionUseCase } from "../../../core/use-cases/manage-session.use
 import { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";
 import { SwitchAgentUseCase } from "../../../core/use-cases/switch-agent.use-case";
 
+// Hooks imports
+import { useSettings } from "../../../hooks/useSettings";
+
 // ViewModel imports
 import { ChatViewModel } from "../../../adapters/view-models/chat.view-model";
 
@@ -80,11 +83,7 @@ function ChatComponent({
 	}, [plugin]);
 
 	// Use the settings store to get reactive settings
-	const settings = useSyncExternalStore(
-		plugin.settingsStore.subscribe,
-		plugin.settingsStore.getSnapshot,
-		plugin.settingsStore.getSnapshot,
-	);
+	const settings = useSettings(plugin);
 
 	// Check for updates asynchronously
 	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
