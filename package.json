@@ -17,14 +17,17 @@
 		"@types/node": "^16.11.6",
 		"@types/react": "^19.1.13",
 		"@types/react-dom": "^19.1.9",
-		"@typescript-eslint/eslint-plugin": "5.29.0",
-		"@typescript-eslint/parser": "5.29.0",
+		"@typescript-eslint/parser": "^8.0.0",
 		"builtin-modules": "3.3.0",
 		"esbuild": "0.17.3",
+		"eslint": "^9.0.0",
+		"eslint-plugin-obsidianmd": "^0.1.9",
 		"obsidian": "latest",
 		"prettier": "^3.4.2",
 		"tslib": "2.4.0",
-		"typescript": "4.7.4"
+		"typescript": "^5.9.3",
+		"@typescript-eslint/utils": "^8.0.0",
+		"typescript-eslint": "^8.0.0"
 	},
 	"dependencies": {
 		"@agentclientprotocol/sdk": "^0.5.1",
