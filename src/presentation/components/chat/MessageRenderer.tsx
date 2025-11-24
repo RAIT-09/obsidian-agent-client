@@ -2,21 +2,23 @@ import * as React from "react";
 import type { ChatMessage } from "../../../types";
 import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
-import type { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";
 import { MessageContentRenderer } from "./MessageContentRenderer";
 
 interface MessageRendererProps {
 	message: ChatMessage;
 	plugin: AgentClientPlugin;
 	acpClient?: IAcpClient;
-	handlePermissionUseCase?: HandlePermissionUseCase;
+	onApprovePermission?: (
+		requestId: string,
+		optionId: string,
+	) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function MessageRenderer({
 	message,
 	plugin,
 	acpClient,
-	handlePermissionUseCase,
+	onApprovePermission,
 }: MessageRendererProps) {
 	return (
 		<div
@@ -30,7 +32,7 @@ export function MessageRenderer({
 						messageId={message.id}
 						messageRole={message.role}
 						acpClient={acpClient}
-						handlePermissionUseCase={handlePermissionUseCase}
+						onApprovePermission={onApprovePermission}
 					/>
 				</div>
 			))}

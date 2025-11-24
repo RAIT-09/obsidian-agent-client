@@ -1,8 +1,6 @@
 import * as React from "react";
 const { useMemo } = React;
-import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
-import type { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";
 import { Logger } from "../../../shared/logger";
 import * as acp from "@agentclientprotocol/sdk";
 
@@ -15,18 +13,19 @@ interface PermissionRequestSectionProps {
 		isActive?: boolean;
 	};
 	toolCallId: string;
-	acpClient?: IAcpClient;
-	handlePermissionUseCase?: HandlePermissionUseCase;
 	plugin: AgentClientPlugin;
+	onApprovePermission?: (
+		requestId: string,
+		optionId: string,
+	) => Promise<{ success: boolean; error?: string }>;
 	onOptionSelected?: (optionId: string) => void;
 }
 
 export function PermissionRequestSection({
 	permissionRequest,
 	toolCallId,
-	acpClient,
-	handlePermissionUseCase,
 	plugin,
+	onApprovePermission,
 	onOptionSelected,
 }: PermissionRequestSectionProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
@@ -52,16 +51,12 @@ export function PermissionRequestSection({
 									onOptionSelected(option.optionId);
 								}
 
-								if (handlePermissionUseCase) {
-									// Send response to agent via Use Case
-									const result =
-										await handlePermissionUseCase.approvePermission(
-											{
-												requestId:
-													permissionRequest.requestId,
-												optionId: option.optionId,
-											},
-										);
+								if (onApprovePermission) {
+									// Send response to agent via callback
+									const result = await onApprovePermission(
+										permissionRequest.requestId,
+										option.optionId,
+									);
 
 									if (!result.success) {
 										logger.error(
@@ -71,7 +66,7 @@ export function PermissionRequestSection({
 									}
 								} else {
 									logger.warn(
-										"Cannot handle permission response: missing handlePermissionUseCase",
+										"Cannot handle permission response: missing onApprovePermission callback",
 									);
 								}
 							}}

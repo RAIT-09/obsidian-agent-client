@@ -2,7 +2,6 @@ import * as React from "react";
 import type { MessageContent } from "../../../types";
 import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
-import type { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";
 import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 import { CollapsibleThought } from "./CollapsibleThought";
 import { TerminalRenderer } from "./TerminalRenderer";
@@ -15,7 +14,10 @@ interface MessageContentRendererProps {
 	messageId?: string;
 	messageRole?: "user" | "assistant";
 	acpClient?: IAcpClient;
-	handlePermissionUseCase?: HandlePermissionUseCase;
+	onApprovePermission?: (
+		requestId: string,
+		optionId: string,
+	) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function MessageContentRenderer({
@@ -24,7 +26,7 @@ export function MessageContentRenderer({
 	messageId,
 	messageRole,
 	acpClient,
-	handlePermissionUseCase,
+	onApprovePermission,
 }: MessageContentRendererProps) {
 	switch (content.type) {
 		case "text":
@@ -54,7 +56,7 @@ export function MessageContentRenderer({
 					content={content}
 					plugin={plugin}
 					acpClient={acpClient}
-					handlePermissionUseCase={handlePermissionUseCase}
+					onApprovePermission={onApprovePermission}
 				/>
 			);
 

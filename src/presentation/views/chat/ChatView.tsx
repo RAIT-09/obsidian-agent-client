@@ -315,7 +315,7 @@ function ChatComponent({
 				agentLabel={agentLabel}
 				plugin={plugin}
 				acpClient={acpClientRef.current || undefined}
-				handlePermissionUseCase={chat.handlePermissionUseCase}
+				onApprovePermission={chat.approvePermission}
 				onClearError={chat.clearError}
 			/>
 

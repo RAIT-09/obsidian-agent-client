@@ -9,7 +9,6 @@ const { forwardRef } = React;
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 import type { ChatMessage, ErrorInfo } from "../../../types";
 import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
-import type { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";
 import { MessageRenderer } from "./MessageRenderer";
 
 interface ChatMessagesProps {
@@ -34,8 +33,11 @@ interface ChatMessagesProps {
 	/** ACP client for terminal rendering */
 	acpClient?: IAcpClient;
 
-	/** Permission use case for handling permissions */
-	handlePermissionUseCase: HandlePermissionUseCase;
+	/** Callback to approve permission */
+	onApprovePermission: (
+		requestId: string,
+		optionId: string,
+	) => Promise<{ success: boolean; error?: string }>;
 
 	/** Callback to clear error */
 	onClearError: () => void;
@@ -51,7 +53,7 @@ export const ChatMessages = forwardRef<HTMLDivElement, ChatMessagesProps>(
 			agentLabel,
 			plugin,
 			acpClient,
-			handlePermissionUseCase,
+			onApprovePermission,
 			onClearError,
 		},
 		ref,
@@ -100,7 +102,7 @@ export const ChatMessages = forwardRef<HTMLDivElement, ChatMessagesProps>(
 						message={message}
 						plugin={plugin}
 						acpClient={acpClient}
-						handlePermissionUseCase={handlePermissionUseCase}
+						onApprovePermission={onApprovePermission}
 					/>
 				))}
 				{isSending && (

@@ -413,7 +413,10 @@ export function useChat(options: UseChatOptions) {
 	);
 
 	const approvePermission = useCallback(
-		async (requestId: string, optionId: string) => {
+		async (
+			requestId: string,
+			optionId: string,
+		): Promise<{ success: boolean; error?: string }> => {
 			try {
 				const result =
 					await useCases.handlePermission.approvePermission({
@@ -429,11 +432,14 @@ export function useChat(options: UseChatOptions) {
 							"Failed to respond to permission request",
 					});
 				}
+				return result;
 			} catch (error) {
+				const errorMessage = `Failed to respond to permission request: ${error instanceof Error ? error.message : String(error)}`;
 				sessionHook.setError({
 					title: "Permission Error",
-					message: `Failed to respond to permission request: ${error instanceof Error ? error.message : String(error)}`,
+					message: errorMessage,
 				});
+				return { success: false, error: errorMessage };
 			}
 		},
 		[useCases, sessionHook],
@@ -556,9 +562,6 @@ export function useChat(options: UseChatOptions) {
 		acpClient: acpAdapter as IAcpClient,
 		vaultAdapter,
 		mentionService,
-
-		// Use cases (for HandlePermissionUseCase access in components)
-		handlePermissionUseCase: useCases.handlePermission,
 	};
 }
 

@@ -3,7 +3,6 @@ const { useState } = React;
 import type { MessageContent } from "../../../types";
 import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
-import type { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { PermissionRequestSection } from "./PermissionRequestSection";
 // import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
@@ -12,14 +11,17 @@ interface ToolCallRendererProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
 	plugin: AgentClientPlugin;
 	acpClient?: IAcpClient;
-	handlePermissionUseCase?: HandlePermissionUseCase;
+	onApprovePermission?: (
+		requestId: string,
+		optionId: string,
+	) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function ToolCallRenderer({
 	content,
 	plugin,
 	acpClient,
-	handlePermissionUseCase,
+	onApprovePermission,
 }: ToolCallRendererProps) {
 	const {
 		kind,
@@ -142,9 +144,8 @@ export function ToolCallRenderer({
 						selectedOptionId: selectedOptionId,
 					}}
 					toolCallId={toolCallId}
-					acpClient={acpClient}
-					handlePermissionUseCase={handlePermissionUseCase}
 					plugin={plugin}
+					onApprovePermission={onApprovePermission}
 					onOptionSelected={setSelectedOptionId}
 				/>
 			)}
