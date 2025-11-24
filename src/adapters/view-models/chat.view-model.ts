@@ -795,6 +795,34 @@ export class ChatViewModel {
 		});
 	};
 
+	/**
+	 * Sync session state from external source (useAgentSession hook).
+	 *
+	 * This is a temporary bridge during the refactoring process.
+	 * Eventually, all session state management will move to hooks.
+	 *
+	 * @param sessionState - Session state from useAgentSession
+	 */
+	syncSessionState = (sessionState: {
+		sessionId: string | null;
+		state: SessionState;
+		agentId: string;
+		agentDisplayName: string;
+		authMethods?: import("../../core/domain/models/chat-session").AuthenticationMethod[];
+	}): void => {
+		this.setState({
+			session: {
+				...this.state.session,
+				sessionId: sessionState.sessionId,
+				state: sessionState.state,
+				agentId: sessionState.agentId,
+				agentDisplayName: sessionState.agentDisplayName,
+				authMethods:
+					sessionState.authMethods || this.state.session.authMethods,
+			},
+		});
+	};
+
 	// ========================================
 	// Actions: Permission Handling
 	// ========================================

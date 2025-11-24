@@ -44,6 +44,7 @@ import { useSettings } from "../../../hooks/useSettings";
 import { useMentions } from "../../../hooks/useMentions";
 import { useSlashCommands } from "../../../hooks/useSlashCommands";
 import { useAutoMention } from "../../../hooks/useAutoMention";
+import { useAgentSession } from "../../../hooks/useAgentSession";
 
 // ViewModel imports
 import { ChatViewModel } from "../../../adapters/view-models/chat.view-model";
@@ -164,6 +165,13 @@ function ChatComponent({
 		return new SwitchAgentUseCase(plugin.settingsStore);
 	}, [plugin]);
 
+	// Create useAgentSession hook for session lifecycle management
+	const agentSession = useAgentSession(
+		manageSessionUseCase,
+		switchAgentUseCase,
+		vaultPath,
+	);
+
 	// Create ChatViewModel
 	const viewModel = useMemo(() => {
 		return new ChatViewModel(
@@ -193,16 +201,16 @@ function ChatComponent({
 		};
 	}, [view, viewModel]);
 
-	// Set AcpAdapter callbacks to ViewModel methods
-	// This connects the adapter's message updates to the ViewModel's state management
+	// Set AcpAdapter callbacks
+	// Message callbacks go to ViewModel, session callbacks go to useAgentSession
 	useEffect(() => {
 		acpAdapter.setMessageCallbacks(
 			viewModel.addMessage,
 			viewModel.updateLastMessage,
 			viewModel.updateMessage,
-			viewModel.updateAvailableCommands,
+			agentSession.updateAvailableCommands,
 		);
-	}, [acpAdapter, viewModel]);
+	}, [acpAdapter, viewModel, agentSession.updateAvailableCommands]);
 
 	// Subscribe to ViewModel state
 	const vmState = useSyncExternalStore(
@@ -213,9 +221,29 @@ function ChatComponent({
 
 	// Extract state from ViewModel for easier access
 	const messages = vmState.messages;
-	const session = vmState.session;
-	const errorInfo = vmState.errorInfo;
 	const isSendingFromVM = vmState.isSending;
+
+	// Session state from useAgentSession hook
+	const { session, errorInfo, isReady: isSessionReady } = agentSession;
+
+	// Sync session state from useAgentSession to ViewModel
+	// This is a temporary bridge during the refactoring process
+	useEffect(() => {
+		viewModel.syncSessionState({
+			sessionId: session.sessionId,
+			state: session.state,
+			agentId: session.agentId,
+			agentDisplayName: session.agentDisplayName,
+			authMethods: session.authMethods,
+		});
+	}, [
+		viewModel,
+		session.sessionId,
+		session.state,
+		session.agentId,
+		session.agentDisplayName,
+		session.authMethods,
+	]);
 
 	// Slash command dropdown via useSlashCommands hook
 	const slashCommands = useSlashCommands(
@@ -225,9 +253,6 @@ function ChatComponent({
 
 	// Helper to check if agent is currently processing a request
 	const isSending = isSendingFromVM; // Use ViewModel state
-
-	// Helper to check if session is ready for user input
-	const isSessionReady = session.state === "ready";
 
 	const getActiveAgentLabel = () => {
 		const activeId = session.agentId;
@@ -369,12 +394,14 @@ function ChatComponent({
 
 	// Initialize session on mount or when agent changes
 	useEffect(() => {
-		logger.log("[Debug] Starting connection setup via ViewModel...");
-		viewModel.createNewSession();
+		logger.log("[Debug] Starting connection setup via useAgentSession...");
+		void agentSession.createSession();
 
 		// Note: No cleanup here - disconnect() during agent switching would kill
 		// the new process. Final cleanup is handled by dispose() on unmount.
-	}, [session.agentId, viewModel]);
+		// IMPORTANT: agentSession.createSession is stable (useCallback) - using the object
+		// itself would cause infinite re-renders since it's recreated each render.
+	}, [session.agentId, agentSession.createSession]);
 
 	// Cleanup ViewModel on unmount
 	useEffect(() => {
@@ -387,10 +414,15 @@ function ChatComponent({
 	useEffect(() => {
 		const newActiveAgentId = settings.activeAgentId || settings.claude.id;
 		if (messages.length === 0 && newActiveAgentId !== session.agentId) {
-			// Switch agent via ViewModel
-			viewModel.switchAgent(newActiveAgentId);
+			// Switch agent via useAgentSession
+			void agentSession.switchAgent(newActiveAgentId);
 		}
-	}, [settings.activeAgentId, messages.length, session.agentId, viewModel]);
+	}, [
+		settings.activeAgentId,
+		messages.length,
+		session.agentId,
+		agentSession.switchAgent,
+	]);
 
 	// Auto-scroll when messages change
 	useEffect(() => {
@@ -511,17 +543,17 @@ function ChatComponent({
 			return;
 		}
 
-		logger.log("[Debug] Creating new session via ViewModel...");
+		logger.log("[Debug] Creating new session via useAgentSession...");
 		setInputValue("");
 		autoMention.toggle(false);
-		await viewModel.restartSession();
+		await agentSession.restartSession();
 	};
 
 	const handleStopGeneration = async () => {
 		logger.log("Cancelling current operation...");
 		// Get last user message before cancel (to restore it)
 		const lastMessage = viewModel.getSnapshot().lastUserMessage;
-		await viewModel.cancelCurrentOperation();
+		await agentSession.cancelOperation();
 
 		// Restore the last user message to input field
 		if (lastMessage) {
