@@ -76,12 +76,19 @@ function ChatComponent({
 		[plugin],
 	);
 
+	// Cleanup NoteMentionService when component unmounts
+	useEffect(() => {
+		return () => {
+			noteMentionService.destroy();
+		};
+	}, [noteMentionService]);
+
 	const acpAdapter = useMemo(() => new AcpAdapter(plugin), [plugin]);
 	const acpClientRef = useRef<IAcpClient>(acpAdapter);
 
 	const vaultAccessAdapter = useMemo(() => {
-		return new ObsidianVaultAdapter(plugin);
-	}, [plugin]);
+		return new ObsidianVaultAdapter(plugin, noteMentionService);
+	}, [plugin, noteMentionService]);
 
 	// ============================================================
 	// Custom Hooks

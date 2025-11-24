@@ -8,6 +8,7 @@ export class NoteMentionService {
 	private lastBuild = 0;
 	private plugin: AgentClientPlugin;
 	private logger: Logger;
+	private eventRefs: ReturnType<typeof this.plugin.app.vault.on>[] = [];
 
 	constructor(plugin: AgentClientPlugin) {
 		this.plugin = plugin;
@@ -15,17 +16,33 @@ export class NoteMentionService {
 		this.rebuildIndex();
 
 		// Listen for vault changes to keep index up to date
-		this.plugin.app.vault.on("create", (file) => {
-			if (file instanceof TFile && file.extension === "md") {
-				this.rebuildIndex();
-			}
-		});
-		this.plugin.app.vault.on("delete", () => this.rebuildIndex());
-		this.plugin.app.vault.on("rename", (file) => {
-			if (file instanceof TFile && file.extension === "md") {
-				this.rebuildIndex();
-			}
-		});
+		this.eventRefs.push(
+			this.plugin.app.vault.on("create", (file) => {
+				if (file instanceof TFile && file.extension === "md") {
+					this.rebuildIndex();
+				}
+			}),
+		);
+		this.eventRefs.push(
+			this.plugin.app.vault.on("delete", () => this.rebuildIndex()),
+		);
+		this.eventRefs.push(
+			this.plugin.app.vault.on("rename", (file) => {
+				if (file instanceof TFile && file.extension === "md") {
+					this.rebuildIndex();
+				}
+			}),
+		);
+	}
+
+	/**
+	 * Clean up event listeners. Call this when the service is no longer needed.
+	 */
+	destroy(): void {
+		for (const ref of this.eventRefs) {
+			this.plugin.app.vault.offref(ref);
+		}
+		this.eventRefs = [];
 	}
 
 	private rebuildIndex() {

@@ -41,8 +41,11 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 	private selectionCompartment: Compartment | null = null;
 	private lastSelectionKey = "";
 
-	constructor(private plugin: AgentClientPlugin) {
-		this.mentionService = new NoteMentionService(plugin);
+	constructor(
+		private plugin: AgentClientPlugin,
+		mentionService: NoteMentionService,
+	) {
+		this.mentionService = mentionService;
 	}
 
 	/**
