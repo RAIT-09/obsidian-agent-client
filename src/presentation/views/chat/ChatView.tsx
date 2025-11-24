@@ -24,7 +24,6 @@ import { ObsidianVaultAdapter } from "../../../adapters/obsidian/vault.adapter";
 // Use Case imports
 import { SendMessageUseCase } from "../../../core/use-cases/send-message.use-case";
 import { ManageSessionUseCase } from "../../../core/use-cases/manage-session.use-case";
-import { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";
 
 // Hooks imports
 import { useSettings } from "../../../hooks/useSettings";
@@ -106,10 +105,6 @@ function ChatComponent({
 		return new ManageSessionUseCase(acpAdapter, plugin.settingsStore);
 	}, [acpAdapter, plugin]);
 
-	const handlePermissionUseCase = useMemo(() => {
-		return new HandlePermissionUseCase(acpAdapter, plugin.settingsStore);
-	}, [acpAdapter, plugin]);
-
 	// ============================================================
 	// Custom Hooks
 	// ============================================================
@@ -140,7 +135,7 @@ function ChatComponent({
 
 	const { messages, isSending } = chat;
 
-	const permission = usePermission(handlePermissionUseCase, messages);
+	const permission = usePermission(acpAdapter, messages);
 
 	const mentions = useMentions(vaultAccessAdapter, plugin);
 	const autoMention = useAutoMention(vaultAccessAdapter);

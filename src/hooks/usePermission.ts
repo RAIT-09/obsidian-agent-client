@@ -3,7 +3,7 @@ import type {
 	ChatMessage,
 	PermissionOption,
 } from "../core/domain/models/chat-message";
-import type { HandlePermissionUseCase } from "../core/use-cases/handle-permission.use-case";
+import type { IAgentClient } from "../core/domain/ports/agent-client.port";
 import type { ErrorInfo } from "../core/domain/models/agent-error";
 
 // ============================================================================
@@ -67,7 +67,9 @@ export interface UsePermissionReturn {
 /**
  * Find the active permission request from messages.
  */
-function findActivePermission(messages: ChatMessage[]): ActivePermission | null {
+function findActivePermission(
+	messages: ChatMessage[],
+): ActivePermission | null {
 	for (const message of messages) {
 		for (const content of message.content) {
 			if (content.type === "tool_call") {
@@ -125,11 +127,11 @@ function selectOption(
  * - Provides methods to approve/reject permissions
  * - Handles hotkey-triggered approve/reject actions
  *
- * @param handlePermissionUseCase - Use case for permission operations
+ * @param agentClient - Agent client for permission responses
  * @param messages - Chat messages (from useChat) to scan for active permissions
  */
 export function usePermission(
-	handlePermissionUseCase: HandlePermissionUseCase,
+	agentClient: IAgentClient,
 	messages: ChatMessage[],
 ): UsePermissionReturn {
 	// Error state
@@ -143,21 +145,12 @@ export function usePermission(
 
 	/**
 	 * Approve a specific permission request.
+	 * Calls agentClient.respondToPermission directly.
 	 */
 	const approvePermission = useCallback(
 		async (requestId: string, optionId: string): Promise<void> => {
 			try {
-				const result = await handlePermissionUseCase.approvePermission({
-					requestId,
-					optionId,
-				});
-
-				if (!result.success) {
-					setErrorInfo({
-						title: "Permission Error",
-						message: result.error || "Failed to respond to permission request",
-					});
-				}
+				await agentClient.respondToPermission(requestId, optionId);
 			} catch (error) {
 				setErrorInfo({
 					title: "Permission Error",
@@ -165,7 +158,7 @@ export function usePermission(
 				});
 			}
 		},
-		[handlePermissionUseCase],
+		[agentClient],
 	);
 
 	/**
