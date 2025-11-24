@@ -101,7 +101,7 @@ export class SettingsStore implements ISettingsAccess {
 	set(next: AgentClientPluginSettings): void {
 		// Delegate to async updateSettings
 		// Note: Fire-and-forget - callers don't expect this to be async
-		this.updateSettings(next);
+		void this.updateSettings(next);
 	}
 }
 

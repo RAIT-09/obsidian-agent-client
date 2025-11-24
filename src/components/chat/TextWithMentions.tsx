@@ -35,7 +35,7 @@ export function TextWithMentions({
 				key="auto-mention"
 				className="text-mention"
 				onClick={() => {
-					plugin.app.workspace.openLinkText(
+					void plugin.app.workspace.openLinkText(
 						autoMentionContext.notePath,
 						"",
 					);
@@ -71,7 +71,7 @@ export function TextWithMentions({
 					key={match.index}
 					className="text-mention"
 					onClick={() => {
-						plugin.app.workspace.openLinkText(file.path, "");
+						void plugin.app.workspace.openLinkText(file.path, "");
 					}}
 				>
 					@{noteName}

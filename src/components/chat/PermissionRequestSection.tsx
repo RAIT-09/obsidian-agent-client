@@ -46,7 +46,7 @@ export function PermissionRequestSection({
 						<button
 							key={option.optionId}
 							className={`permission-option ${option.kind ? `permission-kind-${option.kind}` : ""}`}
-							onClick={async () => {
+							onClick={() => {
 								// Update local UI state immediately for feedback
 								if (onOptionSelected) {
 									onOptionSelected(option.optionId);
@@ -54,7 +54,7 @@ export function PermissionRequestSection({
 
 								if (onApprovePermission) {
 									// Send response to agent via callback
-									await onApprovePermission(
+									void onApprovePermission(
 										permissionRequest.requestId,
 										option.optionId,
 									);

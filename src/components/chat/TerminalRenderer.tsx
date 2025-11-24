@@ -79,10 +79,12 @@ export function TerminalRenderer({
 		};
 
 		// Start polling immediately
-		pollOutput();
+		void pollOutput();
 
 		// Set up polling interval with shorter interval to catch fast commands
-		intervalRef.current = window.setInterval(pollOutput, 100);
+		intervalRef.current = window.setInterval(() => {
+			void pollOutput();
+		}, 100);
 
 		return () => {
 			if (intervalRef.current) {

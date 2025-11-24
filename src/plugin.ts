@@ -105,7 +105,7 @@ export default class AgentClientPlugin extends Plugin {
 			"bot-message-square",
 			"Open agent client",
 			(_evt: MouseEvent) => {
-				this.activateView();
+				void this.activateView();
 			},
 		);
 		ribbonIconEl.addClass("agent-client-ribbon-icon");
@@ -114,7 +114,7 @@ export default class AgentClientPlugin extends Plugin {
 			id: "open-chat-view",
 			name: "Open agent chat",
 			callback: () => {
-				this.activateView();
+				void this.activateView();
 			},
 		});
 
@@ -146,7 +146,7 @@ export default class AgentClientPlugin extends Plugin {
 		}
 
 		if (leaf) {
-			workspace.revealLeaf(leaf);
+			await workspace.revealLeaf(leaf);
 			// Focus textarea after revealing the leaf
 			const viewContainerEl = leaf.view?.containerEl;
 			if (viewContainerEl) {

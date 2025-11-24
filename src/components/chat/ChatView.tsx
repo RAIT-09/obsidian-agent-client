@@ -482,8 +482,8 @@ function ChatComponent({
 			<ChatHeader
 				agentLabel={activeAgentLabel}
 				isUpdateAvailable={isUpdateAvailable}
-				onNewChat={() => handleNewChat()}
-				onExportChat={handleExportChat}
+				onNewChat={() => void handleNewChat()}
+				onExportChat={() => void handleExportChat()}
 				onOpenSettings={handleOpenSettings}
 			/>
 

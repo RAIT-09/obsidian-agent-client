@@ -21,7 +21,7 @@ export function MarkdownTextRenderer({
 		el.classList.add("markdown-rendered");
 
 		// Render markdown
-		MarkdownRenderer.render(
+		void MarkdownRenderer.render(
 			plugin.app,
 			text,
 			el,
