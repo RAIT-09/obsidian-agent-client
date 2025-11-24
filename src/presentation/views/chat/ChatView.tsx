@@ -42,6 +42,7 @@ import { SwitchAgentUseCase } from "../../../core/use-cases/switch-agent.use-cas
 // Hooks imports
 import { useSettings } from "../../../hooks/useSettings";
 import { useMentions } from "../../../hooks/useMentions";
+import { useSlashCommands } from "../../../hooks/useSlashCommands";
 
 // ViewModel imports
 import { ChatViewModel } from "../../../adapters/view-models/chat.view-model";
@@ -226,10 +227,11 @@ function ChatComponent({
 	const isAutoMentionTemporarilyDisabled =
 		vmState.isAutoMentionTemporarilyDisabled;
 
-	// Slash command dropdown state from ViewModel
-	const showSlashCommandDropdown = vmState.showSlashCommandDropdown;
-	const slashCommandSuggestions = vmState.slashCommandSuggestions;
-	const selectedSlashCommandIndex = vmState.selectedSlashCommandIndex;
+	// Slash command dropdown via useSlashCommands hook
+	const slashCommands = useSlashCommands(
+		session.availableCommands || [],
+		(disabled) => viewModel.toggleAutoMention(disabled),
+	);
 
 	// Helper to check if agent is currently processing a request
 	const isSending = isSendingFromVM; // Use ViewModel state
@@ -306,9 +308,9 @@ function ChatComponent({
 		setTextAndFocus(newText);
 	};
 
-	// Slash command handling - delegate to ViewModel
-	const selectSlashCommand = (command: SlashCommand) => {
-		const newText = viewModel.selectSlashCommand(inputValue, command);
+	// Slash command handling - delegate to useSlashCommands hook
+	const handleSelectSlashCommand = (command: SlashCommand) => {
+		const newText = slashCommands.selectSuggestion(inputValue, command);
 		setInputValue(newText);
 
 		// Setup hint overlay if command has hint
@@ -551,7 +553,7 @@ function ChatComponent({
 	 */
 	const handleDropdownKeyPress = (e: React.KeyboardEvent): boolean => {
 		// Check which dropdown is active
-		const isSlashCommandActive = showSlashCommandDropdown;
+		const isSlashCommandActive = slashCommands.isOpen;
 		const isMentionActive = mentions.isOpen;
 
 		if (!isSlashCommandActive && !isMentionActive) {
@@ -562,7 +564,7 @@ function ChatComponent({
 		if (e.key === "ArrowDown") {
 			e.preventDefault();
 			if (isSlashCommandActive) {
-				viewModel.navigateSlashCommandDropdown("down");
+				slashCommands.navigate("down");
 			} else {
 				mentions.navigate("down");
 			}
@@ -572,7 +574,7 @@ function ChatComponent({
 		if (e.key === "ArrowUp") {
 			e.preventDefault();
 			if (isSlashCommandActive) {
-				viewModel.navigateSlashCommandDropdown("up");
+				slashCommands.navigate("up");
 			} else {
 				mentions.navigate("up");
 			}
@@ -584,9 +586,9 @@ function ChatComponent({
 			e.preventDefault();
 			if (isSlashCommandActive) {
 				const selectedCommand =
-					slashCommandSuggestions[selectedSlashCommandIndex];
+					slashCommands.suggestions[slashCommands.selectedIndex];
 				if (selectedCommand) {
-					selectSlashCommand(selectedCommand);
+					handleSelectSlashCommand(selectedCommand);
 				}
 			} else {
 				const selectedSuggestion =
@@ -602,7 +604,7 @@ function ChatComponent({
 		if (e.key === "Escape") {
 			e.preventDefault();
 			if (isSlashCommandActive) {
-				viewModel.closeSlashCommandDropdown();
+				slashCommands.close();
 			} else {
 				mentions.close();
 			}
@@ -657,8 +659,8 @@ function ChatComponent({
 		// Update mention suggestions via useMentions hook
 		void mentions.updateSuggestions(newValue, cursorPosition);
 
-		// Update slash command suggestions via ViewModel
-		viewModel.updateSlashCommandSuggestions(newValue, cursorPosition);
+		// Update slash command suggestions via useSlashCommands hook
+		slashCommands.updateSuggestions(newValue, cursorPosition);
 	};
 
 	const handleExportChat = async () => {
@@ -798,15 +800,13 @@ function ChatComponent({
 							view={view}
 						/>
 					)}
-					{showSlashCommandDropdown && (
+					{slashCommands.isOpen && (
 						<SuggestionDropdown
 							type="slash-command"
-							items={slashCommandSuggestions}
-							selectedIndex={selectedSlashCommandIndex}
-							onSelect={selectSlashCommand}
-							onClose={() =>
-								viewModel.closeSlashCommandDropdown()
-							}
+							items={slashCommands.suggestions}
+							selectedIndex={slashCommands.selectedIndex}
+							onSelect={handleSelectSlashCommand}
+							onClose={slashCommands.close}
 							plugin={plugin}
 							view={view}
 						/>
