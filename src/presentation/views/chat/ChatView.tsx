@@ -46,6 +46,7 @@ import { useSlashCommands } from "../../../hooks/useSlashCommands";
 import { useAutoMention } from "../../../hooks/useAutoMention";
 import { useAgentSession } from "../../../hooks/useAgentSession";
 import { useChat } from "../../../hooks/useChat";
+import { usePermission } from "../../../hooks/usePermission";
 
 // ViewModel imports
 import { ChatViewModel } from "../../../adapters/view-models/chat.view-model";
@@ -192,8 +193,15 @@ function ChatComponent({
 		},
 	);
 
-	// Combined error info (session errors take precedence)
-	const errorInfo = sessionErrorInfo || chat.errorInfo;
+	// Message state from useChat hook (needed for usePermission)
+	const { messages, isSending } = chat;
+
+	// Permission handling via usePermission hook
+	const permission = usePermission(handlePermissionUseCase, messages);
+
+	// Combined error info (session errors take precedence, then chat, then permission)
+	const errorInfo =
+		sessionErrorInfo || chat.errorInfo || permission.errorInfo;
 
 	// Create ChatViewModel
 	const viewModel = useMemo(() => {
@@ -201,7 +209,6 @@ function ChatComponent({
 			plugin,
 			sendMessageUseCase,
 			manageSessionUseCase,
-			handlePermissionUseCase,
 			switchAgentUseCase,
 			vaultAccessAdapter,
 			vaultPath,
@@ -210,7 +217,6 @@ function ChatComponent({
 		plugin,
 		sendMessageUseCase,
 		manageSessionUseCase,
-		handlePermissionUseCase,
 		switchAgentUseCase,
 		vaultAccessAdapter,
 		vaultPath,
@@ -240,22 +246,6 @@ function ChatComponent({
 		chat.updateMessage,
 		agentSession.updateAvailableCommands,
 	]);
-
-	// Subscribe to ViewModel state (only for permission handling now)
-	const vmState = useSyncExternalStore(
-		viewModel.subscribe,
-		viewModel.getSnapshot,
-		viewModel.getSnapshot,
-	);
-
-	// Message state from useChat hook
-	const { messages, isSending } = chat;
-
-	// Sync messages from useChat to ViewModel for permission handling
-	// This is a temporary bridge - permission handling will move to a hook later
-	useEffect(() => {
-		viewModel.syncMessages(messages);
-	}, [viewModel, messages]);
 
 	// Slash command dropdown via useSlashCommands hook
 	const slashCommands = useSlashCommands(
@@ -532,6 +522,48 @@ function ChatComponent({
 		};
 	}, [plugin.app.workspace, autoMention.toggle]);
 
+	// Subscribe to workspace events for permission handling (approve/reject hotkeys)
+	useEffect(() => {
+		const workspace = plugin.app.workspace;
+
+		const approveRef = workspace.on(
+			"agent-client:approve-active-permission" as "quit",
+			() => {
+				void (async () => {
+					const success = await permission.approveActivePermission();
+					if (!success) {
+						new Notice(
+							"[Agent Client] No active permission request",
+						);
+					}
+				})();
+			},
+		);
+
+		const rejectRef = workspace.on(
+			"agent-client:reject-active-permission" as "quit",
+			() => {
+				void (async () => {
+					const success = await permission.rejectActivePermission();
+					if (!success) {
+						new Notice(
+							"[Agent Client] No active permission request",
+						);
+					}
+				})();
+			},
+		);
+
+		return () => {
+			workspace.offref(approveRef);
+			workspace.offref(rejectRef);
+		};
+	}, [
+		plugin.app.workspace,
+		permission.approveActivePermission,
+		permission.rejectActivePermission,
+	]);
+
 	const updateIconColor = (svg: SVGElement) => {
 		// Remove all state classes
 		svg.classList.remove("icon-sending", "icon-active", "icon-inactive");
@@ -805,8 +837,8 @@ function ChatComponent({
 								message={message}
 								plugin={plugin}
 								acpClient={acpClientRef.current || undefined}
-								handlePermissionUseCase={
-									handlePermissionUseCase
+								onApprovePermission={
+									permission.approvePermission
 								}
 							/>
 						))}
@@ -979,7 +1011,7 @@ export class ChatView extends ItemView {
 
 		this.root = createRoot(container);
 		this.root.render(<ChatComponent plugin={this.plugin} view={this} />);
-		this.registerPermissionEvents();
+		// Note: Permission hotkey events are now handled in React component via useEffect
 		return Promise.resolve();
 	}
 
@@ -997,47 +1029,5 @@ export class ChatView extends ItemView {
 			this.root.unmount();
 			this.root = null;
 		}
-	}
-
-	private registerPermissionEvents(): void {
-		const approveHandler = async () => {
-			const viewModel = this.viewModel;
-			if (!viewModel) {
-				new Notice("[Agent Client] Chat view is not ready");
-				return;
-			}
-			const success = await viewModel.approveActivePermission();
-			if (!success) {
-				new Notice("[Agent Client] No active permission request");
-			}
-		};
-
-		const rejectHandler = async () => {
-			const viewModel = this.viewModel;
-			if (!viewModel) {
-				new Notice("[Agent Client] Chat view is not ready");
-				return;
-			}
-			const success = await viewModel.rejectActivePermission();
-			if (!success) {
-				new Notice("[Agent Client] No active permission request");
-			}
-		};
-
-		const workspace = this.app.workspace as unknown as {
-			on: (event: string, callback: () => void) => EventRef;
-		};
-
-		this.registerEvent(
-			workspace.on("agent-client:approve-active-permission", () => {
-				void approveHandler();
-			}),
-		);
-		this.registerEvent(
-			workspace.on("agent-client:reject-active-permission", () => {
-				void rejectHandler();
-			}),
-		);
-		// Note: agent-client:toggle-auto-mention is handled in React component via useEffect
 	}
 }

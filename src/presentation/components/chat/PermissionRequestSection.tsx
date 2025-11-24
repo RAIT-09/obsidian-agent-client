@@ -1,8 +1,6 @@
 import * as React from "react";
 const { useMemo } = React;
-import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
-import type { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";
 import { Logger } from "../../../shared/logger";
 import * as acp from "@agentclientprotocol/sdk";
 
@@ -15,18 +13,20 @@ interface PermissionRequestSectionProps {
 		isActive?: boolean;
 	};
 	toolCallId: string;
-	acpClient?: IAcpClient;
-	handlePermissionUseCase?: HandlePermissionUseCase;
 	plugin: AgentClientPlugin;
+	/** Callback to approve a permission request */
+	onApprovePermission?: (
+		requestId: string,
+		optionId: string,
+	) => Promise<void>;
 	onOptionSelected?: (optionId: string) => void;
 }
 
 export function PermissionRequestSection({
 	permissionRequest,
 	toolCallId,
-	acpClient,
-	handlePermissionUseCase,
 	plugin,
+	onApprovePermission,
 	onOptionSelected,
 }: PermissionRequestSectionProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
@@ -52,26 +52,15 @@ export function PermissionRequestSection({
 									onOptionSelected(option.optionId);
 								}
 
-								if (handlePermissionUseCase) {
-									// Send response to agent via Use Case
-									const result =
-										await handlePermissionUseCase.approvePermission(
-											{
-												requestId:
-													permissionRequest.requestId,
-												optionId: option.optionId,
-											},
-										);
-
-									if (!result.success) {
-										logger.error(
-											"Failed to approve permission:",
-											result.error,
-										);
-									}
+								if (onApprovePermission) {
+									// Send response to agent via callback
+									await onApprovePermission(
+										permissionRequest.requestId,
+										option.optionId,
+									);
 								} else {
 									logger.warn(
-										"Cannot handle permission response: missing handlePermissionUseCase",
+										"Cannot handle permission response: missing onApprovePermission callback",
 									);
 								}
 							}}

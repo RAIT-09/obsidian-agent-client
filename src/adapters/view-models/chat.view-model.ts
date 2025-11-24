@@ -15,7 +15,6 @@
 import type {
 	ChatMessage,
 	MessageContent,
-	PermissionOption,
 } from "../../core/domain/models/chat-message";
 import type {
 	ChatSession,
@@ -27,7 +26,6 @@ import type { NoteMetadata } from "../../core/domain/ports/vault-access.port";
 import type { IVaultAccess } from "../../core/domain/ports/vault-access.port";
 import type { SendMessageUseCase } from "../../core/use-cases/send-message.use-case";
 import type { ManageSessionUseCase } from "../../core/use-cases/manage-session.use-case";
-import type { HandlePermissionUseCase } from "../../core/use-cases/handle-permission.use-case";
 import type { SwitchAgentUseCase } from "../../core/use-cases/switch-agent.use-case";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
 import type { MentionContext } from "../../shared/mention-utils";
@@ -134,7 +132,6 @@ export class ChatViewModel {
 
 	private sendMessageUseCase: SendMessageUseCase;
 	private manageSessionUseCase: ManageSessionUseCase;
-	private handlePermissionUseCase: HandlePermissionUseCase;
 	private switchAgentUseCase: SwitchAgentUseCase;
 
 	// ========================================
@@ -153,7 +150,6 @@ export class ChatViewModel {
 	 * @param plugin - Plugin instance
 	 * @param sendMessageUseCase - Use case for sending messages
 	 * @param manageSessionUseCase - Use case for session management
-	 * @param handlePermissionUseCase - Use case for permission handling
 	 * @param switchAgentUseCase - Use case for agent switching
 	 * @param vaultAccess - Vault access port for note searching (mention functionality)
 	 * @param workingDirectory - Working directory for the agent
@@ -162,7 +158,6 @@ export class ChatViewModel {
 		plugin: AgentClientPlugin,
 		sendMessageUseCase: SendMessageUseCase,
 		manageSessionUseCase: ManageSessionUseCase,
-		handlePermissionUseCase: HandlePermissionUseCase,
 		switchAgentUseCase: SwitchAgentUseCase,
 		vaultAccess: IVaultAccess,
 		private workingDirectory: string,
@@ -170,7 +165,6 @@ export class ChatViewModel {
 		this.plugin = plugin;
 		this.sendMessageUseCase = sendMessageUseCase;
 		this.manageSessionUseCase = manageSessionUseCase;
-		this.handlePermissionUseCase = handlePermissionUseCase;
 		this.switchAgentUseCase = switchAgentUseCase;
 		this.vaultAccess = vaultAccess;
 
@@ -794,145 +788,6 @@ export class ChatViewModel {
 			},
 		});
 	};
-
-	/**
-	 * Sync messages from external source (useChat hook).
-	 *
-	 * This is a temporary bridge during the refactoring process.
-	 * Permission handling needs access to messages to find active permissions.
-	 * Eventually, permission handling will also move to a hook.
-	 *
-	 * @param messages - Messages from useChat
-	 */
-	syncMessages = (messages: ChatMessage[]): void => {
-		this.setState({
-			messages,
-		});
-	};
-
-	// ========================================
-	// Actions: Permission Handling
-	// ========================================
-
-	/**
-	 * Approve a permission request.
-	 *
-	 * @param requestId - ID of the permission request
-	 * @param optionId - ID of the selected option
-	 */
-	async approvePermission(
-		requestId: string,
-		optionId: string,
-	): Promise<void> {
-		try {
-			// Use HandlePermissionUseCase to respond to permission
-			const result = await this.handlePermissionUseCase.approvePermission(
-				{
-					requestId,
-					optionId,
-				},
-			);
-
-			if (!result.success) {
-				this.setState({
-					errorInfo: {
-						title: "Permission Error",
-						message:
-							result.error ||
-							"Failed to respond to permission request",
-					},
-				});
-			}
-		} catch (error) {
-			this.setState({
-				errorInfo: {
-					title: "Permission Error",
-					message: `Failed to respond to permission request: ${error instanceof Error ? error.message : String(error)}`,
-				},
-			});
-		}
-	}
-
-	private findActivePermission(): {
-		requestId: string;
-		options: PermissionOption[];
-	} | null {
-		for (const message of this.state.messages) {
-			for (const content of message.content) {
-				if (content.type === "tool_call") {
-					const permission = content.permissionRequest;
-					if (permission?.isActive) {
-						return {
-							requestId: permission.requestId,
-							options: permission.options,
-						};
-					}
-				}
-			}
-		}
-		return null;
-	}
-
-	private selectOption(
-		options: PermissionOption[],
-		preferredKinds: PermissionOption["kind"][],
-		fallback?: (option: PermissionOption) => boolean,
-	): PermissionOption | undefined {
-		for (const kind of preferredKinds) {
-			const match = options.find((opt) => opt.kind === kind);
-			if (match) {
-				return match;
-			}
-		}
-		if (fallback) {
-			const fallbackOption = options.find(fallback);
-			if (fallbackOption) {
-				return fallbackOption;
-			}
-		}
-		return options[0];
-	}
-
-	async approveActivePermission(): Promise<boolean> {
-		const active = this.findActivePermission();
-		if (!active || active.options.length === 0) {
-			return false;
-		}
-
-		const option = this.selectOption(active.options, [
-			"allow_once",
-			"allow_always",
-		]);
-
-		if (!option) {
-			return false;
-		}
-
-		await this.approvePermission(active.requestId, option.optionId);
-		return true;
-	}
-
-	async rejectActivePermission(): Promise<boolean> {
-		const active = this.findActivePermission();
-		if (!active || active.options.length === 0) {
-			return false;
-		}
-
-		const option = this.selectOption(
-			active.options,
-			["reject_once", "reject_always"],
-			(opt) =>
-				opt.name.toLowerCase().includes("reject") ||
-				opt.name.toLowerCase().includes("deny"),
-		);
-
-		if (!option) {
-			return false;
-		}
-
-		await this.approvePermission(active.requestId, option.optionId);
-		return true;
-	}
 
 	// ========================================
 	// Actions: Agent Management
