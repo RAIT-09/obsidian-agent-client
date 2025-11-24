@@ -268,10 +268,10 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		const raw = (await this.loadData()) ?? {};
-
-		// Type guard: treat raw as a record of unknown values
-		const rawSettings = raw as Record<string, unknown>;
+		const rawSettings = ((await this.loadData()) ?? {}) as Record<
+			string,
+			unknown
+		>;
 
 		const claudeFromRaw =
 			typeof rawSettings.claude === "object" &&
@@ -473,7 +473,7 @@ export default class AgentClientPlugin extends Plugin {
 		const response = await requestUrl({
 			url: "https://api.github.com/repos/RAIT-09/obsidian-agent-client/releases/latest",
 		});
-		const data = response.json;
+		const data = response.json as { tag_name?: string };
 		const latestVersion = data.tag_name;
 		const currentVersion = this.manifest.version;
 

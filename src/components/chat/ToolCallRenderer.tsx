@@ -148,7 +148,7 @@ export function ToolCallRenderer({
 								<div key={index} className="tool-call-content">
 									<MarkdownTextRenderer
 										text={item.content.text}
-										plugin={plugin}
+										app={plugin.app}
 									/>
 								</div>
 							);

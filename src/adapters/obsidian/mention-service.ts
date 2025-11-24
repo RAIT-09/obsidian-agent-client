@@ -86,7 +86,10 @@ export class NoteMentionService {
 				// Get aliases from frontmatter
 				const fileCache =
 					this.plugin.app.metadataCache.getFileCache(file);
-				const aliases = fileCache?.frontmatter?.aliases;
+				const aliases = fileCache?.frontmatter?.aliases as
+					| string[]
+					| string
+					| undefined;
 				const aliasArray: string[] = Array.isArray(aliases)
 					? aliases
 					: aliases

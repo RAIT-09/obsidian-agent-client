@@ -373,17 +373,17 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		const stdin = agentProcess.stdin;
 		const stdout = agentProcess.stdout;
 
-		const input = new WritableStream({
-			write(chunk) {
+		const input = new WritableStream<Uint8Array>({
+			write(chunk: Uint8Array) {
 				stdin.write(chunk);
 			},
 			close() {
 				stdin.end();
 			},
 		});
-		const output = new ReadableStream({
+		const output = new ReadableStream<Uint8Array>({
 			start(controller) {
-				stdout.on("data", (chunk) => {
+				stdout.on("data", (chunk: Uint8Array) => {
 					controller.enqueue(chunk);
 				});
 				stdout.on("end", () => {
@@ -526,29 +526,35 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			await this.connection.authenticate({ methodId });
 			this.logger.log("[AcpAdapter] ✅ authenticate ok:", methodId);
 			return true;
-		} catch (error) {
+		} catch (error: unknown) {
 			this.logger.error("[AcpAdapter] Authentication Error:", error);
 
 			// Check if this is a rate limit error
+			const errorObj = error as Record<string, unknown> | null;
 			const isRateLimitError =
-				error &&
-				typeof error === "object" &&
-				"code" in error &&
-				error.code === 429;
+				errorObj &&
+				typeof errorObj === "object" &&
+				"code" in errorObj &&
+				errorObj.code === 429;
 
 			let agentError: AgentError;
 
 			if (isRateLimitError) {
 				// Rate limit error
+				const errorMessage =
+					errorObj &&
+					"message" in errorObj &&
+					typeof errorObj.message === "string"
+						? errorObj.message
+						: null;
 				agentError = {
 					id: crypto.randomUUID(),
 					category: "rate_limit",
 					severity: "error",
 					title: "Rate Limit Exceeded",
-					message:
-						"message" in error && typeof error.message === "string"
-							? `Rate limit exceeded: ${error.message}`
-							: "Rate limit exceeded. Too many requests. Please try again later.",
+					message: errorMessage
+						? `Rate limit exceeded: ${errorMessage}`
+						: "Rate limit exceeded. Too many requests. Please try again later.",
 					suggestion:
 						"You have exceeded the API rate limit. Please wait a few moments before trying again.",
 					occurredAt: new Date(),
@@ -605,18 +611,22 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			this.logger.log(
 				`[AcpAdapter] ✅ Agent completed with: ${promptResult.stopReason}`,
 			);
-		} catch (error) {
+		} catch (error: unknown) {
 			this.logger.error("[AcpAdapter] Prompt Error:", error);
 
 			// Check if this is an ignorable error (empty response or user abort)
+			const errorObj = error as Record<string, unknown> | null;
 			if (
-				error &&
-				typeof error === "object" &&
-				"code" in error &&
-				error.code === -32603 &&
-				"data" in error
+				errorObj &&
+				typeof errorObj === "object" &&
+				"code" in errorObj &&
+				errorObj.code === -32603 &&
+				"data" in errorObj
 			) {
-				const errorData = error.data;
+				const errorData = errorObj.data as Record<
+					string,
+					unknown
+				> | null;
 				if (
 					errorData &&
 					typeof errorData === "object" &&
@@ -1095,8 +1105,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		// If no existing tool_call was found, create a new tool_call message with permission
 		if (!updated && params.toolCall?.title) {
 			const toolCallInfo = params.toolCall;
-			const status = (toolCallInfo.status ||
-				"pending") as acp.ToolCallStatus;
+			const status = toolCallInfo.status || "pending";
 			const kind = toolCallInfo.kind as acp.ToolKind | undefined;
 			const content = AcpTypeConverter.toToolCallContent(
 				toolCallInfo.content as acp.ToolCallContent[] | undefined,

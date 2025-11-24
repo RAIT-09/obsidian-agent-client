@@ -148,7 +148,7 @@ export function useAutoExport(plugin: AgentClientPlugin): UseAutoExportReturn {
 						`Chat auto-exported before ${context}`,
 					);
 				}
-			} catch (error) {
+			} catch {
 				// Show error notification
 				new Notice("[Agent Client] Failed to export chat");
 				// Error already logged in exportChat

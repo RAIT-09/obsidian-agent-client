@@ -333,7 +333,10 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 	 */
 	private convertToMetadata(file: TFile): NoteMetadata {
 		const cache = this.plugin.app.metadataCache.getFileCache(file);
-		const aliases = cache?.frontmatter?.aliases;
+		const aliases = cache?.frontmatter?.aliases as
+			| string[]
+			| string
+			| undefined;
 
 		return {
 			path: file.path,

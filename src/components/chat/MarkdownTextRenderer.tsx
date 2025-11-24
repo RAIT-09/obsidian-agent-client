@@ -1,17 +1,13 @@
 import * as React from "react";
 const { useRef, useEffect } = React;
-import { MarkdownRenderer } from "obsidian";
-import type AgentClientPlugin from "../../plugin";
+import { Component, MarkdownRenderer, type App } from "obsidian";
 
 interface MarkdownTextRendererProps {
 	text: string;
-	plugin: AgentClientPlugin;
+	app: App;
 }
 
-export function MarkdownTextRenderer({
-	text,
-	plugin,
-}: MarkdownTextRendererProps) {
+export function MarkdownTextRenderer({ text, app }: MarkdownTextRendererProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -20,15 +16,17 @@ export function MarkdownTextRenderer({
 		el.empty?.();
 		el.classList.add("markdown-rendered");
 
+		// Create a temporary component for the markdown renderer lifecycle
+		const component = new Component();
+		component.load();
+
 		// Render markdown
-		void MarkdownRenderer.render(
-			plugin.app,
-			text,
-			el,
-			"", // sourcePath - empty for dynamic content
-			plugin,
-		);
-	}, [text, plugin]);
+		void MarkdownRenderer.render(app, text, el, "", component);
+
+		return () => {
+			component.unload();
+		};
+	}, [text, app]);
 
 	return <div ref={containerRef} className="markdown-text-renderer" />;
 }

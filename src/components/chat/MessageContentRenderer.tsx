@@ -36,7 +36,9 @@ export function MessageContentRenderer({
 			if (messageRole === "user") {
 				return <TextWithMentions text={content.text} plugin={plugin} />;
 			}
-			return <MarkdownTextRenderer text={content.text} plugin={plugin} />;
+			return (
+				<MarkdownTextRenderer text={content.text} app={plugin.app} />
+			);
 
 		case "text_with_context":
 			// User messages with auto-mention context
