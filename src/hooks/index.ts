@@ -11,14 +11,6 @@ export { useSettings, useSettingsValue } from "./useSettings";
 export { useMessages, type UseMessagesReturn } from "./useMessages";
 export { useSession, type UseSessionReturn } from "./useSession";
 
-// Chat actions
-export { useSendMessage, type UseSendMessageReturn } from "./useSendMessage";
-export { usePermissions, type UsePermissionsReturn } from "./usePermissions";
-
-// UI state (context-dependent - legacy)
-export { useMentions } from "./useMentions";
-export { useSlashCommands } from "./useSlashCommands";
-
 // UI state (standalone dropdowns)
 export {
 	useMentionsDropdown,

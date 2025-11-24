@@ -10,14 +10,3 @@ export {
 	usePluginOptional,
 	PluginContext,
 } from "./PluginContext";
-
-export {
-	ChatProvider,
-	useChatContext,
-	useChatState,
-	useChatDispatch,
-	ChatContext,
-	createInitialState,
-} from "./ChatContext";
-
-export type { ChatState, ChatAction } from "./ChatContext";
