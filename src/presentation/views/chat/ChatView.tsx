@@ -1,22 +1,14 @@
-import { ItemView, WorkspaceLeaf, setIcon, Platform, Notice } from "obsidian";
-import type { EventRef } from "obsidian";
+import { ItemView, WorkspaceLeaf, Platform, Notice } from "obsidian";
 import * as React from "react";
-const {
-	useState,
-	useRef,
-	useEffect,
-	useSyncExternalStore,
-	useMemo,
-	useCallback,
-} = React;
+const { useState, useRef, useEffect, useMemo, useCallback } = React;
 import { createRoot, Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 
 // Component imports
-import { SuggestionDropdown } from "../../components/chat/SuggestionDropdown";
-import { MessageRenderer } from "../../components/chat/MessageRenderer";
-import { HeaderButton } from "../../components/shared/HeaderButton";
+import { ChatHeader } from "../../components/chat/ChatHeader";
+import { ChatMessages } from "../../components/chat/ChatMessages";
+import { ChatInput } from "../../components/chat/ChatInput";
 
 // Service imports
 import { NoteMentionService } from "../../../adapters/obsidian/mention-service";
@@ -24,10 +16,6 @@ import { NoteMentionService } from "../../../adapters/obsidian/mention-service";
 // Utility imports
 import { Logger } from "../../../shared/logger";
 import { ChatExporter } from "../../../shared/chat-exporter";
-
-// Type imports
-import type { NoteMetadata } from "../../../core/domain/ports/vault-access.port";
-import type { SlashCommand } from "../../../core/domain/models/chat-session";
 
 // Adapter imports
 import { AcpAdapter, type IAcpClient } from "../../../adapters/acp/acp.adapter";
@@ -48,7 +36,7 @@ import { useAgentSession } from "../../../hooks/useAgentSession";
 import { useChat } from "../../../hooks/useChat";
 import { usePermission } from "../../../hooks/usePermission";
 
-// ViewModel imports
+// ViewModel imports (temporary - will be removed)
 import { ChatViewModel } from "../../../adapters/view-models/chat.view-model";
 
 // Type definitions for Obsidian internal APIs
@@ -72,15 +60,18 @@ function ChatComponent({
 	plugin: AgentClientPlugin;
 	view: ChatView;
 }) {
-	// Create logger instance
-	const logger = useMemo(() => new Logger(plugin), [plugin]);
-
-	// Check current platform (Obsidian requires this check for desktop-only plugins)
+	// ============================================================
+	// Platform Check
+	// ============================================================
 	if (!Platform.isDesktopApp) {
 		throw new Error("Agent Client is only available on desktop");
 	}
 
-	// Get the Vault root path (safe to use after platform check)
+	// ============================================================
+	// Memoized Services & Adapters
+	// ============================================================
+	const logger = useMemo(() => new Logger(plugin), [plugin]);
+
 	const vaultPath = useMemo(() => {
 		return (
 			(plugin.app.vault.adapter as VaultAdapterWithBasePath).basePath ||
@@ -88,100 +79,59 @@ function ChatComponent({
 		);
 	}, [plugin]);
 
-	// Use the settings store to get reactive settings
-	const settings = useSettings(plugin);
-
-	// Check for updates asynchronously
-	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
-	useEffect(() => {
-		plugin
-			.checkForUpdates()
-			.then(setIsUpdateAvailable)
-			.catch((error) => {
-				console.error("Failed to check for updates:", error);
-			});
-	}, []);
-
-	const [inputValue, setInputValue] = useState("");
-	// Hint overlay state for slash commands
-	const [hintText, setHintText] = useState<string | null>(null);
-	const [commandText, setCommandText] = useState<string>("");
-
-	const textareaRef = useRef<HTMLTextAreaElement>(null);
-	const sendButtonRef = useRef<HTMLButtonElement>(null);
-	const acpClientRef = useRef<IAcpClient | null>(null);
-	const messagesContainerRef = useRef<HTMLDivElement>(null);
-	const [isAtBottom, setIsAtBottom] = useState(true);
-
-	// Note mention service for @-mention functionality
 	const noteMentionService = useMemo(
 		() => new NoteMentionService(plugin),
 		[plugin],
 	);
 
-	// Create AcpAdapter (shared across all use cases)
-	// Callbacks will be set after ViewModel creation
-	const acpAdapter = useMemo(() => {
-		const adapter = new AcpAdapter(plugin);
-		// Set acpClientRef for TerminalRenderer access
-		acpClientRef.current = adapter;
-		return adapter;
-	}, [plugin]);
+	const acpAdapter = useMemo(() => new AcpAdapter(plugin), [plugin]);
+	const acpClientRef = useRef<IAcpClient>(acpAdapter);
 
-	// Create ObsidianVaultAdapter
 	const vaultAccessAdapter = useMemo(() => {
 		return new ObsidianVaultAdapter(plugin);
 	}, [plugin]);
 
-	const mentions = useMentions(vaultAccessAdapter, plugin);
-	const autoMention = useAutoMention(vaultAccessAdapter);
-
-	// Create SendMessageUseCase
+	// ============================================================
+	// Use Cases (temporary - will be inlined into hooks)
+	// ============================================================
 	const sendMessageUseCase = useMemo(() => {
 		return new SendMessageUseCase(
-			acpAdapter, // Use AcpAdapter as IAgentClient
+			acpAdapter,
 			vaultAccessAdapter,
 			plugin.settingsStore,
 			noteMentionService,
 		);
 	}, [acpAdapter, vaultAccessAdapter, plugin, noteMentionService]);
 
-	// Create ManageSessionUseCase
 	const manageSessionUseCase = useMemo(() => {
-		return new ManageSessionUseCase(
-			acpAdapter, // Use AcpAdapter as IAgentClient
-			plugin.settingsStore,
-		);
+		return new ManageSessionUseCase(acpAdapter, plugin.settingsStore);
 	}, [acpAdapter, plugin]);
 
-	// Create HandlePermissionUseCase
 	const handlePermissionUseCase = useMemo(() => {
-		return new HandlePermissionUseCase(
-			acpAdapter, // Use AcpAdapter as IAgentClient
-			plugin.settingsStore,
-		);
+		return new HandlePermissionUseCase(acpAdapter, plugin.settingsStore);
 	}, [acpAdapter, plugin]);
 
-	// Create SwitchAgentUseCase
 	const switchAgentUseCase = useMemo(() => {
 		return new SwitchAgentUseCase(plugin.settingsStore);
 	}, [plugin]);
 
-	// Create useAgentSession hook for session lifecycle management
+	// ============================================================
+	// Custom Hooks
+	// ============================================================
+	const settings = useSettings(plugin);
+
 	const agentSession = useAgentSession(
 		manageSessionUseCase,
 		switchAgentUseCase,
 		vaultPath,
 	);
 
-	// Session state from useAgentSession hook (needed for useChat)
 	const {
 		session,
 		errorInfo: sessionErrorInfo,
 		isReady: isSessionReady,
 	} = agentSession;
 
-	// Create useChat hook for message management
 	const chat = useChat(
 		sendMessageUseCase,
 		{
@@ -193,17 +143,24 @@ function ChatComponent({
 		},
 	);
 
-	// Message state from useChat hook (needed for usePermission)
 	const { messages, isSending } = chat;
 
-	// Permission handling via usePermission hook
 	const permission = usePermission(handlePermissionUseCase, messages);
 
-	// Combined error info (session errors take precedence, then chat, then permission)
+	const mentions = useMentions(vaultAccessAdapter, plugin);
+	const autoMention = useAutoMention(vaultAccessAdapter);
+	const slashCommands = useSlashCommands(
+		session.availableCommands || [],
+		autoMention.toggle,
+	);
+
+	// Combined error info (session errors take precedence)
 	const errorInfo =
 		sessionErrorInfo || chat.errorInfo || permission.errorInfo;
 
-	// Create ChatViewModel
+	// ============================================================
+	// ViewModel (temporary - for cleanup on close)
+	// ============================================================
 	const viewModel = useMemo(() => {
 		return new ChatViewModel(
 			plugin,
@@ -222,7 +179,6 @@ function ChatComponent({
 		vaultPath,
 	]);
 
-	// Store ViewModel reference in ChatView for cleanup on close
 	useEffect(() => {
 		view.viewModel = viewModel;
 		return () => {
@@ -230,30 +186,16 @@ function ChatComponent({
 		};
 	}, [view, viewModel]);
 
-	// Set AcpAdapter callbacks
-	// Message callbacks go to useChat, session callbacks go to useAgentSession
-	useEffect(() => {
-		acpAdapter.setMessageCallbacks(
-			chat.addMessage,
-			chat.updateLastMessage,
-			chat.updateMessage,
-			agentSession.updateAvailableCommands,
-		);
-	}, [
-		acpAdapter,
-		chat.addMessage,
-		chat.updateLastMessage,
-		chat.updateMessage,
-		agentSession.updateAvailableCommands,
-	]);
+	// ============================================================
+	// Local State
+	// ============================================================
+	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+	const [restoredMessage, setRestoredMessage] = useState<string | null>(null);
 
-	// Slash command dropdown via useSlashCommands hook
-	const slashCommands = useSlashCommands(
-		session.availableCommands || [],
-		autoMention.toggle,
-	);
-
-	const getActiveAgentLabel = () => {
+	// ============================================================
+	// Computed Values
+	// ============================================================
+	const activeAgentLabel = useMemo(() => {
 		const activeId = session.agentId;
 		if (activeId === plugin.settings.claude.id) {
 			return (
@@ -274,132 +216,92 @@ function ChatComponent({
 			(agent) => agent.id === activeId,
 		);
 		return custom?.displayName || custom?.id || activeId;
-	};
+	}, [session.agentId, plugin.settings]);
 
-	const activeAgentLabel = getActiveAgentLabel();
-
-	// Auto-scroll functions
-	const checkIfAtBottom = () => {
-		const container = messagesContainerRef.current;
-		if (!container) return true;
-
-		const threshold = 50;
-		const isNearBottom =
-			container.scrollTop + container.clientHeight >=
-			container.scrollHeight - threshold;
-		setIsAtBottom(isNearBottom);
-		return isNearBottom;
-	};
-
-	const scrollToBottom = () => {
-		const container = messagesContainerRef.current;
-		if (container) {
-			container.scrollTop = container.scrollHeight;
-		}
-	};
-
-	/**
-	 * Common logic for setting cursor position after text replacement.
-	 */
-	const setTextAndFocus = (newText: string) => {
-		setInputValue(newText);
-
-		// Set cursor position to end of text
-		window.setTimeout(() => {
-			const textarea = textareaRef.current;
-			if (textarea) {
-				const cursorPos = newText.length;
-				textarea.selectionStart = cursorPos;
-				textarea.selectionEnd = cursorPos;
-				textarea.focus();
-			}
-		}, 0);
-	};
-
-	// Mention handling - delegate to ViewModel
-	const selectMention = (suggestion: NoteMetadata) => {
-		const newText = mentions.selectSuggestion(inputValue, suggestion);
-		setTextAndFocus(newText);
-	};
-
-	// Slash command handling - delegate to useSlashCommands hook
-	const handleSelectSlashCommand = (command: SlashCommand) => {
-		const newText = slashCommands.selectSuggestion(inputValue, command);
-		setInputValue(newText);
-
-		// Setup hint overlay if command has hint
-		if (command.hint) {
-			const cmdText = `/${command.name} `;
-			setCommandText(cmdText);
-			setHintText(command.hint);
-		} else {
-			// No hint - clear hint state
-			setHintText(null);
-			setCommandText("");
+	// ============================================================
+	// Callbacks
+	// ============================================================
+	const handleNewChat = useCallback(async () => {
+		if (messages.length === 0) {
+			new Notice("[Agent Client] Already a new session");
+			return;
 		}
 
-		// Place cursor right after command name (before hint text)
-		window.setTimeout(() => {
-			const textarea = textareaRef.current;
-			if (textarea) {
-				const cursorPos = command.hint
-					? `/${command.name} `.length
-					: newText.length;
-				textarea.selectionStart = cursorPos;
-				textarea.selectionEnd = cursorPos;
-				textarea.focus();
-			}
-		}, 0);
-	};
+		logger.log("[Debug] Creating new session via useAgentSession...");
+		autoMention.toggle(false);
+		chat.clearMessages();
+		await agentSession.restartSession();
+	}, [messages.length, logger, autoMention, chat, agentSession]);
 
-	const adjustTextareaHeight = () => {
-		const textarea = textareaRef.current;
-		if (textarea) {
-			// Remove previous dynamic height classes
-			textarea.classList.remove(
-				"textarea-auto-height",
-				"textarea-expanded",
+	const handleExportChat = useCallback(async () => {
+		if (messages.length === 0) {
+			new Notice("[Agent Client] No messages to export");
+			return;
+		}
+
+		try {
+			const exporter = new ChatExporter(plugin);
+			const openFile = plugin.settings.exportSettings.openFileAfterExport;
+			const filePath = await exporter.exportToMarkdown(
+				messages,
+				session.agentDisplayName,
+				session.agentId,
+				session.sessionId || "unknown",
+				session.createdAt,
+				openFile,
 			);
-
-			// Temporarily use auto to measure
-			textarea.classList.add("textarea-auto-height");
-			const scrollHeight = textarea.scrollHeight;
-			const maxHeight = 300; // Increased from 120 to 300
-			const hasAutoMention =
-				textarea.classList.contains("has-auto-mention");
-			const minHeight = hasAutoMention ? 116 : 80;
-
-			// Check if expansion is needed
-			const calculatedHeight = Math.max(
-				minHeight,
-				Math.min(scrollHeight, maxHeight),
-			);
-
-			// Apply expanded class if needed
-			if (calculatedHeight > minHeight) {
-				textarea.classList.add("textarea-expanded");
-				// Set CSS variable for dynamic height
-				textarea.style.setProperty(
-					"--textarea-height",
-					`${calculatedHeight}px`,
-				);
-			} else {
-				textarea.style.removeProperty("--textarea-height");
-			}
-
-			textarea.classList.remove("textarea-auto-height");
+			new Notice(`[Agent Client] Chat exported to ${filePath}`);
+		} catch (error) {
+			new Notice("[Agent Client] Failed to export chat");
+			logger.error("Export error:", error);
 		}
-	};
+	}, [messages, session, plugin, logger]);
 
+	const handleOpenSettings = useCallback(() => {
+		const appWithSettings = plugin.app as unknown as AppWithSettings;
+		appWithSettings.setting.open();
+		appWithSettings.setting.openTabById(plugin.manifest.id);
+	}, [plugin]);
+
+	const handleSendMessage = useCallback(
+		async (content: string) => {
+			await chat.sendMessage(content, {
+				activeNote: autoMention.activeNote,
+				vaultBasePath:
+					(plugin.app.vault.adapter as VaultAdapterWithBasePath)
+						.basePath || "",
+				isAutoMentionDisabled: autoMention.isDisabled,
+			});
+		},
+		[chat, autoMention, plugin],
+	);
+
+	const handleStopGeneration = useCallback(async () => {
+		logger.log("Cancelling current operation...");
+		// Save last user message before cancel (to restore it)
+		const lastMessage = chat.lastUserMessage;
+		await agentSession.cancelOperation();
+		// Restore the last user message to input field
+		if (lastMessage) {
+			setRestoredMessage(lastMessage);
+		}
+	}, [logger, agentSession, chat.lastUserMessage]);
+
+	const handleClearError = useCallback(() => {
+		chat.clearError();
+	}, [chat]);
+
+	const handleRestoredMessageConsumed = useCallback(() => {
+		setRestoredMessage(null);
+	}, []);
+
+	// ============================================================
+	// Effects - Session Lifecycle
+	// ============================================================
 	// Initialize session on mount or when agent changes
 	useEffect(() => {
 		logger.log("[Debug] Starting connection setup via useAgentSession...");
 		void agentSession.createSession();
-
-		// Note: No cleanup here - disconnect() during agent switching would kill
-		// the new process. Final cleanup is handled by dispose() on unmount.
-		// IMPORTANT: agentSession.createSession is stable (useCallback) - using the object
-		// itself would cause infinite re-renders since it's recreated each render.
 	}, [session.agentId, agentSession.createSession]);
 
 	// Cleanup ViewModel on unmount
@@ -413,7 +315,6 @@ function ChatComponent({
 	useEffect(() => {
 		const newActiveAgentId = settings.activeAgentId || settings.claude.id;
 		if (messages.length === 0 && newActiveAgentId !== session.agentId) {
-			// Switch agent via useAgentSession
 			void agentSession.switchAgent(newActiveAgentId);
 		}
 	}, [
@@ -423,66 +324,39 @@ function ChatComponent({
 		agentSession.switchAgent,
 	]);
 
-	// Auto-scroll when messages change
+	// ============================================================
+	// Effects - ACP Adapter Callbacks
+	// ============================================================
 	useEffect(() => {
-		if (isAtBottom && messages.length > 0) {
-			// Use setTimeout to ensure DOM has updated
-			window.setTimeout(() => {
-				scrollToBottom();
-			}, 0);
-		}
-	}, [messages, isAtBottom]);
+		acpAdapter.setMessageCallbacks(
+			chat.addMessage,
+			chat.updateLastMessage,
+			chat.updateMessage,
+			agentSession.updateAvailableCommands,
+		);
+	}, [
+		acpAdapter,
+		chat.addMessage,
+		chat.updateLastMessage,
+		chat.updateMessage,
+		agentSession.updateAvailableCommands,
+	]);
 
-	// Set up scroll event listener
+	// ============================================================
+	// Effects - Update Check
+	// ============================================================
 	useEffect(() => {
-		const container = messagesContainerRef.current;
-		if (!container) return;
+		plugin
+			.checkForUpdates()
+			.then(setIsUpdateAvailable)
+			.catch((error) => {
+				console.error("Failed to check for updates:", error);
+			});
+	}, [plugin]);
 
-		const handleScroll = () => {
-			checkIfAtBottom();
-		};
-
-		view.registerDomEvent(container, "scroll", handleScroll);
-
-		// Initial check
-		checkIfAtBottom();
-	}, []);
-
-	// Auto-focus textarea on mount
-	useEffect(() => {
-		window.setTimeout(() => {
-			if (textareaRef.current) {
-				textareaRef.current.focus();
-			}
-		}, 0);
-	}, []);
-
-	useEffect(() => {
-		adjustTextareaHeight();
-	}, [inputValue]);
-
-	useEffect(() => {
-		if (sendButtonRef.current) {
-			// Set icon based on sending state
-			const iconName = isSending ? "square" : "send-horizontal";
-			setIcon(sendButtonRef.current, iconName);
-			const svg = sendButtonRef.current.querySelector("svg");
-			if (svg) {
-				updateIconColor(svg);
-			}
-		}
-	}, [isSending]);
-
-	useEffect(() => {
-		if (sendButtonRef.current) {
-			const svg = sendButtonRef.current.querySelector("svg");
-			if (svg) {
-				updateIconColor(svg);
-			}
-		}
-	}, [inputValue, isSending]);
-
-	// Show auto-mention notes and track selection
+	// ============================================================
+	// Effects - Auto-mention Active Note Tracking
+	// ============================================================
 	useEffect(() => {
 		let isMounted = true;
 
@@ -503,13 +377,12 @@ function ChatComponent({
 		};
 	}, [autoMention.updateActiveNote, vaultAccessAdapter]);
 
-	// Subscribe to workspace event for toggling auto-mention (e.g., from hotkey)
+	// ============================================================
+	// Effects - Workspace Events (Hotkeys)
+	// ============================================================
 	useEffect(() => {
 		const workspace = plugin.app.workspace;
 
-		// "as quit" is a type assertion to bypass TypeScript's strict event name checking.
-		// Obsidian's type definitions only allow official event names, but we use a custom event.
-		// At runtime, the actual string "agent-client:toggle-auto-mention" is used.
 		const eventRef = workspace.on(
 			"agent-client:toggle-auto-mention" as "quit",
 			() => {
@@ -522,7 +395,6 @@ function ChatComponent({
 		};
 	}, [plugin.app.workspace, autoMention.toggle]);
 
-	// Subscribe to workspace events for permission handling (approve/reject hotkeys)
 	useEffect(() => {
 		const workspace = plugin.app.workspace;
 
@@ -564,419 +436,48 @@ function ChatComponent({
 		permission.rejectActivePermission,
 	]);
 
-	const updateIconColor = (svg: SVGElement) => {
-		// Remove all state classes
-		svg.classList.remove("icon-sending", "icon-active", "icon-inactive");
-
-		if (isSending) {
-			// Stop button - always active when sending
-			svg.classList.add("icon-sending");
-		} else {
-			// Send button - active when has input
-			const hasInput = inputValue.trim() !== "";
-			svg.classList.add(hasInput ? "icon-active" : "icon-inactive");
-		}
-	};
-
-	const createNewSession = async () => {
-		if (messages.length === 0) {
-			new Notice("[Agent Client] Already a new session");
-			return;
-		}
-
-		logger.log("[Debug] Creating new session via useAgentSession...");
-		setInputValue("");
-		autoMention.toggle(false);
-		chat.clearMessages(); // Clear messages before restarting session
-		await agentSession.restartSession();
-	};
-
-	const handleStopGeneration = async () => {
-		logger.log("Cancelling current operation...");
-		// Get last user message before cancel (to restore it)
-		const lastMessage = chat.lastUserMessage;
-		await agentSession.cancelOperation();
-
-		// Restore the last user message to input field
-		if (lastMessage) {
-			setInputValue(lastMessage);
-		}
-	};
-
-	const handleSendMessage = async () => {
-		if (!inputValue.trim() || isSending) return;
-
-		// Save input value before clearing
-		const messageToSend = inputValue;
-
-		// Clear input and hint state immediately (before sending)
-		setInputValue("");
-		setHintText(null);
-		setCommandText("");
-		setIsAtBottom(true);
-
-		// Send message via useChat hook
-		await chat.sendMessage(messageToSend, {
-			activeNote: autoMention.activeNote,
-			vaultBasePath:
-				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
-					.basePath || "",
-			isAutoMentionDisabled: autoMention.isDisabled,
-		});
-
-		// Scroll after sending
-		window.setTimeout(() => {
-			scrollToBottom();
-		}, 0);
-	};
-
-	/**
-	 * Handle dropdown keyboard navigation.
-	 * Common logic for both mention and slash command dropdowns.
-	 */
-	const handleDropdownKeyPress = (e: React.KeyboardEvent): boolean => {
-		// Check which dropdown is active
-		const isSlashCommandActive = slashCommands.isOpen;
-		const isMentionActive = mentions.isOpen;
-
-		if (!isSlashCommandActive && !isMentionActive) {
-			return false; // No dropdown active
-		}
-
-		// Arrow navigation
-		if (e.key === "ArrowDown") {
-			e.preventDefault();
-			if (isSlashCommandActive) {
-				slashCommands.navigate("down");
-			} else {
-				mentions.navigate("down");
-			}
-			return true;
-		}
-
-		if (e.key === "ArrowUp") {
-			e.preventDefault();
-			if (isSlashCommandActive) {
-				slashCommands.navigate("up");
-			} else {
-				mentions.navigate("up");
-			}
-			return true;
-		}
-
-		// Select item (Enter or Tab)
-		if (e.key === "Enter" || e.key === "Tab") {
-			e.preventDefault();
-			if (isSlashCommandActive) {
-				const selectedCommand =
-					slashCommands.suggestions[slashCommands.selectedIndex];
-				if (selectedCommand) {
-					handleSelectSlashCommand(selectedCommand);
-				}
-			} else {
-				const selectedSuggestion =
-					mentions.suggestions[mentions.selectedIndex];
-				if (selectedSuggestion) {
-					selectMention(selectedSuggestion);
-				}
-			}
-			return true;
-		}
-
-		// Close dropdown (Escape)
-		if (e.key === "Escape") {
-			e.preventDefault();
-			if (isSlashCommandActive) {
-				slashCommands.close();
-			} else {
-				mentions.close();
-			}
-			return true;
-		}
-
-		return false;
-	};
-
-	const handleKeyPress = (e: React.KeyboardEvent) => {
-		// Handle dropdown navigation first (both mention and slash command)
-		if (handleDropdownKeyPress(e)) {
-			return; // Handled by dropdown
-		}
-
-		// Normal input handling
-		if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-			e.preventDefault();
-			// Only send if send button would not be disabled (same condition as button)
-			const buttonDisabled =
-				!isSending && (inputValue.trim() === "" || !isSessionReady);
-			if (!buttonDisabled && !isSending) {
-				handleSendMessage();
-			}
-		}
-	};
-
-	const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-		const newValue = e.target.value;
-		const cursorPosition = e.target.selectionStart || 0;
-
-		logger.log(
-			"[DEBUG] Input changed:",
-			newValue,
-			"cursor:",
-			cursorPosition,
-		);
-
-		setInputValue(newValue);
-
-		// Hide hint overlay when user modifies the input
-		// (hint should only show right after command selection)
-		if (hintText) {
-			// Check if user changed the hint text
-			const expectedText = commandText + hintText;
-			if (newValue !== expectedText) {
-				setHintText(null);
-				setCommandText("");
-			}
-		}
-
-		// Update mention suggestions via useMentions hook
-		void mentions.updateSuggestions(newValue, cursorPosition);
-
-		// Update slash command suggestions via useSlashCommands hook
-		slashCommands.updateSuggestions(newValue, cursorPosition);
-	};
-
-	const handleExportChat = async () => {
-		if (messages.length === 0) {
-			new Notice("[Agent Client] No messages to export");
-			return;
-		}
-
-		try {
-			const exporter = new ChatExporter(plugin);
-			const openFile = plugin.settings.exportSettings.openFileAfterExport;
-			const filePath = await exporter.exportToMarkdown(
-				messages,
-				session.agentDisplayName,
-				session.agentId,
-				session.sessionId || "unknown",
-				session.createdAt,
-				openFile,
-			);
-			new Notice(`[Agent Client] Chat exported to ${filePath}`);
-		} catch (error) {
-			new Notice("[Agent Client] Failed to export chat");
-			logger.error("Export error:", error);
-		}
-	};
-
+	// ============================================================
+	// Render
+	// ============================================================
 	return (
 		<div className="chat-view-container">
-			<div className="chat-view-header">
-				<h3 className="chat-view-header-title">{activeAgentLabel}</h3>
-				{isUpdateAvailable && (
-					<p className="chat-view-header-update">Update available!</p>
-				)}
-				<div className="chat-view-header-actions">
-					<HeaderButton
-						iconName="plus"
-						tooltip="New chat"
-						onClick={createNewSession}
-					/>
-					<HeaderButton
-						iconName="save"
-						tooltip="Export chat to Markdown"
-						onClick={handleExportChat}
-					/>
-					<HeaderButton
-						iconName="settings"
-						tooltip="Settings"
-						onClick={() => {
-							// Open plugin settings
-							const appWithSettings =
-								plugin.app as unknown as AppWithSettings;
-							appWithSettings.setting.open();
-							appWithSettings.setting.openTabById(
-								plugin.manifest.id,
-							);
-						}}
-					/>
-				</div>
-			</div>
+			<ChatHeader
+				agentLabel={activeAgentLabel}
+				isUpdateAvailable={isUpdateAvailable}
+				onNewChat={handleNewChat}
+				onExportChat={handleExportChat}
+				onOpenSettings={handleOpenSettings}
+			/>
 
-			<div ref={messagesContainerRef} className="chat-view-messages">
-				{errorInfo ? (
-					<div className="chat-error-container">
-						<h4 className="chat-error-title">{errorInfo.title}</h4>
-						<p className="chat-error-message">
-							{errorInfo.message}
-						</p>
-						{errorInfo.suggestion && (
-							<p className="chat-error-suggestion">
-								💡 {errorInfo.suggestion}
-							</p>
-						)}
-						<button
-							onClick={() => chat.clearError()}
-							className="chat-error-button"
-						>
-							OK
-						</button>
-					</div>
-				) : messages.length === 0 ? (
-					<div className="chat-empty-state">
-						{!isSessionReady
-							? `Connecting to ${activeAgentLabel}...`
-							: `Start a conversation with ${activeAgentLabel}...`}
-					</div>
-				) : (
-					<>
-						{messages.map((message) => (
-							<MessageRenderer
-								key={message.id}
-								message={message}
-								plugin={plugin}
-								acpClient={acpClientRef.current || undefined}
-								onApprovePermission={
-									permission.approvePermission
-								}
-							/>
-						))}
-						{isSending && (
-							<div className="loading-indicator">
-								<div className="loading-dots">
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-								</div>
-							</div>
-						)}
-					</>
-				)}
-			</div>
+			<ChatMessages
+				messages={messages}
+				isSending={isSending}
+				isSessionReady={isSessionReady}
+				agentLabel={activeAgentLabel}
+				errorInfo={errorInfo}
+				plugin={plugin}
+				view={view}
+				acpClient={acpClientRef.current}
+				onApprovePermission={permission.approvePermission}
+				onClearError={handleClearError}
+			/>
 
-			<div className="chat-input-container">
-				<div className="chat-input-wrapper">
-					{/* Mention Dropdown - overlay positioned */}
-					{(() => {
-						logger.log("[DEBUG] Dropdown render check:", {
-							isOpen: mentions.isOpen,
-							suggestionsCount: mentions.suggestions.length,
-							selectedIndex: mentions.selectedIndex,
-						});
-						return null;
-					})()}
-					{mentions.isOpen && (
-						<SuggestionDropdown
-							type="mention"
-							items={mentions.suggestions}
-							selectedIndex={mentions.selectedIndex}
-							onSelect={selectMention}
-							onClose={mentions.close}
-							plugin={plugin}
-							view={view}
-						/>
-					)}
-					{slashCommands.isOpen && (
-						<SuggestionDropdown
-							type="slash-command"
-							items={slashCommands.suggestions}
-							selectedIndex={slashCommands.selectedIndex}
-							onSelect={handleSelectSlashCommand}
-							onClose={slashCommands.close}
-							plugin={plugin}
-							view={view}
-						/>
-					)}
-					{settings.autoMentionActiveNote &&
-						autoMention.activeNote && (
-							<div className="auto-mention-inline">
-								<span
-									className={`mention-badge ${autoMention.isDisabled ? "disabled" : ""}`}
-								>
-									@{autoMention.activeNote.name}
-									{autoMention.activeNote.selection && (
-										<span className="selection-indicator">
-											{":"}
-											{autoMention.activeNote.selection
-												.from.line + 1}
-											-
-											{autoMention.activeNote.selection.to
-												.line + 1}
-										</span>
-									)}
-								</span>
-								<button
-									className="auto-mention-toggle-btn"
-									onClick={(e) => {
-										const newDisabledState =
-											!autoMention.isDisabled;
-										autoMention.toggle(newDisabledState);
-										const iconName = newDisabledState
-											? "x"
-											: "plus";
-										setIcon(e.currentTarget, iconName);
-									}}
-									title={
-										autoMention.isDisabled
-											? "Enable auto-mention"
-											: "Temporarily disable auto-mention"
-									}
-									ref={(el) => {
-										if (el) {
-											const iconName =
-												autoMention.isDisabled
-													? "plus"
-													: "x";
-											setIcon(el, iconName);
-										}
-									}}
-								/>
-							</div>
-						)}
-					<div className="textarea-wrapper">
-						<textarea
-							ref={textareaRef}
-							value={inputValue}
-							onChange={handleInputChange}
-							onKeyDown={handleKeyPress}
-							placeholder={`Message ${activeAgentLabel} - @ to mention notes${session.availableCommands && session.availableCommands.length > 0 ? ", / for commands" : ""}`}
-							className={`chat-input-textarea ${settings.autoMentionActiveNote && autoMention.activeNote ? "has-auto-mention" : ""}`}
-							rows={1}
-						/>
-						{hintText && (
-							<div className="hint-overlay" aria-hidden="true">
-								<span className="invisible">{commandText}</span>
-								<span className="hint-text">{hintText}</span>
-							</div>
-						)}
-					</div>
-					<button
-						ref={sendButtonRef}
-						onClick={
-							isSending ? handleStopGeneration : handleSendMessage
-						}
-						disabled={
-							!isSending &&
-							(inputValue.trim() === "" || !isSessionReady)
-						}
-						className={`chat-send-button ${isSending ? "sending" : ""} ${!isSending && (inputValue.trim() === "" || !isSessionReady) ? "disabled" : ""}`}
-						title={
-							!isSessionReady
-								? "Connecting..."
-								: isSending
-									? "Stop generation"
-									: "Send message"
-						}
-					></button>
-				</div>
-			</div>
+			<ChatInput
+				isSending={isSending}
+				isSessionReady={isSessionReady}
+				agentLabel={activeAgentLabel}
+				availableCommands={session.availableCommands || []}
+				autoMentionEnabled={settings.autoMentionActiveNote}
+				restoredMessage={restoredMessage}
+				mentions={mentions}
+				slashCommands={slashCommands}
+				autoMention={autoMention}
+				plugin={plugin}
+				view={view}
+				onSendMessage={handleSendMessage}
+				onStopGeneration={handleStopGeneration}
+				onRestoredMessageConsumed={handleRestoredMessageConsumed}
+			/>
 		</div>
 	);
 }
@@ -1011,13 +512,11 @@ export class ChatView extends ItemView {
 
 		this.root = createRoot(container);
 		this.root.render(<ChatComponent plugin={this.plugin} view={this} />);
-		// Note: Permission hotkey events are now handled in React component via useEffect
 		return Promise.resolve();
 	}
 
 	async onClose() {
 		this.logger.log("[ChatView] onClose() called");
-		// Cleanup ViewModel and disconnect agent before unmounting
 		if (this.viewModel) {
 			this.logger.log("[ChatView] Disposing ViewModel...");
 			await this.viewModel.dispose();
