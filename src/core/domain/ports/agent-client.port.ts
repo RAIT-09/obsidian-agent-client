@@ -11,68 +11,17 @@
  * adapter layer, keeping the domain logic stable.
  */
 
-import type { ChatMessage, PermissionOption } from "../models/chat-message";
-import type { AgentError } from "../models/agent-error";
-import type { AuthenticationMethod } from "../models/chat-session";
+import type {
+	ChatMessage,
+	PermissionOption,
+	AuthenticationMethod,
+	AgentError,
+	AgentConfig,
+	PermissionRequest,
+} from "../../../types";
 
-/**
- * Runtime configuration for launching an AI agent process.
- *
- * This is the execution-time configuration used when spawning an agent process,
- * as opposed to BaseAgentSettings which is the storage format in plugin settings.
- *
- * Key differences from BaseAgentSettings:
- * - env is converted to Record<string, string> format for process.spawn()
- * - workingDirectory is added for the session execution context
- *
- * Adapters are responsible for converting BaseAgentSettings → AgentConfig
- * before launching the agent process.
- */
-export interface AgentConfig {
-	/** Unique identifier for this agent (e.g., "claude", "gemini") */
-	id: string;
-
-	/** Display name for the agent */
-	displayName: string;
-
-	/** Command to execute (full path to executable) */
-	command: string;
-
-	/** Command-line arguments */
-	args: string[];
-
-	/**
-	 * Environment variables for the agent process.
-	 * Converted from AgentEnvVar[] to Record format for process.spawn().
-	 */
-	env?: Record<string, string>;
-
-	/** Working directory for the agent session */
-	workingDirectory: string;
-}
-
-/**
- * Permission request from an agent.
- *
- * Represents a request for user approval to perform an operation
- * (e.g., file read/write, command execution).
- */
-export interface PermissionRequest {
-	/** Unique identifier for this permission request */
-	requestId: string;
-
-	/** Tool call that triggered the permission request */
-	toolCallId: string;
-
-	/** Human-readable title of the operation */
-	title?: string;
-
-	/**
-	 * Available permission options (allow once, always, deny, etc.).
-	 * Uses PermissionOption from domain/models/chat-message.ts.
-	 */
-	options: PermissionOption[];
-}
+// Re-export types for backward compatibility
+export type { AgentConfig, PermissionRequest } from "../../../types";
 
 /**
  * Result of initializing a connection to an agent.

@@ -6,48 +6,10 @@
  * Obsidian's specific APIs (TFile, Vault, MetadataCache, etc.).
  */
 
-/**
- * Position in the editor (line and character).
- * Line numbers are 0-indexed.
- */
-export interface EditorPosition {
-	/** Line number (0-indexed) */
-	line: number;
-	/** Character position within the line */
-	ch: number;
-}
+// Re-export types from centralized types/ directory
+export type { EditorPosition, NoteMetadata } from "../../../types";
 
-/**
- * Metadata for a note in the vault.
- *
- * Contains essential information about a note file without
- * exposing Obsidian's internal TFile structure.
- */
-export interface NoteMetadata {
-	/** Full path to the note within the vault (e.g., "folder/note.md") */
-	path: string;
-
-	/** Filename without extension (e.g., "note") */
-	name: string;
-
-	/** File extension (usually "md") */
-	extension: string;
-
-	/** Creation timestamp (milliseconds since epoch) */
-	created: number;
-
-	/** Last modified timestamp (milliseconds since epoch) */
-	modified: number;
-
-	/** Optional aliases from frontmatter */
-	aliases?: string[];
-
-	/** Optional text selection range in the editor */
-	selection?: {
-		from: EditorPosition;
-		to: EditorPosition;
-	};
-}
+import type { NoteMetadata } from "../../../types";
 
 /**
  * Interface for accessing vault notes and files.
