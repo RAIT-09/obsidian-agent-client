@@ -41,6 +41,7 @@ import { SwitchAgentUseCase } from "../../../core/use-cases/switch-agent.use-cas
 
 // Hooks imports
 import { useSettings } from "../../../hooks/useSettings";
+import { useMentions } from "../../../hooks/useMentions";
 
 // ViewModel imports
 import { ChatViewModel } from "../../../adapters/view-models/chat.view-model";
@@ -129,6 +130,8 @@ function ChatComponent({
 	const vaultAccessAdapter = useMemo(() => {
 		return new ObsidianVaultAdapter(plugin);
 	}, [plugin]);
+
+	const mentions = useMentions(vaultAccessAdapter, plugin);
 
 	const updateActiveNote = useCallback(async () => {
 		const activeNote = await vaultAccessAdapter.getActiveNote();
@@ -219,10 +222,7 @@ function ChatComponent({
 	const errorInfo = vmState.errorInfo;
 	const isSendingFromVM = vmState.isSending;
 
-	// Mention dropdown state from ViewModel
-	const showMentionDropdown = vmState.showMentionDropdown;
-	const mentionSuggestions = vmState.mentionSuggestions;
-	const selectedMentionIndex = vmState.selectedMentionIndex;
+	// Auto-mention state from ViewModel
 	const isAutoMentionTemporarilyDisabled =
 		vmState.isAutoMentionTemporarilyDisabled;
 
@@ -302,7 +302,7 @@ function ChatComponent({
 
 	// Mention handling - delegate to ViewModel
 	const selectMention = (suggestion: NoteMetadata) => {
-		const newText = viewModel.selectMention(inputValue, suggestion);
+		const newText = mentions.selectSuggestion(inputValue, suggestion);
 		setTextAndFocus(newText);
 	};
 
@@ -552,7 +552,7 @@ function ChatComponent({
 	const handleDropdownKeyPress = (e: React.KeyboardEvent): boolean => {
 		// Check which dropdown is active
 		const isSlashCommandActive = showSlashCommandDropdown;
-		const isMentionActive = showMentionDropdown;
+		const isMentionActive = mentions.isOpen;
 
 		if (!isSlashCommandActive && !isMentionActive) {
 			return false; // No dropdown active
@@ -564,7 +564,7 @@ function ChatComponent({
 			if (isSlashCommandActive) {
 				viewModel.navigateSlashCommandDropdown("down");
 			} else {
-				viewModel.navigateMentionDropdown("down");
+				mentions.navigate("down");
 			}
 			return true;
 		}
@@ -574,7 +574,7 @@ function ChatComponent({
 			if (isSlashCommandActive) {
 				viewModel.navigateSlashCommandDropdown("up");
 			} else {
-				viewModel.navigateMentionDropdown("up");
+				mentions.navigate("up");
 			}
 			return true;
 		}
@@ -590,7 +590,7 @@ function ChatComponent({
 				}
 			} else {
 				const selectedSuggestion =
-					mentionSuggestions[selectedMentionIndex];
+					mentions.suggestions[mentions.selectedIndex];
 				if (selectedSuggestion) {
 					selectMention(selectedSuggestion);
 				}
@@ -604,7 +604,7 @@ function ChatComponent({
 			if (isSlashCommandActive) {
 				viewModel.closeSlashCommandDropdown();
 			} else {
-				viewModel.closeMentionDropdown();
+				mentions.close();
 			}
 			return true;
 		}
@@ -654,8 +654,8 @@ function ChatComponent({
 			}
 		}
 
-		// Update mention suggestions via ViewModel
-		viewModel.updateMentionSuggestions(newValue, cursorPosition);
+		// Update mention suggestions via useMentions hook
+		void mentions.updateSuggestions(newValue, cursorPosition);
 
 		// Update slash command suggestions via ViewModel
 		viewModel.updateSlashCommandSuggestions(newValue, cursorPosition);
@@ -781,19 +781,19 @@ function ChatComponent({
 					{/* Mention Dropdown - overlay positioned */}
 					{(() => {
 						logger.log("[DEBUG] Dropdown render check:", {
-							showMentionDropdown,
-							suggestionsCount: mentionSuggestions.length,
-							selectedIndex: selectedMentionIndex,
+							isOpen: mentions.isOpen,
+							suggestionsCount: mentions.suggestions.length,
+							selectedIndex: mentions.selectedIndex,
 						});
 						return null;
 					})()}
-					{showMentionDropdown && (
+					{mentions.isOpen && (
 						<SuggestionDropdown
 							type="mention"
-							items={mentionSuggestions}
-							selectedIndex={selectedMentionIndex}
+							items={mentions.suggestions}
+							selectedIndex={mentions.selectedIndex}
 							onSelect={selectMention}
-							onClose={() => viewModel.closeMentionDropdown()}
+							onClose={mentions.close}
 							plugin={plugin}
 							view={view}
 						/>
