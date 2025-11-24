@@ -11,16 +11,43 @@ import {
 import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
 
 export interface UseMentionsReturn {
+	/** Note suggestions matching the current mention query */
 	suggestions: NoteMetadata[];
+	/** Currently selected index in the dropdown */
 	selectedIndex: number;
+	/** Whether the dropdown is open */
 	isOpen: boolean;
+	/** Current mention context (query, position, etc.) */
 	context: MentionContext | null;
+
+	/**
+	 * Update mention suggestions based on current input.
+	 * Detects @-mentions and searches for matching notes.
+	 */
 	updateSuggestions: (input: string, cursorPosition: number) => Promise<void>;
+
+	/**
+	 * Select a note from the dropdown.
+	 * @returns Updated input text with mention replaced (e.g., "@[[note name]]")
+	 */
 	selectSuggestion: (input: string, suggestion: NoteMetadata) => string;
+
+	/** Navigate the dropdown selection */
 	navigate: (direction: "up" | "down") => void;
+
+	/** Close the dropdown */
 	close: () => void;
 }
 
+/**
+ * Hook for managing mention dropdown state and logic.
+ *
+ * Handles @-mention detection, note searching, and dropdown interaction.
+ * Uses detectMention/replaceMention utilities for parsing.
+ *
+ * @param vaultAccess - Vault access port for note searching
+ * @param plugin - Plugin instance for settings and configuration
+ */
 export function useMentions(
 	vaultAccess: IVaultAccess,
 	plugin: AgentClientPlugin,
