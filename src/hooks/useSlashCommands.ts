@@ -70,7 +70,11 @@ export function useSlashCommands() {
 				query,
 			});
 		},
-		[state.session.availableCommands, state.showSlashCommandDropdown, dispatch],
+		[
+			state.session.availableCommands,
+			state.showSlashCommandDropdown,
+			dispatch,
+		],
 	);
 
 	/**
@@ -98,7 +102,8 @@ export function useSlashCommands() {
 	 */
 	const navigateSlashCommandDropdown = useCallback(
 		(direction: "up" | "down") => {
-			const { slashCommandSuggestions, selectedSlashCommandIndex } = state;
+			const { slashCommandSuggestions, selectedSlashCommandIndex } =
+				state;
 			const count = slashCommandSuggestions.length;
 			if (count === 0) return;
 

@@ -4,4 +4,8 @@
  * Re-exports from centralized types/ directory for backward compatibility.
  */
 
-export type { EditorPosition, NoteMetadata, IVaultAccess } from "../../../types";
+export type {
+	EditorPosition,
+	NoteMetadata,
+	IVaultAccess,
+} from "../../../types";

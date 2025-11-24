@@ -1,14 +1,7 @@
 import { ItemView, WorkspaceLeaf, setIcon, Platform, Notice } from "obsidian";
 import type { EventRef } from "obsidian";
 import * as React from "react";
-const {
-	useState,
-	useRef,
-	useEffect,
-	useSyncExternalStore,
-	useMemo,
-	useCallback,
-} = React;
+const { useState, useRef, useEffect, useMemo, useCallback } = React;
 import { createRoot, Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
@@ -18,34 +11,27 @@ import { SuggestionDropdown } from "../../components/chat/SuggestionDropdown";
 import { MessageRenderer } from "../../components/chat/MessageRenderer";
 import { HeaderButton } from "../../components/shared/HeaderButton";
 
-// Service imports
-import { NoteMentionService } from "../../../adapters/obsidian/mention-service";
-
 // Utility imports
 import { Logger } from "../../../shared/logger";
 import { ChatExporter } from "../../../shared/chat-exporter";
 
 // Type imports
 import type { NoteMetadata, SlashCommand } from "../../../types";
-
-// Adapter imports
-import { AcpAdapter, type IAcpClient } from "../../../adapters/acp/acp.adapter";
-import { ObsidianVaultAdapter } from "../../../adapters/obsidian/vault.adapter";
-
-// Use Case imports
-import { SendMessageUseCase } from "../../../core/use-cases/send-message.use-case";
-import { ManageSessionUseCase } from "../../../core/use-cases/manage-session.use-case";
-import { HandlePermissionUseCase } from "../../../core/use-cases/handle-permission.use-case";
-import { SwitchAgentUseCase } from "../../../core/use-cases/switch-agent.use-case";
-
-// ViewModel imports
-import { ChatViewModel } from "../../../adapters/view-models/chat.view-model";
+import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
 
 // Context imports
 import { PluginProvider } from "../../../contexts";
 
 // Hook imports
-import { useSettingsValue } from "../../../hooks";
+import {
+	useSettingsValue,
+	useChat,
+	useMentionsDropdown,
+	useSlashCommandsDropdown,
+} from "../../../hooks";
+
+// Bridge type for ChatView class access
+import type { ChatBridge } from "./ChatBridge";
 
 // Type definitions for Obsidian internal APIs
 interface VaultAdapterWithBasePath {
@@ -112,129 +98,89 @@ function ChatComponent({
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
 
-	// Note mention service for @-mention functionality
-	const noteMentionService = useMemo(
-		() => new NoteMentionService(plugin),
-		[plugin],
-	);
+	// ========================================
+	// Initialize Chat Hook
+	// ========================================
 
-	// Create AcpAdapter (shared across all use cases)
-	// Callbacks will be set after ViewModel creation
-	const acpAdapter = useMemo(() => {
-		const adapter = new AcpAdapter(plugin);
-		// Set acpClientRef for TerminalRenderer access
-		acpClientRef.current = adapter;
-		return adapter;
-	}, [plugin]);
+	const chat = useChat({
+		plugin,
+		workingDirectory: vaultPath,
+	});
 
-	// Create ObsidianVaultAdapter
-	const vaultAccessAdapter = useMemo(() => {
-		return new ObsidianVaultAdapter(plugin);
-	}, [plugin]);
+	// Set acpClientRef for TerminalRenderer access
+	useEffect(() => {
+		acpClientRef.current = chat.acpClient;
+	}, [chat.acpClient]);
+
+	// ========================================
+	// Initialize Dropdown Hooks
+	// ========================================
+
+	const mentions = useMentionsDropdown({
+		plugin,
+		vaultAccess: chat.vaultAdapter,
+	});
+
+	const slashCommands = useSlashCommandsDropdown({
+		availableCommands: chat.availableCommands,
+		onAutoMentionToggle: mentions.toggleAutoMention,
+	});
+
+	// ========================================
+	// Create Bridge for ChatView Class
+	// ========================================
+
+	const bridgeRef = useRef<ChatBridge | null>(null);
+
+	useEffect(() => {
+		bridgeRef.current = {
+			dispose: chat.dispose,
+			approveActivePermission: chat.approveActivePermission,
+			rejectActivePermission: chat.rejectActivePermission,
+			toggleAutoMention: mentions.toggleAutoMention,
+			getIsAutoMentionDisabled: () => mentions.isAutoMentionDisabled,
+			getSnapshot: () => ({
+				messages: chat.messages,
+				session: {
+					agentId: chat.session.agentId,
+				},
+			}),
+			restartSession: chat.restartSession,
+		};
+		view.chatBridge = bridgeRef.current;
+		return () => {
+			view.chatBridge = null;
+		};
+	}, [view, chat, mentions]);
+
+	// ========================================
+	// Active Note Tracking
+	// ========================================
 
 	const updateActiveNote = useCallback(async () => {
-		const activeNote = await vaultAccessAdapter.getActiveNote();
+		const activeNote = await chat.vaultAdapter.getActiveNote();
 		setLastActiveNote(activeNote);
-	}, [vaultAccessAdapter]);
+	}, [chat.vaultAdapter]);
 
-	// Create SendMessageUseCase
-	const sendMessageUseCase = useMemo(() => {
-		return new SendMessageUseCase(
-			acpAdapter, // Use AcpAdapter as IAgentClient
-			vaultAccessAdapter,
-			plugin.settingsStore,
-			noteMentionService,
-		);
-	}, [acpAdapter, vaultAccessAdapter, plugin, noteMentionService]);
+	// ========================================
+	// Extract State from Hooks
+	// ========================================
 
-	// Create ManageSessionUseCase
-	const manageSessionUseCase = useMemo(() => {
-		return new ManageSessionUseCase(
-			acpAdapter, // Use AcpAdapter as IAgentClient
-			plugin.settingsStore,
-		);
-	}, [acpAdapter, plugin]);
+	const messages = chat.messages;
+	const session = chat.session;
+	const errorInfo = chat.errorInfo;
+	const isSending = chat.isSending;
 
-	// Create HandlePermissionUseCase
-	const handlePermissionUseCase = useMemo(() => {
-		return new HandlePermissionUseCase(
-			acpAdapter, // Use AcpAdapter as IAgentClient
-			plugin.settingsStore,
-		);
-	}, [acpAdapter, plugin]);
+	// Mention dropdown state
+	const showMentionDropdown = mentions.showDropdown;
+	const mentionSuggestions = mentions.suggestions;
+	const selectedMentionIndex = mentions.selectedIndex;
+	const isAutoMentionTemporarilyDisabled = mentions.isAutoMentionDisabled;
 
-	// Create SwitchAgentUseCase
-	const switchAgentUseCase = useMemo(() => {
-		return new SwitchAgentUseCase(plugin.settingsStore);
-	}, [plugin]);
-
-	// Create ChatViewModel
-	const viewModel = useMemo(() => {
-		return new ChatViewModel(
-			plugin,
-			sendMessageUseCase,
-			manageSessionUseCase,
-			handlePermissionUseCase,
-			switchAgentUseCase,
-			vaultAccessAdapter,
-			vaultPath,
-		);
-	}, [
-		plugin,
-		sendMessageUseCase,
-		manageSessionUseCase,
-		handlePermissionUseCase,
-		switchAgentUseCase,
-		vaultAccessAdapter,
-		vaultPath,
-	]);
-
-	// Store ViewModel reference in ChatView for cleanup on close
-	useEffect(() => {
-		view.viewModel = viewModel;
-		return () => {
-			view.viewModel = null;
-		};
-	}, [view, viewModel]);
-
-	// Set AcpAdapter callbacks to ViewModel methods
-	// This connects the adapter's message updates to the ViewModel's state management
-	useEffect(() => {
-		acpAdapter.setMessageCallbacks(
-			viewModel.addMessage,
-			viewModel.updateLastMessage,
-			viewModel.updateMessage,
-			viewModel.updateAvailableCommands,
-		);
-	}, [acpAdapter, viewModel]);
-
-	// Subscribe to ViewModel state
-	const vmState = useSyncExternalStore(
-		viewModel.subscribe,
-		viewModel.getSnapshot,
-		viewModel.getSnapshot,
-	);
-
-	// Extract state from ViewModel for easier access
-	const messages = vmState.messages;
-	const session = vmState.session;
-	const errorInfo = vmState.errorInfo;
-	const isSendingFromVM = vmState.isSending;
-
-	// Mention dropdown state from ViewModel
-	const showMentionDropdown = vmState.showMentionDropdown;
-	const mentionSuggestions = vmState.mentionSuggestions;
-	const selectedMentionIndex = vmState.selectedMentionIndex;
-	const isAutoMentionTemporarilyDisabled =
-		vmState.isAutoMentionTemporarilyDisabled;
-
-	// Slash command dropdown state from ViewModel
-	const showSlashCommandDropdown = vmState.showSlashCommandDropdown;
-	const slashCommandSuggestions = vmState.slashCommandSuggestions;
-	const selectedSlashCommandIndex = vmState.selectedSlashCommandIndex;
-
-	// Helper to check if agent is currently processing a request
-	const isSending = isSendingFromVM; // Use ViewModel state
+	// Slash command dropdown state
+	const showSlashCommandDropdown = slashCommands.showDropdown;
+	const slashCommandSuggestions = slashCommands.suggestions;
+	const selectedSlashCommandIndex = slashCommands.selectedIndex;
 
 	// Helper to check if session is ready for user input
 	const isSessionReady = session.state === "ready";
@@ -302,15 +248,15 @@ function ChatComponent({
 		}, 0);
 	};
 
-	// Mention handling - delegate to ViewModel
+	// Mention handling - delegate to hook
 	const selectMention = (suggestion: NoteMetadata) => {
-		const newText = viewModel.selectMention(inputValue, suggestion);
+		const newText = mentions.selectMention(inputValue, suggestion);
 		setTextAndFocus(newText);
 	};
 
-	// Slash command handling - delegate to ViewModel
+	// Slash command handling - delegate to hook
 	const selectSlashCommand = (command: SlashCommand) => {
-		const newText = viewModel.selectSlashCommand(inputValue, command);
+		const newText = slashCommands.selectCommand(command);
 		setInputValue(newText);
 
 		// Setup hint overlay if command has hint
@@ -379,28 +325,28 @@ function ChatComponent({
 
 	// Initialize session on mount or when agent changes
 	useEffect(() => {
-		logger.log("[Debug] Starting connection setup via ViewModel...");
-		viewModel.createNewSession();
+		logger.log("[Debug] Starting connection setup via useChat hook...");
+		chat.createNewSession();
 
 		// Note: No cleanup here - disconnect() during agent switching would kill
 		// the new process. Final cleanup is handled by dispose() on unmount.
-	}, [session.agentId, viewModel]);
+	}, [session.agentId, chat]);
 
-	// Cleanup ViewModel on unmount
+	// Cleanup on unmount
 	useEffect(() => {
 		return () => {
-			viewModel.dispose();
+			chat.dispose();
 		};
-	}, [viewModel]);
+	}, [chat]);
 
 	// Monitor agent changes from settings when messages are empty
 	useEffect(() => {
 		const newActiveAgentId = settings.activeAgentId || settings.claude.id;
 		if (messages.length === 0 && newActiveAgentId !== session.agentId) {
-			// Switch agent via ViewModel
-			viewModel.switchAgent(newActiveAgentId);
+			// Switch agent via hook
+			chat.switchAgent(newActiveAgentId);
 		}
-	}, [settings.activeAgentId, messages.length, session.agentId, viewModel]);
+	}, [settings.activeAgentId, messages.length, session.agentId, chat]);
 
 	// Auto-scroll when messages change
 	useEffect(() => {
@@ -470,7 +416,7 @@ function ChatComponent({
 			await updateActiveNote();
 		};
 
-		const unsubscribe = vaultAccessAdapter.subscribeSelectionChanges(() => {
+		const unsubscribe = chat.vaultAdapter.subscribeSelectionChanges(() => {
 			void refreshActiveNote();
 		});
 
@@ -480,7 +426,7 @@ function ChatComponent({
 			isMounted = false;
 			unsubscribe();
 		};
-	}, [updateActiveNote, vaultAccessAdapter]);
+	}, [updateActiveNote, chat.vaultAdapter]);
 
 	const updateIconColor = (svg: SVGElement) => {
 		// Remove all state classes
@@ -502,17 +448,17 @@ function ChatComponent({
 			return;
 		}
 
-		logger.log("[Debug] Creating new session via ViewModel...");
+		logger.log("[Debug] Creating new session via useChat hook...");
 		setInputValue("");
-		viewModel.toggleAutoMention(false);
-		await viewModel.restartSession();
+		mentions.toggleAutoMention(false);
+		await chat.restartSession();
 	};
 
 	const handleStopGeneration = async () => {
 		logger.log("Cancelling current operation...");
 		// Get last user message before cancel (to restore it)
-		const lastMessage = viewModel.getSnapshot().lastUserMessage;
-		await viewModel.cancelCurrentOperation();
+		const lastMessage = chat.lastUserMessage;
+		await chat.cancelCurrentOperation();
 
 		// Restore the last user message to input field
 		if (lastMessage) {
@@ -521,7 +467,7 @@ function ChatComponent({
 	};
 
 	const handleSendMessage = async () => {
-		if (!inputValue.trim() || isSendingFromVM) return;
+		if (!inputValue.trim() || isSending) return;
 
 		// Save input value before clearing
 		const messageToSend = inputValue;
@@ -532,8 +478,8 @@ function ChatComponent({
 		setCommandText("");
 		setIsAtBottom(true);
 
-		// Send message via ViewModel
-		await viewModel.sendMessage(messageToSend, {
+		// Send message via hook
+		await chat.sendMessage(messageToSend, {
 			activeNote: lastActiveNote,
 			vaultBasePath:
 				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
@@ -564,9 +510,9 @@ function ChatComponent({
 		if (e.key === "ArrowDown") {
 			e.preventDefault();
 			if (isSlashCommandActive) {
-				viewModel.navigateSlashCommandDropdown("down");
+				slashCommands.navigate("down");
 			} else {
-				viewModel.navigateMentionDropdown("down");
+				mentions.navigate("down");
 			}
 			return true;
 		}
@@ -574,9 +520,9 @@ function ChatComponent({
 		if (e.key === "ArrowUp") {
 			e.preventDefault();
 			if (isSlashCommandActive) {
-				viewModel.navigateSlashCommandDropdown("up");
+				slashCommands.navigate("up");
 			} else {
-				viewModel.navigateMentionDropdown("up");
+				mentions.navigate("up");
 			}
 			return true;
 		}
@@ -604,9 +550,9 @@ function ChatComponent({
 		if (e.key === "Escape") {
 			e.preventDefault();
 			if (isSlashCommandActive) {
-				viewModel.closeSlashCommandDropdown();
+				slashCommands.closeDropdown();
 			} else {
-				viewModel.closeMentionDropdown();
+				mentions.closeDropdown();
 			}
 			return true;
 		}
@@ -656,11 +602,11 @@ function ChatComponent({
 			}
 		}
 
-		// Update mention suggestions via ViewModel
-		viewModel.updateMentionSuggestions(newValue, cursorPosition);
+		// Update mention suggestions via hook
+		mentions.updateSuggestions(newValue, cursorPosition);
 
-		// Update slash command suggestions via ViewModel
-		viewModel.updateSlashCommandSuggestions(newValue, cursorPosition);
+		// Update slash command suggestions via hook
+		slashCommands.updateSuggestions(newValue, cursorPosition);
 	};
 
 	const handleExportChat = async () => {
@@ -734,7 +680,7 @@ function ChatComponent({
 							</p>
 						)}
 						<button
-							onClick={() => viewModel.clearError()}
+							onClick={() => chat.clearError()}
 							className="chat-error-button"
 						>
 							OK
@@ -755,7 +701,7 @@ function ChatComponent({
 								plugin={plugin}
 								acpClient={acpClientRef.current || undefined}
 								handlePermissionUseCase={
-									handlePermissionUseCase
+									chat.handlePermissionUseCase
 								}
 							/>
 						))}
@@ -795,7 +741,7 @@ function ChatComponent({
 							items={mentionSuggestions}
 							selectedIndex={selectedMentionIndex}
 							onSelect={selectMention}
-							onClose={() => viewModel.closeMentionDropdown()}
+							onClose={() => mentions.closeDropdown()}
 							plugin={plugin}
 							view={view}
 						/>
@@ -806,9 +752,7 @@ function ChatComponent({
 							items={slashCommandSuggestions}
 							selectedIndex={selectedSlashCommandIndex}
 							onSelect={selectSlashCommand}
-							onClose={() =>
-								viewModel.closeSlashCommandDropdown()
-							}
+							onClose={() => slashCommands.closeDropdown()}
 							plugin={plugin}
 							view={view}
 						/>
@@ -832,7 +776,7 @@ function ChatComponent({
 								onClick={(e) => {
 									const newDisabledState =
 										!isAutoMentionTemporarilyDisabled;
-									viewModel.toggleAutoMention(
+									mentions.toggleAutoMention(
 										newDisabledState,
 									);
 									const iconName = newDisabledState
@@ -902,7 +846,7 @@ export class ChatView extends ItemView {
 	private root: Root | null = null;
 	private plugin: AgentClientPlugin;
 	private logger: Logger;
-	public viewModel: ChatViewModel | null = null;
+	public chatBridge: ChatBridge | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: AgentClientPlugin) {
 		super(leaf);
@@ -938,13 +882,13 @@ export class ChatView extends ItemView {
 
 	async onClose() {
 		this.logger.log("[ChatView] onClose() called");
-		// Cleanup ViewModel and disconnect agent before unmounting
-		if (this.viewModel) {
-			this.logger.log("[ChatView] Disposing ViewModel...");
-			await this.viewModel.dispose();
-			this.viewModel = null;
+		// Cleanup via bridge and disconnect agent before unmounting
+		if (this.chatBridge) {
+			this.logger.log("[ChatView] Disposing via ChatBridge...");
+			await this.chatBridge.dispose();
+			this.chatBridge = null;
 		} else {
-			this.logger.log("[ChatView] No ViewModel to dispose");
+			this.logger.log("[ChatView] No ChatBridge to dispose");
 		}
 		if (this.root) {
 			this.root.unmount();
@@ -954,24 +898,24 @@ export class ChatView extends ItemView {
 
 	private registerPermissionEvents(): void {
 		const approveHandler = async () => {
-			const viewModel = this.viewModel;
-			if (!viewModel) {
+			const bridge = this.chatBridge;
+			if (!bridge) {
 				new Notice("[Agent Client] Chat view is not ready");
 				return;
 			}
-			const success = await viewModel.approveActivePermission();
+			const success = await bridge.approveActivePermission();
 			if (!success) {
 				new Notice("[Agent Client] No active permission request");
 			}
 		};
 
 		const rejectHandler = async () => {
-			const viewModel = this.viewModel;
-			if (!viewModel) {
+			const bridge = this.chatBridge;
+			if (!bridge) {
 				new Notice("[Agent Client] Chat view is not ready");
 				return;
 			}
-			const success = await viewModel.rejectActivePermission();
+			const success = await bridge.rejectActivePermission();
 			if (!success) {
 				new Notice("[Agent Client] No active permission request");
 			}
@@ -982,14 +926,14 @@ export class ChatView extends ItemView {
 		};
 
 		const toggleAutoMentionHandler = () => {
-			const viewModel = this.viewModel;
-			if (!viewModel) {
+			const bridge = this.chatBridge;
+			if (!bridge) {
 				new Notice("[Agent Client] Chat view is not ready");
 				return;
 			}
-			const currentState = viewModel.getSnapshot();
-			const newState = !currentState.isAutoMentionTemporarilyDisabled;
-			viewModel.toggleAutoMention(newState);
+			const currentState = bridge.getIsAutoMentionDisabled();
+			const newState = !currentState;
+			bridge.toggleAutoMention(newState);
 		};
 
 		this.registerEvent(

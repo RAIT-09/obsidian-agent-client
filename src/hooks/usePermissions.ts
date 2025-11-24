@@ -98,7 +98,8 @@ export function usePermissions(options: UsePermissionsOptions) {
 					sessionHook.setError({
 						title: "Permission Error",
 						message:
-							result.error || "Failed to respond to permission request",
+							result.error ||
+							"Failed to respond to permission request",
 					});
 				}
 			} catch (error) {

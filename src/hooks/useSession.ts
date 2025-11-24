@@ -40,7 +40,10 @@ type SessionAction =
 			type: "SET_AUTH_METHODS";
 			authMethods: AuthenticationMethod[];
 	  }
-	| { type: "SET_AVAILABLE_COMMANDS"; commands: ChatSession["availableCommands"] }
+	| {
+			type: "SET_AVAILABLE_COMMANDS";
+			commands: ChatSession["availableCommands"];
+	  }
 	| { type: "SET_ERROR"; error: ErrorInfo | null }
 	| { type: "SET_SENDING"; isSending: boolean }
 	| { type: "CLEAR_ERROR" }
@@ -82,7 +85,10 @@ function sessionReducer(
 		case "SET_AVAILABLE_COMMANDS":
 			return {
 				...state,
-				session: { ...state.session, availableCommands: action.commands },
+				session: {
+					...state.session,
+					availableCommands: action.commands,
+				},
 			};
 
 		case "SET_ERROR":
@@ -172,9 +178,12 @@ export function useSession(options: UseSessionOptions) {
 		dispatch({ type: "SET_SESSION_ID", sessionId });
 	}, []);
 
-	const setAuthMethods = useCallback((authMethods: AuthenticationMethod[]) => {
-		dispatch({ type: "SET_AUTH_METHODS", authMethods });
-	}, []);
+	const setAuthMethods = useCallback(
+		(authMethods: AuthenticationMethod[]) => {
+			dispatch({ type: "SET_AUTH_METHODS", authMethods });
+		},
+		[],
+	);
 
 	const setAvailableCommands = useCallback(
 		(commands: ChatSession["availableCommands"]) => {

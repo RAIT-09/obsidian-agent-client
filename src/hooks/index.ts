@@ -15,9 +15,21 @@ export { useSession, type UseSessionReturn } from "./useSession";
 export { useSendMessage, type UseSendMessageReturn } from "./useSendMessage";
 export { usePermissions, type UsePermissionsReturn } from "./usePermissions";
 
-// UI state
+// UI state (context-dependent - legacy)
 export { useMentions } from "./useMentions";
 export { useSlashCommands } from "./useSlashCommands";
+
+// UI state (standalone dropdowns)
+export {
+	useMentionsDropdown,
+	type UseMentionsDropdownOptions,
+	type UseMentionsDropdownReturn,
+} from "./useMentionsDropdown";
+export {
+	useSlashCommandsDropdown,
+	type UseSlashCommandsDropdownOptions,
+	type UseSlashCommandsDropdownReturn,
+} from "./useSlashCommandsDropdown";
 
 // Combined chat hook
 export { useChat, type UseChatReturn } from "./useChat";

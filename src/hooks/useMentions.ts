@@ -9,10 +9,7 @@ const { useCallback, useMemo } = React;
 import { usePlugin } from "../contexts";
 import { useChatContext } from "../contexts";
 import { NoteMentionService } from "../adapters/obsidian/mention-service";
-import {
-	detectMention,
-	replaceMention,
-} from "../shared/mention-utils";
+import { detectMention, replaceMention } from "../shared/mention-utils";
 import type { NoteMetadata } from "../types";
 
 /**
@@ -47,7 +44,9 @@ export function useMentions() {
 			}
 
 			// Search for notes matching the query
-			const suggestions = mentionService.searchNotes(mentionContext.query);
+			const suggestions = mentionService.searchNotes(
+				mentionContext.query,
+			);
 			const noteMetadata: NoteMetadata[] = suggestions.map((file) => ({
 				path: file.path,
 				name: file.basename,

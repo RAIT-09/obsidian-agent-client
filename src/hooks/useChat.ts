@@ -11,7 +11,12 @@
 
 import { useMemo, useCallback, useEffect, useState } from "react";
 import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
-import type { ChatMessage, SlashCommand, NoteMetadata } from "../types";
+import type {
+	ChatMessage,
+	SlashCommand,
+	NoteMetadata,
+	PermissionOption,
+} from "../types";
 import type { IAcpClient } from "../adapters/acp/acp.adapter";
 
 import { useMessages } from "./useMessages";
@@ -63,17 +68,28 @@ export function useChat(options: UseChatOptions) {
 	// ========================================
 
 	const messagesHook = useMessages();
-	const { messages, addMessage, updateLastMessage, updateMessage, clearMessages, setLastUserMessage } =
-		messagesHook;
+	const {
+		messages,
+		addMessage,
+		updateLastMessage,
+		updateMessage,
+		clearMessages,
+		setLastUserMessage,
+	} = messagesHook;
 
 	// Get initial agent info
 	const initialAgentId = plugin.settings.activeAgentId;
 	const initialAgentDisplayName = useMemo(() => {
 		const settings = plugin.settings;
-		if (initialAgentId === settings.claude.id) return settings.claude.displayName;
-		if (initialAgentId === settings.codex.id) return settings.codex.displayName;
-		if (initialAgentId === settings.gemini.id) return settings.gemini.displayName;
-		const custom = settings.customAgents.find((a) => a.id === initialAgentId);
+		if (initialAgentId === settings.claude.id)
+			return settings.claude.displayName;
+		if (initialAgentId === settings.codex.id)
+			return settings.codex.displayName;
+		if (initialAgentId === settings.gemini.id)
+			return settings.gemini.displayName;
+		const custom = settings.customAgents.find(
+			(a) => a.id === initialAgentId,
+		);
 		return custom?.displayName || initialAgentId;
 	}, [plugin.settings, initialAgentId]);
 
@@ -84,47 +100,50 @@ export function useChat(options: UseChatOptions) {
 	});
 
 	// Slash commands state (standalone, not using ChatContext)
-	const [availableCommands, setAvailableCommands] = useState<SlashCommand[]>([]);
+	const [availableCommands, setAvailableCommands] = useState<SlashCommand[]>(
+		[],
+	);
 
 	// ========================================
 	// Initialize Adapters and Use Cases (memoized)
 	// ========================================
 
-	const { acpAdapter, vaultAdapter, mentionService, useCases } = useMemo(() => {
-		// Create adapters
-		const mentionSvc = new NoteMentionService(plugin);
-		const vaultAdp = new ObsidianVaultAdapter(plugin);
-		const acpAdp = new AcpAdapter(plugin);
+	const { acpAdapter, vaultAdapter, mentionService, useCases } =
+		useMemo(() => {
+			// Create adapters
+			const mentionSvc = new NoteMentionService(plugin);
+			const vaultAdp = new ObsidianVaultAdapter(plugin);
+			const acpAdp = new AcpAdapter(plugin);
 
-		// Create use cases
-		const sendMessageUC = new SendMessageUseCase(
-			acpAdp,
-			vaultAdp,
-			plugin.settingsStore,
-			mentionSvc,
-		);
-		const manageSessionUC = new ManageSessionUseCase(
-			acpAdp,
-			plugin.settingsStore,
-		);
-		const handlePermissionUC = new HandlePermissionUseCase(
-			acpAdp,
-			plugin.settingsStore,
-		);
-		const switchAgentUC = new SwitchAgentUseCase(plugin.settingsStore);
+			// Create use cases
+			const sendMessageUC = new SendMessageUseCase(
+				acpAdp,
+				vaultAdp,
+				plugin.settingsStore,
+				mentionSvc,
+			);
+			const manageSessionUC = new ManageSessionUseCase(
+				acpAdp,
+				plugin.settingsStore,
+			);
+			const handlePermissionUC = new HandlePermissionUseCase(
+				acpAdp,
+				plugin.settingsStore,
+			);
+			const switchAgentUC = new SwitchAgentUseCase(plugin.settingsStore);
 
-		return {
-			acpAdapter: acpAdp,
-			vaultAdapter: vaultAdp,
-			mentionService: mentionSvc,
-			useCases: {
-				sendMessage: sendMessageUC,
-				manageSession: manageSessionUC,
-				handlePermission: handlePermissionUC,
-				switchAgent: switchAgentUC,
-			},
-		};
-	}, [plugin]);
+			return {
+				acpAdapter: acpAdp,
+				vaultAdapter: vaultAdp,
+				mentionService: mentionSvc,
+				useCases: {
+					sendMessage: sendMessageUC,
+					manageSession: manageSessionUC,
+					handlePermission: handlePermissionUC,
+					switchAgent: switchAgentUC,
+				},
+			};
+		}, [plugin]);
 
 	// Store ACP adapter reference on plugin for external access
 	useEffect(() => {
@@ -170,7 +189,10 @@ export function useChat(options: UseChatOptions) {
 			});
 
 			if (result.success && result.sessionId) {
-				sessionHook.markReady(result.sessionId, result.authMethods || []);
+				sessionHook.markReady(
+					result.sessionId,
+					result.authMethods || [],
+				);
 			} else {
 				sessionHook.setSessionState("error");
 				sessionHook.setError(
@@ -186,7 +208,8 @@ export function useChat(options: UseChatOptions) {
 			sessionHook.setError({
 				title: "Session Creation Failed",
 				message: `Failed to create new session: ${error instanceof Error ? error.message : String(error)}`,
-				suggestion: "Please check the agent configuration and try again.",
+				suggestion:
+					"Please check the agent configuration and try again.",
 			});
 		}
 	}, [useCases, workingDirectory, clearMessages, sessionHook]);
@@ -207,9 +230,42 @@ export function useChat(options: UseChatOptions) {
 	}, [useCases, sessionHook]);
 
 	const disconnect = useCallback(async () => {
-		await useCases.manageSession.closeSession(sessionHook.session.sessionId);
+		await useCases.manageSession.closeSession(
+			sessionHook.session.sessionId,
+		);
 		await useCases.manageSession.disconnect();
 		sessionHook.markDisconnected();
+	}, [useCases, sessionHook]);
+
+	/**
+	 * Restart session - cancel current and create new.
+	 */
+	const restartSession = useCallback(async () => {
+		const { session } = sessionHook;
+		if (session.sessionId) {
+			try {
+				await useCases.manageSession.closeSession(session.sessionId);
+			} catch (error) {
+				console.warn("Failed to close session during restart:", error);
+			}
+		}
+		await createNewSession();
+	}, [useCases, sessionHook, createNewSession]);
+
+	/**
+	 * Dispose - cleanup all resources.
+	 * Called when the view is being closed.
+	 */
+	const dispose = useCallback(async () => {
+		try {
+			const { session } = sessionHook;
+			if (session.sessionId) {
+				await useCases.manageSession.closeSession(session.sessionId);
+			}
+			await useCases.manageSession.disconnect();
+		} catch (error) {
+			console.warn("Error during dispose:", error);
+		}
 	}, [useCases, sessionHook]);
 
 	// ========================================
@@ -294,25 +350,83 @@ export function useChat(options: UseChatOptions) {
 				});
 			}
 		},
-		[useCases, plugin.settings, sessionHook, addMessage, setLastUserMessage],
+		[
+			useCases,
+			plugin.settings,
+			sessionHook,
+			addMessage,
+			setLastUserMessage,
+		],
 	);
 
 	// ========================================
 	// Permission Actions
 	// ========================================
 
+	/**
+	 * Find the active permission request in current messages.
+	 */
+	const findActivePermission = useCallback((): {
+		requestId: string;
+		options: PermissionOption[];
+	} | null => {
+		for (const message of messages) {
+			for (const content of message.content) {
+				if (content.type === "tool_call") {
+					const permission = content.permissionRequest;
+					if (permission?.isActive) {
+						return {
+							requestId: permission.requestId,
+							options: permission.options,
+						};
+					}
+				}
+			}
+		}
+		return null;
+	}, [messages]);
+
+	/**
+	 * Select an option from permission options based on preferred kinds.
+	 */
+	const selectOption = useCallback(
+		(
+			options: PermissionOption[],
+			preferredKinds: PermissionOption["kind"][],
+			fallback?: (option: PermissionOption) => boolean,
+		): PermissionOption | undefined => {
+			for (const kind of preferredKinds) {
+				const match = options.find((opt) => opt.kind === kind);
+				if (match) {
+					return match;
+				}
+			}
+			if (fallback) {
+				const fallbackOption = options.find(fallback);
+				if (fallbackOption) {
+					return fallbackOption;
+				}
+			}
+			return options[0];
+		},
+		[],
+	);
+
 	const approvePermission = useCallback(
 		async (requestId: string, optionId: string) => {
 			try {
-				const result = await useCases.handlePermission.approvePermission({
-					requestId,
-					optionId,
-				});
+				const result =
+					await useCases.handlePermission.approvePermission({
+						requestId,
+						optionId,
+					});
 
 				if (!result.success) {
 					sessionHook.setError({
 						title: "Permission Error",
-						message: result.error || "Failed to respond to permission request",
+						message:
+							result.error ||
+							"Failed to respond to permission request",
 					});
 				}
 			} catch (error) {
@@ -324,6 +438,55 @@ export function useChat(options: UseChatOptions) {
 		},
 		[useCases, sessionHook],
 	);
+
+	/**
+	 * Approve the currently active permission request.
+	 * Selects the first "allow" option.
+	 */
+	const approveActivePermission = useCallback(async (): Promise<boolean> => {
+		const active = findActivePermission();
+		if (!active || active.options.length === 0) {
+			return false;
+		}
+
+		const option = selectOption(active.options, [
+			"allow_once",
+			"allow_always",
+		]);
+
+		if (!option) {
+			return false;
+		}
+
+		await approvePermission(active.requestId, option.optionId);
+		return true;
+	}, [findActivePermission, selectOption, approvePermission]);
+
+	/**
+	 * Reject the currently active permission request.
+	 * Selects the first "reject" option.
+	 */
+	const rejectActivePermission = useCallback(async (): Promise<boolean> => {
+		const active = findActivePermission();
+		if (!active || active.options.length === 0) {
+			return false;
+		}
+
+		const option = selectOption(
+			active.options,
+			["reject_once", "reject_always"],
+			(opt) =>
+				opt.name.toLowerCase().includes("reject") ||
+				opt.name.toLowerCase().includes("deny"),
+		);
+
+		if (!option) {
+			return false;
+		}
+
+		await approvePermission(active.requestId, option.optionId);
+		return true;
+	}, [findActivePermission, selectOption, approvePermission]);
 
 	// ========================================
 	// Agent Actions
@@ -364,8 +527,10 @@ export function useChat(options: UseChatOptions) {
 
 		// Session actions
 		createNewSession,
+		restartSession,
 		cancelCurrentOperation,
 		disconnect,
+		dispose,
 
 		// Message actions
 		sendMessage,
@@ -376,6 +541,8 @@ export function useChat(options: UseChatOptions) {
 
 		// Permission actions
 		approvePermission,
+		approveActivePermission,
+		rejectActivePermission,
 
 		// Agent actions
 		switchAgent,

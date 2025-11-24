@@ -229,7 +229,8 @@ export function useMessages() {
 			// Check if message exists before dispatching
 			const exists = state.messages.some((msg) =>
 				msg.content.some(
-					(c) => c.type === "tool_call" && c.toolCallId === toolCallId,
+					(c) =>
+						c.type === "tool_call" && c.toolCallId === toolCallId,
 				),
 			);
 

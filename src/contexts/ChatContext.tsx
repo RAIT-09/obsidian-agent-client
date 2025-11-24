@@ -154,9 +154,12 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
 			return {
 				...state,
 				showMentionDropdown: action.show,
-				mentionSuggestions: action.suggestions ?? state.mentionSuggestions,
+				mentionSuggestions:
+					action.suggestions ?? state.mentionSuggestions,
 				currentMentionQuery: action.query ?? state.currentMentionQuery,
-				selectedMentionIndex: action.show ? 0 : state.selectedMentionIndex,
+				selectedMentionIndex: action.show
+					? 0
+					: state.selectedMentionIndex,
 			};
 
 		case "SET_MENTION_INDEX":
@@ -188,7 +191,10 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
 			};
 
 		case "SET_AUTO_MENTION_DISABLED":
-			return { ...state, isAutoMentionTemporarilyDisabled: action.disabled };
+			return {
+				...state,
+				isAutoMentionTemporarilyDisabled: action.disabled,
+			};
 
 		case "RESET_STATE":
 			return createInitialState(state.session.agentId);
