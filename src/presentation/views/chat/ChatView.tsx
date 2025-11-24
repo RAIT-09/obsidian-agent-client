@@ -45,6 +45,7 @@ import { useMentions } from "../../../hooks/useMentions";
 import { useSlashCommands } from "../../../hooks/useSlashCommands";
 import { useAutoMention } from "../../../hooks/useAutoMention";
 import { useAgentSession } from "../../../hooks/useAgentSession";
+import { useChat } from "../../../hooks/useChat";
 
 // ViewModel imports
 import { ChatViewModel } from "../../../adapters/view-models/chat.view-model";
@@ -172,6 +173,28 @@ function ChatComponent({
 		vaultPath,
 	);
 
+	// Session state from useAgentSession hook (needed for useChat)
+	const {
+		session,
+		errorInfo: sessionErrorInfo,
+		isReady: isSessionReady,
+	} = agentSession;
+
+	// Create useChat hook for message management
+	const chat = useChat(
+		sendMessageUseCase,
+		{
+			sessionId: session.sessionId,
+			authMethods: session.authMethods,
+		},
+		{
+			windowsWslMode: settings.windowsWslMode,
+		},
+	);
+
+	// Combined error info (session errors take precedence)
+	const errorInfo = sessionErrorInfo || chat.errorInfo;
+
 	// Create ChatViewModel
 	const viewModel = useMemo(() => {
 		return new ChatViewModel(
@@ -202,57 +225,43 @@ function ChatComponent({
 	}, [view, viewModel]);
 
 	// Set AcpAdapter callbacks
-	// Message callbacks go to ViewModel, session callbacks go to useAgentSession
+	// Message callbacks go to useChat, session callbacks go to useAgentSession
 	useEffect(() => {
 		acpAdapter.setMessageCallbacks(
-			viewModel.addMessage,
-			viewModel.updateLastMessage,
-			viewModel.updateMessage,
+			chat.addMessage,
+			chat.updateLastMessage,
+			chat.updateMessage,
 			agentSession.updateAvailableCommands,
 		);
-	}, [acpAdapter, viewModel, agentSession.updateAvailableCommands]);
+	}, [
+		acpAdapter,
+		chat.addMessage,
+		chat.updateLastMessage,
+		chat.updateMessage,
+		agentSession.updateAvailableCommands,
+	]);
 
-	// Subscribe to ViewModel state
+	// Subscribe to ViewModel state (only for permission handling now)
 	const vmState = useSyncExternalStore(
 		viewModel.subscribe,
 		viewModel.getSnapshot,
 		viewModel.getSnapshot,
 	);
 
-	// Extract state from ViewModel for easier access
-	const messages = vmState.messages;
-	const isSendingFromVM = vmState.isSending;
+	// Message state from useChat hook
+	const { messages, isSending } = chat;
 
-	// Session state from useAgentSession hook
-	const { session, errorInfo, isReady: isSessionReady } = agentSession;
-
-	// Sync session state from useAgentSession to ViewModel
-	// This is a temporary bridge during the refactoring process
+	// Sync messages from useChat to ViewModel for permission handling
+	// This is a temporary bridge - permission handling will move to a hook later
 	useEffect(() => {
-		viewModel.syncSessionState({
-			sessionId: session.sessionId,
-			state: session.state,
-			agentId: session.agentId,
-			agentDisplayName: session.agentDisplayName,
-			authMethods: session.authMethods,
-		});
-	}, [
-		viewModel,
-		session.sessionId,
-		session.state,
-		session.agentId,
-		session.agentDisplayName,
-		session.authMethods,
-	]);
+		viewModel.syncMessages(messages);
+	}, [viewModel, messages]);
 
 	// Slash command dropdown via useSlashCommands hook
 	const slashCommands = useSlashCommands(
 		session.availableCommands || [],
 		autoMention.toggle,
 	);
-
-	// Helper to check if agent is currently processing a request
-	const isSending = isSendingFromVM; // Use ViewModel state
 
 	const getActiveAgentLabel = () => {
 		const activeId = session.agentId;
@@ -546,13 +555,14 @@ function ChatComponent({
 		logger.log("[Debug] Creating new session via useAgentSession...");
 		setInputValue("");
 		autoMention.toggle(false);
+		chat.clearMessages(); // Clear messages before restarting session
 		await agentSession.restartSession();
 	};
 
 	const handleStopGeneration = async () => {
 		logger.log("Cancelling current operation...");
 		// Get last user message before cancel (to restore it)
-		const lastMessage = viewModel.getSnapshot().lastUserMessage;
+		const lastMessage = chat.lastUserMessage;
 		await agentSession.cancelOperation();
 
 		// Restore the last user message to input field
@@ -562,7 +572,7 @@ function ChatComponent({
 	};
 
 	const handleSendMessage = async () => {
-		if (!inputValue.trim() || isSendingFromVM) return;
+		if (!inputValue.trim() || isSending) return;
 
 		// Save input value before clearing
 		const messageToSend = inputValue;
@@ -573,8 +583,8 @@ function ChatComponent({
 		setCommandText("");
 		setIsAtBottom(true);
 
-		// Send message via ViewModel
-		await viewModel.sendMessage(messageToSend, {
+		// Send message via useChat hook
+		await chat.sendMessage(messageToSend, {
 			activeNote: autoMention.activeNote,
 			vaultBasePath:
 				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
@@ -775,7 +785,7 @@ function ChatComponent({
 							</p>
 						)}
 						<button
-							onClick={() => viewModel.clearError()}
+							onClick={() => chat.clearError()}
 							className="chat-error-button"
 						>
 							OK

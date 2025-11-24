@@ -796,30 +796,17 @@ export class ChatViewModel {
 	};
 
 	/**
-	 * Sync session state from external source (useAgentSession hook).
+	 * Sync messages from external source (useChat hook).
 	 *
 	 * This is a temporary bridge during the refactoring process.
-	 * Eventually, all session state management will move to hooks.
+	 * Permission handling needs access to messages to find active permissions.
+	 * Eventually, permission handling will also move to a hook.
 	 *
-	 * @param sessionState - Session state from useAgentSession
+	 * @param messages - Messages from useChat
 	 */
-	syncSessionState = (sessionState: {
-		sessionId: string | null;
-		state: SessionState;
-		agentId: string;
-		agentDisplayName: string;
-		authMethods?: import("../../core/domain/models/chat-session").AuthenticationMethod[];
-	}): void => {
+	syncMessages = (messages: ChatMessage[]): void => {
 		this.setState({
-			session: {
-				...this.state.session,
-				sessionId: sessionState.sessionId,
-				state: sessionState.state,
-				agentId: sessionState.agentId,
-				agentDisplayName: sessionState.agentDisplayName,
-				authMethods:
-					sessionState.authMethods || this.state.session.authMethods,
-			},
+			messages,
 		});
 	};
 
