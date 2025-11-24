@@ -6,7 +6,7 @@
  * on the specific implementation (e.g., Obsidian's data.json storage).
  */
 
-import type { AgentClientPluginSettings } from "../../../infrastructure/obsidian-plugin/plugin";
+import type { AgentClientPluginSettings } from "../../plugin";
 
 /**
  * Interface for accessing and managing plugin settings.

@@ -1,8 +1,8 @@
-import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../plugin";
 import type {
 	ChatMessage,
 	MessageContent,
-} from "../core/domain/models/chat-message";
+} from "../domain/models/chat-message";
 import { Logger } from "./logger";
 import { TFile } from "obsidian";
 

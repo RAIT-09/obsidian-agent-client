@@ -1,7 +1,7 @@
 import * as React from "react";
 const { useRef, useEffect } = React;
 import { MarkdownRenderer } from "obsidian";
-import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../../plugin";
 
 interface MarkdownTextRendererProps {
 	text: string;

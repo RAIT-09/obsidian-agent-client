@@ -1,10 +1,10 @@
 import { spawn, ChildProcess, SpawnOptions } from "child_process";
 import * as acp from "@agentclientprotocol/sdk";
-import type AgentClientPlugin from "../obsidian-plugin/plugin";
-import { Logger } from "../../shared/logger";
+import type AgentClientPlugin from "../plugin";
+import { Logger } from "./logger";
 import { Platform } from "obsidian";
-import { wrapCommandForWsl } from "../../shared/wsl-utils";
-import { resolveCommandDirectory } from "../../shared/path-utils";
+import { wrapCommandForWsl } from "./wsl-utils";
+import { resolveCommandDirectory } from "./path-utils";
 
 interface TerminalProcess {
 	id: string;

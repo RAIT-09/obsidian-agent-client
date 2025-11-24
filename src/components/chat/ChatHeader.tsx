@@ -1,5 +1,5 @@
 import * as React from "react";
-import { HeaderButton } from "../shared/HeaderButton";
+import { HeaderButton } from "./HeaderButton";
 
 /**
  * Props for ChatHeader component

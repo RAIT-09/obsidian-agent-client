@@ -1,5 +1,5 @@
 import * as React from "react";
-import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../../plugin";
 
 interface TextWithMentionsProps {
 	text: string;

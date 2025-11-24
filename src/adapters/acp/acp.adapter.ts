@@ -8,18 +8,18 @@ import type {
 	InitializeResult,
 	NewSessionResult,
 	PermissionRequest,
-} from "../../core/domain/ports/agent-client.port";
+} from "../../domain/ports/agent-client.port";
 import type {
 	ChatMessage,
 	MessageContent,
 	PermissionOption,
-} from "../../core/domain/models/chat-message";
-import type { AgentError } from "../../core/domain/models/agent-error";
+} from "../../domain/models/chat-message";
+import type { AgentError } from "../../domain/models/agent-error";
 import { AcpTypeConverter } from "./acp-type-converter";
-import { TerminalManager } from "../../infrastructure/terminal/terminal-manager";
+import { TerminalManager } from "../../shared/terminal-manager";
 import { Logger } from "../../shared/logger";
-import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
-import type { SlashCommand } from "src/core/domain/models/chat-session";
+import type AgentClientPlugin from "../../plugin";
+import type { SlashCommand } from "src/domain/models/chat-session";
 import {
 	wrapCommandForWsl,
 	convertWindowsPathToWsl,

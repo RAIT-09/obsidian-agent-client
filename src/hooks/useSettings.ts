@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../plugin";
 
 /**
  * Hook for subscribing to plugin settings changes.

@@ -2,12 +2,12 @@ import { useState, useCallback, useMemo } from "react";
 import type {
 	ChatMessage,
 	MessageContent,
-} from "../core/domain/models/chat-message";
-import type { IAgentClient } from "../core/domain/ports/agent-client.port";
-import type { IVaultAccess } from "../core/domain/ports/vault-access.port";
-import type { NoteMetadata } from "../core/domain/ports/vault-access.port";
-import type { AuthenticationMethod } from "../core/domain/models/chat-session";
-import type { ErrorInfo } from "../core/domain/models/agent-error";
+} from "../domain/models/chat-message";
+import type { IAgentClient } from "../domain/ports/agent-client.port";
+import type { IVaultAccess } from "../domain/ports/vault-access.port";
+import type { NoteMetadata } from "../domain/ports/vault-access.port";
+import type { AuthenticationMethod } from "../domain/models/chat-session";
+import type { ErrorInfo } from "../domain/models/agent-error";
 import type { IMentionService } from "../shared/mention-utils";
 import { prepareMessage, sendPreparedMessage } from "../shared/message-service";
 import { Platform } from "obsidian";

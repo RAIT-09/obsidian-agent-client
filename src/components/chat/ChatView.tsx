@@ -3,33 +3,33 @@ import * as React from "react";
 const { useState, useRef, useEffect, useMemo, useCallback } = React;
 import { createRoot, Root } from "react-dom/client";
 
-import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../../plugin";
 
 // Component imports
-import { ChatHeader } from "../../components/chat/ChatHeader";
-import { ChatMessages } from "../../components/chat/ChatMessages";
-import { ChatInput } from "../../components/chat/ChatInput";
+import { ChatHeader } from "./ChatHeader";
+import { ChatMessages } from "./ChatMessages";
+import { ChatInput } from "./ChatInput";
 
 // Service imports
-import { NoteMentionService } from "../../../adapters/obsidian/mention-service";
+import { NoteMentionService } from "../../adapters/obsidian/mention-service";
 
 // Utility imports
-import { Logger } from "../../../shared/logger";
-import { ChatExporter } from "../../../shared/chat-exporter";
+import { Logger } from "../../shared/logger";
+import { ChatExporter } from "../../shared/chat-exporter";
 
 // Adapter imports
-import { AcpAdapter, type IAcpClient } from "../../../adapters/acp/acp.adapter";
-import { ObsidianVaultAdapter } from "../../../adapters/obsidian/vault.adapter";
+import { AcpAdapter, type IAcpClient } from "../../adapters/acp/acp.adapter";
+import { ObsidianVaultAdapter } from "../../adapters/obsidian/vault.adapter";
 
 // Hooks imports
-import { useSettings } from "../../../hooks/useSettings";
-import { useMentions } from "../../../hooks/useMentions";
-import { useSlashCommands } from "../../../hooks/useSlashCommands";
-import { useAutoMention } from "../../../hooks/useAutoMention";
-import { useAgentSession } from "../../../hooks/useAgentSession";
-import { useChat } from "../../../hooks/useChat";
-import { usePermission } from "../../../hooks/usePermission";
-import { useAutoExport } from "../../../hooks/useAutoExport";
+import { useSettings } from "../../hooks/useSettings";
+import { useMentions } from "../../hooks/useMentions";
+import { useSlashCommands } from "../../hooks/useSlashCommands";
+import { useAutoMention } from "../../hooks/useAutoMention";
+import { useAgentSession } from "../../hooks/useAgentSession";
+import { useChat } from "../../hooks/useChat";
+import { usePermission } from "../../hooks/usePermission";
+import { useAutoExport } from "../../hooks/useAutoExport";
 
 // Type definitions for Obsidian internal APIs
 interface VaultAdapterWithBasePath {

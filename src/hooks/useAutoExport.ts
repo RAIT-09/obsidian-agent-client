@@ -1,10 +1,10 @@
 import { useCallback, useRef } from "react";
-import type { ChatMessage } from "../core/domain/models/chat-message";
-import type { ChatSession } from "../core/domain/models/chat-session";
+import type { ChatMessage } from "../domain/models/chat-message";
+import type { ChatSession } from "../domain/models/chat-session";
 import { ChatExporter } from "../shared/chat-exporter";
 import { Logger } from "../shared/logger";
 import { Notice } from "obsidian";
-import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../plugin";
 
 // ============================================================================
 // Types

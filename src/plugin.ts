@@ -2,25 +2,25 @@ import { Plugin, WorkspaceLeaf, Notice, requestUrl } from "obsidian";
 import {
 	ChatView,
 	VIEW_TYPE_CHAT,
-} from "../../presentation/views/chat/ChatView";
+} from "./components/chat/ChatView";
 import {
 	createSettingsStore,
 	type SettingsStore,
-} from "../../adapters/obsidian/settings-store.adapter";
-import { AgentClientSettingTab } from "../../presentation/components/settings/AgentClientSettingTab";
+} from "./adapters/obsidian/settings-store.adapter";
+import { AgentClientSettingTab } from "./components/settings/AgentClientSettingTab";
 import {
 	sanitizeArgs,
 	normalizeEnvVars,
 	normalizeCustomAgent,
 	ensureUniqueCustomAgentIds,
-} from "../../shared/settings-utils";
+} from "./shared/settings-utils";
 import {
 	AgentEnvVar,
 	GeminiAgentSettings,
 	ClaudeAgentSettings,
 	CodexAgentSettings,
 	CustomAgentSettings,
-} from "../../core/domain/models/agent-config";
+} from "./domain/models/agent-config";
 
 // Re-export for backward compatibility
 export type { AgentEnvVar, CustomAgentSettings };
@@ -94,7 +94,7 @@ export default class AgentClientPlugin extends Plugin {
 	settingsStore!: SettingsStore;
 
 	// Active ACP adapter instance (shared across use cases)
-	acpAdapter: import("../../adapters/acp/acp.adapter").AcpAdapter | null =
+	acpAdapter: import("./adapters/acp/acp.adapter").AcpAdapter | null =
 		null;
 
 	async onload() {

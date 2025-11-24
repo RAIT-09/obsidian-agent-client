@@ -1,7 +1,7 @@
 import * as React from "react";
-import type { MessageContent } from "../../../core/domain/models/chat-message";
-import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
-import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
+import type { MessageContent } from "../../domain/models/chat-message";
+import type { IAcpClient } from "../../adapters/acp/acp.adapter";
+import type AgentClientPlugin from "../../plugin";
 import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 import { CollapsibleThought } from "./CollapsibleThought";
 import { TerminalRenderer } from "./TerminalRenderer";

@@ -1,5 +1,5 @@
 import * as acp from "@agentclientprotocol/sdk";
-import type { ToolCallContent } from "../../core/domain/models/chat-message";
+import type { ToolCallContent } from "../../domain/models/chat-message";
 
 /**
  * Type converter between ACP Protocol types and Domain types.

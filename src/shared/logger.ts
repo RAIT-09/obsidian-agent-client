@@ -1,4 +1,4 @@
-import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../plugin";
 
 export class Logger {
 	constructor(private plugin: AgentClientPlugin) {}

@@ -2,9 +2,9 @@ import { useState, useCallback, useMemo } from "react";
 import type {
 	ChatMessage,
 	PermissionOption,
-} from "../core/domain/models/chat-message";
-import type { IAgentClient } from "../core/domain/ports/agent-client.port";
-import type { ErrorInfo } from "../core/domain/models/agent-error";
+} from "../domain/models/chat-message";
+import type { IAgentClient } from "../domain/ports/agent-client.port";
+import type { ErrorInfo } from "../domain/models/agent-error";
 
 // ============================================================================
 // Types

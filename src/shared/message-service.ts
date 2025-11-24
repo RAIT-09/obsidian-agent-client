@@ -12,14 +12,14 @@
  * - Handle authentication errors with retry logic
  */
 
-import type { IAgentClient } from "../core/domain/ports/agent-client.port";
+import type { IAgentClient } from "../domain/ports/agent-client.port";
 import type {
 	IVaultAccess,
 	NoteMetadata,
 	EditorPosition,
-} from "../core/domain/ports/vault-access.port";
-import type { AgentError } from "../core/domain/models/agent-error";
-import type { AuthenticationMethod } from "../core/domain/models/chat-session";
+} from "../domain/ports/vault-access.port";
+import type { AgentError } from "../domain/models/agent-error";
+import type { AuthenticationMethod } from "../domain/models/chat-session";
 import {
 	extractMentionedNotes,
 	type IMentionService,

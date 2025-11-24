@@ -2,13 +2,13 @@ import { useState, useCallback } from "react";
 import type {
 	NoteMetadata,
 	IVaultAccess,
-} from "../core/domain/ports/vault-access.port";
+} from "../domain/ports/vault-access.port";
 import {
 	detectMention,
 	replaceMention,
 	type MentionContext,
 } from "../shared/mention-utils";
-import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../plugin";
 
 export interface UseMentionsReturn {
 	/** Note suggestions matching the current mention query */

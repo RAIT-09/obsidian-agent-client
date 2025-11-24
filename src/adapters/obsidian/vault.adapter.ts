@@ -10,9 +10,9 @@ import type {
 	IVaultAccess,
 	NoteMetadata,
 	EditorPosition,
-} from "../../core/domain/ports/vault-access.port";
+} from "../../domain/ports/vault-access.port";
 import { NoteMentionService } from "./mention-service";
-import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../../plugin";
 import {
 	TFile,
 	MarkdownView,

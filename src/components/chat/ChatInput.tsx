@@ -2,15 +2,15 @@ import * as React from "react";
 const { useRef, useState, useEffect, useCallback, useMemo } = React;
 import { setIcon } from "obsidian";
 
-import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
-import type { ChatView } from "../../views/chat/ChatView";
-import type { NoteMetadata } from "../../../core/domain/ports/vault-access.port";
-import type { SlashCommand } from "../../../core/domain/models/chat-session";
-import type { UseMentionsReturn } from "../../../hooks/useMentions";
-import type { UseSlashCommandsReturn } from "../../../hooks/useSlashCommands";
-import type { UseAutoMentionReturn } from "../../../hooks/useAutoMention";
+import type AgentClientPlugin from "../../plugin";
+import type { ChatView } from "./ChatView";
+import type { NoteMetadata } from "../../domain/ports/vault-access.port";
+import type { SlashCommand } from "../../domain/models/chat-session";
+import type { UseMentionsReturn } from "../../hooks/useMentions";
+import type { UseSlashCommandsReturn } from "../../hooks/useSlashCommands";
+import type { UseAutoMentionReturn } from "../../hooks/useAutoMention";
 import { SuggestionDropdown } from "./SuggestionDropdown";
-import { Logger } from "../../../shared/logger";
+import { Logger } from "../../shared/logger";
 
 /**
  * Props for ChatInput component

@@ -1,8 +1,8 @@
 import * as React from "react";
 const { useState, useRef, useEffect, useMemo } = React;
-import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
-import { Logger } from "../../../shared/logger";
-import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
+import type { IAcpClient } from "../../adapters/acp/acp.adapter";
+import { Logger } from "../../shared/logger";
+import type AgentClientPlugin from "../../plugin";
 
 interface TerminalRendererProps {
 	terminalId: string;

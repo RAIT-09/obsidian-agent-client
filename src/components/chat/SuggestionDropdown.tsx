@@ -1,10 +1,10 @@
 import * as React from "react";
 const { useRef, useEffect, useMemo } = React;
-import { Logger } from "../../../shared/logger";
-import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
-import type { ChatView } from "../../views/chat/ChatView";
-import type { NoteMetadata } from "../../../core/domain/ports/vault-access.port";
-import type { SlashCommand } from "../../../core/domain/models/chat-session";
+import { Logger } from "../../shared/logger";
+import type AgentClientPlugin from "../../plugin";
+import type { ChatView } from "./ChatView";
+import type { NoteMetadata } from "../../domain/ports/vault-access.port";
+import type { SlashCommand } from "../../domain/models/chat-session";
 
 /**
  * Dropdown type for suggestion display.

@@ -1,6 +1,6 @@
 import * as React from "react";
 const { useState } = React;
-import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../../plugin";
 import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 
 interface CollapsibleThoughtProps {

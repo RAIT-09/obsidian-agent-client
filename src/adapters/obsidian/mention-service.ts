@@ -1,5 +1,5 @@
 import { TFile, prepareFuzzySearch } from "obsidian";
-import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../../plugin";
 import { Logger } from "../../shared/logger";
 
 // Note mention service for @-mention functionality
