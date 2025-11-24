@@ -1,10 +1,11 @@
 import * as React from "react";
-const { useState } = React;
+const { useState, useMemo } = React;
 import type { MessageContent } from "../../domain/models/chat-message";
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../plugin";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { PermissionRequestSection } from "./PermissionRequestSection";
+import { toRelativePath } from "../../shared/path-utils";
 // import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 
 interface ToolCallRendererProps {
@@ -30,7 +31,7 @@ export function ToolCallRenderer({
 		status,
 		toolCallId,
 		permissionRequest,
-		// locations,
+		locations,
 		// rawInput,
 		content: toolContent,
 	} = content;
@@ -46,6 +47,12 @@ export function ToolCallRenderer({
 			setSelectedOptionId(permissionRequest?.selectedOptionId);
 		}
 	}, [permissionRequest?.selectedOptionId]);
+
+	// Get vault path for relative path display
+	const vaultPath = useMemo(() => {
+		const adapter = plugin.app.vault.adapter as { basePath?: string };
+		return adapter.basePath || "";
+	}, [plugin]);
 
 	// Get icon based on kind
 	const getKindIcon = (kind?: string) => {
@@ -83,6 +90,19 @@ export function ToolCallRenderer({
 					</span>
 					{title}
 				</div>
+				{locations && locations.length > 0 && (
+					<div className="message-tool-call-locations">
+						{locations.map((loc, idx) => (
+							<span
+								key={idx}
+								className="message-tool-call-location"
+							>
+								{toRelativePath(loc.path, vaultPath)}
+								{loc.line != null && `:${loc.line}`}
+							</span>
+						))}
+					</div>
+				)}
 				<div className="message-tool-call-status">Status: {status}</div>
 			</div>
 

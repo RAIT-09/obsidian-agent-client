@@ -150,6 +150,20 @@ If your plugin does not need CSS, delete this file.
 	word-break: break-word;
 }
 
+.message-tool-call-locations {
+	color: var(--text-muted);
+	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
+}
+
+.message-tool-call-location {
+	display: block;
+	font-family: var(--font-monospace);
+	font-size: 0.9em;
+}
+
 .message-tool-call-status {
 	color: var(--text-muted);
 	user-select: text;

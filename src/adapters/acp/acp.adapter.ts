@@ -865,6 +865,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					status: update.status || "pending",
 					kind: update.kind,
 					content: AcpTypeConverter.toToolCallContent(update.content),
+					locations: update.locations ?? undefined,
 				});
 
 				// Create new message only if no existing tool call was found
@@ -882,6 +883,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 								content: AcpTypeConverter.toToolCallContent(
 									update.content,
 								),
+								locations: update.locations ?? undefined,
 							},
 						],
 						timestamp: new Date(),
@@ -902,6 +904,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					status: update.status || "pending",
 					kind: update.kind || undefined,
 					content: AcpTypeConverter.toToolCallContent(update.content),
+					locations: update.locations ?? undefined,
 				});
 				break;
 
