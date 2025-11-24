@@ -18,3 +18,6 @@ export { usePermissions, type UsePermissionsReturn } from "./usePermissions";
 // UI state
 export { useMentions } from "./useMentions";
 export { useSlashCommands } from "./useSlashCommands";
+
+// Combined chat hook
+export { useChat, type UseChatReturn } from "./useChat";
