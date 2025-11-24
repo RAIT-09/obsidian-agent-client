@@ -1,70 +1,66 @@
 # Agent Client Plugin - LLM Developer Guide
 
 ## Overview
-Obsidian plugin for AI agent interaction (Claude Code, Gemini CLI, custom agents). **Clean Architecture** (5 layers): Presentation → Adapters → Use Cases → Domain ← Infrastructure.
+Obsidian plugin for AI agent interaction (Claude Code, Gemini CLI, custom agents). **React Hooks Architecture**.
 
 **Tech**: React 19, TypeScript, Obsidian API, Agent Client Protocol (ACP)
 
 ## Architecture
 
-**Dependency Flow**: Inward only. Core domain has zero external dependencies.
-
 ```
 src/
-├── core/domain/              # Pure domain models + ports (interfaces)
+├── domain/                   # Pure domain models + ports (interfaces)
 │   ├── models/               # agent-config, agent-error, chat-message, chat-session
 │   └── ports/                # IAgentClient, ISettingsAccess, IVaultAccess
-├── core/use-cases/           # Business logic
-│   ├── handle-permission.use-case.ts
-│   ├── manage-session.use-case.ts
-│   ├── send-message.use-case.ts
-│   └── switch-agent.use-case.ts
 ├── adapters/                 # Interface implementations
 │   ├── acp/                  # ACP protocol (acp.adapter.ts, acp-type-converter.ts)
-│   ├── obsidian/             # Platform adapters (vault, settings, mention-service)
-│   └── view-models/          # chat.view-model.ts (MVVM)
-├── infrastructure/           # External frameworks
-│   ├── obsidian-plugin/      # plugin.ts (lifecycle, persistence)
-│   └── terminal/             # terminal-manager.ts
-├── presentation/             # UI layer
-│   ├── views/chat/           # ChatView.tsx (DI container + rendering)
-│   └── components/           # chat/, settings/, shared/
-└── shared/                   # Utilities (logger, exporter, mention-utils, settings-utils)
+│   └── obsidian/             # Platform adapters (vault, settings, mention-service)
+├── hooks/                    # React custom hooks (state + logic)
+│   ├── useAgentSession.ts    # Session lifecycle, agent switching
+│   ├── useChat.ts            # Message sending, callbacks
+│   ├── usePermission.ts      # Permission handling
+│   ├── useMentions.ts        # @[[note]] suggestions
+│   ├── useSlashCommands.ts   # /command suggestions
+│   ├── useAutoMention.ts     # Auto-mention active note
+│   ├── useAutoExport.ts      # Auto-export on new/close
+│   └── useSettings.ts        # Settings subscription
+├── components/               # UI components
+│   ├── chat/                 # ChatView, ChatHeader, ChatMessages, ChatInput, etc.
+│   └── settings/             # AgentClientSettingTab
+├── shared/                   # Utilities
+│   ├── message-service.ts    # prepareMessage, sendPreparedMessage (pure functions)
+│   ├── terminal-manager.ts   # Process spawn, stdout/stderr capture
+│   ├── logger.ts, chat-exporter.ts, mention-utils.ts, etc.
+├── plugin.ts                 # Obsidian plugin lifecycle, settings persistence
+└── main.ts                   # Entry point
 ```
 
 ## Key Components
 
-### ChatView (`presentation/views/chat/ChatView.tsx`)
-- **DI Container**: Instantiates Use Cases, Adapters, ViewModel via useMemo
-- **Rendering**: Uses useSyncExternalStore for ViewModel state
-- **No Business Logic**: Pure UI component
+### ChatView (`components/chat/ChatView.tsx`)
+- **Hook Composition**: Combines all hooks (useAgentSession, useChat, usePermission, etc.)
+- **Adapter Instantiation**: Creates AcpAdapter, VaultAdapter, MentionService via useMemo
+- **Rendering**: Delegates to ChatHeader, ChatMessages, ChatInput
 
-### ChatViewModel (`adapters/view-models/chat.view-model.ts`)
-- **State**: messages, session, errorInfo, isSending, mention dropdown, slash command dropdown
-- **Methods** (27): Session mgmt, messaging, permissions, agent switching, mentions, slash commands
-- **Delegates**: All logic to Use Cases
-- **Callbacks**: addMessage, updateLastMessage, updateMessage, updateAvailableCommands (from AcpAdapter)
+### Hooks (`hooks/`)
 
-### Use Cases (`core/use-cases/`)
-
-**SendMessageUseCase**:
-- `prepareMessage()`: Sync - auto-mention, convert @[[note]] → paths
-- `sendPreparedMessage()`: Async - send via IAgentClient, auth retry
-- Error handling: Ignore "empty response text", auto-retry auth failures
-
-**ManageSessionUseCase**:
+**useAgentSession**: Session lifecycle
 - `createSession()`: Load config, inject API keys, initialize + newSession
-- `restartSession()`: Cancel old, create new
-- `closeSession()`: Call IAgentClient.cancel()
+- `switchAgent()`: Change active agent, restart session
+- `closeSession()`: Cancel session, disconnect
 
-**HandlePermissionUseCase**:
-- `approvePermission()`: Respond with selected option
-- `shouldAutoApprove()`: Check settings.autoAllowPermissions
-- `getAutoApproveOption()`: Select first allow_once/allow_always
+**useChat**: Messaging
+- `sendMessage()`: Prepare (auto-mention, path conversion) → send via IAgentClient
+- `handleNewChat()`: Export if enabled, restart session
+- Callbacks: addMessage, updateLastMessage, updateMessage
 
-**SwitchAgentUseCase**:
-- `switchAgent()`: Update settings.activeAgentId
-- `getAvailableAgents()`: Return claude, gemini, custom agents
+**usePermission**: Permission handling
+- `handlePermissionResponse()`: Respond with selected option
+- Auto-approve logic based on settings
+
+**useMentions / useSlashCommands**: Input suggestions
+- Dropdown state management
+- Selection handlers
 
 ### AcpAdapter (`adapters/acp/acp.adapter.ts`)
 Implements IAgentClient + IAcpClient (terminal ops)
@@ -72,47 +68,20 @@ Implements IAgentClient + IAcpClient (terminal ops)
 - **Process**: spawn() with login shell (macOS/Linux -l, Windows shell:true)
 - **Protocol**: JSON-RPC over stdin/stdout via ndJsonStream
 - **Flow**: initialize() → newSession() → sendMessage() → sessionUpdate() callbacks
-- **Callbacks**: setMessageCallbacks() wires to ViewModel
 - **Updates**: agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan, available_commands_update
 - **Permissions**: Promise-based Map<requestId, resolver>
 - **Terminal**: createTerminal, terminalOutput, killTerminal, releaseTerminal
 
-### Obsidian Adapters
+### Obsidian Adapters (`adapters/obsidian/`)
 
-**VaultAdapter**: IVaultAccess - searchNotes (fuzzy via NoteMentionService), getActiveNote, readNote
-**SettingsStore**: ISettingsAccess - Observer pattern, getSnapshot(), subscribe(), updateSettings()
-**MentionService**: File index, fuzzy search (basename, path, frontmatter aliases)
+**VaultAdapter**: IVaultAccess - searchNotes (fuzzy), getActiveNote, readNote
+**SettingsStore**: ISettingsAccess - Observer pattern, getSnapshot(), subscribe()
+**MentionService**: File index, fuzzy search (basename, path, aliases)
 
-### Terminal Manager (`infrastructure/terminal/terminal-manager.ts`)
-- spawn(), capture stdout/stderr (10MB limit), track exit codes
-- killTerminal(): SIGTERM → wait → SIGKILL
-
-### Mention System
-
-**Flow**:
-1. User types `@` → ChatViewModel.updateMentionSuggestions()
-2. detectMention() finds cursor context
-3. IVaultAccess.searchNotes() → fuzzy search
-4. Display SuggestionDropdown (type: "mention")
-5. User selects → replaceMention() → convertMentionsToPath()
-
-**Syntax**: `@[[note name]]` → `/absolute/path/to/note name.md`
-
-### Slash Command System
-
-**Flow**:
-1. User types `/` at start → ChatViewModel.updateSlashCommandSuggestions()
-2. Filter availableCommands by query after `/`
-3. Display SuggestionDropdown (type: "slash-command")
-4. User selects → Insert command, show hint overlay if command has hint
-5. Auto-mention temporarily disabled (ACP requires `/` at message start)
-
-**Features**:
-- **Hint Overlay**: Visual hint displayed using invisible span for precise alignment
-- **Auto-mention Disable**: Prevents auto-mention from interfering with slash command recognition
-- **Dropdown Reuse**: SuggestionDropdown component handles both mentions and slash commands
-
-**ACP Integration**: Receives `available_commands_update` notification with command metadata (name, description, hint)
+### Message Service (`shared/message-service.ts`)
+Pure functions (non-React):
+- `prepareMessage()`: Auto-mention, convert @[[note]] → paths
+- `sendPreparedMessage()`: Send via IAgentClient, auth retry
 
 ## Ports (Interfaces)
 
@@ -146,11 +115,11 @@ interface ISettingsAccess {
 
 ## Development Rules
 
-### Clean Architecture
-1. **Dependencies**: Inward only (Presentation → Adapters → Use Cases → Domain)
-2. **Domain**: Zero external deps (no `obsidian`, `@agentclientprotocol/sdk`)
-3. **Use Ports**: Use Cases depend on interfaces, not implementations
-4. **No UI Logic**: ChatView/components render only, delegate to ViewModel
+### Architecture
+1. **Hooks for state + logic**: No ViewModel, no Use Cases classes
+2. **Pure functions in shared/**: Non-React business logic
+3. **Ports for ACP resistance**: IAgentClient interface isolates protocol changes
+4. **Domain has zero deps**: No `obsidian`, `@agentclientprotocol/sdk`
 
 ### Obsidian Plugin Review (CRITICAL)
 1. No innerHTML/outerHTML - use createEl/createDiv/createSpan
@@ -161,47 +130,41 @@ interface ISettingsAccess {
 
 ### Naming Conventions
 - Ports: `*.port.ts`
-- Use Cases: `*.use-case.ts`
 - Adapters: `*.adapter.ts`
-- ViewModels: `*.view-model.ts`
+- Hooks: `use*.ts`
 - Components: `PascalCase.tsx`
 - Utils/Models: `kebab-case.ts`
 
 ### Code Patterns
-1. Error handling: try-catch async ops
-2. Strict typing, avoid `any`
-3. React: hooks, useMemo for DI
-4. Settings: validate + defaults
+1. React hooks for state management
+2. useCallback/useMemo for performance
+3. useRef for cleanup function access
+4. Error handling: try-catch async ops
 5. Logging: Logger class (respects debugMode)
 
 ## Common Tasks
 
-### Add Use Case
-1. Create `core/use-cases/[name].use-case.ts`
-2. Define input/output interfaces
-3. Inject ports via constructor
-4. Add to ChatViewModel dependencies
-5. Call from ChatViewModel method
+### Add New Feature Hook
+1. Create `hooks/use[Feature].ts`
+2. Define state with useState/useReducer
+3. Export functions and state
+4. Compose in ChatView.tsx
 
 ### Add Agent Type
-1. **Optional**: Define config in `core/domain/models/agent-config.ts`
+1. **Optional**: Define config in `domain/models/agent-config.ts`
 2. **Adapter**: Implement IAgentClient in `adapters/[agent]/[agent].adapter.ts`
 3. **Settings**: Add to AgentClientPluginSettings in plugin.ts
 4. **UI**: Update AgentClientSettingTab
-**No changes in Use Cases/Domain!**
 
 ### Modify Message Types
-1. Update `ChatMessage`/`MessageContent` in `core/domain/models/chat-message.ts`
+1. Update `ChatMessage`/`MessageContent` in `domain/models/chat-message.ts`
 2. Update `AcpAdapter.sessionUpdate()` to handle new type
 3. Update `MessageContentRenderer` to render new type
-4. **Optional**: Update AcpTypeConverter
 
 ### Debug
 1. Settings → Developer Settings → Debug Mode ON
 2. Open DevTools (Cmd+Option+I / Ctrl+Shift+I)
-3. Filter logs: `[AcpAdapter]`, `[ViewModel]`, `[NoteMentionService]`
-
-**Logged**: Process lifecycle, ACP messages, session state, permissions, terminal ops, errors
+3. Filter logs: `[AcpAdapter]`, `[useChat]`, `[NoteMentionService]`
 
 ## ACP Protocol
 
@@ -211,16 +174,11 @@ interface ISettingsAccess {
 **Notifications**: session/update (agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan, available_commands_update)
 **Requests**: requestPermission
 
-**Slash Commands**: Agents advertise available commands via `available_commands_update` notification. Commands include:
-- `name`: Command identifier (e.g., "web", "test")
-- `description`: Human-readable description
-- `hint`: Optional input hint (e.g., "query to search for")
-
 **Agents**:
-- Claude Code: `@zed-industries/claude-code-acp` (ANTHROPIC_API_KEY)
-- Gemini CLI: `@google/gemini-cli --experimental-acp` (GOOGLE_API_KEY)
+- Claude Code: `@anthropics/claude-code-acp` (ANTHROPIC_API_KEY)
+- Gemini CLI: `@anthropics/gemini-cli-acp` (GOOGLE_API_KEY)
 - Custom: Any ACP-compatible agent
 
 ---
 
-**Last Updated**: October 2025 | **Architecture**: Clean (5-layer) | **Version**: 0.2.0
+**Last Updated**: November 2025 | **Architecture**: React Hooks | **Version**: 0.3.0
