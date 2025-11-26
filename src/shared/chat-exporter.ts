@@ -22,7 +22,12 @@ export class ChatExporter {
 		openFile = true,
 	): Promise<string> {
 		const settings = this.plugin.settings.exportSettings;
-		const fileName = this.generateFileName(sessionCreatedAt);
+
+		// Use first message timestamp if available, fallback to session creation time
+		const effectiveTimestamp =
+			messages.length > 0 ? messages[0].timestamp : sessionCreatedAt;
+
+		const fileName = this.generateFileName(effectiveTimestamp);
 		const folderPath = settings.defaultFolder || "Agent Client";
 
 		// Create folder if it doesn't exist
@@ -35,13 +40,13 @@ export class ChatExporter {
 				agentLabel,
 				agentId,
 				sessionId,
-				sessionCreatedAt,
+				effectiveTimestamp,
 			);
 			const chatContent = this.convertMessagesToMarkdown(
 				messages,
 				agentLabel,
 				sessionId,
-				sessionCreatedAt,
+				effectiveTimestamp,
 			);
 			const fullContent = `${frontmatter}\n\n${chatContent}`;
 
