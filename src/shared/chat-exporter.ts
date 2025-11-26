@@ -1,8 +1,8 @@
-import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../plugin";
 import type {
 	ChatMessage,
 	MessageContent,
-} from "../core/domain/models/chat-message";
+} from "../domain/models/chat-message";
 import { Logger } from "./logger";
 import { TFile } from "obsidian";
 
@@ -22,7 +22,12 @@ export class ChatExporter {
 		openFile = true,
 	): Promise<string> {
 		const settings = this.plugin.settings.exportSettings;
-		const fileName = this.generateFileName(sessionCreatedAt);
+
+		// Use first message timestamp if available, fallback to session creation time
+		const effectiveTimestamp =
+			messages.length > 0 ? messages[0].timestamp : sessionCreatedAt;
+
+		const fileName = this.generateFileName(effectiveTimestamp);
 		const folderPath = settings.defaultFolder || "Agent Client";
 
 		// Create folder if it doesn't exist
@@ -35,13 +40,13 @@ export class ChatExporter {
 				agentLabel,
 				agentId,
 				sessionId,
-				sessionCreatedAt,
+				effectiveTimestamp,
 			);
 			const chatContent = this.convertMessagesToMarkdown(
 				messages,
 				agentLabel,
 				sessionId,
-				sessionCreatedAt,
+				effectiveTimestamp,
 			);
 			const fullContent = `${frontmatter}\n\n${chatContent}`;
 
@@ -204,6 +209,17 @@ tags: [agent-client]
 		content: Extract<MessageContent, { type: "tool_call" }>,
 	): string {
 		let md = `### 🔧 ${content.title || "Tool"}\n\n`;
+
+		// Add locations if present
+		if (content.locations && content.locations.length > 0) {
+			const locationStrs = content.locations.map((loc) =>
+				loc.line != null
+					? `\`${loc.path}:${loc.line}\``
+					: `\`${loc.path}\``,
+			);
+			md += `**Locations**: ${locationStrs.join(", ")}\n\n`;
+		}
+
 		md += `**Status**: ${content.status}\n\n`;
 
 		// Only export diffs

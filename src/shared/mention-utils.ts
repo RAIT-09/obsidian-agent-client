@@ -1,6 +1,6 @@
 import { TFile } from "obsidian";
 import { Logger } from "./logger";
-import type AgentClientPlugin from "../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../plugin";
 
 // Interface for mention service to avoid circular dependency
 export interface IMentionService {

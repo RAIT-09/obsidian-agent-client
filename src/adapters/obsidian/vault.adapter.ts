@@ -10,9 +10,9 @@ import type {
 	IVaultAccess,
 	NoteMetadata,
 	EditorPosition,
-} from "../../core/domain/ports/vault-access.port";
+} from "../../domain/ports/vault-access.port";
 import { NoteMentionService } from "./mention-service";
-import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
+import type AgentClientPlugin from "../../plugin";
 import {
 	TFile,
 	MarkdownView,
@@ -41,8 +41,11 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 	private selectionCompartment: Compartment | null = null;
 	private lastSelectionKey = "";
 
-	constructor(private plugin: AgentClientPlugin) {
-		this.mentionService = new NoteMentionService(plugin);
+	constructor(
+		private plugin: AgentClientPlugin,
+		mentionService: NoteMentionService,
+	) {
+		this.mentionService = mentionService;
 	}
 
 	/**
@@ -330,7 +333,10 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 	 */
 	private convertToMetadata(file: TFile): NoteMetadata {
 		const cache = this.plugin.app.metadataCache.getFileCache(file);
-		const aliases = cache?.frontmatter?.aliases;
+		const aliases = cache?.frontmatter?.aliases as
+			| string[]
+			| string
+			| undefined;
 
 		return {
 			path: file.path,

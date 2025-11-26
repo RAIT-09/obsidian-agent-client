@@ -6,9 +6,9 @@
  * via useSyncExternalStore, and handles persistence to Obsidian's data.json.
  */
 
-import type { ISettingsAccess } from "../../core/domain/ports/settings-access.port";
-import type { AgentClientPluginSettings } from "../../infrastructure/obsidian-plugin/plugin";
-import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
+import type { ISettingsAccess } from "../../domain/ports/settings-access.port";
+import type { AgentClientPluginSettings } from "../../plugin";
+import type AgentClientPlugin from "../../plugin";
 
 /** Listener callback invoked when settings change */
 type Listener = () => void;
@@ -101,7 +101,7 @@ export class SettingsStore implements ISettingsAccess {
 	set(next: AgentClientPluginSettings): void {
 		// Delegate to async updateSettings
 		// Note: Fire-and-forget - callers don't expect this to be async
-		this.updateSettings(next);
+		void this.updateSettings(next);
 	}
 }
 
