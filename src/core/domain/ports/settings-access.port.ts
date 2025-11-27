@@ -6,7 +6,7 @@
  * on the specific implementation (e.g., Obsidian's data.json storage).
  */
 
-import type { AgentClientPluginSettings } from "../../../infrastructure/obsidian-plugin/plugin";
+import type { PluginSettings } from "../models/settings";
 
 /**
  * Interface for accessing and managing plugin settings.
@@ -26,7 +26,7 @@ export interface ISettingsAccess {
 	 *
 	 * @returns Current plugin settings
 	 */
-	getSnapshot(): AgentClientPluginSettings;
+	getSnapshot(): PluginSettings;
 
 	/**
 	 * Update plugin settings.
@@ -37,7 +37,7 @@ export interface ISettingsAccess {
 	 * @param updates - Partial settings object with properties to update
 	 * @returns Promise that resolves when settings are saved
 	 */
-	updateSettings(updates: Partial<AgentClientPluginSettings>): Promise<void>;
+	updateSettings(updates: Partial<PluginSettings>): Promise<void>;
 
 	/**
 	 * Subscribe to settings changes.

@@ -14,6 +14,13 @@
 import type { ChatMessage, PermissionOption } from "../models/chat-message";
 import type { AgentError } from "../models/agent-error";
 import type { AuthenticationMethod } from "../models/chat-session";
+import type { BaseAgentSettings } from "../models/agent-config";
+
+/**
+ * Environment variables for process.spawn().
+ * Key-value pairs of environment variable names to values.
+ */
+export type ProcessEnv = Record<string, string>;
 
 /**
  * Runtime configuration for launching an AI agent process.
@@ -28,16 +35,8 @@ import type { AuthenticationMethod } from "../models/chat-session";
  * Adapters are responsible for converting BaseAgentSettings → AgentConfig
  * before launching the agent process.
  */
-export interface AgentConfig {
-	/** Unique identifier for this agent (e.g., "claude", "gemini") */
-	id: string;
-
-	/** Display name for the agent */
-	displayName: string;
-
-	/** Command to execute (full path to executable) */
-	command: string;
-
+export interface AgentConfig
+	extends Pick<BaseAgentSettings, "id" | "displayName" | "command"> {
 	/** Command-line arguments */
 	args: string[];
 
@@ -45,7 +44,7 @@ export interface AgentConfig {
 	 * Environment variables for the agent process.
 	 * Converted from AgentEnvVar[] to Record format for process.spawn().
 	 */
-	env?: Record<string, string>;
+	env?: ProcessEnv;
 
 	/** Working directory for the agent session */
 	workingDirectory: string;
@@ -94,6 +93,16 @@ export interface NewSessionResult {
 }
 
 /**
+ * Image data to be sent with a message.
+ */
+export interface MessageImage {
+	/** Base64 encoded image data (without data URI prefix) */
+	data: string;
+	/** MIME type of the image (e.g., "image/png", "image/jpeg") */
+	mimeType: string;
+}
+
+/**
  * Interface for communicating with ACP-compatible agents.
  *
  * Provides methods for connecting to agents, sending messages,
@@ -139,10 +148,11 @@ export interface IAgentClient {
 	 *
 	 * @param sessionId - Session identifier
 	 * @param message - Message text to send
+	 * @param images - Optional array of images to include with the message
 	 * @returns Promise resolving when agent completes processing
 	 * @throws AgentError if sending fails
 	 */
-	sendMessage(sessionId: string, message: string): Promise<void>;
+	sendMessage(sessionId: string, message: string, images?: MessageImage[]): Promise<void>;
 
 	/**
 	 * Cancel ongoing agent operations.

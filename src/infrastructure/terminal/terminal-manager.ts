@@ -228,12 +228,27 @@ export class TerminalManager {
 		});
 	}
 
-	killTerminal(terminalId: string): boolean {
+	async killTerminal(terminalId: string): Promise<boolean> {
 		const terminal = this.terminals.get(terminalId);
 		if (!terminal) return false;
 
 		if (!terminal.exitStatus) {
 			terminal.process.kill("SIGTERM");
+
+			// Wait up to 3 seconds for graceful exit
+			const exited = await Promise.race([
+				new Promise<boolean>((resolve) => {
+					terminal.process.once("exit", () => resolve(true));
+				}),
+				new Promise<boolean>((resolve) =>
+					setTimeout(() => resolve(false), 3000),
+				),
+			]);
+
+			// Force kill if still running
+			if (!exited && !terminal.exitStatus) {
+				terminal.process.kill("SIGKILL");
+			}
 		}
 		return true;
 	}
@@ -258,8 +273,11 @@ export class TerminalManager {
 		return true;
 	}
 
-	killAllTerminals(): void {
+	async killAllTerminals(): Promise<void> {
 		this.logger.log(`Killing ${this.terminals.size} running terminals...`);
+
+		const killPromises: Promise<boolean>[] = [];
+
 		this.terminals.forEach((terminal, terminalId) => {
 			// Clear cleanup timeout if scheduled
 			if (terminal.cleanupTimeout) {
@@ -267,9 +285,13 @@ export class TerminalManager {
 			}
 			if (!terminal.exitStatus) {
 				this.logger.log(`Killing terminal ${terminalId}`);
-				this.killTerminal(terminalId);
+				killPromises.push(this.killTerminal(terminalId));
 			}
 		});
+
+		// Wait for all kills to complete
+		await Promise.all(killPromises);
+
 		// Clear all terminals
 		this.terminals.clear();
 	}

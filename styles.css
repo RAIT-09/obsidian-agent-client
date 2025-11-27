@@ -7,13 +7,523 @@ If your plugin does not need CSS, delete this file.
 
 */
 
+/* ===== Accessibility Utilities ===== */
+
+/* Screen reader only content - visually hidden but accessible */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Focus visible styles - applied to interactive elements */
+/* Uses :focus-visible for keyboard-only focus indication */
+.header-button:focus-visible,
+.chat-send-button:focus-visible,
+.auto-mention-toggle-btn:focus-visible,
+.permission-option:focus-visible,
+.chat-error-button:focus-visible,
+.mention-dropdown-item:focus-visible,
+.suggestion-dropdown-item:focus-visible,
+.collapsible-thought-header:focus-visible,
+.text-mention:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+/* Ensure chat textarea has focus ring */
+.chat-input-textarea:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+	.permission-option {
+		border-width: 2px !important;
+	}
+
+	.mention-dropdown-item.selected {
+		border: 2px solid var(--interactive-accent);
+	}
+
+	.chat-error-container {
+		border-width: 2px;
+	}
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+	.loading-dot {
+		animation: none;
+		background-color: var(--interactive-accent);
+	}
+
+	.header-button,
+	.header-button svg,
+	.chat-send-button svg,
+	.permission-option,
+	.auto-mention-toggle-btn,
+	.mention-dropdown-item,
+	.suggestion-dropdown-item {
+		transition: none;
+	}
+}
+
+/* ===== Virtual Scrolling ===== */
+
+/* Container for virtualized list */
+.virtual-list-container {
+	position: relative;
+	width: 100%;
+}
+
+/* Individual virtualized message item */
+.virtual-message-item {
+	box-sizing: border-box;
+	width: 100%;
+}
+
+/* Ensure smooth scroll behavior for virtualized container */
+.chat-view-messages {
+	scroll-behavior: auto; /* Use auto for virtual scrolling, not smooth */
+	overflow-y: auto;
+	overflow-x: hidden;
+	contain: strict; /* Performance optimization */
+}
+
+/* Override for non-virtualized scroll */
+.chat-view-messages:not(:has(.virtual-list-container)) {
+	scroll-behavior: smooth;
+	contain: content;
+}
+
 /* ===== Settings Tab Custom Agent Block ===== */
 .agent-client-custom-agent {
 	padding: 16px;
-	margin-bottom: 24px;
+	margin-bottom: 16px;
 	background-color: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 8px;
+	cursor: grab;
+	transition: box-shadow 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.agent-client-custom-agent:hover {
+	border-color: var(--background-modifier-border-hover);
+}
+
+.agent-client-custom-agent.dragging {
+	opacity: 0.5;
+	cursor: grabbing;
+}
+
+.agent-client-custom-agent.drag-over {
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+/* ===== Built-in Agent Block ===== */
+.agent-client-builtin-agent {
+	padding: 16px;
+	margin-bottom: 16px;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+}
+
+/* ===== Agent Header with Status ===== */
+.agent-header-with-status {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 12px;
+}
+
+.agent-header-title {
+	margin: 0 !important;
+	font-size: 16px;
+	font-weight: 600;
+}
+
+.agent-status-badge {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 10px;
+	border-radius: 12px;
+	font-size: 12px;
+	font-weight: 500;
+	background-color: var(--background-primary);
+}
+
+.agent-status-badge .status-ready {
+	color: var(--color-green);
+}
+
+.agent-status-badge .status-warning {
+	color: var(--color-orange);
+}
+
+.agent-status-badge .status-error {
+	color: var(--color-red);
+}
+
+.agent-status-badge .status-incomplete {
+	color: var(--text-muted);
+}
+
+.agent-status-badge svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* ===== Quick Switch Agent Selector ===== */
+.agent-quick-switch-container {
+	margin-bottom: 24px;
+	padding-bottom: 24px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.agent-quick-switch-title {
+	margin: 0 0 16px 0 !important;
+	font-size: 18px;
+	font-weight: 600;
+}
+
+.agent-cards-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.agent-card {
+	display: flex;
+	flex-direction: column;
+	padding: 14px;
+	background-color: var(--background-secondary);
+	border: 2px solid var(--background-modifier-border);
+	border-radius: 10px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	position: relative;
+	min-height: 80px;
+}
+
+.agent-card:hover {
+	border-color: var(--interactive-accent-hover);
+	background-color: var(--background-modifier-hover);
+}
+
+.agent-card:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.agent-card-active {
+	border-color: var(--interactive-accent);
+	background-color: var(--background-modifier-hover);
+}
+
+.agent-card-active::after {
+	content: "";
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	width: 8px;
+	height: 8px;
+	background-color: var(--interactive-accent);
+	border-radius: 50%;
+}
+
+.agent-card-status-indicator {
+	position: absolute;
+	top: 12px;
+	left: 12px;
+}
+
+.agent-card-status-indicator svg {
+	width: 16px;
+	height: 16px;
+}
+
+.agent-card-status-indicator.status-ready {
+	color: var(--color-green);
+}
+
+.agent-card-status-indicator.status-warning {
+	color: var(--color-orange);
+}
+
+.agent-card-status-indicator.status-error {
+	color: var(--color-red);
+}
+
+.agent-card-status-indicator.status-incomplete {
+	color: var(--text-muted);
+}
+
+.agent-card-info {
+	margin-top: 24px;
+}
+
+.agent-card-name {
+	font-weight: 600;
+	font-size: 14px;
+	color: var(--text-normal);
+	margin-bottom: 4px;
+}
+
+.agent-card-type {
+	font-size: 11px;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.agent-card-status-text {
+	font-size: 11px;
+	color: var(--text-faint);
+	margin-top: 6px;
+}
+
+/* Hide the dropdown but keep it functional */
+.agent-selector-hidden {
+	display: none;
+}
+
+/* ===== Custom Agent Header ===== */
+.custom-agent-header {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 16px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.drag-handle {
+	cursor: grab;
+	color: var(--text-muted);
+	padding: 4px;
+	border-radius: 4px;
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.drag-handle:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.drag-handle svg {
+	width: 16px;
+	height: 16px;
+}
+
+.custom-agent-status-indicator svg {
+	width: 16px;
+	height: 16px;
+}
+
+.custom-agent-status-indicator.status-ready {
+	color: var(--color-green);
+}
+
+.custom-agent-status-indicator.status-warning {
+	color: var(--color-orange);
+}
+
+.custom-agent-status-indicator.status-error {
+	color: var(--color-red);
+}
+
+.custom-agent-status-indicator.status-incomplete {
+	color: var(--text-muted);
+}
+
+.custom-agent-title {
+	flex: 1;
+	font-weight: 600;
+	font-size: 15px;
+	color: var(--text-normal);
+}
+
+.custom-agent-delete-btn {
+	padding: 6px;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	color: var(--text-muted);
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.custom-agent-delete-btn:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--color-red);
+}
+
+.custom-agent-delete-btn svg {
+	width: 16px;
+	height: 16px;
+}
+
+.custom-agent-content {
+	padding-left: 4px;
+}
+
+/* ===== Custom Agents Section ===== */
+.custom-agents-actions {
+	margin-bottom: 16px;
+}
+
+.custom-agents-list {
+	margin-bottom: 16px;
+}
+
+.custom-agents-empty {
+	color: var(--text-muted);
+	font-style: italic;
+	padding: 16px;
+	text-align: center;
+	background-color: var(--background-secondary);
+	border-radius: 8px;
+	border: 1px dashed var(--background-modifier-border);
+}
+
+/* ===== Environment Variables Editor ===== */
+.env-vars-section {
+	margin-top: 16px;
+	padding: 12px;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+}
+
+.env-vars-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+
+.env-vars-title {
+	font-weight: 600;
+	font-size: 13px;
+	color: var(--text-normal);
+}
+
+.env-vars-description {
+	font-size: 12px;
+	color: var(--text-muted);
+	margin-bottom: 12px;
+}
+
+.env-vars-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.env-var-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.env-var-key {
+	flex: 0 0 140px;
+	padding: 6px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-secondary);
+	color: var(--text-normal);
+	font-family: var(--font-monospace);
+	font-size: 13px;
+}
+
+.env-var-key:focus {
+	border-color: var(--interactive-accent);
+	outline: none;
+}
+
+.env-var-equals {
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+	font-weight: 600;
+}
+
+.env-var-value {
+	flex: 1;
+	padding: 6px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-secondary);
+	color: var(--text-normal);
+	font-family: var(--font-monospace);
+	font-size: 13px;
+}
+
+.env-var-value:focus {
+	border-color: var(--interactive-accent);
+	outline: none;
+}
+
+.env-var-delete {
+	padding: 6px;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	color: var(--text-muted);
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.env-var-delete:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--color-red);
+}
+
+.env-var-delete svg {
+	width: 14px;
+	height: 14px;
+}
+
+.env-vars-add {
+	display: flex;
+}
+
+.env-vars-add-btn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	background-color: transparent;
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: 4px;
+	color: var(--text-muted);
+	font-size: 13px;
+	cursor: pointer;
+	transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.env-vars-add-btn:hover {
+	background-color: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+	color: var(--interactive-accent);
+}
+
+.env-vars-add-btn svg {
+	width: 14px;
+	height: 14px;
 }
 
 /* ===== Loading Indicator ===== */
@@ -653,7 +1163,6 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-muted);
 	background-color: transparent;
 	font-size: 0.9em;
-	cursor: pointer;
 	overflow-wrap: break-word;
 	word-wrap: break-word;
 	word-break: break-word;
@@ -665,6 +1174,10 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	align-items: center;
 	gap: 4px;
+	cursor: pointer;
+	border-radius: 4px;
+	padding: 4px;
+	margin: -4px;
 }
 
 .collapsible-thought-icon {
@@ -682,28 +1195,257 @@ If your plugin does not need CSS, delete this file.
 	word-break: break-word;
 }
 
-/* Mention Dropdown */
+/* ===== Suggestion Dropdown (Mentions & Slash Commands) ===== */
+
+/* Base dropdown container */
+.suggestion-dropdown {
+	position: absolute;
+	bottom: 100%;
+	left: 0;
+	right: 0;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+	font-size: 14px;
+	margin-bottom: 8px;
+	z-index: 1000;
+	display: flex;
+	flex-direction: column;
+	max-height: 400px;
+	overflow: hidden;
+}
+
+/* Scrollable content area */
+.suggestion-dropdown-content {
+	overflow-y: auto;
+	overflow-x: hidden;
+	flex: 1;
+	min-height: 0;
+}
+
+/* Legacy class alias for backward compatibility */
 .mention-dropdown {
 	position: absolute;
 	bottom: 100%;
 	left: 0;
 	right: 0;
 	background-color: var(--background-secondary);
-	border: 2px solid var(--background-modifier-border);
+	border: 1px solid var(--background-modifier-border);
 	border-radius: 8px;
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-	overflow-y: auto;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 	font-size: 14px;
 	margin-bottom: 8px;
 	z-index: 1000;
+	display: flex;
+	flex-direction: column;
+	max-height: 400px;
+	overflow: hidden;
 }
 
-.mention-dropdown-item {
-	padding: 4px 16px;
+/* ===== Category Headers ===== */
+.suggestion-dropdown-category-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 12px 4px 12px;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	background-color: var(--background-secondary);
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+.suggestion-dropdown-category-header svg {
+	width: 12px;
+	height: 12px;
+	opacity: 0.7;
+}
+
+/* ===== Dropdown Items ===== */
+.suggestion-dropdown-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 8px 12px;
 	cursor: pointer;
 	background-color: transparent;
 	user-select: none;
 	transition: background-color 0.1s ease;
+}
+
+.suggestion-dropdown-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.suggestion-dropdown-item.selected {
+	background-color: var(--background-primary);
+}
+
+.suggestion-dropdown-item.has-border {
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Item icon container */
+.suggestion-dropdown-item-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	flex-shrink: 0;
+	color: var(--text-muted);
+	margin-top: 1px;
+}
+
+.suggestion-dropdown-item.selected .suggestion-dropdown-item-icon {
+	color: var(--interactive-accent);
+}
+
+/* Item content */
+.suggestion-dropdown-item-content {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.suggestion-dropdown-item-name {
+	font-weight: 500;
+	color: var(--text-normal);
+	margin-bottom: 2px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.suggestion-dropdown-item-path,
+.suggestion-dropdown-item-description {
+	font-size: 12px;
+	color: var(--text-muted);
+	opacity: 0.8;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Command slash prefix styling */
+.command-slash {
+	color: var(--text-muted);
+	font-weight: 400;
+}
+
+/* ===== Hint Badge (per-item) ===== */
+.suggestion-dropdown-item-hint-badge {
+	flex-shrink: 0;
+	padding: 2px 6px;
+	font-size: 10px;
+	color: var(--text-faint);
+	background-color: var(--background-modifier-border);
+	border-radius: 4px;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+	max-width: 120px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	align-self: center;
+}
+
+.suggestion-dropdown-item-hint-badge.visible {
+	opacity: 1;
+}
+
+/* ===== Hint Preview Area ===== */
+.suggestion-dropdown-hint-preview {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	background-color: var(--background-primary);
+	border-top: 1px solid var(--background-modifier-border);
+	font-size: 12px;
+}
+
+.hint-preview-label {
+	color: var(--text-muted);
+	font-weight: 500;
+}
+
+.hint-preview-text {
+	color: var(--text-faint);
+	font-style: italic;
+}
+
+/* ===== Keyboard Shortcuts Footer ===== */
+.suggestion-dropdown-footer {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	padding: 6px 12px;
+	background-color: var(--background-primary);
+	border-top: 1px solid var(--background-modifier-border);
+	font-size: 11px;
+}
+
+.keyboard-hint {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--text-muted);
+}
+
+.keyboard-hint kbd {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 4px;
+	font-family: inherit;
+	font-size: 10px;
+	font-weight: 500;
+	color: var(--text-muted);
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 3px;
+	box-shadow: 0 1px 0 var(--background-modifier-border);
+}
+
+/* ===== Fuzzy Match Highlighting ===== */
+.fuzzy-match {
+	background-color: var(--text-highlight-bg);
+	color: inherit;
+	font-weight: 600;
+	border-radius: 2px;
+	padding: 0 1px;
+}
+
+/* ===== Icon Styles ===== */
+.slash-command-icon,
+.mention-icon {
+	color: currentColor;
+}
+
+/* ===== Legacy Mention Dropdown Classes ===== */
+/* Maintain backward compatibility with existing code */
+.mention-dropdown-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 8px 12px;
+	cursor: pointer;
+	background-color: transparent;
+	user-select: none;
+	transition: background-color 0.1s ease;
+}
+
+.mention-dropdown-item:hover {
+	background-color: var(--background-modifier-hover);
 }
 
 .mention-dropdown-item.selected {
@@ -794,6 +1536,22 @@ If your plugin does not need CSS, delete this file.
 
 .terminal-renderer-exit.error {
 	background-color: var(--color-red);
+}
+
+/* xterm.js styles are imported in TerminalPanel.tsx */
+/* Additional terminal overrides below */
+
+.terminal-panel .xterm {
+	padding: 4px;
+}
+
+.terminal-panel .xterm-viewport::-webkit-scrollbar {
+	width: 8px;
+}
+
+.terminal-panel .xterm-viewport::-webkit-scrollbar-thumb {
+	background: var(--background-modifier-border);
+	border-radius: 4px;
 }
 
 /* Message Renderer */
@@ -961,4 +1719,292 @@ If your plugin does not need CSS, delete this file.
 	overflow-wrap: break-word;
 	word-wrap: break-word;
 	word-break: break-word;
+}
+
+/* ===== Session History Panel ===== */
+
+.session-history-panel {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-color: var(--background-primary);
+	z-index: 100;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.session-history-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 16px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	flex-shrink: 0;
+}
+
+.session-history-header h4 {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.session-history-close {
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.session-history-close:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.session-history-content {
+	flex: 1;
+	overflow-y: auto;
+	padding: 8px;
+}
+
+.session-history-loading,
+.session-history-error,
+.session-history-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: var(--text-muted);
+	font-size: 14px;
+}
+
+.session-history-error {
+	color: var(--color-red);
+}
+
+.session-history-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.session-history-item {
+	padding: 12px;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	cursor: pointer;
+	transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.session-history-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.session-history-item.active {
+	border-color: var(--interactive-accent);
+	background-color: var(--background-modifier-hover);
+}
+
+.session-history-item:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.session-history-item-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 4px;
+}
+
+.session-history-agent {
+	font-weight: 600;
+	font-size: 13px;
+	color: var(--text-normal);
+}
+
+.session-history-time {
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.session-history-preview {
+	font-size: 13px;
+	color: var(--text-muted);
+	margin-bottom: 8px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.session-history-meta {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 12px;
+	color: var(--text-faint);
+}
+
+.session-history-delete {
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+	opacity: 0;
+	transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.session-history-item:hover .session-history-delete {
+	opacity: 1;
+}
+
+.session-history-delete:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--color-red);
+}
+
+.session-history-delete:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+	opacity: 1;
+}
+
+/* ===== Suggestion Dropdown Accessibility ===== */
+
+/* High contrast mode support for suggestion dropdown */
+@media (prefers-contrast: high) {
+	.suggestion-dropdown {
+		border-width: 2px;
+	}
+
+	.suggestion-dropdown-item.selected {
+		outline: 2px solid var(--interactive-accent);
+		outline-offset: -2px;
+	}
+
+	.keyboard-hint kbd {
+		border-width: 2px;
+	}
+
+	.fuzzy-match {
+		outline: 1px solid var(--text-highlight-bg);
+	}
+}
+
+/* Reduced motion support for suggestion dropdown */
+@media (prefers-reduced-motion: reduce) {
+	.suggestion-dropdown-item,
+	.suggestion-dropdown-item-hint-badge {
+		transition: none;
+	}
+}
+
+/* ===== Pasted Images Preview ===== */
+
+/* Container for image previews above the textarea */
+.pasted-images-preview {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 8px 12px;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-bottom: none;
+	border-radius: 8px 8px 0 0;
+}
+
+/* Individual image preview item */
+.pasted-image-item {
+	position: relative;
+	width: 64px;
+	height: 64px;
+	border-radius: 6px;
+	overflow: hidden;
+	border: 1px solid var(--background-modifier-border);
+	background-color: var(--background-primary);
+}
+
+/* Image thumbnail */
+.pasted-image-thumbnail {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* Remove button for each image */
+.pasted-image-remove {
+	position: absolute;
+	top: 2px;
+	right: 2px;
+	width: 18px;
+	height: 18px;
+	padding: 0 !important;
+	margin: 0 !important;
+	border: none !important;
+	border-radius: 50% !important;
+	background-color: var(--background-primary) !important;
+	color: var(--text-muted);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.pasted-image-item:hover .pasted-image-remove {
+	opacity: 1;
+}
+
+.pasted-image-remove:hover {
+	background-color: var(--background-modifier-hover) !important;
+	color: var(--color-red);
+}
+
+.pasted-image-remove:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
+	opacity: 1;
+}
+
+.pasted-image-remove svg {
+	width: 12px;
+	height: 12px;
+}
+
+/* Adjust textarea when images are present */
+.chat-input-textarea.has-images {
+	border-radius: 0 0 8px 8px;
+}
+
+/* Ensure the auto-mention inline also adjusts when images are present */
+.pasted-images-preview + .auto-mention-inline {
+	border-radius: 0;
+	border-top: none;
+}
+
+/* When both images and auto-mention are present */
+.pasted-images-preview ~ .textarea-wrapper .chat-input-textarea.has-auto-mention.has-images {
+	border-radius: 0 0 8px 8px;
 }

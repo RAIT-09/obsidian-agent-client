@@ -5,6 +5,9 @@
  * independent of the plugin infrastructure. They define
  * the core concepts of agent identity, capabilities, and
  * connection parameters.
+ *
+ * Note: These types are intentionally mutable as they represent
+ * user-configurable settings that are persisted and modified via UI.
  */
 
 // ============================================================================
@@ -54,11 +57,20 @@ export interface BaseAgentSettings {
 }
 
 /**
+ * Agent settings with API key support.
+ * Used by built-in agents (Claude, Codex, Gemini) that require API keys.
+ */
+export interface AgentSettingsWithApiKey extends BaseAgentSettings {
+	/** API key for the agent's service */
+	apiKey: string;
+}
+
+/**
  * Configuration for Gemini CLI agent.
  *
  * Extends base settings with Gemini-specific requirements.
  */
-export interface GeminiAgentSettings extends BaseAgentSettings {
+export interface GeminiAgentSettings extends AgentSettingsWithApiKey {
 	/** Google API key for Gemini (GOOGLE_API_KEY) */
 	apiKey: string;
 }
@@ -68,7 +80,7 @@ export interface GeminiAgentSettings extends BaseAgentSettings {
  *
  * Extends base settings with Claude-specific requirements.
  */
-export interface ClaudeAgentSettings extends BaseAgentSettings {
+export interface ClaudeAgentSettings extends AgentSettingsWithApiKey {
 	/** Anthropic API key for Claude (ANTHROPIC_API_KEY) */
 	apiKey: string;
 }
@@ -78,7 +90,7 @@ export interface ClaudeAgentSettings extends BaseAgentSettings {
  *
  * Extends base settings with Codex-specific requirements.
  */
-export interface CodexAgentSettings extends BaseAgentSettings {
+export interface CodexAgentSettings extends AgentSettingsWithApiKey {
 	/** OpenAI API key for Codex (OPENAI_API_KEY) */
 	apiKey: string;
 }
@@ -88,6 +100,6 @@ export interface CodexAgentSettings extends BaseAgentSettings {
  *
  * Uses only the base settings, allowing users to configure
  * any agent that implements the Agent Client Protocol.
+ * Custom agents do not require API keys (they may use env vars instead).
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface CustomAgentSettings extends BaseAgentSettings {}
+export type CustomAgentSettings = BaseAgentSettings;

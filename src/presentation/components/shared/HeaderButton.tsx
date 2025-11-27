@@ -6,12 +6,15 @@ interface HeaderButtonProps {
 	iconName: string;
 	tooltip: string;
 	onClick: () => void;
+	/** Optional custom aria-label (defaults to tooltip) */
+	ariaLabel?: string;
 }
 
-export function HeaderButton({
+export const HeaderButton = React.memo(function HeaderButton({
 	iconName,
 	tooltip,
 	onClick,
+	ariaLabel,
 }: HeaderButtonProps) {
 	const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -24,9 +27,11 @@ export function HeaderButton({
 	return (
 		<button
 			ref={buttonRef}
+			type="button"
 			title={tooltip}
+			aria-label={ariaLabel || tooltip}
 			onClick={onClick}
 			className="header-button"
 		/>
 	);
-}
+});

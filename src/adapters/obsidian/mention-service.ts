@@ -1,13 +1,17 @@
-import { TFile, prepareFuzzySearch } from "obsidian";
+import { TFile, prepareFuzzySearch, EventRef } from "obsidian";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
 import { Logger } from "../../shared/logger";
 
 // Note mention service for @-mention functionality
 export class NoteMentionService {
 	private files: TFile[] = [];
+	private fileByPath = new Map<string, TFile>();
 	private lastBuild = 0;
 	private plugin: AgentClientPlugin;
 	private logger: Logger;
+	private eventRefs: EventRef[] = [];
+	private debounceTimeout: ReturnType<typeof setTimeout> | null = null;
+	private static readonly DEBOUNCE_MS = 100;
 
 	constructor(plugin: AgentClientPlugin) {
 		this.plugin = plugin;
@@ -15,25 +19,69 @@ export class NoteMentionService {
 		this.rebuildIndex();
 
 		// Listen for vault changes to keep index up to date
-		this.plugin.app.vault.on("create", (file) => {
-			if (file instanceof TFile && file.extension === "md") {
-				this.rebuildIndex();
-			}
-		});
-		this.plugin.app.vault.on("delete", () => this.rebuildIndex());
-		this.plugin.app.vault.on("rename", (file) => {
-			if (file instanceof TFile && file.extension === "md") {
-				this.rebuildIndex();
-			}
-		});
+		// Store EventRefs for cleanup
+		this.eventRefs.push(
+			this.plugin.app.vault.on("create", (file) => {
+				if (file instanceof TFile && file.extension === "md") {
+					this.debouncedRebuildIndex();
+				}
+			}),
+		);
+		this.eventRefs.push(
+			this.plugin.app.vault.on("delete", () => this.debouncedRebuildIndex()),
+		);
+		this.eventRefs.push(
+			this.plugin.app.vault.on("rename", (file) => {
+				if (file instanceof TFile && file.extension === "md") {
+					this.debouncedRebuildIndex();
+				}
+			}),
+		);
 	}
 
-	private rebuildIndex() {
+	/**
+	 * Debounced rebuild to avoid excessive rebuilds during bulk operations.
+	 */
+	private debouncedRebuildIndex(): void {
+		if (this.debounceTimeout) {
+			clearTimeout(this.debounceTimeout);
+		}
+		this.debounceTimeout = setTimeout(() => {
+			this.rebuildIndex();
+			this.debounceTimeout = null;
+		}, NoteMentionService.DEBOUNCE_MS);
+	}
+
+	private rebuildIndex(): void {
 		this.files = this.plugin.app.vault.getMarkdownFiles();
+		// Build O(1) lookup map
+		this.fileByPath.clear();
+		for (const file of this.files) {
+			this.fileByPath.set(file.path, file);
+		}
 		this.lastBuild = Date.now();
 		this.logger.log(
 			`[NoteMentionService] Rebuilt index with ${this.files.length} files`,
 		);
+	}
+
+	/**
+	 * Cleanup resources when service is destroyed.
+	 * Call this when the plugin unloads.
+	 */
+	destroy(): void {
+		// Clear debounce timeout
+		if (this.debounceTimeout) {
+			clearTimeout(this.debounceTimeout);
+			this.debounceTimeout = null;
+		}
+		// Unregister all event listeners
+		for (const ref of this.eventRefs) {
+			this.plugin.app.vault.offref(ref);
+		}
+		this.eventRefs = [];
+		this.files = [];
+		this.fileByPath.clear();
 	}
 
 	searchNotes(query: string): TFile[] {
@@ -103,6 +151,6 @@ export class NoteMentionService {
 	}
 
 	getFileByPath(path: string): TFile | null {
-		return this.files.find((file) => file.path === path) || null;
+		return this.fileByPath.get(path) ?? null;
 	}
 }

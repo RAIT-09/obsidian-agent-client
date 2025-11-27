@@ -8,6 +8,7 @@ import type {
 	InitializeResult,
 	NewSessionResult,
 	PermissionRequest,
+	MessageImage,
 } from "../../core/domain/ports/agent-client.port";
 import type {
 	ChatMessage,
@@ -19,7 +20,10 @@ import { AcpTypeConverter } from "./acp-type-converter";
 import { TerminalManager } from "../../infrastructure/terminal/terminal-manager";
 import { Logger } from "../../shared/logger";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
-import type { SlashCommand } from "src/core/domain/models/chat-session";
+import type {
+	SlashCommand,
+	SlashCommandCategory,
+} from "src/core/domain/models/chat-session";
 import {
 	wrapCommandForWsl,
 	convertWindowsPathToWsl,
@@ -331,6 +335,9 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				signal,
 			);
 
+			// Cancel any pending permission requests to avoid promise leaks
+			this.cancelPendingPermissionRequests();
+
 			if (code === 127) {
 				this.logger.error(`[AcpAdapter] Command not found: ${command}`);
 
@@ -381,13 +388,25 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				stdin.end();
 			},
 		});
+		let streamClosed = false;
 		const output = new ReadableStream({
 			start(controller) {
 				stdout.on("data", (chunk) => {
-					controller.enqueue(chunk);
+					if (!streamClosed) {
+						controller.enqueue(chunk);
+					}
 				});
 				stdout.on("end", () => {
-					controller.close();
+					if (!streamClosed) {
+						streamClosed = true;
+						controller.close();
+					}
+				});
+				stdout.on("error", (error) => {
+					if (!streamClosed) {
+						streamClosed = true;
+						controller.error(error);
+					}
 				});
 			},
 		});
@@ -579,7 +598,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	/**
 	 * Send a message to the agent in a specific session.
 	 */
-	async sendMessage(sessionId: string, message: string): Promise<void> {
+	async sendMessage(sessionId: string, message: string, images?: MessageImage[]): Promise<void> {
 		if (!this.connection) {
 			throw new Error(
 				"Connection not initialized. Call initialize() first.",
@@ -590,16 +609,33 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.resetCurrentMessage();
 
 		try {
-			this.logger.log(`[AcpAdapter] ✅ Sending Message...: ${message}`);
+			this.logger.log(`[AcpAdapter] ✅ Sending Message...: ${message}${images && images.length > 0 ? ` (with ${images.length} image(s))` : ""}`);
+
+			// Build prompt content array with text and optional images
+			const promptContent: acp.ContentBlock[] = [];
+
+			// Add images first (if any)
+			if (images && images.length > 0) {
+				for (const img of images) {
+					promptContent.push({
+						type: "image",
+						data: img.data,
+						mimeType: img.mimeType,
+					});
+				}
+			}
+
+			// Add text message (can be empty if only images)
+			if (message.trim() !== "" || promptContent.length === 0) {
+				promptContent.push({
+					type: "text",
+					text: message || "Analyze this image.",
+				});
+			}
 
 			const promptResult = await this.connection.prompt({
 				sessionId: sessionId,
-				prompt: [
-					{
-						type: "text",
-						text: message,
-					},
-				],
+				prompt: promptContent,
 			});
 
 			this.logger.log(
@@ -696,11 +732,14 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	/**
 	 * Disconnect from the agent and clean up resources.
 	 */
-	disconnect(): Promise<void> {
+	async disconnect(): Promise<void> {
 		this.logger.log("[AcpAdapter] Disconnecting...");
 
-		// Cancel all pending operations
+		// Cancel all pending operations (including terminals)
 		this.cancelAllOperations();
+
+		// Wait for terminal cleanup to complete
+		await this.terminalManager.killAllTerminals();
 
 		// Kill the agent process
 		if (this.agentProcess) {
@@ -719,8 +758,16 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.isInitializedFlag = false;
 		this.currentAgentId = null;
 
+		// Clear all callback references to prevent memory leaks
+		this.messageCallback = null;
+		this.errorCallback = null;
+		this.permissionCallback = null;
+		this.updateAvailableCommandsCallback = null;
+		this.addMessage = () => {};
+		this.updateLastMessage = () => {};
+		this.updateMessage = () => false;
+
 		this.logger.log("[AcpAdapter] Disconnected");
-		return Promise.resolve();
 	}
 
 	/**
@@ -924,6 +971,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					name: cmd.name,
 					description: cmd.description,
 					hint: cmd.input?.hint ?? null,
+					category: this.inferCommandCategory(cmd.name),
 				}));
 
 				if (this.updateAvailableCommandsCallback) {
@@ -933,6 +981,49 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			}
 		}
 		return Promise.resolve();
+	}
+
+	/**
+	 * Infer a command category from its name using keyword patterns.
+	 *
+	 * Maps common command name patterns to categories for UI grouping:
+	 * - search: web, search, find, grep, lookup
+	 * - action: run, test, exec, build, deploy, install, lint, format
+	 * - navigation: goto, open, jump, cd, navigate
+	 * - utility: help, clear, config, settings, status
+	 * - custom: default for unrecognized commands
+	 */
+	private inferCommandCategory(commandName: string): SlashCommandCategory {
+		const name = commandName.toLowerCase();
+
+		// Search-related commands
+		if (
+			/^(web|search|find|grep|lookup|query|browse)/.test(name) ||
+			name.includes("search")
+		) {
+			return "search";
+		}
+
+		// Action/execution commands
+		if (
+			/^(run|test|exec|build|deploy|install|lint|format|commit|push|pr|review|doctor|memory|init|compact|resume)/.test(
+				name,
+			)
+		) {
+			return "action";
+		}
+
+		// Navigation commands
+		if (/^(goto|open|jump|cd|navigate|vim)/.test(name)) {
+			return "navigation";
+		}
+
+		// Utility commands
+		if (/^(help|clear|config|settings|status|model|bug)/.test(name)) {
+			return "utility";
+		}
+
+		return "custom";
 	}
 
 	/**

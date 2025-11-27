@@ -1,4 +1,5 @@
 import * as React from "react";
+const { useCallback } = React;
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
 
 interface TextWithMentionsProps {
@@ -12,6 +13,48 @@ interface TextWithMentionsProps {
 			toLine: number;
 		};
 	};
+}
+
+/**
+ * Clickable mention link component with keyboard accessibility.
+ */
+function MentionLink({
+	noteName,
+	notePath,
+	plugin,
+	displayText,
+}: {
+	noteName: string;
+	notePath: string;
+	plugin: AgentClientPlugin;
+	displayText?: string;
+}) {
+	const handleClick = useCallback(() => {
+		plugin.app.workspace.openLinkText(notePath, "");
+	}, [plugin.app.workspace, notePath]);
+
+	const handleKeyDown = useCallback(
+		(event: React.KeyboardEvent) => {
+			if (event.key === "Enter" || event.key === " ") {
+				event.preventDefault();
+				handleClick();
+			}
+		},
+		[handleClick],
+	);
+
+	return (
+		<span
+			className="text-mention"
+			role="link"
+			tabIndex={0}
+			onClick={handleClick}
+			onKeyDown={handleKeyDown}
+			aria-label={`Open note: ${noteName}`}
+		>
+			{displayText || `@${noteName}`}
+		</span>
+	);
 }
 
 // Function to render text with @mentions and optional auto-mention
@@ -31,18 +74,13 @@ export function TextWithMentions({
 			: `@${autoMentionContext.noteName}`;
 
 		parts.push(
-			<span
+			<MentionLink
 				key="auto-mention"
-				className="text-mention"
-				onClick={() => {
-					plugin.app.workspace.openLinkText(
-						autoMentionContext.notePath,
-						"",
-					);
-				}}
-			>
-				{displayText}
-			</span>,
+				noteName={autoMentionContext.noteName}
+				notePath={autoMentionContext.notePath}
+				plugin={plugin}
+				displayText={displayText}
+			/>,
 		);
 		parts.push("\n");
 	}
@@ -67,15 +105,12 @@ export function TextWithMentions({
 		if (file) {
 			// File exists - render as clickable mention
 			parts.push(
-				<span
+				<MentionLink
 					key={match.index}
-					className="text-mention"
-					onClick={() => {
-						plugin.app.workspace.openLinkText(file.path, "");
-					}}
-				>
-					@{noteName}
-				</span>,
+					noteName={noteName}
+					notePath={file.path}
+					plugin={plugin}
+				/>,
 			);
 		} else {
 			// File doesn't exist - render as plain text

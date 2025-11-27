@@ -18,7 +18,7 @@ interface MessageContentRendererProps {
 	handlePermissionUseCase?: HandlePermissionUseCase;
 }
 
-export function MessageContentRenderer({
+export const MessageContentRenderer = React.memo(function MessageContentRenderer({
 	content,
 	plugin,
 	messageId,
@@ -91,4 +91,4 @@ export function MessageContentRenderer({
 		default:
 			return <span>Unsupported content type</span>;
 	}
-}
+});

@@ -25,10 +25,13 @@ import type {
 import type { ErrorInfo } from "../../core/domain/models/agent-error";
 import type { NoteMetadata } from "../../core/domain/ports/vault-access.port";
 import type { IVaultAccess } from "../../core/domain/ports/vault-access.port";
+import type { IPersistence } from "../../core/domain/ports/persistence.port";
+import type { MessageImage } from "../../core/domain/ports/agent-client.port";
 import type { SendMessageUseCase } from "../../core/use-cases/send-message.use-case";
 import type { ManageSessionUseCase } from "../../core/use-cases/manage-session.use-case";
 import type { HandlePermissionUseCase } from "../../core/use-cases/handle-permission.use-case";
 import type { SwitchAgentUseCase } from "../../core/use-cases/switch-agent.use-case";
+import { SessionHistoryUseCase } from "../../core/use-cases/session-history.use-case";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
 import type { MentionContext } from "../../shared/mention-utils";
 import { detectMention, replaceMention } from "../../shared/mention-utils";
@@ -87,6 +90,9 @@ export interface ChatViewModelState {
 
 	/** Last user message that can be restored after cancel */
 	lastUserMessage: string | null;
+
+	/** Whether the session history panel is shown */
+	showSessionHistory: boolean;
 }
 
 // ============================================================================
@@ -105,6 +111,9 @@ export interface SendMessageOptions {
 
 	/** Whether auto-mention is temporarily disabled */
 	isAutoMentionDisabled?: boolean;
+
+	/** Optional images to include with the message */
+	images?: MessageImage[];
 }
 
 // ============================================================================
@@ -136,6 +145,7 @@ export class ChatViewModel {
 	private manageSessionUseCase: ManageSessionUseCase;
 	private handlePermissionUseCase: HandlePermissionUseCase;
 	private switchAgentUseCase: SwitchAgentUseCase;
+	private sessionHistoryUseCase: SessionHistoryUseCase | null = null;
 
 	// ========================================
 	// Other Dependencies
@@ -147,6 +157,9 @@ export class ChatViewModel {
 	/** Vault access for note search (mention functionality) */
 	private vaultAccess: IVaultAccess;
 
+	/** Persistence adapter for session history (optional) */
+	private persistence: IPersistence | null = null;
+
 	/**
 	 * Create a new ChatViewModel.
 	 *
@@ -157,6 +170,7 @@ export class ChatViewModel {
 	 * @param switchAgentUseCase - Use case for agent switching
 	 * @param vaultAccess - Vault access port for note searching (mention functionality)
 	 * @param workingDirectory - Working directory for the agent
+	 * @param persistence - Optional persistence adapter for session history
 	 */
 	constructor(
 		plugin: AgentClientPlugin,
@@ -166,6 +180,7 @@ export class ChatViewModel {
 		switchAgentUseCase: SwitchAgentUseCase,
 		vaultAccess: IVaultAccess,
 		private workingDirectory: string,
+		persistence?: IPersistence,
 	) {
 		this.plugin = plugin;
 		this.sendMessageUseCase = sendMessageUseCase;
@@ -173,6 +188,12 @@ export class ChatViewModel {
 		this.handlePermissionUseCase = handlePermissionUseCase;
 		this.switchAgentUseCase = switchAgentUseCase;
 		this.vaultAccess = vaultAccess;
+		this.persistence = persistence || null;
+
+		// Create session history use case if persistence is available
+		if (this.persistence) {
+			this.sessionHistoryUseCase = new SessionHistoryUseCase(this.persistence);
+		}
 
 		// Initialize state
 		this.state = this.createInitialState();
@@ -265,6 +286,8 @@ export class ChatViewModel {
 			slashCommandSuggestions: [],
 			selectedSlashCommandIndex: 0,
 			lastUserMessage: null,
+			// Session history panel state
+			showSessionHistory: false,
 		};
 	}
 
@@ -538,23 +561,38 @@ export class ChatViewModel {
 		});
 
 		// Phase 2: Add user message to UI immediately
+		// Build content array with text and optional images
+		const messageContent: MessageContent[] = [];
+
+		// Add images first (if any)
+		if (options.images && options.images.length > 0) {
+			for (const img of options.images) {
+				messageContent.push({
+					type: "image",
+					data: img.data,
+					mimeType: img.mimeType,
+				});
+			}
+		}
+
+		// Add text content (with or without auto-mention context)
+		if (prepared.autoMentionContext) {
+			messageContent.push({
+				type: "text_with_context",
+				text: prepared.displayMessage,
+				autoMentionContext: prepared.autoMentionContext,
+			});
+		} else {
+			messageContent.push({
+				type: "text",
+				text: prepared.displayMessage,
+			});
+		}
+
 		const userMessage: ChatMessage = {
 			id: crypto.randomUUID(),
 			role: "user",
-			content: prepared.autoMentionContext
-				? [
-						{
-							type: "text_with_context",
-							text: prepared.displayMessage,
-							autoMentionContext: prepared.autoMentionContext,
-						},
-					]
-				: [
-						{
-							type: "text",
-							text: prepared.displayMessage,
-						},
-					],
+			content: messageContent,
 			timestamp: new Date(),
 		};
 		this.addMessage(userMessage);
@@ -576,6 +614,7 @@ export class ChatViewModel {
 				agentMessage: prepared.agentMessage,
 				displayMessage: prepared.displayMessage,
 				authMethods: this.state.session.authMethods,
+				images: options.images,
 			});
 
 			if (result.success) {
@@ -659,7 +698,8 @@ export class ChatViewModel {
 		}
 
 		const lastMessage = this.state.messages[this.state.messages.length - 1];
-		const updatedMessage = { ...lastMessage };
+		// Clone content array to avoid mutating the original
+		const updatedMessage = { ...lastMessage, content: [...lastMessage.content] };
 
 		if (content.type === "text" || content.type === "agent_thought") {
 			// Append to existing content of same type or create new content
@@ -969,13 +1009,16 @@ export class ChatViewModel {
 		const context = detectMention(input, cursorPosition, this.plugin);
 
 		if (!context) {
-			// No mention context - close dropdown
-			this.setState({
-				showMentionDropdown: false,
-				mentionSuggestions: [],
-				selectedMentionIndex: 0,
-				mentionContext: null,
-			});
+			// No mention context - close dropdown only if currently open
+			// This avoids unnecessary state updates and re-renders
+			if (this.state.showMentionDropdown) {
+				this.setState({
+					showMentionDropdown: false,
+					mentionSuggestions: [],
+					selectedMentionIndex: 0,
+					mentionContext: null,
+				});
+			}
 			return;
 		}
 
@@ -1212,6 +1255,161 @@ export class ChatViewModel {
 	}
 
 	// ========================================
+	// Session History Management
+	// ========================================
+
+	/**
+	 * Get the session history use case.
+	 * Returns null if persistence is not available.
+	 */
+	getSessionHistoryUseCase(): SessionHistoryUseCase | null {
+		return this.sessionHistoryUseCase;
+	}
+
+	/**
+	 * Check if session history is available.
+	 */
+	hasSessionHistory(): boolean {
+		return this.sessionHistoryUseCase !== null;
+	}
+
+	/**
+	 * Toggle session history panel visibility.
+	 */
+	toggleSessionHistory(): void {
+		this.setState({
+			showSessionHistory: !this.state.showSessionHistory,
+		});
+	}
+
+	/**
+	 * Open session history panel.
+	 */
+	openSessionHistory(): void {
+		this.setState({
+			showSessionHistory: true,
+		});
+	}
+
+	/**
+	 * Close session history panel.
+	 */
+	closeSessionHistory(): void {
+		this.setState({
+			showSessionHistory: false,
+		});
+	}
+
+	/**
+	 * Save current session to history.
+	 */
+	async saveCurrentSession(): Promise<void> {
+		if (!this.sessionHistoryUseCase || !this.state.session.sessionId) {
+			return;
+		}
+
+		try {
+			await this.sessionHistoryUseCase.saveSession(
+				this.state.session.sessionId,
+				this.state.session.agentId,
+				this.state.session.agentDisplayName,
+				this.workingDirectory,
+				this.state.messages,
+				this.state.session.createdAt,
+			);
+		} catch (error) {
+			console.error("[ChatViewModel] Failed to save session:", error);
+		}
+	}
+
+	/**
+	 * Restore a session from history.
+	 */
+	async restoreFromHistory(sessionId: string): Promise<boolean> {
+		if (!this.sessionHistoryUseCase) {
+			return false;
+		}
+
+		try {
+			const result = await this.sessionHistoryUseCase.restoreSession(sessionId);
+			if (!result) {
+				return false;
+			}
+
+			// Close history panel
+			this.setState({
+				showSessionHistory: false,
+			});
+
+			// Disconnect current session
+			await this.manageSessionUseCase.closeSession(this.state.session.sessionId);
+			await this.manageSessionUseCase.disconnect();
+
+			// Create new session with restored agent
+			const activeAgentId = result.session.agentId;
+			const currentAgent = this.switchAgentUseCase.getAvailableAgents()
+				.find(a => a.id === activeAgentId) || { displayName: result.session.agentDisplayName };
+
+			// Set UI with restored messages
+			this.setState({
+				messages: result.messages,
+				session: {
+					sessionId: null, // Will be set after new session creation
+					state: "initializing",
+					agentId: activeAgentId,
+					agentDisplayName: currentAgent.displayName,
+					authMethods: [],
+					createdAt: result.session.createdAt,
+					lastActivityAt: result.session.lastActivityAt,
+					workingDirectory: this.workingDirectory,
+				},
+				errorInfo: null,
+			});
+
+			// Create new session with the restored agent
+			const createResult = await this.manageSessionUseCase.createSession({
+				workingDirectory: this.workingDirectory,
+				agentId: activeAgentId,
+			});
+
+			if (createResult.success && createResult.sessionId) {
+				this.setState({
+					session: {
+						...this.state.session,
+						sessionId: createResult.sessionId,
+						state: "ready",
+						authMethods: createResult.authMethods || [],
+						lastActivityAt: new Date(),
+					},
+				});
+				return true;
+			} else {
+				this.setState({
+					session: {
+						...this.state.session,
+						state: "error",
+					},
+					errorInfo: createResult.error || {
+						title: "Session Restore Failed",
+						message: "Failed to create session after restore",
+						suggestion: "Please try again.",
+					},
+				});
+				return false;
+			}
+		} catch (error) {
+			console.error("[ChatViewModel] Failed to restore session:", error);
+			this.setState({
+				errorInfo: {
+					title: "Restore Failed",
+					message: `Failed to restore session: ${error instanceof Error ? error.message : String(error)}`,
+				},
+			});
+			return false;
+		}
+	}
+
+	// ========================================
 	// Cleanup
 	// ========================================
 
@@ -1219,6 +1417,8 @@ export class ChatViewModel {
 	 * Cleanup resources when ViewModel is destroyed.
 	 */
 	async dispose(): Promise<void> {
+		// Auto-save current session before disposing
+		await this.saveCurrentSession();
 		await this.disconnect();
 		this.listeners.clear();
 	}

@@ -7,8 +7,11 @@
  */
 
 import type { ISettingsAccess } from "../../core/domain/ports/settings-access.port";
-import type { AgentClientPluginSettings } from "../../infrastructure/obsidian-plugin/plugin";
+import type { PluginSettings } from "../../core/domain/models/settings";
 import type AgentClientPlugin from "../../infrastructure/obsidian-plugin/plugin";
+
+// Type alias for backward compatibility within this file
+type AgentClientPluginSettings = PluginSettings;
 
 /** Listener callback invoked when settings change */
 type Listener = () => void;

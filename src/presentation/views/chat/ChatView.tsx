@@ -16,7 +16,14 @@ import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plug
 // Component imports
 import { SuggestionDropdown } from "../../components/chat/SuggestionDropdown";
 import { MessageRenderer } from "../../components/chat/MessageRenderer";
+import { VirtualMessageList } from "../../components/chat/VirtualMessageList";
+import { SessionHistoryPanel } from "../../components/chat/SessionHistoryPanel";
 import { HeaderButton } from "../../components/shared/HeaderButton";
+import { TabBar, type TabId } from "../../components/shared/TabBar";
+import { TerminalPanel } from "../../components/terminal";
+import { SettingsPanel } from "../../components/settings";
+import { PtyManager } from "../../../infrastructure/pty";
+import { ClaudeConfigService } from "../../../adapters/claude-config";
 
 // Service imports
 import { NoteMentionService } from "../../../adapters/obsidian/mention-service";
@@ -32,6 +39,7 @@ import type { SlashCommand } from "../../../core/domain/models/chat-session";
 // Adapter imports
 import { AcpAdapter, type IAcpClient } from "../../../adapters/acp/acp.adapter";
 import { ObsidianVaultAdapter } from "../../../adapters/obsidian/vault.adapter";
+import { IndexedDBAdapter } from "../../../adapters/persistence/indexed-db.adapter";
 
 // Use Case imports
 import { SendMessageUseCase } from "../../../core/use-cases/send-message.use-case";
@@ -55,6 +63,16 @@ interface AppWithSettings {
 }
 
 export const VIEW_TYPE_CHAT = "agent-client-chat-view";
+
+/**
+ * Represents an image pasted into the chat input.
+ */
+export interface PastedImage {
+	id: string;
+	data: string; // Base64 encoded image data (without data URI prefix)
+	mimeType: string;
+	previewUrl: string; // Data URI for preview display
+}
 
 function ChatComponent({
 	plugin,
@@ -95,7 +113,7 @@ function ChatComponent({
 			.catch((error) => {
 				console.error("Failed to check for updates:", error);
 			});
-	}, []);
+	}, [plugin]);
 
 	const [inputValue, setInputValue] = useState("");
 	const [lastActiveNote, setLastActiveNote] = useState<NoteMetadata | null>(
@@ -104,12 +122,66 @@ function ChatComponent({
 	// Hint overlay state for slash commands
 	const [hintText, setHintText] = useState<string | null>(null);
 	const [commandText, setCommandText] = useState<string>("");
+	// Pasted images state
+	const [pastedImages, setPastedImages] = useState<PastedImage[]>([]);
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
 	const acpClientRef = useRef<IAcpClient | null>(null);
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
+
+	// Tab state
+	const [activeTab, setActiveTab] = useState<TabId>("chat");
+
+	// PTY Manager for terminal
+	const ptyManager = useMemo(() => new PtyManager(plugin), [plugin]);
+	const [isPythonAvailable, setIsPythonAvailable] = useState(false);
+
+	// Claude config service
+	const claudeConfigService = useMemo(
+		() => new ClaudeConfigService(plugin),
+		[plugin],
+	);
+	const [settingsDirty, setSettingsDirty] = useState(false);
+
+	// Detect Python on mount
+	useEffect(() => {
+		ptyManager.warmUp().then(() => {
+			ptyManager.isPythonAvailable().then(setIsPythonAvailable);
+		});
+
+		return () => {
+			ptyManager.dispose();
+		};
+	}, [ptyManager]);
+
+	// Cleanup config service on unmount
+	useEffect(() => {
+		return () => {
+			claudeConfigService.dispose();
+		};
+	}, [claudeConfigService]);
+
+	// Listen for tab switch events from commands
+	useEffect(() => {
+		const handleTabSwitch = (tabId: TabId) => {
+			setActiveTab(tabId);
+		};
+
+		const workspace = plugin.app.workspace as unknown as {
+			on: (event: string, callback: (tabId: TabId) => void) => EventRef;
+		};
+
+		const eventRef = workspace.on(
+			"agent-client:switch-tab",
+			handleTabSwitch,
+		);
+
+		return () => {
+			plugin.app.workspace.offref(eventRef);
+		};
+	}, [plugin.app.workspace]);
 
 	// Note mention service for @-mention functionality
 	const noteMentionService = useMemo(
@@ -130,6 +202,11 @@ function ChatComponent({
 	const vaultAccessAdapter = useMemo(() => {
 		return new ObsidianVaultAdapter(plugin);
 	}, [plugin]);
+
+	// Create IndexedDB persistence adapter
+	const persistenceAdapter = useMemo(() => {
+		return new IndexedDBAdapter();
+	}, []);
 
 	const updateActiveNote = useCallback(async () => {
 		const activeNote = await vaultAccessAdapter.getActiveNote();
@@ -177,6 +254,7 @@ function ChatComponent({
 			switchAgentUseCase,
 			vaultAccessAdapter,
 			vaultPath,
+			persistenceAdapter,
 		);
 	}, [
 		plugin,
@@ -186,6 +264,7 @@ function ChatComponent({
 		switchAgentUseCase,
 		vaultAccessAdapter,
 		vaultPath,
+		persistenceAdapter,
 	]);
 
 	// Store ViewModel reference in ChatView for cleanup on close
@@ -232,13 +311,16 @@ function ChatComponent({
 	const slashCommandSuggestions = vmState.slashCommandSuggestions;
 	const selectedSlashCommandIndex = vmState.selectedSlashCommandIndex;
 
+	// Session history state from ViewModel
+	const showSessionHistory = vmState.showSessionHistory;
+
 	// Helper to check if agent is currently processing a request
 	const isSending = isSendingFromVM; // Use ViewModel state
 
 	// Helper to check if session is ready for user input
 	const isSessionReady = session.state === "ready";
 
-	const getActiveAgentLabel = () => {
+	const activeAgentLabel = useMemo(() => {
 		const activeId = session.agentId;
 		if (activeId === plugin.settings.claude.id) {
 			return (
@@ -259,12 +341,10 @@ function ChatComponent({
 			(agent) => agent.id === activeId,
 		);
 		return custom?.displayName || custom?.id || activeId;
-	};
-
-	const activeAgentLabel = getActiveAgentLabel();
+	}, [session.agentId, plugin.settings]);
 
 	// Auto-scroll functions
-	const checkIfAtBottom = () => {
+	const checkIfAtBottom = useCallback(() => {
 		const container = messagesContainerRef.current;
 		if (!container) return true;
 
@@ -274,19 +354,19 @@ function ChatComponent({
 			container.scrollHeight - threshold;
 		setIsAtBottom(isNearBottom);
 		return isNearBottom;
-	};
+	}, []);
 
-	const scrollToBottom = () => {
+	const scrollToBottom = useCallback(() => {
 		const container = messagesContainerRef.current;
 		if (container) {
 			container.scrollTop = container.scrollHeight;
 		}
-	};
+	}, []);
 
 	/**
 	 * Common logic for setting cursor position after text replacement.
 	 */
-	const setTextAndFocus = (newText: string) => {
+	const setTextAndFocus = useCallback((newText: string) => {
 		setInputValue(newText);
 
 		// Set cursor position to end of text
@@ -299,45 +379,51 @@ function ChatComponent({
 				textarea.focus();
 			}
 		}, 0);
-	};
+	}, []);
 
 	// Mention handling - delegate to ViewModel
-	const selectMention = (suggestion: NoteMetadata) => {
-		const newText = viewModel.selectMention(inputValue, suggestion);
-		setTextAndFocus(newText);
-	};
+	const selectMention = useCallback(
+		(suggestion: NoteMetadata) => {
+			const newText = viewModel.selectMention(inputValue, suggestion);
+			setTextAndFocus(newText);
+		},
+		[viewModel, inputValue, setTextAndFocus],
+	);
 
 	// Slash command handling - delegate to ViewModel
-	const selectSlashCommand = (command: SlashCommand) => {
-		const newText = viewModel.selectSlashCommand(inputValue, command);
-		setInputValue(newText);
+	const selectSlashCommand = useCallback(
+		(command: SlashCommand) => {
+			const newText = viewModel.selectSlashCommand(inputValue, command);
+			setInputValue(newText);
 
-		// Setup hint overlay if command has hint
-		if (command.hint) {
-			const cmdText = `/${command.name} `;
-			setCommandText(cmdText);
-			setHintText(command.hint);
-		} else {
-			// No hint - clear hint state
-			setHintText(null);
-			setCommandText("");
-		}
-
-		// Place cursor right after command name (before hint text)
-		window.setTimeout(() => {
-			const textarea = textareaRef.current;
-			if (textarea) {
-				const cursorPos = command.hint
-					? `/${command.name} `.length
-					: newText.length;
-				textarea.selectionStart = cursorPos;
-				textarea.selectionEnd = cursorPos;
-				textarea.focus();
+			// Setup hint overlay if command has hint
+			if (command.hint) {
+				const cmdText = `/${command.name} `;
+				setCommandText(cmdText);
+				setHintText(command.hint);
+			} else {
+				// No hint - clear hint state
+				setHintText(null);
+				setCommandText("");
 			}
-		}, 0);
-	};
 
-	const adjustTextareaHeight = () => {
+			// Place cursor right after command name (before hint text)
+			window.setTimeout(() => {
+				const textarea = textareaRef.current;
+				if (textarea) {
+					const cursorPos = command.hint
+						? `/${command.name} `.length
+						: newText.length;
+					textarea.selectionStart = cursorPos;
+					textarea.selectionEnd = cursorPos;
+					textarea.focus();
+				}
+			}, 0);
+		},
+		[viewModel, inputValue],
+	);
+
+	const adjustTextareaHeight = useCallback(() => {
 		const textarea = textareaRef.current;
 		if (textarea) {
 			// Remove previous dynamic height classes
@@ -374,7 +460,7 @@ function ChatComponent({
 
 			textarea.classList.remove("textarea-auto-height");
 		}
-	};
+	}, []);
 
 	// Initialize session on mount or when agent changes
 	useEffect(() => {
@@ -458,7 +544,7 @@ function ChatComponent({
 				updateIconColor(svg);
 			}
 		}
-	}, [inputValue, isSending]);
+	}, [inputValue, isSending, pastedImages]);
 
 	// Show auto-mention notes and track selection
 	useEffect(() => {
@@ -489,13 +575,13 @@ function ChatComponent({
 			// Stop button - always active when sending
 			svg.classList.add("icon-sending");
 		} else {
-			// Send button - active when has input
-			const hasInput = inputValue.trim() !== "";
-			svg.classList.add(hasInput ? "icon-active" : "icon-inactive");
+			// Send button - active when has input (text or images)
+			const hasContent = inputValue.trim() !== "" || pastedImages.length > 0;
+			svg.classList.add(hasContent ? "icon-active" : "icon-inactive");
 		}
 	};
 
-	const createNewSession = async () => {
+	const createNewSession = useCallback(async () => {
 		if (messages.length === 0) {
 			new Notice("[Agent Client] Already a new session");
 			return;
@@ -505,9 +591,9 @@ function ChatComponent({
 		setInputValue("");
 		viewModel.toggleAutoMention(false);
 		await viewModel.restartSession();
-	};
+	}, [messages.length, logger, viewModel]);
 
-	const handleStopGeneration = async () => {
+	const handleStopGeneration = useCallback(async () => {
 		logger.log("Cancelling current operation...");
 		// Get last user message before cancel (to restore it)
 		const lastMessage = viewModel.getSnapshot().lastUserMessage;
@@ -517,152 +603,250 @@ function ChatComponent({
 		if (lastMessage) {
 			setInputValue(lastMessage);
 		}
-	};
+	}, [logger, viewModel]);
 
-	const handleSendMessage = async () => {
-		if (!inputValue.trim() || isSendingFromVM) return;
+	const handleSendMessage = useCallback(async () => {
+		// Allow sending if there's text OR images
+		const hasContent = inputValue.trim() !== "" || pastedImages.length > 0;
+		if (!hasContent || isSendingFromVM) return;
 
-		// Save input value before clearing
+		// Save input value and images before clearing
 		const messageToSend = inputValue;
+		const imagesToSend = [...pastedImages];
 
-		// Clear input and hint state immediately (before sending)
+		// Clear input, hint state, and images immediately (before sending)
 		setInputValue("");
 		setHintText(null);
 		setCommandText("");
+		setPastedImages([]);
 		setIsAtBottom(true);
 
-		// Send message via ViewModel
+		// Send message via ViewModel with images
 		await viewModel.sendMessage(messageToSend, {
 			activeNote: lastActiveNote,
 			vaultBasePath:
 				(plugin.app.vault.adapter as VaultAdapterWithBasePath)
 					.basePath || "",
 			isAutoMentionDisabled: isAutoMentionTemporarilyDisabled,
+			images: imagesToSend.map((img) => ({
+				data: img.data,
+				mimeType: img.mimeType,
+			})),
 		});
 
 		// Scroll after sending
 		window.setTimeout(() => {
 			scrollToBottom();
 		}, 0);
-	};
+	}, [
+		inputValue,
+		pastedImages,
+		isSendingFromVM,
+		viewModel,
+		lastActiveNote,
+		plugin.app.vault.adapter,
+		isAutoMentionTemporarilyDisabled,
+		scrollToBottom,
+	]);
 
 	/**
 	 * Handle dropdown keyboard navigation.
 	 * Common logic for both mention and slash command dropdowns.
 	 */
-	const handleDropdownKeyPress = (e: React.KeyboardEvent): boolean => {
-		// Check which dropdown is active
-		const isSlashCommandActive = showSlashCommandDropdown;
-		const isMentionActive = showMentionDropdown;
+	const handleDropdownKeyPress = useCallback(
+		(e: React.KeyboardEvent): boolean => {
+			// Check which dropdown is active
+			const isSlashCommandActive = showSlashCommandDropdown;
+			const isMentionActive = showMentionDropdown;
 
-		if (!isSlashCommandActive && !isMentionActive) {
-			return false; // No dropdown active
-		}
-
-		// Arrow navigation
-		if (e.key === "ArrowDown") {
-			e.preventDefault();
-			if (isSlashCommandActive) {
-				viewModel.navigateSlashCommandDropdown("down");
-			} else {
-				viewModel.navigateMentionDropdown("down");
+			if (!isSlashCommandActive && !isMentionActive) {
+				return false; // No dropdown active
 			}
-			return true;
-		}
 
-		if (e.key === "ArrowUp") {
-			e.preventDefault();
-			if (isSlashCommandActive) {
-				viewModel.navigateSlashCommandDropdown("up");
-			} else {
-				viewModel.navigateMentionDropdown("up");
-			}
-			return true;
-		}
-
-		// Select item (Enter or Tab)
-		if (e.key === "Enter" || e.key === "Tab") {
-			e.preventDefault();
-			if (isSlashCommandActive) {
-				const selectedCommand =
-					slashCommandSuggestions[selectedSlashCommandIndex];
-				if (selectedCommand) {
-					selectSlashCommand(selectedCommand);
+			// Arrow navigation
+			if (e.key === "ArrowDown") {
+				e.preventDefault();
+				if (isSlashCommandActive) {
+					viewModel.navigateSlashCommandDropdown("down");
+				} else {
+					viewModel.navigateMentionDropdown("down");
 				}
-			} else {
-				const selectedSuggestion =
-					mentionSuggestions[selectedMentionIndex];
-				if (selectedSuggestion) {
-					selectMention(selectedSuggestion);
+				return true;
+			}
+
+			if (e.key === "ArrowUp") {
+				e.preventDefault();
+				if (isSlashCommandActive) {
+					viewModel.navigateSlashCommandDropdown("up");
+				} else {
+					viewModel.navigateMentionDropdown("up");
+				}
+				return true;
+			}
+
+			// Select item (Enter or Tab)
+			if (e.key === "Enter" || e.key === "Tab") {
+				e.preventDefault();
+				if (isSlashCommandActive) {
+					const selectedCommand =
+						slashCommandSuggestions[selectedSlashCommandIndex];
+					if (selectedCommand) {
+						selectSlashCommand(selectedCommand);
+					}
+				} else {
+					const selectedSuggestion =
+						mentionSuggestions[selectedMentionIndex];
+					if (selectedSuggestion) {
+						selectMention(selectedSuggestion);
+					}
+				}
+				return true;
+			}
+
+			// Close dropdown (Escape)
+			if (e.key === "Escape") {
+				e.preventDefault();
+				if (isSlashCommandActive) {
+					viewModel.closeSlashCommandDropdown();
+				} else {
+					viewModel.closeMentionDropdown();
+				}
+				return true;
+			}
+
+			return false;
+		},
+		[
+			showSlashCommandDropdown,
+			showMentionDropdown,
+			viewModel,
+			slashCommandSuggestions,
+			selectedSlashCommandIndex,
+			selectSlashCommand,
+			mentionSuggestions,
+			selectedMentionIndex,
+			selectMention,
+		],
+	);
+
+	const handleKeyPress = useCallback(
+		(e: React.KeyboardEvent) => {
+			// Handle dropdown navigation first (both mention and slash command)
+			if (handleDropdownKeyPress(e)) {
+				return; // Handled by dropdown
+			}
+
+			// Normal input handling
+			if (
+				e.key === "Enter" &&
+				!e.shiftKey &&
+				!e.nativeEvent.isComposing
+			) {
+				e.preventDefault();
+				// Only send if send button would not be disabled (same condition as button)
+				const hasContent = inputValue.trim() !== "" || pastedImages.length > 0;
+				const buttonDisabled = !isSending && (!hasContent || !isSessionReady);
+				if (!buttonDisabled && !isSending) {
+					handleSendMessage();
 				}
 			}
-			return true;
-		}
+		},
+		[
+			handleDropdownKeyPress,
+			isSending,
+			inputValue,
+			pastedImages,
+			isSessionReady,
+			handleSendMessage,
+		],
+	);
 
-		// Close dropdown (Escape)
-		if (e.key === "Escape") {
+	const handleInputChange = useCallback(
+		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+			const newValue = e.target.value;
+			const cursorPosition = e.target.selectionStart || 0;
+
+			setInputValue(newValue);
+
+			// Hide hint overlay when user modifies the input
+			// (hint should only show right after command selection)
+			if (hintText) {
+				// Check if user changed the hint text
+				const expectedText = commandText + hintText;
+				if (newValue !== expectedText) {
+					setHintText(null);
+					setCommandText("");
+				}
+			}
+
+			// Update mention suggestions via ViewModel
+			viewModel.updateMentionSuggestions(newValue, cursorPosition);
+
+			// Update slash command suggestions via ViewModel
+			viewModel.updateSlashCommandSuggestions(newValue, cursorPosition);
+		},
+		[hintText, commandText, viewModel],
+	);
+
+	/**
+	 * Handle paste events to extract images from clipboard.
+	 */
+	const handlePaste = useCallback(
+		(e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+			const items = e.clipboardData?.items;
+			if (!items) return;
+
+			const imageItems: DataTransferItem[] = [];
+			for (let i = 0; i < items.length; i++) {
+				const item = items[i];
+				if (item.type.startsWith("image/")) {
+					imageItems.push(item);
+				}
+			}
+
+			// If no images, let default paste behavior handle it (text)
+			if (imageItems.length === 0) return;
+
+			// Prevent default paste behavior for images
 			e.preventDefault();
-			if (isSlashCommandActive) {
-				viewModel.closeSlashCommandDropdown();
-			} else {
-				viewModel.closeMentionDropdown();
+
+			// Process each image
+			for (const item of imageItems) {
+				const file = item.getAsFile();
+				if (!file) continue;
+
+				const reader = new FileReader();
+				reader.onload = (event) => {
+					const result = event.target?.result;
+					if (typeof result !== "string") return;
+
+					// result is a data URI: "data:image/png;base64,..."
+					const [prefix, base64Data] = result.split(",");
+					const mimeType = prefix.split(":")[1]?.split(";")[0] || "image/png";
+
+					const newImage: PastedImage = {
+						id: crypto.randomUUID(),
+						data: base64Data,
+						mimeType,
+						previewUrl: result,
+					};
+
+					setPastedImages((prev) => [...prev, newImage]);
+				};
+				reader.readAsDataURL(file);
 			}
-			return true;
-		}
+		},
+		[],
+	);
 
-		return false;
-	};
+	/**
+	 * Remove a pasted image from the preview.
+	 */
+	const removePastedImage = useCallback((imageId: string) => {
+		setPastedImages((prev) => prev.filter((img) => img.id !== imageId));
+	}, []);
 
-	const handleKeyPress = (e: React.KeyboardEvent) => {
-		// Handle dropdown navigation first (both mention and slash command)
-		if (handleDropdownKeyPress(e)) {
-			return; // Handled by dropdown
-		}
-
-		// Normal input handling
-		if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-			e.preventDefault();
-			// Only send if send button would not be disabled (same condition as button)
-			const buttonDisabled =
-				!isSending && (inputValue.trim() === "" || !isSessionReady);
-			if (!buttonDisabled && !isSending) {
-				handleSendMessage();
-			}
-		}
-	};
-
-	const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-		const newValue = e.target.value;
-		const cursorPosition = e.target.selectionStart || 0;
-
-		logger.log(
-			"[DEBUG] Input changed:",
-			newValue,
-			"cursor:",
-			cursorPosition,
-		);
-
-		setInputValue(newValue);
-
-		// Hide hint overlay when user modifies the input
-		// (hint should only show right after command selection)
-		if (hintText) {
-			// Check if user changed the hint text
-			const expectedText = commandText + hintText;
-			if (newValue !== expectedText) {
-				setHintText(null);
-				setCommandText("");
-			}
-		}
-
-		// Update mention suggestions via ViewModel
-		viewModel.updateMentionSuggestions(newValue, cursorPosition);
-
-		// Update slash command suggestions via ViewModel
-		viewModel.updateSlashCommandSuggestions(newValue, cursorPosition);
-	};
-
-	const handleExportChat = async () => {
+	const handleExportChat = useCallback(async () => {
 		if (messages.length === 0) {
 			new Notice("[Agent Client] No messages to export");
 			return;
@@ -684,215 +868,363 @@ function ChatComponent({
 			new Notice("[Agent Client] Failed to export chat");
 			logger.error("Export error:", error);
 		}
-	};
+	}, [messages, plugin, session, logger]);
+
+	const openSettings = useCallback(() => {
+		// Open plugin settings
+		const appWithSettings = plugin.app as unknown as AppWithSettings;
+		appWithSettings.setting.open();
+		appWithSettings.setting.openTabById(plugin.manifest.id);
+	}, [plugin]);
+
+	const openInNewPane = useCallback(() => {
+		plugin.openInNewPane();
+	}, [plugin]);
+
+	const closeMentionDropdown = useCallback(() => {
+		viewModel.closeMentionDropdown();
+	}, [viewModel]);
+
+	const closeSlashCommandDropdown = useCallback(() => {
+		viewModel.closeSlashCommandDropdown();
+	}, [viewModel]);
+
+	// Session history handlers
+	const handleOpenHistory = useCallback(() => {
+		viewModel.openSessionHistory();
+	}, [viewModel]);
+
+	const handleCloseHistory = useCallback(() => {
+		viewModel.closeSessionHistory();
+	}, [viewModel]);
+
+	const handleSelectSession = useCallback(async (sessionId: string) => {
+		await viewModel.restoreFromHistory(sessionId);
+	}, [viewModel]);
+
+	// Get session history use case for the panel
+	const sessionHistoryUseCase = viewModel.getSessionHistoryUseCase();
 
 	return (
 		<div className="chat-view-container">
-			<div className="chat-view-header">
-				<h3 className="chat-view-header-title">{activeAgentLabel}</h3>
-				{isUpdateAvailable && (
-					<p className="chat-view-header-update">Update available!</p>
-				)}
-				<div className="chat-view-header-actions">
-					<HeaderButton
-						iconName="plus"
-						tooltip="New chat"
-						onClick={createNewSession}
-					/>
-					<HeaderButton
-						iconName="save"
-						tooltip="Export chat to Markdown"
-						onClick={handleExportChat}
-					/>
-					<HeaderButton
-						iconName="settings"
-						tooltip="Settings"
-						onClick={() => {
-							// Open plugin settings
-							const appWithSettings =
-								plugin.app as unknown as AppWithSettings;
-							appWithSettings.setting.open();
-							appWithSettings.setting.openTabById(
-								plugin.manifest.id,
-							);
-						}}
-					/>
-				</div>
-			</div>
+			<TabBar
+				activeTab={activeTab}
+				onTabChange={setActiveTab}
+				terminalStatus={ptyManager.status}
+				settingsDirty={settingsDirty}
+			/>
 
-			<div ref={messagesContainerRef} className="chat-view-messages">
-				{errorInfo ? (
-					<div className="chat-error-container">
-						<h4 className="chat-error-title">{errorInfo.title}</h4>
-						<p className="chat-error-message">
-							{errorInfo.message}
-						</p>
-						{errorInfo.suggestion && (
-							<p className="chat-error-suggestion">
-								💡 {errorInfo.suggestion}
+			{activeTab === "chat" && (
+				<>
+					<div className="chat-view-header">
+						<h3 className="chat-view-header-title">
+							{activeAgentLabel}
+						</h3>
+						{isUpdateAvailable && (
+							<p className="chat-view-header-update">
+								Update available!
 							</p>
 						)}
-						<button
-							onClick={() => viewModel.clearError()}
-							className="chat-error-button"
-						>
-							OK
-						</button>
+						<div className="chat-view-header-actions">
+							<HeaderButton
+								iconName="plus"
+								tooltip="New chat"
+								onClick={createNewSession}
+							/>
+							{sessionHistoryUseCase && (
+								<HeaderButton
+									iconName="history"
+									tooltip="Session history"
+									onClick={handleOpenHistory}
+								/>
+							)}
+							<HeaderButton
+								iconName="save"
+								tooltip="Export chat to Markdown"
+								onClick={handleExportChat}
+							/>
+							<HeaderButton
+								iconName="split-square-horizontal"
+								tooltip="Open in new pane"
+								onClick={openInNewPane}
+							/>
+							<HeaderButton
+								iconName="settings"
+								tooltip="Settings"
+								onClick={openSettings}
+							/>
+						</div>
 					</div>
-				) : messages.length === 0 ? (
-					<div className="chat-empty-state">
-						{!isSessionReady
-							? `Connecting to ${activeAgentLabel}...`
-							: `Start a conversation with ${activeAgentLabel}...`}
-					</div>
-				) : (
-					<>
-						{messages.map((message) => (
-							<MessageRenderer
-								key={message.id}
-								message={message}
+
+					<div
+						ref={messagesContainerRef}
+						className="chat-view-messages"
+					>
+						{errorInfo ? (
+							<div
+								className="chat-error-container"
+								role="alert"
+								aria-live="assertive"
+							>
+								<h4 className="chat-error-title">
+									{errorInfo.title}
+								</h4>
+								<p className="chat-error-message">
+									{errorInfo.message}
+								</p>
+								{errorInfo.suggestion && (
+									<p className="chat-error-suggestion">
+										<span aria-hidden="true">
+											&#128161;
+										</span>
+										<span className="sr-only">
+											Suggestion:
+										</span>{" "}
+										{errorInfo.suggestion}
+									</p>
+								)}
+								<button
+									type="button"
+									onClick={() => viewModel.clearError()}
+									className="chat-error-button"
+								>
+									OK
+								</button>
+							</div>
+						) : messages.length === 0 ? (
+							<div className="chat-empty-state">
+								{!isSessionReady
+									? `Connecting to ${activeAgentLabel}...`
+									: `Start a conversation with ${activeAgentLabel}...`}
+							</div>
+						) : (
+							<VirtualMessageList
+								messages={messages}
 								plugin={plugin}
 								acpClient={acpClientRef.current || undefined}
 								handlePermissionUseCase={
 									handlePermissionUseCase
 								}
+								containerRef={messagesContainerRef}
+								isAtBottom={isAtBottom}
+								onScrollChange={setIsAtBottom}
+								isSending={isSending}
 							/>
-						))}
-						{isSending && (
-							<div className="loading-indicator">
-								<div className="loading-dots">
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-									<div className="loading-dot"></div>
-								</div>
-							</div>
-						)}
-					</>
-				)}
-			</div>
-
-			<div className="chat-input-container">
-				<div className="chat-input-wrapper">
-					{/* Mention Dropdown - overlay positioned */}
-					{(() => {
-						logger.log("[DEBUG] Dropdown render check:", {
-							showMentionDropdown,
-							suggestionsCount: mentionSuggestions.length,
-							selectedIndex: selectedMentionIndex,
-						});
-						return null;
-					})()}
-					{showMentionDropdown && (
-						<SuggestionDropdown
-							type="mention"
-							items={mentionSuggestions}
-							selectedIndex={selectedMentionIndex}
-							onSelect={selectMention}
-							onClose={() => viewModel.closeMentionDropdown()}
-							plugin={plugin}
-							view={view}
-						/>
-					)}
-					{showSlashCommandDropdown && (
-						<SuggestionDropdown
-							type="slash-command"
-							items={slashCommandSuggestions}
-							selectedIndex={selectedSlashCommandIndex}
-							onSelect={selectSlashCommand}
-							onClose={() =>
-								viewModel.closeSlashCommandDropdown()
-							}
-							plugin={plugin}
-							view={view}
-						/>
-					)}
-					{settings.autoMentionActiveNote && lastActiveNote && (
-						<div className="auto-mention-inline">
-							<span
-								className={`mention-badge ${isAutoMentionTemporarilyDisabled ? "disabled" : ""}`}
-							>
-								@{lastActiveNote.name}
-								{lastActiveNote.selection && (
-									<span className="selection-indicator">
-										{":"}
-										{lastActiveNote.selection.from.line + 1}
-										-{lastActiveNote.selection.to.line + 1}
-									</span>
-								)}
-							</span>
-							<button
-								className="auto-mention-toggle-btn"
-								onClick={(e) => {
-									const newDisabledState =
-										!isAutoMentionTemporarilyDisabled;
-									viewModel.toggleAutoMention(
-										newDisabledState,
-									);
-									const iconName = newDisabledState
-										? "x"
-										: "plus";
-									setIcon(e.currentTarget, iconName);
-								}}
-								title={
-									isAutoMentionTemporarilyDisabled
-										? "Enable auto-mention"
-										: "Temporarily disable auto-mention"
-								}
-								ref={(el) => {
-									if (el) {
-										const iconName =
-											isAutoMentionTemporarilyDisabled
-												? "plus"
-												: "x";
-										setIcon(el, iconName);
-									}
-								}}
-							/>
-						</div>
-					)}
-					<div className="textarea-wrapper">
-						<textarea
-							ref={textareaRef}
-							value={inputValue}
-							onChange={handleInputChange}
-							onKeyDown={handleKeyPress}
-							placeholder={`Message ${activeAgentLabel} - @ to mention notes${session.availableCommands && session.availableCommands.length > 0 ? ", / for commands" : ""}`}
-							className={`chat-input-textarea ${settings.autoMentionActiveNote && lastActiveNote ? "has-auto-mention" : ""}`}
-							rows={1}
-						/>
-						{hintText && (
-							<div className="hint-overlay" aria-hidden="true">
-								<span className="invisible">{commandText}</span>
-								<span className="hint-text">{hintText}</span>
-							</div>
 						)}
 					</div>
-					<button
-						ref={sendButtonRef}
-						onClick={
-							isSending ? handleStopGeneration : handleSendMessage
-						}
-						disabled={
-							!isSending &&
-							(inputValue.trim() === "" || !isSessionReady)
-						}
-						className={`chat-send-button ${isSending ? "sending" : ""} ${!isSending && (inputValue.trim() === "" || !isSessionReady) ? "disabled" : ""}`}
-						title={
-							!isSessionReady
-								? "Connecting..."
-								: isSending
-									? "Stop generation"
-									: "Send message"
-						}
-					></button>
-				</div>
-			</div>
+
+					<div className="chat-input-container">
+						<div className="chat-input-wrapper">
+							{/* Mention Dropdown - overlay positioned */}
+							{showMentionDropdown && (
+								<SuggestionDropdown
+									type="mention"
+									items={mentionSuggestions}
+									selectedIndex={selectedMentionIndex}
+									onSelect={selectMention}
+									onClose={closeMentionDropdown}
+									plugin={plugin}
+									view={view}
+									searchQuery={inputValue}
+								/>
+							)}
+							{showSlashCommandDropdown && (
+								<SuggestionDropdown
+									type="slash-command"
+									items={slashCommandSuggestions}
+									selectedIndex={selectedSlashCommandIndex}
+									onSelect={selectSlashCommand}
+									onClose={closeSlashCommandDropdown}
+									plugin={plugin}
+									view={view}
+									searchQuery={inputValue}
+								/>
+							)}
+							{settings.autoMentionActiveNote &&
+								lastActiveNote && (
+									<div className="auto-mention-inline">
+										<span
+											className={`mention-badge ${isAutoMentionTemporarilyDisabled ? "disabled" : ""}`}
+										>
+											@{lastActiveNote.name}
+											{lastActiveNote.selection && (
+												<span className="selection-indicator">
+													{":"}
+													{lastActiveNote.selection
+														.from.line + 1}
+													-
+													{lastActiveNote.selection
+														.to.line + 1}
+												</span>
+											)}
+										</span>
+										<button
+											type="button"
+											className="auto-mention-toggle-btn"
+											onClick={(e) => {
+												const newDisabledState =
+													!isAutoMentionTemporarilyDisabled;
+												viewModel.toggleAutoMention(
+													newDisabledState,
+												);
+												const iconName =
+													newDisabledState
+														? "x"
+														: "plus";
+												setIcon(
+													e.currentTarget,
+													iconName,
+												);
+											}}
+											title={
+												isAutoMentionTemporarilyDisabled
+													? "Enable auto-mention"
+													: "Temporarily disable auto-mention"
+											}
+											aria-label={
+												isAutoMentionTemporarilyDisabled
+													? "Enable auto-mention"
+													: "Temporarily disable auto-mention"
+											}
+											aria-pressed={
+												!isAutoMentionTemporarilyDisabled
+											}
+											ref={(el) => {
+												if (el) {
+													const iconName =
+														isAutoMentionTemporarilyDisabled
+															? "plus"
+															: "x";
+													setIcon(el, iconName);
+												}
+											}}
+										/>
+									</div>
+								)}
+							{/* Image Preview - shown above textarea when images are pasted */}
+							{pastedImages.length > 0 && (
+								<div
+									className="pasted-images-preview"
+									role="list"
+									aria-label="Pasted images"
+								>
+									{pastedImages.map((img) => (
+										<div
+											key={img.id}
+											className="pasted-image-item"
+											role="listitem"
+										>
+											<img
+												src={img.previewUrl}
+												alt="Pasted image preview"
+												className="pasted-image-thumbnail"
+											/>
+											<button
+												type="button"
+												className="pasted-image-remove"
+												onClick={() =>
+													removePastedImage(img.id)
+												}
+												title="Remove image"
+												aria-label="Remove image"
+												ref={(el) => {
+													if (el) {
+														setIcon(el, "x");
+													}
+												}}
+											/>
+										</div>
+									))}
+								</div>
+							)}
+							<div className="textarea-wrapper">
+								<textarea
+									ref={textareaRef}
+									value={inputValue}
+									onChange={handleInputChange}
+									onKeyDown={handleKeyPress}
+									onPaste={handlePaste}
+									placeholder={`Message ${activeAgentLabel} - @ to mention notes${session.availableCommands && session.availableCommands.length > 0 ? ", / for commands" : ""}`}
+									className={`chat-input-textarea ${settings.autoMentionActiveNote && lastActiveNote ? "has-auto-mention" : ""} ${pastedImages.length > 0 ? "has-images" : ""}`}
+									rows={1}
+								/>
+								{hintText && (
+									<div
+										className="hint-overlay"
+										aria-hidden="true"
+									>
+										<span className="invisible">
+											{commandText}
+										</span>
+										<span className="hint-text">
+											{hintText}
+										</span>
+									</div>
+								)}
+							</div>
+							<button
+								ref={sendButtonRef}
+								type="button"
+								onClick={
+									isSending
+										? handleStopGeneration
+										: handleSendMessage
+								}
+								disabled={
+									!isSending &&
+									((inputValue.trim() === "" &&
+										pastedImages.length === 0) ||
+										!isSessionReady)
+								}
+								className={`chat-send-button ${isSending ? "sending" : ""} ${!isSending && ((inputValue.trim() === "" && pastedImages.length === 0) || !isSessionReady) ? "disabled" : ""}`}
+								title={
+									!isSessionReady
+										? "Connecting..."
+										: isSending
+											? "Stop generation"
+											: "Send message"
+								}
+								aria-label={
+									!isSessionReady
+										? "Connecting to agent"
+										: isSending
+											? "Stop generation"
+											: "Send message"
+								}
+							></button>
+						</div>
+					</div>
+
+					{/* Session History Panel - overlay when open */}
+					{showSessionHistory && sessionHistoryUseCase && (
+						<SessionHistoryPanel
+							historyUseCase={sessionHistoryUseCase}
+							onSelectSession={handleSelectSession}
+							onClose={handleCloseHistory}
+							currentSessionId={session.sessionId}
+						/>
+					)}
+				</>
+			)}
+
+			{activeTab === "terminal" && (
+				<TerminalPanel
+					plugin={plugin}
+					ptyManager={ptyManager}
+					isActive={activeTab === "terminal"}
+					isPythonAvailable={isPythonAvailable}
+					claudePath={plugin.settings.claude.command || "claude"}
+					workingDirectory={vaultPath}
+				/>
+			)}
+
+			{activeTab === "settings" && (
+				<SettingsPanel
+					plugin={plugin}
+					configService={claudeConfigService}
+					onDirtyChange={setSettingsDirty}
+				/>
+			)}
 		</div>
 	);
 }

@@ -56,6 +56,23 @@ export interface AuthenticationMethod {
 // ============================================================================
 
 /**
+ * Category for slash commands to enable grouping in the UI.
+ *
+ * Categories help organize commands by their purpose:
+ * - search: Commands for searching (web, files, code)
+ * - action: Commands that perform actions (run, test, deploy)
+ * - navigation: Commands for navigation (goto, open)
+ * - utility: General utility commands (clear, help)
+ * - custom: User-defined or uncategorized commands
+ */
+export type SlashCommandCategory =
+	| "search"
+	| "action"
+	| "navigation"
+	| "utility"
+	| "custom";
+
+/**
  * Represents a slash command available in the current session.
  *
  * Slash commands provide quick access to specific agent capabilities
@@ -79,6 +96,12 @@ export interface SlashCommand {
 	 * Example: "query to search for" for the /web command
 	 */
 	hint?: string | null;
+
+	/**
+	 * Category for grouping related commands in the UI.
+	 * If not provided, defaults to "custom".
+	 */
+	category?: SlashCommandCategory;
 }
 
 // ============================================================================

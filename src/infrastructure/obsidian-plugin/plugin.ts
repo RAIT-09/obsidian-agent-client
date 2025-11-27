@@ -14,80 +14,27 @@ import {
 	normalizeCustomAgent,
 	ensureUniqueCustomAgentIds,
 } from "../../shared/settings-utils";
-import {
+import type {
 	AgentEnvVar,
-	GeminiAgentSettings,
-	ClaudeAgentSettings,
-	CodexAgentSettings,
 	CustomAgentSettings,
 } from "../../core/domain/models/agent-config";
+import type { PluginSettings } from "../../core/domain/models/settings";
+import { DEFAULT_PLUGIN_SETTINGS } from "../../core/domain/models/settings";
 
-// Re-export for backward compatibility
+// Re-export domain types for backward compatibility
 export type { AgentEnvVar, CustomAgentSettings };
 
-export interface AgentClientPluginSettings {
-	gemini: GeminiAgentSettings;
-	claude: ClaudeAgentSettings;
-	codex: CodexAgentSettings;
-	customAgents: CustomAgentSettings[];
-	activeAgentId: string;
-	autoAllowPermissions: boolean;
-	autoMentionActiveNote: boolean;
-	debugMode: boolean;
-	nodePath: string;
-	exportSettings: {
-		defaultFolder: string;
-		filenameTemplate: string;
-		autoExportOnNewChat: boolean;
-		autoExportOnCloseChat: boolean;
-		openFileAfterExport: boolean;
-	};
-	// WSL settings (Windows only)
-	windowsWslMode: boolean;
-	windowsWslDistribution?: string;
-}
+/**
+ * Plugin settings type alias.
+ * Re-exports PluginSettings from domain layer for backward compatibility.
+ */
+export type AgentClientPluginSettings = PluginSettings;
 
-const DEFAULT_SETTINGS: AgentClientPluginSettings = {
-	claude: {
-		id: "claude-code-acp",
-		displayName: "Claude Code",
-		apiKey: "",
-		command: "",
-		args: [],
-		env: [],
-	},
-	codex: {
-		id: "codex-acp",
-		displayName: "Codex",
-		apiKey: "",
-		command: "",
-		args: [],
-		env: [],
-	},
-	gemini: {
-		id: "gemini-cli",
-		displayName: "Gemini CLI",
-		apiKey: "",
-		command: "",
-		args: ["--experimental-acp"],
-		env: [],
-	},
-	customAgents: [],
-	activeAgentId: "claude-code-acp",
-	autoAllowPermissions: false,
-	autoMentionActiveNote: true,
-	debugMode: false,
-	nodePath: "",
-	exportSettings: {
-		defaultFolder: "Agent Client",
-		filenameTemplate: "agent_client_{date}_{time}",
-		autoExportOnNewChat: false,
-		autoExportOnCloseChat: false,
-		openFileAfterExport: true,
-	},
-	windowsWslMode: false,
-	windowsWslDistribution: undefined,
-};
+/**
+ * Default settings for the plugin.
+ * Uses values from domain layer.
+ */
+const DEFAULT_SETTINGS: AgentClientPluginSettings = DEFAULT_PLUGIN_SETTINGS;
 
 export default class AgentClientPlugin extends Plugin {
 	settings: AgentClientPluginSettings;
@@ -122,30 +69,62 @@ export default class AgentClientPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "open-chat-in-new-pane",
+			name: "Open chat in new pane",
+			callback: () => {
+				this.openInNewPane();
+			},
+		});
+
 		// Register agent-specific commands
 		this.registerAgentCommands();
 		this.registerPermissionCommands();
+		this.registerTabSwitchCommands();
 
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
 	}
 
-	onunload() {}
+	async onunload() {
+		// Cleanup AcpAdapter if active
+		if (this.acpAdapter) {
+			try {
+				await this.acpAdapter.disconnect();
+			} catch {
+				// Ignore disconnect errors during unload
+			}
+			this.acpAdapter = null;
+		}
+	}
 
-	async activateView() {
+	async activateView(forceNewPane = false) {
 		const { workspace } = this.app;
 
 		let leaf: WorkspaceLeaf | null = null;
-		const leaves = workspace.getLeavesOfType(VIEW_TYPE_CHAT);
 
-		if (leaves.length > 0) {
-			leaf = leaves[0];
-		} else {
-			leaf = workspace.getRightLeaf(false);
+		if (forceNewPane) {
+			// Always create a new pane when forced
+			leaf = workspace.getLeaf("split", "vertical");
 			if (leaf) {
 				await leaf.setViewState({
 					type: VIEW_TYPE_CHAT,
 					active: true,
 				});
+			}
+		} else {
+			// Default behavior: reuse existing leaf or create in right sidebar
+			const leaves = workspace.getLeavesOfType(VIEW_TYPE_CHAT);
+
+			if (leaves.length > 0) {
+				leaf = leaves[0];
+			} else {
+				leaf = workspace.getRightLeaf(false);
+				if (leaf) {
+					await leaf.setViewState({
+						type: VIEW_TYPE_CHAT,
+						active: true,
+					});
+				}
 			}
 		}
 
@@ -164,6 +143,13 @@ export default class AgentClientPlugin extends Plugin {
 				}, 0);
 			}
 		}
+	}
+
+	/**
+	 * Open chat view in a new split pane (vertical by default)
+	 */
+	async openInNewPane() {
+		await this.activateView(true);
 	}
 
 	/**
@@ -267,6 +253,41 @@ export default class AgentClientPlugin extends Plugin {
 			callback: async () => {
 				await this.activateView();
 				this.app.workspace.trigger("agent-client:toggle-auto-mention");
+			},
+		});
+	}
+
+	private registerTabSwitchCommands(): void {
+		this.addCommand({
+			id: "switch-to-chat-tab",
+			name: "Switch to Chat tab",
+			hotkeys: [{ modifiers: ["Mod"], key: "1" }],
+			callback: () => {
+				this.app.workspace.trigger("agent-client:switch-tab", "chat");
+			},
+		});
+
+		this.addCommand({
+			id: "switch-to-terminal-tab",
+			name: "Switch to Terminal tab",
+			hotkeys: [{ modifiers: ["Mod"], key: "2" }],
+			callback: () => {
+				this.app.workspace.trigger(
+					"agent-client:switch-tab",
+					"terminal",
+				);
+			},
+		});
+
+		this.addCommand({
+			id: "switch-to-settings-tab",
+			name: "Switch to Settings tab",
+			hotkeys: [{ modifiers: ["Mod"], key: "3" }],
+			callback: () => {
+				this.app.workspace.trigger(
+					"agent-client:switch-tab",
+					"settings",
+				);
 			},
 		});
 	}

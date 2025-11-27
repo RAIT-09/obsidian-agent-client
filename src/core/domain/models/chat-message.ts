@@ -55,7 +55,8 @@ export interface DiffContent {
 	type: "diff";
 	path: string;
 	newText: string;
-	oldText?: string | null; // null or undefined for new files
+	/** null or undefined for new files */
+	oldText?: string | null;
 }
 
 /**
@@ -75,7 +76,8 @@ export interface TerminalContent {
  */
 export interface ToolCallLocation {
 	path: string;
-	line?: number | null; // null if the entire file is affected
+	/** null if the entire file is affected */
+	line?: number | null;
 }
 
 /**
@@ -107,8 +109,8 @@ export interface ToolCallUpdate {
 	kind?: ToolKind | null;
 	content?: ToolCallContent[] | null;
 	locations?: ToolCallLocation[] | null;
-	rawInput?: { [k: string]: unknown }; // Tool's input parameters
-	rawOutput?: { [k: string]: unknown }; // Tool's output data
+	rawInput?: { [k: string]: unknown };
+	rawOutput?: { [k: string]: unknown };
 }
 
 // ============================================================================
@@ -133,6 +135,7 @@ export interface ChatMessage {
  *
  * This union type represents all possible content blocks:
  * - text: Plain text from user or agent
+ * - text_with_context: Text with auto-mention context
  * - agent_thought: Agent's internal reasoning (often collapsed in UI)
  * - image: Visual content (base64 encoded)
  * - tool_call: Agent's tool execution with results
@@ -144,7 +147,7 @@ export type MessageContent =
 	| {
 			type: "text";
 			text: string;
-	}
+	  }
 	| {
 			type: "text_with_context";
 			text: string;
@@ -156,17 +159,17 @@ export type MessageContent =
 					toLine: number;
 				};
 			};
-	}
+	  }
 	| {
 			type: "agent_thought";
 			text: string;
-	}
+	  }
 	| {
 			type: "image";
 			data: string; // Base64 encoded image data
 			mimeType: string; // e.g., "image/png"
 			uri?: string; // Optional source URI
-	}
+	  }
 	| {
 			type: "tool_call";
 			toolCallId: string;
@@ -184,11 +187,11 @@ export type MessageContent =
 				isCancelled?: boolean;
 				isActive?: boolean;
 			};
-	}
+	  }
 	| {
 			type: "plan";
 			entries: PlanEntry[];
-	}
+	  }
 	| {
 			type: "permission_request";
 			toolCall: ToolCallUpdate;
@@ -196,8 +199,8 @@ export type MessageContent =
 			selectedOptionId?: string;
 			isCancelled?: boolean;
 			isActive?: boolean;
-	}
+	  }
 	| {
 			type: "terminal";
 			terminalId: string;
-	};
+	  };

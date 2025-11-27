@@ -1,5 +1,5 @@
 import * as React from "react";
-const { useState } = React;
+const { useState, useMemo, useCallback } = React;
 import type { MessageContent } from "../../../core/domain/models/chat-message";
 import type { IAcpClient } from "../../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../../infrastructure/obsidian-plugin/plugin";
@@ -15,7 +15,7 @@ interface ToolCallRendererProps {
 	handlePermissionUseCase?: HandlePermissionUseCase;
 }
 
-export function ToolCallRenderer({
+export const ToolCallRenderer = React.memo(function ToolCallRenderer({
 	content,
 	plugin,
 	acpClient,
@@ -42,10 +42,19 @@ export function ToolCallRenderer({
 		if (permissionRequest?.selectedOptionId !== selectedOptionId) {
 			setSelectedOptionId(permissionRequest?.selectedOptionId);
 		}
-	}, [permissionRequest?.selectedOptionId]);
+	}, [permissionRequest?.selectedOptionId, selectedOptionId]);
+
+	// Memoize permission request with selected option to avoid inline object creation
+	const mergedPermissionRequest = useMemo(
+		() =>
+			permissionRequest
+				? { ...permissionRequest, selectedOptionId }
+				: null,
+		[permissionRequest, selectedOptionId],
+	);
 
 	// Get icon based on kind
-	const getKindIcon = (kind?: string) => {
+	const getKindIcon = useCallback((kind?: string) => {
 		switch (kind) {
 			case "read":
 				return "📖";
@@ -68,7 +77,7 @@ export function ToolCallRenderer({
 			default:
 				return "🔧";
 		}
-	};
+	}, []);
 
 	return (
 		<div className="message-tool-call">
@@ -135,12 +144,9 @@ export function ToolCallRenderer({
 				})}
 
 			{/* Permission request section */}
-			{permissionRequest && (
+			{mergedPermissionRequest && (
 				<PermissionRequestSection
-					permissionRequest={{
-						...permissionRequest,
-						selectedOptionId: selectedOptionId,
-					}}
+					permissionRequest={mergedPermissionRequest}
 					toolCallId={toolCallId}
 					acpClient={acpClient}
 					handlePermissionUseCase={handlePermissionUseCase}
@@ -150,7 +156,7 @@ export function ToolCallRenderer({
 			)}
 		</div>
 	);
-}
+});
 
 /*
 // Details component that switches based on kind

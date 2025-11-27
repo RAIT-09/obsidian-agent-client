@@ -1,9 +1,22 @@
-# Agent Client Plugin - LLM Developer Guide
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Overview
-Obsidian plugin for AI agent interaction (Claude Code, Gemini CLI, custom agents). **Clean Architecture** (5 layers): Presentation → Adapters → Use Cases → Domain ← Infrastructure.
+Obsidian plugin for AI agent interaction (Claude Code, Codex, Gemini CLI, custom agents). **Clean Architecture** (5 layers): Presentation → Adapters → Use Cases → Domain ← Infrastructure.
 
 **Tech**: React 19, TypeScript, Obsidian API, Agent Client Protocol (ACP)
+
+## Commands
+
+```bash
+npm run dev           # Development (watch mode with esbuild)
+npm run build         # Production build (tsc check + esbuild)
+npm run format        # Auto-fix formatting (Prettier)
+npm run format:check  # Check formatting only
+```
+
+No test framework configured. No linting scripts available.
 
 ## Architecture
 
@@ -203,6 +216,22 @@ interface ISettingsAccess {
 
 **Logged**: Process lifecycle, ACP messages, session state, permissions, terminal ops, errors
 
+## Settings Structure
+
+Key settings in `AgentClientPluginSettings` (`infrastructure/obsidian-plugin/plugin.ts:28`):
+
+| Setting | Type | Description |
+|---------|------|-------------|
+| `activeAgentId` | string | Currently selected agent ID |
+| `autoAllowPermissions` | boolean | Auto-approve permission requests |
+| `autoMentionActiveNote` | boolean | Prepend active note to messages |
+| `debugMode` | boolean | Enable debug logging |
+| `nodePath` | string | Absolute path to Node.js |
+| `windowsWslMode` | boolean | Convert paths to WSL format (Windows only) |
+
+Agent settings (`claude`, `codex`, `gemini`): `id`, `displayName`, `apiKey`, `command`, `args[]`, `env[]`
+Custom agents: Array of same structure with unique IDs
+
 ## ACP Protocol
 
 **Communication**: JSON-RPC 2.0 over stdin/stdout
@@ -211,16 +240,19 @@ interface ISettingsAccess {
 **Notifications**: session/update (agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan, available_commands_update)
 **Requests**: requestPermission
 
-**Slash Commands**: Agents advertise available commands via `available_commands_update` notification. Commands include:
-- `name`: Command identifier (e.g., "web", "test")
-- `description`: Human-readable description
-- `hint`: Optional input hint (e.g., "query to search for")
-
 **Agents**:
 - Claude Code: `@zed-industries/claude-code-acp` (ANTHROPIC_API_KEY)
+- Codex: `@zed-industries/codex-acp` (OPENAI_API_KEY)
 - Gemini CLI: `@google/gemini-cli --experimental-acp` (GOOGLE_API_KEY)
 - Custom: Any ACP-compatible agent
 
+## Platform Support
+
+**WSL Mode** (Windows): When `windowsWslMode` enabled, paths are converted from Windows to WSL format:
+- `C:\Users\...` → `/mnt/c/Users/...`
+- Uses `wsl-utils.ts` for conversion
+- Check via `ChatViewModel.shouldConvertToWsl()`
+
 ---
 
-**Last Updated**: October 2025 | **Architecture**: Clean (5-layer) | **Version**: 0.2.0
+**Last Updated**: November 2025 | **Architecture**: Clean (5-layer)

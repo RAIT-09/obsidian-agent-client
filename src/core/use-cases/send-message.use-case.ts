@@ -10,7 +10,7 @@
  * - Handle authentication errors with retry logic
  */
 
-import type { IAgentClient } from "../domain/ports/agent-client.port";
+import type { IAgentClient, MessageImage } from "../domain/ports/agent-client.port";
 import type {
 	IVaultAccess,
 	NoteMetadata,
@@ -85,6 +85,9 @@ export interface SendPreparedMessageInput {
 
 	/** Available authentication methods */
 	authMethods: AuthenticationMethod[];
+
+	/** Optional images to include with the message */
+	images?: MessageImage[];
 }
 
 /**
@@ -264,6 +267,7 @@ export class SendMessageUseCase {
 			await this.agentClient.sendMessage(
 				input.sessionId,
 				input.agentMessage,
+				input.images,
 			);
 
 			return {
