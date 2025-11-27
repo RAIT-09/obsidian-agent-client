@@ -6,10 +6,7 @@ import {
 	Platform,
 } from "obsidian";
 import type AgentClientPlugin from "../../plugin";
-import type {
-	CustomAgentSettings,
-	AgentEnvVar,
-} from "../../plugin";
+import type { CustomAgentSettings, AgentEnvVar } from "../../plugin";
 import { normalizeEnvVars } from "../../shared/settings-utils";
 
 export class AgentClientSettingTab extends PluginSettingTab {
@@ -423,7 +420,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("API key")
 			.setDesc(
-				"Anthropic API key. Required if not logging in with a Anthropic account. (Stored as plain text)",
+				"Anthropic API key. Required if not logging in with an Anthropic account. (Stored as plain text)",
 			)
 			.addText((text) => {
 				text.setPlaceholder("Enter your Anthropic API key")
@@ -491,7 +488,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("API key")
 			.setDesc(
-				"OpenAI API key. Required if not logging in with a OpenAI account. (Stored as plain text)",
+				"OpenAI API key. Required if not logging in with an OpenAI account. (Stored as plain text)",
 			)
 			.addText((text) => {
 				text.setPlaceholder("Enter your OpenAI API key")
