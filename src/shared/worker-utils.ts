@@ -35,7 +35,9 @@ export class WorkerWrapper<TInput, TOutput> {
 		this.worker = worker;
 		this.defaultTimeout = defaultTimeout;
 
-		this.worker.onmessage = (event: MessageEvent<WorkerResponse<TOutput>>) => {
+		this.worker.onmessage = (
+			event: MessageEvent<WorkerResponse<TOutput>>,
+		) => {
 			const { id, success, result, error } = event.data;
 			const request = this.pending.get(id);
 
@@ -69,14 +71,20 @@ export class WorkerWrapper<TInput, TOutput> {
 	/**
 	 * Execute a request in the worker and wait for the response.
 	 */
-	async execute(type: string, payload: TInput, timeout?: number): Promise<TOutput> {
+	async execute(
+		type: string,
+		payload: TInput,
+		timeout?: number,
+	): Promise<TOutput> {
 		const id = `${Date.now()}-${++this.messageCounter}`;
 		const timeoutMs = timeout ?? this.defaultTimeout;
 
 		return new Promise((resolve, reject) => {
 			const timeoutId = setTimeout(() => {
 				this.pending.delete(id);
-				reject(new Error(`Worker request timed out after ${timeoutMs}ms`));
+				reject(
+					new Error(`Worker request timed out after ${timeoutMs}ms`),
+				);
 			}, timeoutMs);
 
 			this.pending.set(id, { resolve, reject, timeoutId });
@@ -137,17 +145,23 @@ export function fuzzyMatch(pattern: string, text: string): number {
 	if (textLower === patternLower) return 1000;
 
 	// Starts with
-	if (textLower.startsWith(patternLower)) return 800 + (pattern.length / text.length) * 100;
+	if (textLower.startsWith(patternLower))
+		return 800 + (pattern.length / text.length) * 100;
 
 	// Contains
-	if (textLower.includes(patternLower)) return 500 + (pattern.length / text.length) * 100;
+	if (textLower.includes(patternLower))
+		return 500 + (pattern.length / text.length) * 100;
 
 	// Fuzzy character matching
 	let patternIdx = 0;
 	let score = 0;
 	let consecutiveBonus = 0;
 
-	for (let i = 0; i < textLower.length && patternIdx < patternLower.length; i++) {
+	for (
+		let i = 0;
+		i < textLower.length && patternIdx < patternLower.length;
+		i++
+	) {
 		if (textLower[i] === patternLower[patternIdx]) {
 			score += 10 + consecutiveBonus;
 			consecutiveBonus += 5;

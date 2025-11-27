@@ -83,7 +83,10 @@ export interface IPersistence {
 	/**
 	 * Update session metadata (e.g., lastActivityAt, messageCount).
 	 */
-	updateSession(sessionId: string, updates: Partial<PersistedSession>): Promise<void>;
+	updateSession(
+		sessionId: string,
+		updates: Partial<PersistedSession>,
+	): Promise<void>;
 
 	/**
 	 * Get the total number of stored sessions.

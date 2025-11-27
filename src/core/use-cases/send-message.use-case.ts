@@ -10,7 +10,10 @@
  * - Handle authentication errors with retry logic
  */
 
-import type { IAgentClient, MessageImage } from "../domain/ports/agent-client.port";
+import type {
+	IAgentClient,
+	MessageImage,
+} from "../domain/ports/agent-client.port";
 import type {
 	IVaultAccess,
 	NoteMetadata,

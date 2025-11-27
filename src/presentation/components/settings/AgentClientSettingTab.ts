@@ -377,7 +377,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// Status text
 		const statusText = this.getStatusText(agent.status);
 		if (statusText) {
-			infoEl.createDiv({ text: statusText, cls: "agent-card-status-text" });
+			infoEl.createDiv({
+				text: statusText,
+				cls: "agent-card-status-text",
+			});
 		}
 
 		// Click handler

@@ -51,6 +51,17 @@ if (existsSync(srcHelper)) {
 	console.log("Copied pty-helper.py");
 }
 
+// Copy xterm.css to dist
+const srcXtermCss = "node_modules/xterm/css/xterm.css";
+const destXtermCss = "xterm.css";
+
+if (existsSync(srcXtermCss)) {
+	copyFileSync(srcXtermCss, destXtermCss);
+	console.log("Copied xterm.css");
+} else {
+	console.error("Could not find xterm.css in node_modules");
+}
+
 if (prod) {
 	await context.rebuild();
 	process.exit(0);

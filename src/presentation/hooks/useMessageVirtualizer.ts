@@ -1,6 +1,9 @@
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import { useCallback, useRef, useEffect } from "react";
-import type { ChatMessage, MessageContent } from "../../core/domain/models/chat-message";
+import type {
+	ChatMessage,
+	MessageContent,
+} from "../../core/domain/models/chat-message";
 
 /**
  * Height estimation for different message content types.
@@ -34,15 +37,23 @@ function estimateContentHeight(content: MessageContent): number {
 		case "text":
 			// Estimate based on text length
 			const textLines = Math.ceil((content.text?.length || 0) / 80);
-			return HEIGHT_ESTIMATES.text + textLines * HEIGHT_ESTIMATES.lineHeight;
+			return (
+				HEIGHT_ESTIMATES.text + textLines * HEIGHT_ESTIMATES.lineHeight
+			);
 
 		case "text_with_context":
 			const contextLines = Math.ceil((content.text?.length || 0) / 80);
-			return HEIGHT_ESTIMATES.textWithContext + contextLines * HEIGHT_ESTIMATES.lineHeight;
+			return (
+				HEIGHT_ESTIMATES.textWithContext +
+				contextLines * HEIGHT_ESTIMATES.lineHeight
+			);
 
 		case "agent_thought":
 			const thoughtLines = Math.ceil((content.text?.length || 0) / 80);
-			return HEIGHT_ESTIMATES.agentThought + thoughtLines * HEIGHT_ESTIMATES.lineHeight;
+			return (
+				HEIGHT_ESTIMATES.agentThought +
+				thoughtLines * HEIGHT_ESTIMATES.lineHeight
+			);
 
 		case "image":
 			return HEIGHT_ESTIMATES.image;
@@ -51,7 +62,9 @@ function estimateContentHeight(content: MessageContent): number {
 			let toolHeight = HEIGHT_ESTIMATES.toolCall;
 			// Add height for content items (diff, terminal, etc.)
 			if (content.content && Array.isArray(content.content)) {
-				toolHeight += content.content.length * HEIGHT_ESTIMATES.toolCallContentHeight;
+				toolHeight +=
+					content.content.length *
+					HEIGHT_ESTIMATES.toolCallContentHeight;
 			}
 			// Add height for permission request
 			if (content.permissionRequest?.isActive) {
@@ -61,7 +74,10 @@ function estimateContentHeight(content: MessageContent): number {
 
 		case "plan":
 			const entryCount = content.entries?.length || 0;
-			return HEIGHT_ESTIMATES.plan + entryCount * HEIGHT_ESTIMATES.planEntryHeight;
+			return (
+				HEIGHT_ESTIMATES.plan +
+				entryCount * HEIGHT_ESTIMATES.planEntryHeight
+			);
 
 		case "permission_request":
 			return HEIGHT_ESTIMATES.permissionRequest;
@@ -98,7 +114,10 @@ export interface UseMessageVirtualizerOptions {
 export interface UseMessageVirtualizerResult {
 	virtualItems: VirtualItem[];
 	totalSize: number;
-	scrollToIndex: (index: number, options?: { align?: "start" | "center" | "end" | "auto" }) => void;
+	scrollToIndex: (
+		index: number,
+		options?: { align?: "start" | "center" | "end" | "auto" },
+	) => void;
 	scrollToOffset: (offset: number) => void;
 	measureElement: (element: HTMLElement | null) => void;
 	isScrolling: boolean;
@@ -124,7 +143,8 @@ export function useMessageVirtualizer({
 		estimateSize: (index) => estimateMessageHeight(messages[index]),
 		overscan,
 		// Enable dynamic measurement
-		measureElement: (element) => element?.getBoundingClientRect().height ?? 0,
+		measureElement: (element) =>
+			element?.getBoundingClientRect().height ?? 0,
 		// Smooth scrolling for better UX
 		scrollMargin: 0,
 	});

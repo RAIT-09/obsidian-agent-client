@@ -49,14 +49,18 @@ export class SessionHistoryUseCase {
 	/**
 	 * List available sessions.
 	 */
-	async listSessions(options?: ListSessionsOptions): Promise<SessionSummary[]> {
+	async listSessions(
+		options?: ListSessionsOptions,
+	): Promise<SessionSummary[]> {
 		return this.persistence.listSessions(options);
 	}
 
 	/**
 	 * Restore a session's messages.
 	 */
-	async restoreSession(sessionId: string): Promise<RestoreSessionResult | null> {
+	async restoreSession(
+		sessionId: string,
+	): Promise<RestoreSessionResult | null> {
 		const session = await this.persistence.getSession(sessionId);
 		if (!session) return null;
 
@@ -74,7 +78,10 @@ export class SessionHistoryUseCase {
 	/**
 	 * Update session activity timestamp and message count.
 	 */
-	async updateSessionActivity(sessionId: string, messageCount: number): Promise<void> {
+	async updateSessionActivity(
+		sessionId: string,
+		messageCount: number,
+	): Promise<void> {
 		await this.persistence.updateSession(sessionId, {
 			lastActivityAt: new Date(),
 			messageCount,

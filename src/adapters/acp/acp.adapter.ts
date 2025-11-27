@@ -598,7 +598,11 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	/**
 	 * Send a message to the agent in a specific session.
 	 */
-	async sendMessage(sessionId: string, message: string, images?: MessageImage[]): Promise<void> {
+	async sendMessage(
+		sessionId: string,
+		message: string,
+		images?: MessageImage[],
+	): Promise<void> {
 		if (!this.connection) {
 			throw new Error(
 				"Connection not initialized. Call initialize() first.",
@@ -609,7 +613,9 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.resetCurrentMessage();
 
 		try {
-			this.logger.log(`[AcpAdapter] ✅ Sending Message...: ${message}${images && images.length > 0 ? ` (with ${images.length} image(s))` : ""}`);
+			this.logger.log(
+				`[AcpAdapter] ✅ Sending Message...: ${message}${images && images.length > 0 ? ` (with ${images.length} image(s))` : ""}`,
+			);
 
 			// Build prompt content array with text and optional images
 			const promptContent: acp.ContentBlock[] = [];

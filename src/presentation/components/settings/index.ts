@@ -1,3 +1,3 @@
 // src/presentation/components/settings/index.ts
 
-export { SettingsPanel, type SettingsPanelProps } from './SettingsPanel';
+export { SettingsPanel, type SettingsPanelProps } from "./SettingsPanel";

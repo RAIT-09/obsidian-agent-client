@@ -28,7 +28,9 @@ export class NoteMentionService {
 			}),
 		);
 		this.eventRefs.push(
-			this.plugin.app.vault.on("delete", () => this.debouncedRebuildIndex()),
+			this.plugin.app.vault.on("delete", () =>
+				this.debouncedRebuildIndex(),
+			),
 		);
 		this.eventRefs.push(
 			this.plugin.app.vault.on("rename", (file) => {

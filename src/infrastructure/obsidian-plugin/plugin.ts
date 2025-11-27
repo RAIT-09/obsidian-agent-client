@@ -367,7 +367,7 @@ export default class AgentClientPlugin extends Plugin {
 						? claudeFromRaw.command.trim()
 						: typeof rawSettings.claudeCodeAcpCommandPath ===
 									"string" &&
-									rawSettings.claudeCodeAcpCommandPath.trim()
+							  rawSettings.claudeCodeAcpCommandPath.trim()
 									.length > 0
 							? rawSettings.claudeCodeAcpCommandPath.trim()
 							: DEFAULT_SETTINGS.claude.command,
@@ -409,7 +409,7 @@ export default class AgentClientPlugin extends Plugin {
 					geminiFromRaw.command.trim().length > 0
 						? geminiFromRaw.command.trim()
 						: typeof rawSettings.geminiCommandPath === "string" &&
-									rawSettings.geminiCommandPath.trim().length > 0
+							  rawSettings.geminiCommandPath.trim().length > 0
 							? rawSettings.geminiCommandPath.trim()
 							: DEFAULT_SETTINGS.gemini.command,
 				args:

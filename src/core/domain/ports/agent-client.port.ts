@@ -152,7 +152,11 @@ export interface IAgentClient {
 	 * @returns Promise resolving when agent completes processing
 	 * @throws AgentError if sending fails
 	 */
-	sendMessage(sessionId: string, message: string, images?: MessageImage[]): Promise<void>;
+	sendMessage(
+		sessionId: string,
+		message: string,
+		images?: MessageImage[],
+	): Promise<void>;
 
 	/**
 	 * Cancel ongoing agent operations.

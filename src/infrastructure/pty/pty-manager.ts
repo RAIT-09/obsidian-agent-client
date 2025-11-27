@@ -1,273 +1,308 @@
 // src/infrastructure/pty/pty-manager.ts
 
-import { spawn, ChildProcess } from 'child_process';
-import * as path from 'path';
-import { Platform } from 'obsidian';
-import { detectPython } from './python-detector';
-import { serializeCommand, parseEvent, PtyCommand, PtyEvent } from './pty-protocol';
-import { Logger } from '../../shared/logger';
-import type AgentClientPlugin from '../obsidian-plugin/plugin';
+import { spawn, ChildProcess } from "child_process";
+import * as path from "path";
+import { Platform } from "obsidian";
+import { detectPython } from "./python-detector";
+import {
+	serializeCommand,
+	parseEvent,
+	PtyCommand,
+	PtyEvent,
+} from "./pty-protocol";
+import { Logger } from "../../shared/logger";
+import type AgentClientPlugin from "../obsidian-plugin/plugin";
 
 export interface PtyManagerOptions {
-  onData: (data: string) => void;
-  onExit: (code: number) => void;
-  onError: (error: string) => void;
+	onData: (data: string) => void;
+	onExit: (code: number) => void;
+	onError: (error: string) => void;
 }
 
-export type PtyStatus = 'idle' | 'starting' | 'running' | 'error';
+export type PtyStatus = "idle" | "starting" | "running" | "error";
 
 /**
  * Manages the Python PTY helper process.
  * Provides methods to spawn commands in a pseudo-terminal.
  */
 export class PtyManager {
-  private pythonProcess: ChildProcess | null = null;
-  private pythonPath: string | null = null;
-  private helperPath: string;
-  private logger: Logger;
-  private options: PtyManagerOptions | null = null;
-  private buffer = '';
-  private _status: PtyStatus = 'idle';
-  private warmUpPromise: Promise<void> | null = null;
+	private pythonProcess: ChildProcess | null = null;
+	private pythonPath: string | null = null;
+	private helperPath: string;
+	private logger: Logger;
+	private options: PtyManagerOptions | null = null;
+	private buffer = "";
+	private _status: PtyStatus = "idle";
+	private warmUpPromise: Promise<void> | null = null;
+	private statusListeners = new Set<(status: PtyStatus) => void>();
 
-  constructor(private plugin: AgentClientPlugin) {
-    this.logger = new Logger(plugin);
-    // Helper script is bundled alongside main.js
-    this.helperPath = path.join(
-      (plugin.app.vault.adapter as any).basePath,
-      plugin.manifest.dir || '',
-      'pty-helper.py'
-    );
-  }
+	constructor(private plugin: AgentClientPlugin) {
+		this.logger = new Logger(plugin);
+		// Helper script is bundled alongside main.js
+		this.helperPath = path.join(
+			(plugin.app.vault.adapter as any).basePath,
+			plugin.manifest.dir || "",
+			"pty-helper.py",
+		);
+	}
 
-  get status(): PtyStatus {
-    return this._status;
-  }
+	get status(): PtyStatus {
+		return this._status;
+	}
 
-  /**
-   * Pre-warm the PTY helper by detecting Python.
-   * Call this on plugin load for fast terminal startup.
-   */
-  async warmUp(): Promise<void> {
-    if (this.warmUpPromise) {
-      return this.warmUpPromise;
-    }
+	/**
+	 * Subscribe to status changes.
+	 * Listener is called immediately with current status, then on each change.
+	 * @returns Unsubscribe function
+	 */
+	onStatusChange(listener: (status: PtyStatus) => void): () => void {
+		this.statusListeners.add(listener);
+		listener(this._status);
+		return () => this.statusListeners.delete(listener);
+	}
 
-    this.warmUpPromise = (async () => {
-      this.logger.log('[PtyManager] Warming up...');
-      const result = await detectPython();
+	private setStatus(newStatus: PtyStatus): void {
+		if (this._status !== newStatus) {
+			this._status = newStatus;
+			this.statusListeners.forEach((listener) => listener(newStatus));
+		}
+	}
 
-      if (result.found && result.path) {
-        this.pythonPath = result.path;
-        this.logger.log(`[PtyManager] Python found: ${result.path} (${result.version})`);
-      } else {
-        this.logger.error('[PtyManager] Python not found:', result.error);
-      }
-    })();
+	/**
+	 * Pre-warm the PTY helper by detecting Python.
+	 * Call this on plugin load for fast terminal startup.
+	 */
+	async warmUp(): Promise<void> {
+		if (this.warmUpPromise) {
+			return this.warmUpPromise;
+		}
 
-    return this.warmUpPromise;
-  }
+		this.warmUpPromise = (async () => {
+			this.logger.log("[PtyManager] Warming up...");
+			const result = await detectPython();
 
-  /**
-   * Check if Python is available.
-   */
-  async isPythonAvailable(): Promise<boolean> {
-    await this.warmUp();
-    return this.pythonPath !== null;
-  }
+			if (result.found && result.path) {
+				this.pythonPath = result.path;
+				this.logger.log(
+					`[PtyManager] Python found: ${result.path} (${result.version})`,
+				);
+			} else {
+				this.logger.error(
+					"[PtyManager] Python not found:",
+					result.error,
+				);
+			}
+		})();
 
-  /**
-   * Set callbacks for PTY events.
-   */
-  setOptions(options: PtyManagerOptions): void {
-    this.options = options;
-  }
+		return this.warmUpPromise;
+	}
 
-  /**
-   * Spawn a command in the PTY.
-   */
-  async spawnCommand(
-    cmd: string,
-    args: string[] = [],
-    cwd: string = process.cwd(),
-    env: Record<string, string> = {}
-  ): Promise<void> {
-    await this.warmUp();
+	/**
+	 * Check if Python is available.
+	 */
+	async isPythonAvailable(): Promise<boolean> {
+		await this.warmUp();
+		return this.pythonPath !== null;
+	}
 
-    if (!this.pythonPath) {
-      this._status = 'error';
-      this.options?.onError('Python 3 is required for Terminal mode');
-      return;
-    }
+	/**
+	 * Set callbacks for PTY events.
+	 */
+	setOptions(options: PtyManagerOptions): void {
+		this.options = options;
+	}
 
-    this._status = 'starting';
+	/**
+	 * Spawn a command in the PTY.
+	 */
+	async spawnCommand(
+		cmd: string,
+		args: string[] = [],
+		cwd: string = process.cwd(),
+		env: Record<string, string> = {},
+	): Promise<void> {
+		await this.warmUp();
 
-    // Start Python helper if not running
-    if (!this.pythonProcess) {
-      await this.startHelper();
-    }
+		if (!this.pythonPath) {
+			this.setStatus("error");
+			this.options?.onError("Python 3 is required for Terminal mode");
+			return;
+		}
 
-    // Send spawn command
-    const command: PtyCommand = {
-      type: 'spawn',
-      cmd,
-      args,
-      cwd,
-      env,
-    };
+		this.setStatus("starting");
 
-    this.sendCommand(command);
-  }
+		// Start Python helper if not running
+		if (!this.pythonProcess) {
+			await this.startHelper();
+		}
 
-  /**
-   * Write data to the PTY stdin.
-   */
-  write(data: string): void {
-    if (this._status !== 'running') {
-      this.logger.warn('[PtyManager] Cannot write: PTY not running');
-      return;
-    }
+		// Send spawn command
+		const command: PtyCommand = {
+			type: "spawn",
+			cmd,
+			args,
+			cwd,
+			env,
+		};
 
-    this.sendCommand({ type: 'write', data });
-  }
+		this.sendCommand(command);
+	}
 
-  /**
-   * Resize the PTY.
-   */
-  resize(cols: number, rows: number): void {
-    if (this.pythonProcess) {
-      this.sendCommand({ type: 'resize', cols, rows });
-    }
-  }
+	/**
+	 * Write data to the PTY stdin.
+	 */
+	write(data: string): void {
+		if (this._status !== "running") {
+			this.logger.warn("[PtyManager] Cannot write: PTY not running");
+			return;
+		}
 
-  /**
-   * Kill the current PTY process.
-   */
-  kill(): void {
-    if (this.pythonProcess) {
-      this.sendCommand({ type: 'kill' });
-    }
-  }
+		this.sendCommand({ type: "write", data });
+	}
 
-  /**
-   * Dispose of the PTY manager and kill the helper.
-   */
-  async dispose(): Promise<void> {
-    this.logger.log('[PtyManager] Disposing...');
+	/**
+	 * Resize the PTY.
+	 */
+	resize(cols: number, rows: number): void {
+		if (this.pythonProcess) {
+			this.sendCommand({ type: "resize", cols, rows });
+		}
+	}
 
-    if (this.pythonProcess) {
-      this.pythonProcess.kill('SIGTERM');
+	/**
+	 * Kill the current PTY process.
+	 */
+	kill(): void {
+		if (this.pythonProcess) {
+			this.sendCommand({ type: "kill" });
+		}
+	}
 
-      // Wait for graceful exit with timeout
-      await new Promise<void>((resolve) => {
-        const timeout = setTimeout(() => {
-          this.pythonProcess?.kill('SIGKILL');
-          resolve();
-        }, 100);
+	/**
+	 * Dispose of the PTY manager and kill the helper.
+	 */
+	async dispose(): Promise<void> {
+		this.logger.log("[PtyManager] Disposing...");
 
-        this.pythonProcess?.once('exit', () => {
-          clearTimeout(timeout);
-          resolve();
-        });
-      });
+		if (this.pythonProcess) {
+			this.pythonProcess.kill("SIGTERM");
 
-      this.pythonProcess = null;
-    }
+			// Wait for graceful exit with timeout
+			await new Promise<void>((resolve) => {
+				const timeout = setTimeout(() => {
+					this.pythonProcess?.kill("SIGKILL");
+					resolve();
+				}, 100);
 
-    this._status = 'idle';
-    this.buffer = '';
-  }
+				this.pythonProcess?.once("exit", () => {
+					clearTimeout(timeout);
+					resolve();
+				});
+			});
 
-  private async startHelper(): Promise<void> {
-    if (!this.pythonPath) {
-      throw new Error('Python not available');
-    }
+			this.pythonProcess = null;
+		}
 
-    this.logger.log('[PtyManager] Starting Python helper...');
+		this.setStatus("idle");
+		this.buffer = "";
+	}
 
-    this.pythonProcess = spawn(this.pythonPath, [this.helperPath], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: process.env,
-    });
+	private async startHelper(): Promise<void> {
+		if (!this.pythonPath) {
+			throw new Error("Python not available");
+		}
 
-    this.pythonProcess.stdout?.setEncoding('utf8');
-    this.pythonProcess.stderr?.setEncoding('utf8');
+		this.logger.log("[PtyManager] Starting Python helper...");
 
-    this.pythonProcess.stdout?.on('data', (chunk: string) => {
-      this.buffer += chunk;
-      this.processBuffer();
-    });
+		this.pythonProcess = spawn(this.pythonPath, [this.helperPath], {
+			stdio: ["pipe", "pipe", "pipe"],
+			env: process.env,
+		});
 
-    this.pythonProcess.stderr?.on('data', (data: string) => {
-      this.logger.error('[PtyManager] Helper stderr:', data);
-    });
+		this.pythonProcess.stdout?.setEncoding("utf8");
+		this.pythonProcess.stderr?.setEncoding("utf8");
 
-    this.pythonProcess.on('error', (error) => {
-      this.logger.error('[PtyManager] Helper error:', error);
-      this._status = 'error';
-      this.options?.onError(`PTY helper error: ${error.message}`);
-    });
+		this.pythonProcess.stdout?.on("data", (chunk: string) => {
+			this.buffer += chunk;
+			this.processBuffer();
+		});
 
-    this.pythonProcess.on('exit', (code, signal) => {
-      this.logger.log(`[PtyManager] Helper exited: code=${code}, signal=${signal}`);
-      this.pythonProcess = null;
-      this._status = 'idle';
-    });
-  }
+		this.pythonProcess.stderr?.on("data", (data: string) => {
+			this.logger.error("[PtyManager] Helper stderr:", data);
+		});
 
-  private sendCommand(cmd: PtyCommand): void {
-    if (!this.pythonProcess?.stdin?.writable) {
-      this.logger.warn('[PtyManager] Cannot send command: stdin not writable');
-      return;
-    }
+		this.pythonProcess.on("error", (error) => {
+			this.logger.error("[PtyManager] Helper error:", error);
+			this.setStatus("error");
+			this.options?.onError(`PTY helper error: ${error.message}`);
+		});
 
-    const serialized = serializeCommand(cmd);
-    this.pythonProcess.stdin.write(serialized);
-  }
+		this.pythonProcess.on("exit", (code, signal) => {
+			this.logger.log(
+				`[PtyManager] Helper exited: code=${code}, signal=${signal}`,
+			);
+			this.pythonProcess = null;
+			this.setStatus("idle");
+		});
+	}
 
-  private processBuffer(): void {
-    while (this.buffer.includes('\n')) {
-      const newlineIndex = this.buffer.indexOf('\n');
-      const line = this.buffer.slice(0, newlineIndex);
-      this.buffer = this.buffer.slice(newlineIndex + 1);
+	private sendCommand(cmd: PtyCommand): void {
+		if (!this.pythonProcess?.stdin?.writable) {
+			this.logger.warn(
+				"[PtyManager] Cannot send command: stdin not writable",
+			);
+			return;
+		}
 
-      if (line.trim()) {
-        this.handleEvent(line);
-      }
-    }
-  }
+		const serialized = serializeCommand(cmd);
+		this.pythonProcess.stdin.write(serialized);
+	}
 
-  private handleEvent(line: string): void {
-    const event = parseEvent(line);
-    if (!event) {
-      this.logger.warn('[PtyManager] Invalid event:', line);
-      return;
-    }
+	private processBuffer(): void {
+		while (this.buffer.includes("\n")) {
+			const newlineIndex = this.buffer.indexOf("\n");
+			const line = this.buffer.slice(0, newlineIndex);
+			this.buffer = this.buffer.slice(newlineIndex + 1);
 
-    switch (event.type) {
-      case 'spawned':
-        this._status = 'running';
-        this.logger.log(`[PtyManager] Process spawned: PID ${event.pid}`);
-        break;
+			if (line.trim()) {
+				this.handleEvent(line);
+			}
+		}
+	}
 
-      case 'output':
-        this.options?.onData(event.data);
-        break;
+	private handleEvent(line: string): void {
+		const event = parseEvent(line);
+		if (!event) {
+			this.logger.warn("[PtyManager] Invalid event:", line);
+			return;
+		}
 
-      case 'exit':
-        this._status = 'idle';
-        this.options?.onExit(event.code);
-        break;
+		switch (event.type) {
+			case "spawned":
+				this.setStatus("running");
+				this.logger.log(
+					`[PtyManager] Process spawned: PID ${event.pid}`,
+				);
+				break;
 
-      case 'error':
-        this.logger.error('[PtyManager] PTY error:', event.message);
-        this.options?.onError(event.message);
-        break;
+			case "output":
+				this.options?.onData(event.data);
+				break;
 
-      case 'killed':
-        this._status = 'idle';
-        this.logger.log('[PtyManager] Process killed');
-        break;
-    }
-  }
+			case "exit":
+				this.setStatus("idle");
+				this.options?.onExit(event.code);
+				break;
+
+			case "error":
+				this.logger.error("[PtyManager] PTY error:", event.message);
+				this.options?.onError(event.message);
+				break;
+
+			case "killed":
+				this.setStatus("idle");
+				this.logger.log("[PtyManager] Process killed");
+				break;
+		}
+	}
 }

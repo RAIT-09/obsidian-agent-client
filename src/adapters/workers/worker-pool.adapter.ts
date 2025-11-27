@@ -9,7 +9,11 @@ import type {
 	SearchResult,
 	FileInfo,
 } from "../../core/domain/ports/worker-pool.port";
-import { WorkerWrapper, createInlineWorker, fuzzyMatch } from "../../shared/worker-utils";
+import {
+	WorkerWrapper,
+	createInlineWorker,
+	fuzzyMatch,
+} from "../../shared/worker-utils";
 
 // Inline search worker code (bundled at build time)
 const SEARCH_WORKER_CODE = `
@@ -106,7 +110,10 @@ class SearchWorkerAdapter implements ISearchWorker {
 			const rawWorker = createInlineWorker(SEARCH_WORKER_CODE);
 			this.worker = new WorkerWrapper(rawWorker);
 		} catch (error) {
-			console.warn("[SearchWorkerAdapter] Failed to create worker, will use main thread:", error);
+			console.warn(
+				"[SearchWorkerAdapter] Failed to create worker, will use main thread:",
+				error,
+			);
 			this.worker = null;
 		}
 	}
@@ -120,7 +127,10 @@ class SearchWorkerAdapter implements ISearchWorker {
 		}
 
 		try {
-			const result = await this.worker.execute("search", { query, limit });
+			const result = await this.worker.execute("search", {
+				query,
+				limit,
+			});
 			return result as SearchResult[];
 		} catch (error) {
 			console.warn("[SearchWorkerAdapter] Search failed:", error);
@@ -146,7 +156,9 @@ class SearchWorkerAdapter implements ISearchWorker {
 		if (!this.worker) return 0;
 
 		try {
-			const result = await this.worker.execute("getIndexSize", {}) as { size: number };
+			const result = (await this.worker.execute("getIndexSize", {})) as {
+				size: number;
+			};
 			return result.size;
 		} catch {
 			return 0;

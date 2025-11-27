@@ -576,7 +576,8 @@ function ChatComponent({
 			svg.classList.add("icon-sending");
 		} else {
 			// Send button - active when has input (text or images)
-			const hasContent = inputValue.trim() !== "" || pastedImages.length > 0;
+			const hasContent =
+				inputValue.trim() !== "" || pastedImages.length > 0;
 			svg.classList.add(hasContent ? "icon-active" : "icon-inactive");
 		}
 	};
@@ -744,8 +745,10 @@ function ChatComponent({
 			) {
 				e.preventDefault();
 				// Only send if send button would not be disabled (same condition as button)
-				const hasContent = inputValue.trim() !== "" || pastedImages.length > 0;
-				const buttonDisabled = !isSending && (!hasContent || !isSessionReady);
+				const hasContent =
+					inputValue.trim() !== "" || pastedImages.length > 0;
+				const buttonDisabled =
+					!isSending && (!hasContent || !isSessionReady);
 				if (!buttonDisabled && !isSending) {
 					handleSendMessage();
 				}
@@ -822,7 +825,8 @@ function ChatComponent({
 
 					// result is a data URI: "data:image/png;base64,..."
 					const [prefix, base64Data] = result.split(",");
-					const mimeType = prefix.split(":")[1]?.split(";")[0] || "image/png";
+					const mimeType =
+						prefix.split(":")[1]?.split(";")[0] || "image/png";
 
 					const newImage: PastedImage = {
 						id: crypto.randomUUID(),
@@ -898,12 +902,18 @@ function ChatComponent({
 		viewModel.closeSessionHistory();
 	}, [viewModel]);
 
-	const handleSelectSession = useCallback(async (sessionId: string) => {
-		await viewModel.restoreFromHistory(sessionId);
-	}, [viewModel]);
+	const handleSelectSession = useCallback(
+		async (sessionId: string) => {
+			await viewModel.restoreFromHistory(sessionId);
+		},
+		[viewModel],
+	);
 
 	// Get session history use case for the panel
 	const sessionHistoryUseCase = viewModel.getSessionHistoryUseCase();
+
+	const VIRTUALIZATION_THRESHOLD = 30;
+	const shouldVirtualize = messages.length >= VIRTUALIZATION_THRESHOLD;
 
 	return (
 		<div className="chat-view-container">
@@ -915,7 +925,11 @@ function ChatComponent({
 			/>
 
 			{activeTab === "chat" && (
-				<>
+				<div
+					role="tabpanel"
+					aria-labelledby="tab-chat"
+					className="chat-tab-content"
+				>
 					<div className="chat-view-header">
 						<h3 className="chat-view-header-title">
 							{activeAgentLabel}
@@ -958,7 +972,7 @@ function ChatComponent({
 
 					<div
 						ref={messagesContainerRef}
-						className="chat-view-messages"
+						className={`chat-view-messages ${shouldVirtualize ? "is-virtual" : ""}`}
 					>
 						{errorInfo ? (
 							<div
@@ -993,9 +1007,22 @@ function ChatComponent({
 							</div>
 						) : messages.length === 0 ? (
 							<div className="chat-empty-state">
-								{!isSessionReady
-									? `Connecting to ${activeAgentLabel}...`
-									: `Start a conversation with ${activeAgentLabel}...`}
+								<div
+									className="chat-empty-state-icon"
+									ref={(el) => {
+										if (el)
+											setIcon(el, "bot-message-square");
+									}}
+								/>
+								<p className="chat-empty-state-title">
+									{!isSessionReady
+										? `Connecting to ${activeAgentLabel}...`
+										: `Start a conversation with ${activeAgentLabel}`}
+								</p>
+								<p className="chat-empty-state-hint">
+									Use <code>@</code> to mention notes,{" "}
+									<code>/</code> for commands
+								</p>
 							</div>
 						) : (
 							<VirtualMessageList
@@ -1053,8 +1080,8 @@ function ChatComponent({
 													{lastActiveNote.selection
 														.from.line + 1}
 													-
-													{lastActiveNote.selection
-														.to.line + 1}
+													{lastActiveNote.selection.to
+														.line + 1}
 												</span>
 											)}
 										</span>
@@ -1204,26 +1231,29 @@ function ChatComponent({
 							currentSessionId={session.sessionId}
 						/>
 					)}
-				</>
+				</div>
 			)}
 
 			{activeTab === "terminal" && (
-				<TerminalPanel
-					plugin={plugin}
-					ptyManager={ptyManager}
-					isActive={activeTab === "terminal"}
-					isPythonAvailable={isPythonAvailable}
-					claudePath={plugin.settings.claude.command || "claude"}
-					workingDirectory={vaultPath}
-				/>
+				<div role="tabpanel" aria-labelledby="tab-terminal">
+					<TerminalPanel
+						ptyManager={ptyManager}
+						isActive={activeTab === "terminal"}
+						isPythonAvailable={isPythonAvailable}
+						claudePath={plugin.settings.claude.command || "claude"}
+						workingDirectory={vaultPath}
+					/>
+				</div>
 			)}
 
 			{activeTab === "settings" && (
-				<SettingsPanel
-					plugin={plugin}
-					configService={claudeConfigService}
-					onDirtyChange={setSettingsDirty}
-				/>
+				<div role="tabpanel" aria-labelledby="tab-settings">
+					<SettingsPanel
+						plugin={plugin}
+						configService={claudeConfigService}
+						onDirtyChange={setSettingsDirty}
+					/>
+				</div>
 			)}
 		</div>
 	);

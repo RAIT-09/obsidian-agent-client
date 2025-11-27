@@ -192,7 +192,9 @@ export class ChatViewModel {
 
 		// Create session history use case if persistence is available
 		if (this.persistence) {
-			this.sessionHistoryUseCase = new SessionHistoryUseCase(this.persistence);
+			this.sessionHistoryUseCase = new SessionHistoryUseCase(
+				this.persistence,
+			);
 		}
 
 		// Initialize state
@@ -699,7 +701,10 @@ export class ChatViewModel {
 
 		const lastMessage = this.state.messages[this.state.messages.length - 1];
 		// Clone content array to avoid mutating the original
-		const updatedMessage = { ...lastMessage, content: [...lastMessage.content] };
+		const updatedMessage = {
+			...lastMessage,
+			content: [...lastMessage.content],
+		};
 
 		if (content.type === "text" || content.type === "agent_thought") {
 			// Append to existing content of same type or create new content
@@ -1331,7 +1336,8 @@ export class ChatViewModel {
 		}
 
 		try {
-			const result = await this.sessionHistoryUseCase.restoreSession(sessionId);
+			const result =
+				await this.sessionHistoryUseCase.restoreSession(sessionId);
 			if (!result) {
 				return false;
 			}
@@ -1342,13 +1348,18 @@ export class ChatViewModel {
 			});
 
 			// Disconnect current session
-			await this.manageSessionUseCase.closeSession(this.state.session.sessionId);
+			await this.manageSessionUseCase.closeSession(
+				this.state.session.sessionId,
+			);
 			await this.manageSessionUseCase.disconnect();
 
 			// Create new session with restored agent
 			const activeAgentId = result.session.agentId;
-			const currentAgent = this.switchAgentUseCase.getAvailableAgents()
-				.find(a => a.id === activeAgentId) || { displayName: result.session.agentDisplayName };
+			const currentAgent = this.switchAgentUseCase
+				.getAvailableAgents()
+				.find((a) => a.id === activeAgentId) || {
+				displayName: result.session.agentDisplayName,
+			};
 
 			// Set UI with restored messages
 			this.setState({

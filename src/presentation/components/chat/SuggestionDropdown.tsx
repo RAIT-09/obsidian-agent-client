@@ -160,10 +160,7 @@ const NoteIcon: React.FC = () => (
  *
  * Returns an array of React elements with matched characters wrapped in <mark>.
  */
-function highlightFuzzyMatch(
-	text: string,
-	query: string,
-): React.ReactNode[] {
+function highlightFuzzyMatch(text: string, query: string): React.ReactNode[] {
 	if (!query || query.length === 0) {
 		return [text];
 	}
@@ -198,7 +195,9 @@ function highlightFuzzyMatch(
 	// Add remaining text after last match
 	if (lastMatchEnd < text.length) {
 		result.push(
-			<span key={`text-${lastMatchEnd}`}>{text.slice(lastMatchEnd)}</span>,
+			<span key={`text-${lastMatchEnd}`}>
+				{text.slice(lastMatchEnd)}
+			</span>,
 		);
 	}
 

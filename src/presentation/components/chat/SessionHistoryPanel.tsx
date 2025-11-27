@@ -67,8 +67,12 @@ const SessionItem = memo(function SessionItem({
 			aria-current={isActive ? "true" : undefined}
 		>
 			<div className="session-history-item-header">
-				<span className="session-history-agent">{session.agentDisplayName}</span>
-				<span className="session-history-time">{formatRelativeTime(session.lastActivityAt)}</span>
+				<span className="session-history-agent">
+					{session.agentDisplayName}
+				</span>
+				<span className="session-history-time">
+					{formatRelativeTime(session.lastActivityAt)}
+				</span>
 			</div>
 			<div className="session-history-preview">
 				{session.preview || "No messages"}
@@ -131,17 +135,29 @@ export const SessionHistoryPanel = memo(function SessionHistoryPanel({
 		}
 	}, [historyUseCase]);
 
-	const handleDelete = useCallback(async (sessionId: string) => {
-		try {
-			await historyUseCase.deleteSession(sessionId);
-			setSessions((prev) => prev.filter((s) => s.sessionId !== sessionId));
-		} catch (err) {
-			console.error("[SessionHistoryPanel] Error deleting session:", err);
-		}
-	}, [historyUseCase]);
+	const handleDelete = useCallback(
+		async (sessionId: string) => {
+			try {
+				await historyUseCase.deleteSession(sessionId);
+				setSessions((prev) =>
+					prev.filter((s) => s.sessionId !== sessionId),
+				);
+			} catch (err) {
+				console.error(
+					"[SessionHistoryPanel] Error deleting session:",
+					err,
+				);
+			}
+		},
+		[historyUseCase],
+	);
 
 	return (
-		<div className="session-history-panel" role="dialog" aria-label="Session History">
+		<div
+			className="session-history-panel"
+			role="dialog"
+			aria-label="Session History"
+		>
 			<div className="session-history-header">
 				<h4>Session History</h4>
 				<button
@@ -158,12 +174,12 @@ export const SessionHistoryPanel = memo(function SessionHistoryPanel({
 					<div className="session-history-loading">Loading...</div>
 				)}
 
-				{error && (
-					<div className="session-history-error">{error}</div>
-				)}
+				{error && <div className="session-history-error">{error}</div>}
 
 				{!loading && !error && sessions.length === 0 && (
-					<div className="session-history-empty">No saved sessions</div>
+					<div className="session-history-empty">
+						No saved sessions
+					</div>
 				)}
 
 				{!loading && !error && sessions.length > 0 && (
@@ -172,8 +188,12 @@ export const SessionHistoryPanel = memo(function SessionHistoryPanel({
 							<SessionItem
 								key={session.sessionId}
 								session={session}
-								isActive={session.sessionId === currentSessionId}
-								onSelect={() => onSelectSession(session.sessionId)}
+								isActive={
+									session.sessionId === currentSessionId
+								}
+								onSelect={() =>
+									onSelectSession(session.sessionId)
+								}
 								onDelete={() => handleDelete(session.sessionId)}
 							/>
 						))}

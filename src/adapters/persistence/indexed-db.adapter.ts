@@ -15,7 +15,8 @@ const DB_VERSION = 1;
 const SESSIONS_STORE = "sessions";
 const MESSAGES_STORE = "messages";
 
-interface StoredSession extends Omit<PersistedSession, "createdAt" | "lastActivityAt"> {
+interface StoredSession
+	extends Omit<PersistedSession, "createdAt" | "lastActivityAt"> {
 	createdAt: string;
 	lastActivityAt: string;
 }
@@ -43,7 +44,10 @@ export class IndexedDBAdapter implements IPersistence {
 			const request = indexedDB.open(DB_NAME, DB_VERSION);
 
 			request.onerror = () => {
-				console.error("[IndexedDB] Failed to open database:", request.error);
+				console.error(
+					"[IndexedDB] Failed to open database:",
+					request.error,
+				);
 				reject(request.error);
 			};
 
@@ -57,15 +61,25 @@ export class IndexedDBAdapter implements IPersistence {
 
 				// Sessions store
 				if (!db.objectStoreNames.contains(SESSIONS_STORE)) {
-					const sessionsStore = db.createObjectStore(SESSIONS_STORE, { keyPath: "sessionId" });
-					sessionsStore.createIndex("by-date", "lastActivityAt", { unique: false });
-					sessionsStore.createIndex("by-agent", "agentId", { unique: false });
+					const sessionsStore = db.createObjectStore(SESSIONS_STORE, {
+						keyPath: "sessionId",
+					});
+					sessionsStore.createIndex("by-date", "lastActivityAt", {
+						unique: false,
+					});
+					sessionsStore.createIndex("by-agent", "agentId", {
+						unique: false,
+					});
 				}
 
 				// Messages store
 				if (!db.objectStoreNames.contains(MESSAGES_STORE)) {
-					const messagesStore = db.createObjectStore(MESSAGES_STORE, { keyPath: "id" });
-					messagesStore.createIndex("by-session", "sessionId", { unique: false });
+					const messagesStore = db.createObjectStore(MESSAGES_STORE, {
+						keyPath: "id",
+					});
+					messagesStore.createIndex("by-session", "sessionId", {
+						unique: false,
+					});
 				}
 			};
 		});
@@ -121,12 +135,17 @@ export class IndexedDBAdapter implements IPersistence {
 		});
 	}
 
-	async listSessions(options: ListSessionsOptions = {}): Promise<SessionSummary[]> {
+	async listSessions(
+		options: ListSessionsOptions = {},
+	): Promise<SessionSummary[]> {
 		const db = await this.ensureDb();
 		const { limit = 50, offset = 0, agentId } = options;
 
 		return new Promise((resolve, reject) => {
-			const tx = db.transaction([SESSIONS_STORE, MESSAGES_STORE], "readonly");
+			const tx = db.transaction(
+				[SESSIONS_STORE, MESSAGES_STORE],
+				"readonly",
+			);
 			const sessionsStore = tx.objectStore(SESSIONS_STORE);
 			const messagesStore = tx.objectStore(MESSAGES_STORE);
 
@@ -160,7 +179,9 @@ export class IndexedDBAdapter implements IPersistence {
 
 				// Get first message preview
 				const msgIndex = messagesStore.index("by-session");
-				const msgRequest = msgIndex.openCursor(IDBKeyRange.only(stored.sessionId));
+				const msgRequest = msgIndex.openCursor(
+					IDBKeyRange.only(stored.sessionId),
+				);
 
 				msgRequest.onsuccess = () => {
 					let preview = "";
@@ -168,7 +189,9 @@ export class IndexedDBAdapter implements IPersistence {
 					if (msgCursor) {
 						const storedMsg = msgCursor.value as StoredMessage;
 						try {
-							const msg = JSON.parse(storedMsg.data) as ChatMessage;
+							const msg = JSON.parse(
+								storedMsg.data,
+							) as ChatMessage;
 							if (msg.role === "user" && msg.content.length > 0) {
 								const firstContent = msg.content[0];
 								if (firstContent.type === "text") {
@@ -202,7 +225,10 @@ export class IndexedDBAdapter implements IPersistence {
 		const db = await this.ensureDb();
 
 		return new Promise((resolve, reject) => {
-			const tx = db.transaction([SESSIONS_STORE, MESSAGES_STORE], "readwrite");
+			const tx = db.transaction(
+				[SESSIONS_STORE, MESSAGES_STORE],
+				"readwrite",
+			);
 			const sessionsStore = tx.objectStore(SESSIONS_STORE);
 			const messagesStore = tx.objectStore(MESSAGES_STORE);
 
@@ -227,7 +253,10 @@ export class IndexedDBAdapter implements IPersistence {
 		});
 	}
 
-	async saveMessages(sessionId: string, messages: ChatMessage[]): Promise<void> {
+	async saveMessages(
+		sessionId: string,
+		messages: ChatMessage[],
+	): Promise<void> {
 		const db = await this.ensureDb();
 
 		return new Promise((resolve, reject) => {
@@ -289,7 +318,10 @@ export class IndexedDBAdapter implements IPersistence {
 		});
 	}
 
-	async appendMessages(sessionId: string, messages: ChatMessage[]): Promise<void> {
+	async appendMessages(
+		sessionId: string,
+		messages: ChatMessage[],
+	): Promise<void> {
 		const db = await this.ensureDb();
 		const existing = await this.getMessages(sessionId);
 		const startIndex = existing.length;
@@ -313,7 +345,10 @@ export class IndexedDBAdapter implements IPersistence {
 		});
 	}
 
-	async updateSession(sessionId: string, updates: Partial<PersistedSession>): Promise<void> {
+	async updateSession(
+		sessionId: string,
+		updates: Partial<PersistedSession>,
+	): Promise<void> {
 		const existing = await this.getSession(sessionId);
 		if (!existing) return;
 
@@ -342,7 +377,10 @@ export class IndexedDBAdapter implements IPersistence {
 		const db = await this.ensureDb();
 
 		return new Promise((resolve, reject) => {
-			const tx = db.transaction([SESSIONS_STORE, MESSAGES_STORE], "readwrite");
+			const tx = db.transaction(
+				[SESSIONS_STORE, MESSAGES_STORE],
+				"readwrite",
+			);
 			tx.objectStore(SESSIONS_STORE).clear();
 			tx.objectStore(MESSAGES_STORE).clear();
 

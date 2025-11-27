@@ -79,17 +79,51 @@ export const ToolCallRenderer = React.memo(function ToolCallRenderer({
 		}
 	}, []);
 
+	// Get status class name
+	const getStatusClass = (status?: string) => {
+		switch (status) {
+			case "running":
+			case "pending":
+				return "running";
+			case "completed":
+			case "success":
+				return "completed";
+			case "error":
+			case "failed":
+				return "error";
+			default:
+				return "";
+		}
+	};
+
+	// Get display status text
+	const getStatusText = (status?: string) => {
+		switch (status) {
+			case "running":
+			case "pending":
+				return "Running";
+			case "completed":
+			case "success":
+				return "Done";
+			case "error":
+			case "failed":
+				return "Error";
+			default:
+				return status || "";
+		}
+	};
+
 	return (
 		<div className="message-tool-call">
 			{/* Header */}
 			<div className="message-tool-call-header">
-				<div className="message-tool-call-title">
-					<span className="message-tool-call-icon">
-						{getKindIcon(kind)}
-					</span>
-					{title}
-				</div>
-				<div className="message-tool-call-status">Status: {status}</div>
+				<span className="message-tool-call-icon" aria-hidden="true">
+					{getKindIcon(kind)}
+				</span>
+				<span className="message-tool-call-title">{title}</span>
+				<span className={`message-tool-call-status ${getStatusClass(status)}`}>
+					{getStatusText(status)}
+				</span>
 			</div>
 
 			{/* Kind-specific details */}
