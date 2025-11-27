@@ -551,7 +551,7 @@ export class ChatView extends ItemView {
 		return Promise.resolve();
 	}
 
-	async onClose() {
+	onClose(): Promise<void> {
 		this.logger.log("[ChatView] onClose() called");
 		// Cleanup is handled by React useEffect cleanup in ChatComponent
 		// which performs auto-export and closeSession
@@ -559,5 +559,6 @@ export class ChatView extends ItemView {
 			this.root.unmount();
 			this.root = null;
 		}
+		return Promise.resolve();
 	}
 }
