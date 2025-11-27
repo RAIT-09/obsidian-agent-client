@@ -551,7 +551,7 @@ export class ChatView extends ItemView {
 		return Promise.resolve();
 	}
 
-	async onClose() {
+	onClose() {
 		this.logger.log("[ChatView] onClose() called");
 		// Cleanup is handled by React useEffect cleanup in ChatComponent
 		// which performs auto-export and closeSession

@@ -261,7 +261,7 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "cancel-current-message",
 			name: "Cancel current message",
-			callback: async () => {
+			callback: () => {
 				this.app.workspace.trigger("agent-client:cancel-message");
 			},
 		});
