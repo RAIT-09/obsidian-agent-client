@@ -85,7 +85,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		// Windows WSL Settings (Windows only)
 		if (Platform.isWin) {
-			new Setting(containerEl).setName("Windows WSL").setHeading();
+			new Setting(containerEl)
+				.setName("Windows Subsystem for Linux")
+				.setHeading();
 
 			new Setting(containerEl)
 				.setName("Enable WSL mode")
