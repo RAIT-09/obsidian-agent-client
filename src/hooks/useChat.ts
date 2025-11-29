@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import type {
 	ChatMessage,
 	MessageContent,
@@ -131,10 +131,23 @@ export function useChat(
 	const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
 	const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
 
+	// Track pending tool call IDs to prevent duplicate addMessage calls
+	// This is needed because multiple tool_call events with the same ID can arrive
+	// before React state updates are committed
+	const pendingToolCallIds = useRef<Set<string>>(new Set());
+
 	/**
 	 * Add a new message to the chat.
+	 * For tool_call messages, registers the toolCallId in pendingToolCallIds
+	 * to prevent duplicate messages from race conditions.
 	 */
 	const addMessage = useCallback((message: ChatMessage): void => {
+		// Track tool call IDs to prevent duplicates from race conditions
+		for (const content of message.content) {
+			if (content.type === "tool_call" && content.toolCallId) {
+				pendingToolCallIds.current.add(content.toolCallId);
+			}
+		}
 		setMessages((prev) => [...prev, message]);
 	}, []);
 
@@ -205,9 +218,21 @@ export function useChat(
 
 	/**
 	 * Update a specific message by tool call ID.
+	 * Also checks pendingToolCallIds to handle race conditions where
+	 * multiple tool_call events arrive before state updates are committed.
+	 *
+	 * Returns true if the toolCallId was found in either:
+	 * - pendingToolCallIds (message added but state not yet committed)
+	 * - existing messages in state
+	 *
+	 * The update is always applied via setMessages, even if found in pendingToolCallIds,
+	 * to ensure subsequent updates (like permission requests) are merged correctly.
 	 */
 	const updateMessage = useCallback(
 		(toolCallId: string, content: MessageContent): boolean => {
+			// Check if this toolCallId is pending (added but not yet committed to state)
+			const isPending = pendingToolCallIds.current.has(toolCallId);
+
 			let found = false;
 
 			setMessages((prev) => {
@@ -270,7 +295,8 @@ export function useChat(
 				return found ? updatedMessages : prev;
 			});
 
-			return found;
+			// Return true if found in state OR if pending (to prevent duplicate addMessage)
+			return found || isPending;
 		},
 		[],
 	);
@@ -283,6 +309,7 @@ export function useChat(
 		setLastUserMessage(null);
 		setIsSending(false);
 		setErrorInfo(null);
+		pendingToolCallIds.current.clear();
 	}, []);
 
 	/**
