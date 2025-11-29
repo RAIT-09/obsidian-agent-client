@@ -340,6 +340,7 @@ function ChatComponent({
 			chat.updateLastMessage,
 			chat.updateMessage,
 			agentSession.updateAvailableCommands,
+			agentSession.updateCurrentMode,
 		);
 	}, [
 		acpAdapter,
@@ -347,6 +348,7 @@ function ChatComponent({
 		chat.updateLastMessage,
 		chat.updateMessage,
 		agentSession.updateAvailableCommands,
+		agentSession.updateCurrentMode,
 	]);
 
 	// ============================================================
@@ -514,6 +516,8 @@ function ChatComponent({
 				onSendMessage={handleSendMessage}
 				onStopGeneration={handleStopGeneration}
 				onRestoredMessageConsumed={handleRestoredMessageConsumed}
+				modes={session.modes}
+				onModeChange={(modeId) => void agentSession.setMode(modeId)}
 			/>
 		</div>
 	);

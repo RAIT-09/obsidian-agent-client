@@ -19,7 +19,10 @@ import { AcpTypeConverter } from "./acp-type-converter";
 import { TerminalManager } from "../../shared/terminal-manager";
 import { Logger } from "../../shared/logger";
 import type AgentClientPlugin from "../../plugin";
-import type { SlashCommand } from "src/domain/models/chat-session";
+import type {
+	SlashCommand,
+	SessionModeState,
+} from "src/domain/models/chat-session";
 import {
 	wrapCommandForWsl,
 	convertWindowsPathToWsl,
@@ -71,6 +74,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	private updateAvailableCommandsCallback:
 		| ((commands: SlashCommand[]) => void)
 		| null = null;
+	private updateCurrentModeCallback: ((modeId: string) => void) | null = null;
 
 	// Message update callbacks (for ViewModel integration)
 	private addMessage: (message: ChatMessage) => void;
@@ -132,17 +136,20 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	 * @param updateLastMessage - Callback to update the last message
 	 * @param updateMessage - Callback to update a specific message by toolCallId
 	 * @param updateAvailableCommandsCallback - Callback to update available commands
+	 * @param updateCurrentModeCallback - Callback to update current mode
 	 */
 	setMessageCallbacks(
 		addMessage: (message: ChatMessage) => void,
 		updateLastMessage: (content: MessageContent) => void,
 		updateMessage: (toolCallId: string, content: MessageContent) => boolean,
 		updateAvailableCommandsCallback: (commands: SlashCommand[]) => void,
+		updateCurrentModeCallback: (modeId: string) => void,
 	): void {
 		this.addMessage = addMessage;
 		this.updateLastMessage = updateLastMessage;
 		this.updateMessage = updateMessage;
 		this.updateAvailableCommandsCallback = updateAvailableCommandsCallback;
+		this.updateCurrentModeCallback = updateCurrentModeCallback;
 	}
 
 	/**
@@ -487,9 +494,33 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			this.logger.log(
 				`[AcpAdapter] 📝 Created session: ${sessionResult.sessionId}`,
 			);
+			this.logger.log(
+				"[AcpAdapter] NewSessionResponse:",
+				JSON.stringify(sessionResult, null, 2),
+			);
+
+			// Convert modes from ACP format to domain format
+			let modes: SessionModeState | undefined;
+			if (sessionResult.modes) {
+				modes = {
+					availableModes: sessionResult.modes.availableModes.map(
+						(m) => ({
+							id: m.id,
+							name: m.name,
+							// Convert null to undefined for type compatibility
+							description: m.description ?? undefined,
+						}),
+					),
+					currentModeId: sessionResult.modes.currentModeId,
+				};
+				this.logger.log(
+					`[AcpAdapter] Session modes: ${modes.availableModes.map((m) => m.id).join(", ")} (current: ${modes.currentModeId})`,
+				);
+			}
 
 			return {
 				sessionId: sessionResult.sessionId,
+				modes,
 			};
 		} catch (error) {
 			this.logger.error("[AcpAdapter] New Session Error:", error);
@@ -756,6 +787,40 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	/**
+	 * Set the session mode.
+	 *
+	 * Changes the agent's operating mode for the current session.
+	 * The agent will confirm the mode change via a current_mode_update notification.
+	 *
+	 * Implementation of IAgentClient.setSessionMode()
+	 */
+	async setSessionMode(sessionId: string, modeId: string): Promise<void> {
+		if (!this.connection) {
+			throw new Error(
+				"Connection not initialized. Call initialize() first.",
+			);
+		}
+
+		this.logger.log(
+			`[AcpAdapter] Setting session mode to: ${modeId} for session: ${sessionId}`,
+		);
+
+		try {
+			await this.connection.setSessionMode({
+				sessionId,
+				modeId,
+			});
+			this.logger.log(`[AcpAdapter] Session mode set to: ${modeId}`);
+		} catch (error) {
+			this.logger.error(
+				"[AcpAdapter] Failed to set session mode:",
+				error,
+			);
+			throw error;
+		}
+	}
+
+	/**
 	 * Register a callback to receive chat messages from the agent.
 	 */
 	onMessage(callback: (message: ChatMessage) => void): void {
@@ -941,6 +1006,17 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 				if (this.updateAvailableCommandsCallback) {
 					this.updateAvailableCommandsCallback(commands);
+				}
+				break;
+			}
+
+			case "current_mode_update": {
+				this.logger.log(
+					`[AcpAdapter] current_mode_update: ${update.currentModeId}`,
+				);
+
+				if (this.updateCurrentModeCallback) {
+					this.updateCurrentModeCallback(update.currentModeId);
 				}
 				break;
 			}

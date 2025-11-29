@@ -1,11 +1,14 @@
 import * as React from "react";
 const { useRef, useState, useEffect, useCallback, useMemo } = React;
-import { setIcon } from "obsidian";
+import { setIcon, DropdownComponent } from "obsidian";
 
 import type AgentClientPlugin from "../../plugin";
 import type { ChatView } from "./ChatView";
 import type { NoteMetadata } from "../../domain/ports/vault-access.port";
-import type { SlashCommand } from "../../domain/models/chat-session";
+import type {
+	SlashCommand,
+	SessionModeState,
+} from "../../domain/models/chat-session";
 import type { UseMentionsReturn } from "../../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../../hooks/useSlashCommands";
 import type { UseAutoMentionReturn } from "../../hooks/useAutoMention";
@@ -44,6 +47,10 @@ export interface ChatInputProps {
 	onStopGeneration: () => Promise<void>;
 	/** Callback when restored message has been consumed */
 	onRestoredMessageConsumed: () => void;
+	/** Session mode state (available modes and current mode) */
+	modes?: SessionModeState;
+	/** Callback when mode is changed */
+	onModeChange?: (modeId: string) => void;
 }
 
 /**
@@ -73,6 +80,8 @@ export function ChatInput({
 	onSendMessage,
 	onStopGeneration,
 	onRestoredMessageConsumed,
+	modes,
+	onModeChange,
 }: ChatInputProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 
@@ -84,6 +93,8 @@ export function ChatInput({
 	// Refs
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
+	const modeDropdownRef = useRef<HTMLDivElement>(null);
+	const modeDropdownInstance = useRef<DropdownComponent | null>(null);
 
 	/**
 	 * Common logic for setting cursor position after text replacement.
@@ -425,6 +436,76 @@ export function ChatInput({
 		}
 	}, [restoredMessage, onRestoredMessageConsumed]);
 
+	// Stable references for callbacks
+	const onModeChangeRef = useRef(onModeChange);
+	onModeChangeRef.current = onModeChange;
+
+	// Initialize Mode dropdown (only when availableModes change)
+	const availableModes = modes?.availableModes;
+	const currentModeId = modes?.currentModeId;
+
+	useEffect(() => {
+		const containerEl = modeDropdownRef.current;
+		if (!containerEl) return;
+
+		// Only show dropdown if there are multiple modes
+		if (!availableModes || availableModes.length <= 1) {
+			// Clean up existing dropdown if modes become unavailable
+			if (modeDropdownInstance.current) {
+				containerEl.empty();
+				modeDropdownInstance.current = null;
+			}
+			return;
+		}
+
+		// Create dropdown if not exists
+		if (!modeDropdownInstance.current) {
+			const dropdown = new DropdownComponent(containerEl);
+			modeDropdownInstance.current = dropdown;
+
+			// Add options
+			for (const mode of availableModes) {
+				dropdown.addOption(mode.id, mode.name);
+			}
+
+			// Set initial value
+			if (currentModeId) {
+				dropdown.setValue(currentModeId);
+			}
+
+			// Handle change - use ref to avoid recreating dropdown on callback change
+			dropdown.onChange((value) => {
+				if (onModeChangeRef.current) {
+					onModeChangeRef.current(value);
+				}
+			});
+		}
+
+		// Cleanup on unmount or when availableModes change
+		return () => {
+			if (modeDropdownInstance.current) {
+				containerEl.empty();
+				modeDropdownInstance.current = null;
+			}
+		};
+	}, [availableModes]);
+
+	// Update dropdown value when currentModeId changes (separate effect)
+	useEffect(() => {
+		console.log("[ChatInput] currentModeId changed:", currentModeId);
+		console.log(
+			"[ChatInput] modeDropdownInstance.current:",
+			modeDropdownInstance.current,
+		);
+		if (modeDropdownInstance.current && currentModeId) {
+			console.log(
+				"[ChatInput] Setting dropdown value to:",
+				currentModeId,
+			);
+			modeDropdownInstance.current.setValue(currentModeId);
+		}
+	}, [currentModeId]);
+
 	// Button disabled state
 	const isButtonDisabled =
 		!isSending && (inputValue.trim() === "" || !isSessionReady);
@@ -534,20 +615,43 @@ export function ChatInput({
 					)}
 				</div>
 
-				{/* Send/Stop Button */}
-				<button
-					ref={sendButtonRef}
-					onClick={() => void handleSendOrStop()}
-					disabled={isButtonDisabled}
-					className={`chat-send-button ${isSending ? "sending" : ""} ${isButtonDisabled ? "disabled" : ""}`}
-					title={
-						!isSessionReady
-							? "Connecting..."
-							: isSending
-								? "Stop generation"
-								: "Send message"
-					}
-				></button>
+				{/* Input Actions (Mode Selector + Send Button) */}
+				<div className="chat-input-actions">
+					{/* Mode Selector */}
+					{modes && modes.availableModes.length > 1 && (
+						<div
+							ref={modeDropdownRef}
+							className="mode-selector"
+							title={
+								modes.availableModes.find(
+									(m) => m.id === modes.currentModeId,
+								)?.description ?? "Select mode"
+							}
+						>
+							<span
+								className="mode-selector-icon"
+								ref={(el) => {
+									if (el) setIcon(el, "chevron-down");
+								}}
+							/>
+						</div>
+					)}
+
+					{/* Send/Stop Button */}
+					<button
+						ref={sendButtonRef}
+						onClick={() => void handleSendOrStop()}
+						disabled={isButtonDisabled}
+						className={`chat-send-button ${isSending ? "sending" : ""} ${isButtonDisabled ? "disabled" : ""}`}
+						title={
+							!isSessionReady
+								? "Connecting..."
+								: isSending
+									? "Stop generation"
+									: "Send message"
+						}
+					></button>
+				</div>
 			</div>
 		</div>
 	);

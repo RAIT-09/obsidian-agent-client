@@ -13,7 +13,10 @@
 
 import type { ChatMessage, PermissionOption } from "../models/chat-message";
 import type { AgentError } from "../models/agent-error";
-import type { AuthenticationMethod } from "../models/chat-session";
+import type {
+	AuthenticationMethod,
+	SessionModeState,
+} from "../models/chat-session";
 
 /**
  * Runtime configuration for launching an AI agent process.
@@ -91,6 +94,13 @@ export interface InitializeResult {
 export interface NewSessionResult {
 	/** Unique identifier for the new session */
 	sessionId: string;
+
+	/**
+	 * Mode state for this session.
+	 * Contains available modes and the currently active mode.
+	 * Undefined if the agent does not support modes.
+	 */
+	modes?: SessionModeState;
 }
 
 /**
@@ -222,4 +232,19 @@ export interface IAgentClient {
 	 * @returns Agent ID or null
 	 */
 	getCurrentAgentId(): string | null;
+
+	/**
+	 * Set the session mode.
+	 *
+	 * Changes the agent's operating mode for the current session.
+	 * The mode must be one of the available modes returned in NewSessionResult.
+	 * After calling this, the agent will send a current_mode_update notification
+	 * to confirm the mode change.
+	 *
+	 * @param sessionId - Session identifier
+	 * @param modeId - ID of the mode to set (must be in availableModes)
+	 * @returns Promise resolving when the mode change request is sent
+	 * @throws Error if connection is not initialized or mode is invalid
+	 */
+	setSessionMode(sessionId: string, modeId: string): Promise<void>;
 }

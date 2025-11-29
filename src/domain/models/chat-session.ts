@@ -82,6 +82,45 @@ export interface SlashCommand {
 }
 
 // ============================================================================
+// Session Mode
+// ============================================================================
+
+/**
+ * Represents a mode available in the current session.
+ *
+ * Modes define how the agent behaves and processes requests.
+ * For example, "build" mode for implementation tasks, "plan" mode for
+ * architecture and design discussions.
+ *
+ * Modes are advertised by the agent in the NewSessionResponse and can
+ * be changed during the session via the ACP protocol.
+ */
+export interface SessionMode {
+	/** Unique identifier for this mode (e.g., "build", "plan") */
+	id: string;
+
+	/** Human-readable name for display */
+	name: string;
+
+	/** Optional description of what this mode does */
+	description?: string;
+}
+
+/**
+ * State of available modes in a session.
+ *
+ * Contains both the list of available modes and the currently active mode.
+ * Updated via NewSessionResponse initially and current_mode_update notifications.
+ */
+export interface SessionModeState {
+	/** List of modes available in this session */
+	availableModes: SessionMode[];
+
+	/** ID of the currently active mode */
+	currentModeId: string;
+}
+
+// ============================================================================
 // Chat Session
 // ============================================================================
 
@@ -119,6 +158,13 @@ export interface ChatSession {
 	 * Updated dynamically via ACP's `available_commands_update` notification.
 	 */
 	availableCommands?: SlashCommand[];
+
+	/**
+	 * Mode state for this session.
+	 * Contains available modes and the currently active mode.
+	 * Updated via NewSessionResponse and `current_mode_update` notification.
+	 */
+	modes?: SessionModeState;
 
 	/** Timestamp when the session was created */
 	createdAt: Date;
