@@ -106,6 +106,13 @@ export interface UseAgentSessionReturn {
 	 * @param modeId - ID of the mode to set
 	 */
 	setMode: (modeId: string) => Promise<void>;
+
+	/**
+	 * Set the session model (experimental).
+	 * Sends a request to the agent to change the model.
+	 * @param modelId - ID of the model to set
+	 */
+	setModel: (modelId: string) => Promise<void>;
 }
 
 // ============================================================================
@@ -253,6 +260,7 @@ function createInitialSession(
 		authMethods: [],
 		availableCommands: undefined,
 		modes: undefined,
+		models: undefined,
 		createdAt: new Date(),
 		lastActivityAt: new Date(),
 		workingDirectory,
@@ -318,6 +326,7 @@ export function useAgentSession(
 			authMethods: [],
 			availableCommands: undefined,
 			modes: undefined,
+			models: undefined,
 			createdAt: new Date(),
 			lastActivityAt: new Date(),
 		}));
@@ -371,6 +380,7 @@ export function useAgentSession(
 				state: "ready",
 				authMethods: authMethods,
 				modes: sessionResult.modes,
+				models: sessionResult.models,
 				lastActivityAt: new Date(),
 			}));
 		} catch (error) {
@@ -461,12 +471,13 @@ export function useAgentSession(
 			await settingsAccess.updateSettings({ activeAgentId: agentId });
 
 			// Update session with new agent ID
-			// Clear availableCommands and modes (new agent will send its own)
+			// Clear availableCommands, modes, and models (new agent will send its own)
 			setSession((prev) => ({
 				...prev,
 				agentId,
 				availableCommands: undefined,
 				modes: undefined,
+				models: undefined,
 			}));
 		},
 		[settingsAccess],
@@ -562,6 +573,56 @@ export function useAgentSession(
 		[agentClient, session.sessionId, session.modes?.currentModeId],
 	);
 
+	/**
+	 * Set the session model (experimental).
+	 * Sends a request to the agent to change the model.
+	 */
+	const setModel = useCallback(
+		async (modelId: string) => {
+			if (!session.sessionId) {
+				console.warn("Cannot set model: no active session");
+				return;
+			}
+
+			// Store previous model for rollback on error
+			const previousModelId = session.models?.currentModelId;
+
+			// Optimistic update - update UI immediately
+			setSession((prev) => {
+				if (!prev.models) return prev;
+				return {
+					...prev,
+					models: {
+						...prev.models,
+						currentModelId: modelId,
+					},
+				};
+			});
+
+			try {
+				await agentClient.setSessionModel(session.sessionId, modelId);
+				// Note: Unlike modes, there is no dedicated notification for model changes.
+				// UI is already updated optimistically above.
+			} catch (error) {
+				console.error("Failed to set model:", error);
+				// Rollback to previous model on error
+				if (previousModelId) {
+					setSession((prev) => {
+						if (!prev.models) return prev;
+						return {
+							...prev,
+							models: {
+								...prev.models,
+								currentModelId: previousModelId,
+							},
+						};
+					});
+				}
+			}
+		},
+		[agentClient, session.sessionId, session.models?.currentModelId],
+	);
+
 	return {
 		session,
 		isReady,
@@ -575,5 +636,6 @@ export function useAgentSession(
 		updateAvailableCommands,
 		updateCurrentMode,
 		setMode,
+		setModel,
 	};
 }

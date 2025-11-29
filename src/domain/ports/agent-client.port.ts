@@ -16,6 +16,7 @@ import type { AgentError } from "../models/agent-error";
 import type {
 	AuthenticationMethod,
 	SessionModeState,
+	SessionModelState,
 } from "../models/chat-session";
 
 /**
@@ -101,6 +102,13 @@ export interface NewSessionResult {
 	 * Undefined if the agent does not support modes.
 	 */
 	modes?: SessionModeState;
+
+	/**
+	 * Model state for this session (experimental).
+	 * Contains available models and the currently active model.
+	 * Undefined if the agent does not support model selection.
+	 */
+	models?: SessionModelState;
 }
 
 /**
@@ -247,4 +255,11 @@ export interface IAgentClient {
 	 * @throws Error if connection is not initialized or mode is invalid
 	 */
 	setSessionMode(sessionId: string, modeId: string): Promise<void>;
+
+	/**
+	 * Set the session model (experimental).
+	 * @param sessionId - The session ID
+	 * @param modelId - The model ID to set
+	 */
+	setSessionModel(sessionId: string, modelId: string): Promise<void>;
 }

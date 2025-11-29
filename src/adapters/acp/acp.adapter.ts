@@ -22,6 +22,7 @@ import type AgentClientPlugin from "../../plugin";
 import type {
 	SlashCommand,
 	SessionModeState,
+	SessionModelState,
 } from "src/domain/models/chat-session";
 import {
 	wrapCommandForWsl,
@@ -518,9 +519,29 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				);
 			}
 
+			// Convert models from ACP format to domain format (experimental)
+			let models: SessionModelState | undefined;
+			if (sessionResult.models) {
+				models = {
+					availableModels: sessionResult.models.availableModels.map(
+						(m) => ({
+							modelId: m.modelId,
+							name: m.name,
+							// Convert null to undefined for type compatibility
+							description: m.description ?? undefined,
+						}),
+					),
+					currentModelId: sessionResult.models.currentModelId,
+				};
+				this.logger.log(
+					`[AcpAdapter] Session models: ${models.availableModels.map((m) => m.modelId).join(", ")} (current: ${models.currentModelId})`,
+				);
+			}
+
 			return {
 				sessionId: sessionResult.sessionId,
 				modes,
+				models,
 			};
 		} catch (error) {
 			this.logger.error("[AcpAdapter] New Session Error:", error);
@@ -814,6 +835,35 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		} catch (error) {
 			this.logger.error(
 				"[AcpAdapter] Failed to set session mode:",
+				error,
+			);
+			throw error;
+		}
+	}
+
+	/**
+	 * Implementation of IAgentClient.setSessionModel()
+	 */
+	async setSessionModel(sessionId: string, modelId: string): Promise<void> {
+		if (!this.connection) {
+			throw new Error(
+				"Connection not initialized. Call initialize() first.",
+			);
+		}
+
+		this.logger.log(
+			`[AcpAdapter] Setting session model to: ${modelId} for session: ${sessionId}`,
+		);
+
+		try {
+			await this.connection.setSessionModel({
+				sessionId,
+				modelId,
+			});
+			this.logger.log(`[AcpAdapter] Session model set to: ${modelId}`);
+		} catch (error) {
+			this.logger.error(
+				"[AcpAdapter] Failed to set session model:",
 				error,
 			);
 			throw error;

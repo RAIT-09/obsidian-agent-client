@@ -8,6 +8,7 @@ import type { NoteMetadata } from "../../domain/ports/vault-access.port";
 import type {
 	SlashCommand,
 	SessionModeState,
+	SessionModelState,
 } from "../../domain/models/chat-session";
 import type { UseMentionsReturn } from "../../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../../hooks/useSlashCommands";
@@ -51,6 +52,10 @@ export interface ChatInputProps {
 	modes?: SessionModeState;
 	/** Callback when mode is changed */
 	onModeChange?: (modeId: string) => void;
+	/** Session model state (available models and current model) - experimental */
+	models?: SessionModelState;
+	/** Callback when model is changed */
+	onModelChange?: (modelId: string) => void;
 }
 
 /**
@@ -82,6 +87,8 @@ export function ChatInput({
 	onRestoredMessageConsumed,
 	modes,
 	onModeChange,
+	models,
+	onModelChange,
 }: ChatInputProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 
@@ -95,6 +102,8 @@ export function ChatInput({
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
 	const modeDropdownRef = useRef<HTMLDivElement>(null);
 	const modeDropdownInstance = useRef<DropdownComponent | null>(null);
+	const modelDropdownRef = useRef<HTMLDivElement>(null);
+	const modelDropdownInstance = useRef<DropdownComponent | null>(null);
 
 	/**
 	 * Common logic for setting cursor position after text replacement.
@@ -495,6 +504,67 @@ export function ChatInput({
 		}
 	}, [currentModeId]);
 
+	// Stable references for model callbacks
+	const onModelChangeRef = useRef(onModelChange);
+	onModelChangeRef.current = onModelChange;
+
+	// Initialize Model dropdown (only when availableModels change)
+	const availableModels = models?.availableModels;
+	const currentModelId = models?.currentModelId;
+
+	useEffect(() => {
+		const containerEl = modelDropdownRef.current;
+		if (!containerEl) return;
+
+		// Only show dropdown if there are multiple models
+		if (!availableModels || availableModels.length <= 1) {
+			// Clean up existing dropdown if models become unavailable
+			if (modelDropdownInstance.current) {
+				containerEl.empty();
+				modelDropdownInstance.current = null;
+			}
+			return;
+		}
+
+		// Create dropdown if not exists
+		if (!modelDropdownInstance.current) {
+			const dropdown = new DropdownComponent(containerEl);
+			modelDropdownInstance.current = dropdown;
+
+			// Add options
+			for (const model of availableModels) {
+				dropdown.addOption(model.modelId, model.name);
+			}
+
+			// Set initial value
+			if (currentModelId) {
+				dropdown.setValue(currentModelId);
+			}
+
+			// Handle change - use ref to avoid recreating dropdown on callback change
+			dropdown.onChange((value) => {
+				if (onModelChangeRef.current) {
+					onModelChangeRef.current(value);
+				}
+			});
+		}
+
+		// Cleanup on unmount or when availableModels change
+		return () => {
+			if (modelDropdownInstance.current) {
+				containerEl.empty();
+				modelDropdownInstance.current = null;
+			}
+		};
+	}, [availableModels]);
+
+	// Update dropdown value when currentModelId changes (separate effect)
+	useEffect(() => {
+		if (modelDropdownInstance.current && currentModelId) {
+			modelDropdownInstance.current.setValue(currentModelId);
+		}
+	}, [currentModelId]);
+
 	// Button disabled state
 	const isButtonDisabled =
 		!isSending && (inputValue.trim() === "" || !isSessionReady);
@@ -597,7 +667,7 @@ export function ChatInput({
 					)}
 				</div>
 
-				{/* Input Actions (Mode Selector + Send Button) */}
+				{/* Input Actions (Mode Selector + Model Selector + Send Button) */}
 				<div className="chat-input-actions">
 					{/* Mode Selector */}
 					{modes && modes.availableModes.length > 1 && (
@@ -612,6 +682,26 @@ export function ChatInput({
 						>
 							<span
 								className="mode-selector-icon"
+								ref={(el) => {
+									if (el) setIcon(el, "chevron-down");
+								}}
+							/>
+						</div>
+					)}
+
+					{/* Model Selector (experimental) */}
+					{models && models.availableModels.length > 1 && (
+						<div
+							ref={modelDropdownRef}
+							className="model-selector"
+							title={
+								models.availableModels.find(
+									(m) => m.modelId === models.currentModelId,
+								)?.description ?? "Select model"
+							}
+						>
+							<span
+								className="model-selector-icon"
 								ref={(el) => {
 									if (el) setIcon(el, "chevron-down");
 								}}

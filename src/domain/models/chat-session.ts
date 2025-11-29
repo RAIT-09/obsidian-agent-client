@@ -121,6 +121,42 @@ export interface SessionModeState {
 }
 
 // ============================================================================
+// Model (Experimental)
+// ============================================================================
+
+/**
+ * Represents an AI model available in a session.
+ *
+ * Models determine which AI model is used for responses.
+ * This is an experimental feature and may change.
+ */
+export interface SessionModel {
+	/** Unique identifier for this model (e.g., "claude-sonnet-4") */
+	modelId: string;
+
+	/** Human-readable name for display */
+	name: string;
+
+	/** Optional description of this model */
+	description?: string;
+}
+
+/**
+ * State of available models in a session.
+ *
+ * Contains both the list of available models and the currently active model.
+ * Updated via NewSessionResponse initially.
+ * Note: Unlike modes, there is no dedicated notification for model changes.
+ */
+export interface SessionModelState {
+	/** List of models available in this session */
+	availableModels: SessionModel[];
+
+	/** ID of the currently active model */
+	currentModelId: string;
+}
+
+// ============================================================================
 // Chat Session
 // ============================================================================
 
@@ -165,6 +201,13 @@ export interface ChatSession {
 	 * Updated via NewSessionResponse and `current_mode_update` notification.
 	 */
 	modes?: SessionModeState;
+
+	/**
+	 * Model state for this session (experimental).
+	 * Contains available models and the currently active model.
+	 * Updated via NewSessionResponse initially.
+	 */
+	models?: SessionModelState;
 
 	/** Timestamp when the session was created */
 	createdAt: Date;

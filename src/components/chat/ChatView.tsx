@@ -518,6 +518,8 @@ function ChatComponent({
 				onRestoredMessageConsumed={handleRestoredMessageConsumed}
 				modes={session.modes}
 				onModeChange={(modeId) => void agentSession.setMode(modeId)}
+				models={session.models}
+				onModelChange={(modelId) => void agentSession.setModel(modelId)}
 			/>
 		</div>
 	);
