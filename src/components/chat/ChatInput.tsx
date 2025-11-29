@@ -166,18 +166,37 @@ export function ChatInput({
 	const adjustTextareaHeight = useCallback(() => {
 		const textarea = textareaRef.current;
 		if (textarea) {
-			// Reset height to auto to measure content
-			textarea.style.height = "auto";
+			// Remove previous dynamic height classes
+			textarea.classList.remove(
+				"textarea-auto-height",
+				"textarea-expanded",
+			);
+
+			// Temporarily use auto to measure
+			textarea.classList.add("textarea-auto-height");
 			const scrollHeight = textarea.scrollHeight;
 			const minHeight = 80;
 			const maxHeight = 300;
 
-			// Calculate and apply height
+			// Calculate height
 			const calculatedHeight = Math.max(
 				minHeight,
 				Math.min(scrollHeight, maxHeight),
 			);
-			textarea.style.height = `${calculatedHeight}px`;
+
+			// Apply expanded class if needed
+			if (calculatedHeight > minHeight) {
+				textarea.classList.add("textarea-expanded");
+				// Set CSS variable for dynamic height
+				textarea.style.setProperty(
+					"--textarea-height",
+					`${calculatedHeight}px`,
+				);
+			} else {
+				textarea.style.removeProperty("--textarea-height");
+			}
+
+			textarea.classList.remove("textarea-auto-height");
 		}
 	}, []);
 

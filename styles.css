@@ -566,6 +566,15 @@ If your plugin does not need CSS, delete this file.
 	box-shadow: none !important;
 }
 
+/* Dynamic textarea height management */
+.chat-input-textarea.textarea-auto-height {
+	height: auto;
+}
+
+.chat-input-textarea.textarea-expanded {
+	height: var(--textarea-height, auto);
+}
+
 /* Textarea wrapper for hint overlay */
 .textarea-wrapper {
 	position: relative;

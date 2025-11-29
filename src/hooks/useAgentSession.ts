@@ -4,7 +4,6 @@ import type {
 	SessionState,
 	SlashCommand,
 	AuthenticationMethod,
-	SessionModeState,
 } from "../domain/models/chat-session";
 import type { IAgentClient } from "../domain/ports/agent-client.port";
 import type { ISettingsAccess } from "../domain/ports/settings-access.port";
