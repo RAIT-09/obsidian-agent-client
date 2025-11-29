@@ -443,29 +443,33 @@ If your plugin does not need CSS, delete this file.
 /* Input area */
 .chat-input-container {
 	flex-shrink: 0;
+	position: relative;
 }
 
-.chat-input-wrapper {
-	position: relative;
+/* Input box - outer container with border and background */
+.chat-input-box {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background-color: var(--background-primary);
+	overflow: hidden;
+	transition: box-shadow 0.15s ease;
+}
+
+.chat-input-box:focus-within {
+	box-shadow: 0 0 0 1.5px var(--background-modifier-border);
 }
 
 /* Auto-mention inline display */
 .auto-mention-inline {
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
-	pointer-events: none;
-	z-index: 1;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 4px;
-	padding: 6px 12px 6px 12px;
-	border: 1px solid var(--background-modifier-border);
-	border-bottom-width: 1px;
+	padding: 6px 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
 	background-color: var(--background-primary);
-	border-radius: 8px 8px 0 0;
 }
 
 .mention-badge {
@@ -530,13 +534,13 @@ If your plugin does not need CSS, delete this file.
 
 .chat-input-textarea {
 	width: 100%;
-	padding: 12px 12px 32px 12px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
-	background-color: var(--background-primary);
+	padding: 12px;
+	border: none;
+	background-color: transparent;
 	color: var(--text-normal);
 	resize: none;
 	min-height: 80px;
+	max-height: 300px;
 	font-family: inherit;
 	font-size: var(--font-text-size);
 	line-height: var(--line-height-normal);
@@ -547,36 +551,26 @@ If your plugin does not need CSS, delete this file.
 	-ms-overflow-style: none;
 }
 
-.chat-input-textarea.has-auto-mention {
-	padding-top: calc(var(--font-text-size) * var(--line-height-normal) + 16px);
-	min-height: calc(
-		80px + var(--font-text-size) * var(--line-height-normal) + 16px
-	);
-}
-
 .chat-input-textarea::-webkit-scrollbar {
 	display: none;
 }
 
 .chat-input-textarea:hover {
-	border: 1px solid var(--background-modifier-border) !important;
-	background-color: var(--background-primary) !important;
+	border: none !important;
+	background-color: transparent !important;
 }
 
-/* Dynamic textarea height management */
-.chat-input-textarea.textarea-auto-height {
-	height: auto;
-}
-
-.chat-input-textarea.textarea-expanded {
-	height: var(--textarea-height, auto);
+.chat-input-textarea:focus {
+	border: none !important;
+	outline: none !important;
+	box-shadow: none !important;
 }
 
 /* Textarea wrapper for hint overlay */
 .textarea-wrapper {
 	position: relative;
-	display: flex;
 	flex: 1;
+	min-height: 80px;
 }
 
 /* Hint overlay for slash commands */
@@ -589,9 +583,7 @@ If your plugin does not need CSS, delete this file.
 	bottom: 0;
 	pointer-events: none;
 	/* Match textarea properties exactly */
-	padding: 12px 40px 12px 12px;
-	border: 1px solid transparent;
-	border-radius: 8px;
+	padding: 12px;
 	box-sizing: border-box;
 	font-family: inherit;
 	font-size: var(--font-text-size);
@@ -600,11 +592,6 @@ If your plugin does not need CSS, delete this file.
 	white-space: pre-wrap;
 	word-wrap: break-word;
 	overflow: hidden;
-}
-
-/* Adjust hint overlay padding when auto-mention is shown */
-.chat-input-textarea.has-auto-mention ~ .hint-overlay {
-	padding-top: calc(var(--font-text-size) * var(--line-height-normal) + 16px);
 }
 
 .hint-overlay .invisible {
@@ -617,14 +604,11 @@ If your plugin does not need CSS, delete this file.
 
 /* Input Actions Container */
 .chat-input-actions {
-	position: absolute;
-	right: 8px;
-	bottom: 8px;
 	display: flex;
 	align-items: center;
+	justify-content: flex-end;
 	gap: 8px;
-	background-color: var(--background-primary);
-	padding-left: 8px;
+	padding: 4px 12px 8px 12px;
 }
 
 /* Mode Selector */
@@ -636,6 +620,7 @@ If your plugin does not need CSS, delete this file.
 	cursor: pointer;
 	transition: background-color 0.1s ease;
 	height: 20px;
+	max-width: 120px;
 }
 
 .mode-selector:hover {
@@ -673,6 +658,10 @@ If your plugin does not need CSS, delete this file.
 	-webkit-appearance: none !important;
 	-moz-appearance: none !important;
 	order: 1;
+	max-width: 100px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .mode-selector select.dropdown:hover,

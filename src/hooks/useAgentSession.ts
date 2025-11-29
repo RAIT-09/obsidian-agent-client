@@ -497,17 +497,11 @@ export function useAgentSession(
 	 * Called by AcpAdapter when receiving current_mode_update.
 	 */
 	const updateCurrentMode = useCallback((modeId: string) => {
-		console.log("[useAgentSession] updateCurrentMode called with:", modeId);
 		setSession((prev) => {
-			console.log("[useAgentSession] prev.modes:", prev.modes);
 			// Only update if modes exist
 			if (!prev.modes) {
-				console.log(
-					"[useAgentSession] No modes in session, skipping update",
-				);
 				return prev;
 			}
-			console.log("[useAgentSession] Updating currentModeId to:", modeId);
 			return {
 				...prev,
 				modes: {

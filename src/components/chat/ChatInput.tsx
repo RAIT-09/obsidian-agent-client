@@ -166,39 +166,18 @@ export function ChatInput({
 	const adjustTextareaHeight = useCallback(() => {
 		const textarea = textareaRef.current;
 		if (textarea) {
-			// Remove previous dynamic height classes
-			textarea.classList.remove(
-				"textarea-auto-height",
-				"textarea-expanded",
-			);
-
-			// Temporarily use auto to measure
-			textarea.classList.add("textarea-auto-height");
+			// Reset height to auto to measure content
+			textarea.style.height = "auto";
 			const scrollHeight = textarea.scrollHeight;
+			const minHeight = 80;
 			const maxHeight = 300;
-			const hasAutoMention =
-				textarea.classList.contains("has-auto-mention");
-			const minHeight = hasAutoMention ? 116 : 80;
 
-			// Check if expansion is needed
+			// Calculate and apply height
 			const calculatedHeight = Math.max(
 				minHeight,
 				Math.min(scrollHeight, maxHeight),
 			);
-
-			// Apply expanded class if needed
-			if (calculatedHeight > minHeight) {
-				textarea.classList.add("textarea-expanded");
-				// Set CSS variable for dynamic height
-				textarea.style.setProperty(
-					"--textarea-height",
-					`${calculatedHeight}px`,
-				);
-			} else {
-				textarea.style.removeProperty("--textarea-height");
-			}
-
-			textarea.classList.remove("textarea-auto-height");
+			textarea.style.height = `${calculatedHeight}px`;
 		}
 	}, []);
 
@@ -492,16 +471,7 @@ export function ChatInput({
 
 	// Update dropdown value when currentModeId changes (separate effect)
 	useEffect(() => {
-		console.log("[ChatInput] currentModeId changed:", currentModeId);
-		console.log(
-			"[ChatInput] modeDropdownInstance.current:",
-			modeDropdownInstance.current,
-		);
 		if (modeDropdownInstance.current && currentModeId) {
-			console.log(
-				"[ChatInput] Setting dropdown value to:",
-				currentModeId,
-			);
 			modeDropdownInstance.current.setValue(currentModeId);
 		}
 	}, [currentModeId]);
@@ -515,41 +485,34 @@ export function ChatInput({
 
 	return (
 		<div className="chat-input-container">
-			<div className="chat-input-wrapper">
-				{/* Mention Dropdown */}
-				{(() => {
-					logger.log("[DEBUG] Dropdown render check:", {
-						isOpen: mentions.isOpen,
-						suggestionsCount: mentions.suggestions.length,
-						selectedIndex: mentions.selectedIndex,
-					});
-					return null;
-				})()}
-				{mentions.isOpen && (
-					<SuggestionDropdown
-						type="mention"
-						items={mentions.suggestions}
-						selectedIndex={mentions.selectedIndex}
-						onSelect={selectMention}
-						onClose={mentions.close}
-						plugin={plugin}
-						view={view}
-					/>
-				)}
+			{/* Mention Dropdown */}
+			{mentions.isOpen && (
+				<SuggestionDropdown
+					type="mention"
+					items={mentions.suggestions}
+					selectedIndex={mentions.selectedIndex}
+					onSelect={selectMention}
+					onClose={mentions.close}
+					plugin={plugin}
+					view={view}
+				/>
+			)}
 
-				{/* Slash Command Dropdown */}
-				{slashCommands.isOpen && (
-					<SuggestionDropdown
-						type="slash-command"
-						items={slashCommands.suggestions}
-						selectedIndex={slashCommands.selectedIndex}
-						onSelect={handleSelectSlashCommand}
-						onClose={slashCommands.close}
-						plugin={plugin}
-						view={view}
-					/>
-				)}
+			{/* Slash Command Dropdown */}
+			{slashCommands.isOpen && (
+				<SuggestionDropdown
+					type="slash-command"
+					items={slashCommands.suggestions}
+					selectedIndex={slashCommands.selectedIndex}
+					onSelect={handleSelectSlashCommand}
+					onClose={slashCommands.close}
+					plugin={plugin}
+					view={view}
+				/>
+			)}
 
+			{/* Input Box - flexbox container with border */}
+			<div className="chat-input-box">
 				{/* Auto-mention Badge */}
 				{autoMentionEnabled && autoMention.activeNote && (
 					<div className="auto-mention-inline">
