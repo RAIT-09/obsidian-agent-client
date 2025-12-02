@@ -10,7 +10,6 @@
  */
 
 import type {
-	MessageContent,
 	PlanEntry,
 	ToolCallContent,
 	ToolCallLocation,
@@ -19,6 +18,7 @@ import type {
 	PermissionOption,
 } from "./chat-message";
 import type { SlashCommand } from "./chat-session";
+import type { AgentError } from "./agent-error";
 
 // ============================================================================
 // Session Update Types
@@ -112,6 +112,15 @@ export interface CurrentModeUpdate {
 	currentModeId: string;
 }
 
+/**
+ * Error event from the agent.
+ * Used to report errors that occur during agent operations.
+ */
+export interface ErrorUpdate {
+	type: "error";
+	error: AgentError;
+}
+
 // ============================================================================
 // Union Type
 // ============================================================================
@@ -128,6 +137,9 @@ export interface CurrentModeUpdate {
  * - available_commands_update: Slash commands changed
  * - current_mode_update: Mode changed
  *
+ * Additional client-side events:
+ * - error: Error occurred during agent operations
+ *
  * Note: user_message_chunk is not included as it's not typically processed
  * by the client in the same way (user messages are handled directly).
  */
@@ -138,4 +150,5 @@ export type SessionUpdate =
 	| ToolCallUpdateUpdate
 	| PlanUpdate
 	| AvailableCommandsUpdate
-	| CurrentModeUpdate;
+	| CurrentModeUpdate
+	| ErrorUpdate;

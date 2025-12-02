@@ -11,8 +11,7 @@
  * adapter layer, keeping the domain logic stable.
  */
 
-import type { ChatMessage, PermissionOption } from "../models/chat-message";
-import type { AgentError } from "../models/agent-error";
+import type { PermissionOption } from "../models/chat-message";
 import type {
 	AuthenticationMethod,
 	SessionModeState,
@@ -181,36 +180,6 @@ export interface IAgentClient {
 	disconnect(): Promise<void>;
 
 	/**
-	 * Register callback for receiving messages from the agent.
-	 *
-	 * Called when the agent sends a message or updates an existing message
-	 * (e.g., streaming responses, tool call updates).
-	 *
-	 * @param callback - Function to call when agent sends a message
-	 */
-	onMessage(callback: (message: ChatMessage) => void): void;
-
-	/**
-	 * Register callback for errors.
-	 *
-	 * Called when an error occurs during agent communication.
-	 *
-	 * @param callback - Function to call when an error occurs
-	 */
-	onError(callback: (error: AgentError) => void): void;
-
-	/**
-	 * Register callback for permission requests.
-	 *
-	 * Called when the agent requests user permission to perform an operation.
-	 * The UI should present the options to the user and call respondToPermission
-	 * with the user's choice.
-	 *
-	 * @param callback - Function to call when agent requests permission
-	 */
-	onPermissionRequest(callback: (request: PermissionRequest) => void): void;
-
-	/**
 	 * Register callback for session updates.
 	 *
 	 * Called when the agent sends session update events such as:
@@ -221,9 +190,9 @@ export interface IAgentClient {
 	 * - plan: Agent's task plan
 	 * - available_commands_update: Slash commands changed
 	 * - current_mode_update: Mode changed
+	 * - error: Error occurred during agent operations
 	 *
-	 * This is the unified callback for all session updates, replacing
-	 * individual callbacks for different update types.
+	 * This is the unified callback for all session updates.
 	 *
 	 * @param callback - Function to call when agent sends a session update
 	 */

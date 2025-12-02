@@ -7,10 +7,8 @@ import type {
 	AgentConfig,
 	InitializeResult,
 	NewSessionResult,
-	PermissionRequest,
 } from "../../domain/ports/agent-client.port";
 import type {
-	ChatMessage,
 	MessageContent,
 	PermissionOption,
 } from "../../domain/models/chat-message";
@@ -68,12 +66,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	private agentProcess: ChildProcess | null = null;
 	private logger: Logger;
 
-	// Callback handlers
-	private messageCallback: ((message: ChatMessage) => void) | null = null;
-	private errorCallback: ((error: AgentError) => void) | null = null;
-	private permissionCallback: ((request: PermissionRequest) => void) | null =
-		null;
-
 	// Session update callback (unified callback for all session updates)
 	private sessionUpdateCallback: ((update: SessionUpdate) => void) | null =
 		null;
@@ -114,6 +106,13 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 		// Initialize TerminalManager
 		this.terminalManager = new TerminalManager(plugin);
+	}
+
+	/**
+	 * Emit an error via the session update callback.
+	 */
+	private emitError(error: AgentError): void {
+		this.sessionUpdateCallback?.({ type: "error", error });
 	}
 
 	/**
@@ -175,7 +174,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				occurredAt: new Date(),
 				agentId: config.id,
 			};
-			this.errorCallback?.(error);
+			this.emitError(error);
 			throw new Error(error.message);
 		}
 
@@ -305,7 +304,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				...this.getErrorInfo(error, command, agentLabel),
 			};
 
-			this.errorCallback?.(agentError);
+			this.emitError(agentError);
 		});
 
 		agentProcess.on("exit", (code, signal) => {
@@ -331,7 +330,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					code: code,
 				};
 
-				this.errorCallback?.(error);
+				this.emitError(error);
 			}
 		});
 
@@ -435,7 +434,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				originalError: error,
 			};
 
-			this.errorCallback?.(agentError);
+			this.emitError(agentError);
 			throw error;
 		}
 	}
@@ -536,7 +535,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				originalError: error,
 			};
 
-			this.errorCallback?.(agentError);
+			this.emitError(agentError);
 			throw error;
 		}
 	}
@@ -606,7 +605,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				};
 			}
 
-			this.errorCallback?.(agentError);
+			this.emitError(agentError);
 			return false;
 		}
 	}
@@ -692,7 +691,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				originalError: error,
 			};
 
-			this.errorCallback?.(agentError);
+			this.emitError(agentError);
 			throw error;
 		}
 	}
@@ -845,27 +844,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			);
 			throw error;
 		}
-	}
-
-	/**
-	 * Register a callback to receive chat messages from the agent.
-	 */
-	onMessage(callback: (message: ChatMessage) => void): void {
-		this.messageCallback = callback;
-	}
-
-	/**
-	 * Register a callback to receive error notifications.
-	 */
-	onError(callback: (error: AgentError) => void): void {
-		this.errorCallback = callback;
-	}
-
-	/**
-	 * Register a callback to receive permission requests from the agent.
-	 */
-	onPermissionRequest(callback: (request: PermissionRequest) => void): void {
-		this.permissionCallback = callback;
 	}
 
 	/**
