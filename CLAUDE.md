@@ -10,14 +10,14 @@ Obsidian plugin for AI agent interaction (Claude Code, Gemini CLI, custom agents
 ```
 src/
 ├── domain/                   # Pure domain models + ports (interfaces)
-│   ├── models/               # agent-config, agent-error, chat-message, chat-session
+│   ├── models/               # agent-config, agent-error, chat-message, chat-session, session-update
 │   └── ports/                # IAgentClient, ISettingsAccess, IVaultAccess
 ├── adapters/                 # Interface implementations
 │   ├── acp/                  # ACP protocol (acp.adapter.ts, acp-type-converter.ts)
 │   └── obsidian/             # Platform adapters (vault, settings, mention-service)
 ├── hooks/                    # React custom hooks (state + logic)
 │   ├── useAgentSession.ts    # Session lifecycle, agent switching
-│   ├── useChat.ts            # Message sending, callbacks
+│   ├── useChat.ts            # Message sending, session update handling
 │   ├── usePermission.ts      # Permission handling
 │   ├── useMentions.ts        # @[[note]] suggestions
 │   ├── useSlashCommands.ts   # /command suggestions
@@ -40,6 +40,7 @@ src/
 ### ChatView (`components/chat/ChatView.tsx`)
 - **Hook Composition**: Combines all hooks (useAgentSession, useChat, usePermission, etc.)
 - **Adapter Instantiation**: Creates AcpAdapter, VaultAdapter, MentionService via useMemo
+- **Callback Registration**: Registers `onSessionUpdate` for unified event handling
 - **Rendering**: Delegates to ChatHeader, ChatMessages, ChatInput
 
 ### Hooks (`hooks/`)
@@ -48,11 +49,16 @@ src/
 - `createSession()`: Load config, inject API keys, initialize + newSession
 - `switchAgent()`: Change active agent, restart session
 - `closeSession()`: Cancel session, disconnect
+- `updateAvailableCommands()`: Handle slash command updates
+- `updateCurrentMode()`: Handle mode change updates
 
-**useChat**: Messaging
+**useChat**: Messaging and session update handling
 - `sendMessage()`: Prepare (auto-mention, path conversion) → send via IAgentClient
 - `handleNewChat()`: Export if enabled, restart session
-- Callbacks: addMessage, updateLastMessage, updateMessage
+- `handleSessionUpdate()`: Unified handler for all session updates (agent_message_chunk, tool_call, etc.)
+- `upsertToolCall()`: Create or update tool call in single `setMessages` callback (avoids race conditions)
+- `updateLastMessage()`: Append text/thought chunks to last assistant message
+- `updateMessage()`: Update specific message by tool call ID
 
 **usePermission**: Permission handling
 - `handlePermissionResponse()`: Respond with selected option
@@ -67,8 +73,9 @@ Implements IAgentClient + IAcpClient (terminal ops)
 
 - **Process**: spawn() with login shell (macOS/Linux -l, Windows shell:true)
 - **Protocol**: JSON-RPC over stdin/stdout via ndJsonStream
-- **Flow**: initialize() → newSession() → sendMessage() → sessionUpdate() callbacks
-- **Updates**: agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan, available_commands_update
+- **Flow**: initialize() → newSession() → sendMessage() → sessionUpdate via `onSessionUpdate`
+- **Updates**: agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan, available_commands_update, current_mode_update
+- **Unified Callback**: Single `onSessionUpdate(callback)` replaces legacy `onMessage`, `onError`, `onPermissionRequest`
 - **Permissions**: Promise-based Map<requestId, resolver>
 - **Terminal**: createTerminal, terminalOutput, killTerminal, releaseTerminal
 
@@ -83,6 +90,25 @@ Pure functions (non-React):
 - `prepareMessage()`: Auto-mention, convert @[[note]] → paths
 - `sendPreparedMessage()`: Send via IAgentClient, auth retry
 
+## Domain Models
+
+### SessionUpdate (`domain/models/session-update.ts`)
+Union type for all session update events from the agent:
+
+```typescript
+type SessionUpdate =
+  | AgentMessageChunkUpdate   // Text chunk from agent's response
+  | AgentThoughtChunkUpdate   // Text chunk from agent's reasoning
+  | ToolCallUpdate            // New tool call event
+  | ToolCallUpdateUpdate      // Update to existing tool call
+  | PlanUpdate                // Agent's task plan
+  | AvailableCommandsUpdate   // Slash commands changed
+  | CurrentModeUpdate         // Mode changed
+  | ErrorUpdate;              // Error from agent operations
+```
+
+This domain type abstracts ACP's `SessionNotification.update.sessionUpdate` values, allowing the application layer to handle events without depending on ACP protocol specifics.
+
 ## Ports (Interfaces)
 
 ```typescript
@@ -93,10 +119,15 @@ interface IAgentClient {
   sendMessage(sessionId: string, message: string): Promise<void>;
   cancel(sessionId: string): Promise<void>;
   disconnect(): Promise<void>;
-  onMessage(callback: (message: ChatMessage) => void): void;
-  onError(callback: (error: AgentError) => void): void;
-  onPermissionRequest(callback: (request: PermissionRequest) => void): void;
+
+  // Unified callback for all session updates
+  onSessionUpdate(callback: (update: SessionUpdate) => void): void;
+
   respondToPermission(requestId: string, optionId: string): Promise<void>;
+  isInitialized(): boolean;
+  getCurrentAgentId(): string | null;
+  setSessionMode(sessionId: string, modeId: string): Promise<void>;
+  setSessionModel(sessionId: string, modelId: string): Promise<void>;
 }
 
 interface IVaultAccess {
@@ -120,6 +151,7 @@ interface ISettingsAccess {
 2. **Pure functions in shared/**: Non-React business logic
 3. **Ports for ACP resistance**: IAgentClient interface isolates protocol changes
 4. **Domain has zero deps**: No `obsidian`, `@agentclientprotocol/sdk`
+5. **Unified callbacks**: Use `onSessionUpdate` for all agent events (not multiple callbacks)
 
 ### Obsidian Plugin Review (CRITICAL)
 1. No innerHTML/outerHTML - use createEl/createDiv/createSpan
@@ -141,6 +173,7 @@ interface ISettingsAccess {
 3. useRef for cleanup function access
 4. Error handling: try-catch async ops
 5. Logging: Logger class (respects debugMode)
+6. **Upsert pattern**: Use `setMessages` functional updates to avoid race conditions with tool_call updates
 
 ## Common Tasks
 
@@ -158,8 +191,17 @@ interface ISettingsAccess {
 
 ### Modify Message Types
 1. Update `ChatMessage`/`MessageContent` in `domain/models/chat-message.ts`
-2. Update `AcpAdapter.sessionUpdate()` to handle new type
-3. Update `MessageContentRenderer` to render new type
+2. If adding new session update type:
+   - Add to `SessionUpdate` union in `domain/models/session-update.ts`
+   - Handle in `useChat.handleSessionUpdate()`
+3. Update `AcpAdapter.sessionUpdate()` to emit the new type
+4. Update `MessageContentRenderer` to render new type
+
+### Add New Session Update Type
+1. Define interface in `domain/models/session-update.ts`
+2. Add to `SessionUpdate` union type
+3. Handle in `useChat.handleSessionUpdate()` (for message-level updates)
+4. Or handle in `ChatView` (for session-level updates like `available_commands_update`)
 
 ### Debug
 1. Settings → Developer Settings → Debug Mode ON
@@ -170,8 +212,8 @@ interface ISettingsAccess {
 
 **Communication**: JSON-RPC 2.0 over stdin/stdout
 
-**Methods**: initialize, newSession, authenticate, prompt, cancel
-**Notifications**: session/update (agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan, available_commands_update)
+**Methods**: initialize, newSession, authenticate, prompt, cancel, setSessionMode, setSessionModel
+**Notifications**: session/update (agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan, available_commands_update, current_mode_update)
 **Requests**: requestPermission
 
 **Agents**:
@@ -181,4 +223,4 @@ interface ISettingsAccess {
 
 ---
 
-**Last Updated**: November 2025 | **Architecture**: React Hooks | **Version**: 0.3.0
+**Last Updated**: December 2025 | **Architecture**: React Hooks | **Version**: 0.4.0
