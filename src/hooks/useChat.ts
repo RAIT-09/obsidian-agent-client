@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo } from "react";
 import type {
 	ChatMessage,
 	MessageContent,
@@ -15,6 +15,9 @@ import { Platform } from "obsidian";
 // ============================================================================
 // Types
 // ============================================================================
+
+/** Tool call content type extracted for type safety */
+type ToolCallMessageContent = Extract<MessageContent, { type: "tool_call" }>;
 
 /**
  * Options for sending a message.
@@ -76,9 +79,16 @@ export interface UseChatReturn {
 	/**
 	 * Callback to update a specific message by tool call ID.
 	 * Used by AcpAdapter for tool call status updates.
-	 * @returns True if the message was found and updated
 	 */
-	updateMessage: (toolCallId: string, content: MessageContent) => boolean;
+	updateMessage: (toolCallId: string, content: MessageContent) => void;
+
+	/**
+	 * Callback to upsert a tool call message.
+	 * If a tool call with the given ID exists, it will be updated.
+	 * Otherwise, a new message will be created.
+	 * Used by AcpAdapter for tool_call and tool_call_update events.
+	 */
+	upsertToolCall: (toolCallId: string, content: MessageContent) => void;
 }
 
 /**
@@ -94,6 +104,52 @@ export interface SessionContext {
  */
 export interface SettingsContext {
 	windowsWslMode: boolean;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Merge new tool call content into existing tool call.
+ * Preserves existing values when new values are undefined.
+ */
+function mergeToolCallContent(
+	existing: ToolCallMessageContent,
+	update: ToolCallMessageContent,
+): ToolCallMessageContent {
+	// Merge content arrays
+	let mergedContent = existing.content || [];
+	if (update.content !== undefined) {
+		const newContent = update.content || [];
+
+		// If new content contains diff, replace all old diffs
+		const hasDiff = newContent.some((item) => item.type === "diff");
+		if (hasDiff) {
+			mergedContent = mergedContent.filter(
+				(item) => item.type !== "diff",
+			);
+		}
+
+		mergedContent = [...mergedContent, ...newContent];
+	}
+
+	return {
+		...existing,
+		toolCallId: update.toolCallId,
+		title: update.title !== undefined ? update.title : existing.title,
+		kind: update.kind !== undefined ? update.kind : existing.kind,
+		status: update.status !== undefined ? update.status : existing.status,
+		content: mergedContent,
+		locations:
+			update.locations !== undefined
+				? update.locations
+				: existing.locations,
+		permissionRequest:
+			update.permissionRequest !== undefined
+				? update.permissionRequest
+				: existing.permissionRequest,
+	};
 }
 
 // ============================================================================
@@ -131,23 +187,10 @@ export function useChat(
 	const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
 	const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
 
-	// Track pending tool call IDs to prevent duplicate addMessage calls
-	// This is needed because multiple tool_call events with the same ID can arrive
-	// before React state updates are committed
-	const pendingToolCallIds = useRef<Set<string>>(new Set());
-
 	/**
 	 * Add a new message to the chat.
-	 * For tool_call messages, registers the toolCallId in pendingToolCallIds
-	 * to prevent duplicate messages from race conditions.
 	 */
 	const addMessage = useCallback((message: ChatMessage): void => {
-		// Track tool call IDs to prevent duplicates from race conditions
-		for (const content of message.content) {
-			if (content.type === "tool_call" && content.toolCallId) {
-				pendingToolCallIds.current.add(content.toolCallId);
-			}
-		}
 		setMessages((prev) => [...prev, message]);
 	}, []);
 
@@ -218,85 +261,72 @@ export function useChat(
 
 	/**
 	 * Update a specific message by tool call ID.
-	 * Also checks pendingToolCallIds to handle race conditions where
-	 * multiple tool_call events arrive before state updates are committed.
-	 *
-	 * Returns true if the toolCallId was found in either:
-	 * - pendingToolCallIds (message added but state not yet committed)
-	 * - existing messages in state
-	 *
-	 * The update is always applied via setMessages, even if found in pendingToolCallIds,
-	 * to ensure subsequent updates (like permission requests) are merged correctly.
+	 * Only updates if the tool call exists in state.
 	 */
 	const updateMessage = useCallback(
-		(toolCallId: string, content: MessageContent): boolean => {
-			// Check if this toolCallId is pending (added but not yet committed to state)
-			const isPending = pendingToolCallIds.current.has(toolCallId);
+		(toolCallId: string, content: MessageContent): void => {
+			if (content.type !== "tool_call") return;
 
-			let found = false;
-
-			setMessages((prev) => {
-				const updatedMessages = prev.map((message) => ({
+			setMessages((prev) =>
+				prev.map((message) => ({
 					...message,
 					content: message.content.map((c) => {
 						if (
 							c.type === "tool_call" &&
-							c.toolCallId === toolCallId &&
-							content.type === "tool_call"
+							c.toolCallId === toolCallId
+						) {
+							return mergeToolCallContent(c, content);
+						}
+						return c;
+					}),
+				})),
+			);
+		},
+		[],
+	);
+
+	/**
+	 * Upsert a tool call message.
+	 * If a tool call with the given ID exists, it will be updated (merged).
+	 * Otherwise, a new assistant message will be created.
+	 * All logic is inside setMessages callback to avoid race conditions.
+	 */
+	const upsertToolCall = useCallback(
+		(toolCallId: string, content: MessageContent): void => {
+			if (content.type !== "tool_call") return;
+
+			setMessages((prev) => {
+				// Try to find existing tool call
+				let found = false;
+				const updated = prev.map((message) => ({
+					...message,
+					content: message.content.map((c) => {
+						if (
+							c.type === "tool_call" &&
+							c.toolCallId === toolCallId
 						) {
 							found = true;
-							// Merge content arrays
-							let mergedContent = c.content || [];
-							if (content.content !== undefined) {
-								const newContent = content.content || [];
-
-								// If new content contains diff, replace all old diffs
-								const hasDiff = newContent.some(
-									(item) => item.type === "diff",
-								);
-								if (hasDiff) {
-									mergedContent = mergedContent.filter(
-										(item) => item.type !== "diff",
-									);
-								}
-
-								mergedContent = [
-									...mergedContent,
-									...newContent,
-								];
-							}
-
-							return {
-								...c,
-								toolCallId: content.toolCallId,
-								title:
-									content.title !== undefined
-										? content.title
-										: c.title,
-								kind:
-									content.kind !== undefined
-										? content.kind
-										: c.kind,
-								status:
-									content.status !== undefined
-										? content.status
-										: c.status,
-								content: mergedContent,
-								permissionRequest:
-									content.permissionRequest !== undefined
-										? content.permissionRequest
-										: c.permissionRequest,
-							};
+							return mergeToolCallContent(c, content);
 						}
 						return c;
 					}),
 				}));
 
-				return found ? updatedMessages : prev;
-			});
+				if (found) {
+					return updated;
+				}
 
-			// Return true if found in state OR if pending (to prevent duplicate addMessage)
-			return found || isPending;
+				// Not found - create new message
+				return [
+					...prev,
+					{
+						id: crypto.randomUUID(),
+						role: "assistant" as const,
+						content: [content],
+						timestamp: new Date(),
+					},
+				];
+			});
 		},
 		[],
 	);
@@ -309,7 +339,6 @@ export function useChat(
 		setLastUserMessage(null);
 		setIsSending(false);
 		setErrorInfo(null);
-		pendingToolCallIds.current.clear();
 	}, []);
 
 	/**
@@ -442,5 +471,6 @@ export function useChat(
 		addMessage,
 		updateLastMessage,
 		updateMessage,
+		upsertToolCall,
 	};
 }

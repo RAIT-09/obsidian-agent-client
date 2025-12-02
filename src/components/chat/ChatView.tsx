@@ -339,6 +339,7 @@ function ChatComponent({
 			chat.addMessage,
 			chat.updateLastMessage,
 			chat.updateMessage,
+			chat.upsertToolCall,
 			agentSession.updateAvailableCommands,
 			agentSession.updateCurrentMode,
 		);
@@ -347,6 +348,7 @@ function ChatComponent({
 		chat.addMessage,
 		chat.updateLastMessage,
 		chat.updateMessage,
+		chat.upsertToolCall,
 		agentSession.updateAvailableCommands,
 		agentSession.updateCurrentMode,
 	]);

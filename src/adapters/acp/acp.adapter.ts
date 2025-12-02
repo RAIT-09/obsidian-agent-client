@@ -83,7 +83,11 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	private updateMessage: (
 		toolCallId: string,
 		content: MessageContent,
-	) => boolean;
+	) => void;
+	private upsertToolCall: (
+		toolCallId: string,
+		content: MessageContent,
+	) => void;
 
 	// Configuration state
 	private currentConfig: AgentConfig | null = null;
@@ -108,20 +112,13 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		options: PermissionOption[];
 	}> = [];
 
-	constructor(
-		private plugin: AgentClientPlugin,
-		addMessage?: (message: ChatMessage) => void,
-		updateLastMessage?: (content: MessageContent) => void,
-		updateMessage?: (
-			toolCallId: string,
-			content: MessageContent,
-		) => boolean,
-	) {
+	constructor(private plugin: AgentClientPlugin) {
 		this.logger = new Logger(plugin);
-		// Initialize with provided callbacks or no-ops
-		this.addMessage = addMessage || (() => {});
-		this.updateLastMessage = updateLastMessage || (() => {});
-		this.updateMessage = updateMessage || (() => false);
+		// Initialize with no-op callbacks
+		this.addMessage = () => {};
+		this.updateLastMessage = () => {};
+		this.updateMessage = () => {};
+		this.upsertToolCall = () => {};
 
 		// Initialize TerminalManager
 		this.terminalManager = new TerminalManager(plugin);
@@ -136,19 +133,22 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	 * @param addMessage - Callback to add a new message to chat
 	 * @param updateLastMessage - Callback to update the last message
 	 * @param updateMessage - Callback to update a specific message by toolCallId
+	 * @param upsertToolCall - Callback to upsert a tool call (create or update)
 	 * @param updateAvailableCommandsCallback - Callback to update available commands
 	 * @param updateCurrentModeCallback - Callback to update current mode
 	 */
 	setMessageCallbacks(
 		addMessage: (message: ChatMessage) => void,
 		updateLastMessage: (content: MessageContent) => void,
-		updateMessage: (toolCallId: string, content: MessageContent) => boolean,
+		updateMessage: (toolCallId: string, content: MessageContent) => void,
+		upsertToolCall: (toolCallId: string, content: MessageContent) => void,
 		updateAvailableCommandsCallback: (commands: SlashCommand[]) => void,
 		updateCurrentModeCallback: (modeId: string) => void,
 	): void {
 		this.addMessage = addMessage;
 		this.updateLastMessage = updateLastMessage;
 		this.updateMessage = updateMessage;
+		this.upsertToolCall = upsertToolCall;
 		this.updateAvailableCommandsCallback = updateAvailableCommandsCallback;
 		this.updateCurrentModeCallback = updateCurrentModeCallback;
 	}
@@ -981,53 +981,15 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				}
 				break;
 
-			case "tool_call": {
-				// Try to update existing tool call first
-				const updated = this.updateMessage(update.toolCallId, {
-					type: "tool_call",
-					toolCallId: update.toolCallId,
-					title: update.title,
-					status: update.status || "pending",
-					kind: update.kind,
-					content: AcpTypeConverter.toToolCallContent(update.content),
-					locations: update.locations ?? undefined,
-				});
-
-				// Create new message only if no existing tool call was found
-				if (!updated) {
-					this.addMessage({
-						id: crypto.randomUUID(),
-						role: "assistant",
-						content: [
-							{
-								type: "tool_call",
-								toolCallId: update.toolCallId,
-								title: update.title,
-								status: update.status || "pending",
-								kind: update.kind,
-								content: AcpTypeConverter.toToolCallContent(
-									update.content,
-								),
-								locations: update.locations ?? undefined,
-							},
-						],
-						timestamp: new Date(),
-					});
-				}
-				break;
-			}
-
+			case "tool_call":
 			case "tool_call_update":
-				this.logger.log(
-					`[AcpAdapter] tool_call_update for ${update.toolCallId}, content:`,
-					update.content,
-				);
-				this.updateMessage(update.toolCallId, {
+				// Use upsertToolCall for both - it handles create and update
+				this.upsertToolCall(update.toolCallId, {
 					type: "tool_call",
 					toolCallId: update.toolCallId,
 					title: update.title,
 					status: update.status || "pending",
-					kind: update.kind || undefined,
+					kind: update.kind ?? undefined,
 					content: AcpTypeConverter.toToolCallContent(update.content),
 					locations: update.locations ?? undefined,
 				});
@@ -1221,39 +1183,20 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			options: normalizedOptions,
 		});
 
-		// Try to update existing tool_call with permission request
-		const updated = this.updateMessage(toolCallId, {
+		// Upsert tool_call with permission request
+		// If tool_call exists, it will be updated; otherwise, a new one will be created
+		const toolCallInfo = params.toolCall;
+		this.upsertToolCall(toolCallId, {
 			type: "tool_call",
 			toolCallId: toolCallId,
+			title: toolCallInfo?.title ?? undefined,
+			status: toolCallInfo?.status || "pending",
+			kind: (toolCallInfo?.kind as acp.ToolKind | undefined) ?? undefined,
+			content: AcpTypeConverter.toToolCallContent(
+				toolCallInfo?.content as acp.ToolCallContent[] | undefined,
+			),
 			permissionRequest: permissionRequestData,
-		} as MessageContent);
-
-		// If no existing tool_call was found, create a new tool_call message with permission
-		if (!updated && params.toolCall?.title) {
-			const toolCallInfo = params.toolCall;
-			const status = toolCallInfo.status || "pending";
-			const kind = toolCallInfo.kind as acp.ToolKind | undefined;
-			const content = AcpTypeConverter.toToolCallContent(
-				toolCallInfo.content as acp.ToolCallContent[] | undefined,
-			);
-
-			this.addMessage({
-				id: crypto.randomUUID(),
-				role: "assistant",
-				content: [
-					{
-						type: "tool_call",
-						toolCallId: toolCallInfo.toolCallId,
-						title: toolCallInfo.title,
-						status,
-						kind,
-						content,
-						permissionRequest: permissionRequestData,
-					},
-				],
-				timestamp: new Date(),
-			});
-		}
+		});
 
 		// Return a Promise that will be resolved when user clicks a button
 		return new Promise((resolve) => {
