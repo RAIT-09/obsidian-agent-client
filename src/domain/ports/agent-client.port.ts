@@ -18,6 +18,7 @@ import type {
 	SessionModeState,
 	SessionModelState,
 } from "../models/chat-session";
+import type { SessionUpdate } from "../models/session-update";
 
 /**
  * Runtime configuration for launching an AI agent process.
@@ -208,6 +209,25 @@ export interface IAgentClient {
 	 * @param callback - Function to call when agent requests permission
 	 */
 	onPermissionRequest(callback: (request: PermissionRequest) => void): void;
+
+	/**
+	 * Register callback for session updates.
+	 *
+	 * Called when the agent sends session update events such as:
+	 * - agent_message_chunk: Text chunk from agent's response
+	 * - agent_thought_chunk: Text chunk from agent's reasoning
+	 * - tool_call: New tool call event
+	 * - tool_call_update: Update to existing tool call
+	 * - plan: Agent's task plan
+	 * - available_commands_update: Slash commands changed
+	 * - current_mode_update: Mode changed
+	 *
+	 * This is the unified callback for all session updates, replacing
+	 * individual callbacks for different update types.
+	 *
+	 * @param callback - Function to call when agent sends a session update
+	 */
+	onSessionUpdate(callback: (update: SessionUpdate) => void): void;
 
 	/**
 	 * Respond to a permission request.

@@ -14,6 +14,7 @@ import type {
 	MessageContent,
 	PermissionOption,
 } from "../../domain/models/chat-message";
+import type { SessionUpdate } from "../../domain/models/session-update";
 import type { AgentError } from "../../domain/models/agent-error";
 import { AcpTypeConverter } from "./acp-type-converter";
 import { TerminalManager } from "../../shared/terminal-manager";
@@ -72,19 +73,13 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	private errorCallback: ((error: AgentError) => void) | null = null;
 	private permissionCallback: ((request: PermissionRequest) => void) | null =
 		null;
-	private updateAvailableCommandsCallback:
-		| ((commands: SlashCommand[]) => void)
-		| null = null;
-	private updateCurrentModeCallback: ((modeId: string) => void) | null = null;
 
-	// Message update callbacks (for ViewModel integration)
-	private addMessage: (message: ChatMessage) => void;
-	private updateLastMessage: (content: MessageContent) => void;
+	// Session update callback (unified callback for all session updates)
+	private sessionUpdateCallback: ((update: SessionUpdate) => void) | null =
+		null;
+
+	// Message update callback for permission UI updates
 	private updateMessage: (
-		toolCallId: string,
-		content: MessageContent,
-	) => void;
-	private upsertToolCall: (
 		toolCallId: string,
 		content: MessageContent,
 	) => void;
@@ -114,43 +109,25 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 	constructor(private plugin: AgentClientPlugin) {
 		this.logger = new Logger(plugin);
-		// Initialize with no-op callbacks
-		this.addMessage = () => {};
-		this.updateLastMessage = () => {};
+		// Initialize with no-op callback
 		this.updateMessage = () => {};
-		this.upsertToolCall = () => {};
 
 		// Initialize TerminalManager
 		this.terminalManager = new TerminalManager(plugin);
 	}
 
 	/**
-	 * Set message callbacks after construction.
+	 * Set the update message callback for permission UI updates.
 	 *
-	 * This allows decoupling AcpAdapter creation from ViewModel creation,
-	 * enabling proper dependency injection in Clean Architecture.
+	 * This callback is used to update tool call messages when permission
+	 * requests are responded to or cancelled.
 	 *
-	 * @param addMessage - Callback to add a new message to chat
-	 * @param updateLastMessage - Callback to update the last message
 	 * @param updateMessage - Callback to update a specific message by toolCallId
-	 * @param upsertToolCall - Callback to upsert a tool call (create or update)
-	 * @param updateAvailableCommandsCallback - Callback to update available commands
-	 * @param updateCurrentModeCallback - Callback to update current mode
 	 */
-	setMessageCallbacks(
-		addMessage: (message: ChatMessage) => void,
-		updateLastMessage: (content: MessageContent) => void,
+	setUpdateMessageCallback(
 		updateMessage: (toolCallId: string, content: MessageContent) => void,
-		upsertToolCall: (toolCallId: string, content: MessageContent) => void,
-		updateAvailableCommandsCallback: (commands: SlashCommand[]) => void,
-		updateCurrentModeCallback: (modeId: string) => void,
 	): void {
-		this.addMessage = addMessage;
-		this.updateLastMessage = updateLastMessage;
 		this.updateMessage = updateMessage;
-		this.upsertToolCall = upsertToolCall;
-		this.updateAvailableCommandsCallback = updateAvailableCommandsCallback;
-		this.updateCurrentModeCallback = updateCurrentModeCallback;
 	}
 
 	/**
@@ -892,6 +869,22 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	/**
+	 * Register a callback to receive session updates from the agent.
+	 *
+	 * This unified callback receives all session update events:
+	 * - agent_message_chunk: Text chunk from agent's response
+	 * - agent_thought_chunk: Text chunk from agent's reasoning
+	 * - tool_call: New tool call event
+	 * - tool_call_update: Update to existing tool call
+	 * - plan: Agent's task plan
+	 * - available_commands_update: Slash commands changed
+	 * - current_mode_update: Mode changed
+	 */
+	onSessionUpdate(callback: (update: SessionUpdate) => void): void {
+		this.sessionUpdateCallback = callback;
+	}
+
+	/**
 	 * Respond to a permission request from the agent.
 	 */
 	respondToPermission(requestId: string, optionId: string): Promise<void> {
@@ -965,8 +958,8 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		switch (update.sessionUpdate) {
 			case "agent_message_chunk":
 				if (update.content.type === "text") {
-					this.updateLastMessage({
-						type: "text",
+					this.sessionUpdateCallback?.({
+						type: "agent_message_chunk",
 						text: update.content.text,
 					});
 				}
@@ -974,29 +967,29 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 			case "agent_thought_chunk":
 				if (update.content.type === "text") {
-					this.updateLastMessage({
-						type: "agent_thought",
+					this.sessionUpdateCallback?.({
+						type: "agent_thought_chunk",
 						text: update.content.text,
 					});
 				}
 				break;
 
 			case "tool_call":
-			case "tool_call_update":
-				// Use upsertToolCall for both - it handles create and update
-				this.upsertToolCall(update.toolCallId, {
-					type: "tool_call",
+			case "tool_call_update": {
+				this.sessionUpdateCallback?.({
+					type: update.sessionUpdate,
 					toolCallId: update.toolCallId,
-					title: update.title,
+					title: update.title ?? undefined,
 					status: update.status || "pending",
 					kind: update.kind ?? undefined,
 					content: AcpTypeConverter.toToolCallContent(update.content),
 					locations: update.locations ?? undefined,
 				});
 				break;
+			}
 
 			case "plan":
-				this.updateLastMessage({
+				this.sessionUpdateCallback?.({
 					type: "plan",
 					entries: update.entries,
 				});
@@ -1016,9 +1009,10 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					hint: cmd.input?.hint ?? null,
 				}));
 
-				if (this.updateAvailableCommandsCallback) {
-					this.updateAvailableCommandsCallback(commands);
-				}
+				this.sessionUpdateCallback?.({
+					type: "available_commands_update",
+					commands,
+				});
 				break;
 			}
 
@@ -1027,9 +1021,10 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					`[AcpAdapter] current_mode_update: ${update.currentModeId}`,
 				);
 
-				if (this.updateCurrentModeCallback) {
-					this.updateCurrentModeCallback(update.currentModeId);
-				}
+				this.sessionUpdateCallback?.({
+					type: "current_mode_update",
+					currentModeId: update.currentModeId,
+				});
 				break;
 			}
 		}
@@ -1183,10 +1178,10 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			options: normalizedOptions,
 		});
 
-		// Upsert tool_call with permission request
+		// Emit tool_call with permission request via session update callback
 		// If tool_call exists, it will be updated; otherwise, a new one will be created
 		const toolCallInfo = params.toolCall;
-		this.upsertToolCall(toolCallId, {
+		this.sessionUpdateCallback?.({
 			type: "tool_call",
 			toolCallId: toolCallId,
 			title: toolCallInfo?.title ?? undefined,

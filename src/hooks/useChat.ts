@@ -3,6 +3,7 @@ import type {
 	ChatMessage,
 	MessageContent,
 } from "../domain/models/chat-message";
+import type { SessionUpdate } from "../domain/models/session-update";
 import type { IAgentClient } from "../domain/ports/agent-client.port";
 import type { IVaultAccess } from "../domain/ports/vault-access.port";
 import type { NoteMetadata } from "../domain/ports/vault-access.port";
@@ -89,6 +90,13 @@ export interface UseChatReturn {
 	 * Used by AcpAdapter for tool_call and tool_call_update events.
 	 */
 	upsertToolCall: (toolCallId: string, content: MessageContent) => void;
+
+	/**
+	 * Handle a session update from the agent.
+	 * This is the unified handler for all session update events.
+	 * Should be registered with agentClient.onSessionUpdate().
+	 */
+	handleSessionUpdate: (update: SessionUpdate) => void;
 }
 
 /**
@@ -332,6 +340,62 @@ export function useChat(
 	);
 
 	/**
+	 * Handle a session update from the agent.
+	 * This is the unified handler for all session update events.
+	 *
+	 * Note: available_commands_update and current_mode_update are not handled here
+	 * as they are session-level updates, not message-level updates.
+	 * They should be handled by useAgentSession.
+	 */
+	const handleSessionUpdate = useCallback(
+		(update: SessionUpdate): void => {
+			switch (update.type) {
+				case "agent_message_chunk":
+					updateLastMessage({
+						type: "text",
+						text: update.text,
+					});
+					break;
+
+				case "agent_thought_chunk":
+					updateLastMessage({
+						type: "agent_thought",
+						text: update.text,
+					});
+					break;
+
+				case "tool_call":
+				case "tool_call_update":
+					upsertToolCall(update.toolCallId, {
+						type: "tool_call",
+						toolCallId: update.toolCallId,
+						title: update.title,
+						status: update.status || "pending",
+						kind: update.kind,
+						content: update.content,
+						locations: update.locations,
+						permissionRequest: update.permissionRequest,
+					});
+					break;
+
+				case "plan":
+					updateLastMessage({
+						type: "plan",
+						entries: update.entries,
+					});
+					break;
+
+				// Session-level updates are handled elsewhere (useAgentSession)
+				case "available_commands_update":
+				case "current_mode_update":
+					// These are intentionally not handled here
+					break;
+			}
+		},
+		[updateLastMessage, upsertToolCall],
+	);
+
+	/**
 	 * Clear all messages.
 	 */
 	const clearMessages = useCallback((): void => {
@@ -472,5 +536,6 @@ export function useChat(
 		updateLastMessage,
 		updateMessage,
 		upsertToolCall,
+		handleSessionUpdate,
 	};
 }
