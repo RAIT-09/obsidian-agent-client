@@ -334,22 +334,30 @@ function ChatComponent({
 	// ============================================================
 	// Effects - ACP Adapter Callbacks
 	// ============================================================
+	// Register unified session update callback
 	useEffect(() => {
-		acpAdapter.setMessageCallbacks(
-			chat.addMessage,
-			chat.updateLastMessage,
-			chat.updateMessage,
-			agentSession.updateAvailableCommands,
-			agentSession.updateCurrentMode,
-		);
+		acpAdapter.onSessionUpdate((update) => {
+			// Route message-related updates to useChat
+			chat.handleSessionUpdate(update);
+
+			// Route session-level updates to useAgentSession
+			if (update.type === "available_commands_update") {
+				agentSession.updateAvailableCommands(update.commands);
+			} else if (update.type === "current_mode_update") {
+				agentSession.updateCurrentMode(update.currentModeId);
+			}
+		});
 	}, [
 		acpAdapter,
-		chat.addMessage,
-		chat.updateLastMessage,
-		chat.updateMessage,
+		chat.handleSessionUpdate,
 		agentSession.updateAvailableCommands,
 		agentSession.updateCurrentMode,
 	]);
+
+	// Register updateMessage callback for permission UI updates
+	useEffect(() => {
+		acpAdapter.setUpdateMessageCallback(chat.updateMessage);
+	}, [acpAdapter, chat.updateMessage]);
 
 	// ============================================================
 	// Effects - Update Check

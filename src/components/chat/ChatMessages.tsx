@@ -131,7 +131,10 @@ export function ChatMessages({
 							💡 {errorInfo.suggestion}
 						</p>
 					)}
-					<button onClick={onClearError} className="chat-error-button">
+					<button
+						onClick={onClearError}
+						className="chat-error-button"
+					>
 						OK
 					</button>
 				</div>

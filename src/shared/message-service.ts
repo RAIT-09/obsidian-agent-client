@@ -20,10 +20,7 @@ import type {
 } from "../domain/ports/vault-access.port";
 import type { AgentError } from "../domain/models/agent-error";
 import type { AuthenticationMethod } from "../domain/models/chat-session";
-import {
-	extractMentionedNotes,
-	type IMentionService,
-} from "./mention-utils";
+import { extractMentionedNotes, type IMentionService } from "./mention-utils";
 import { convertWindowsPathToWsl } from "./wsl-utils";
 
 // ============================================================================
@@ -198,7 +195,8 @@ export async function prepareMessage(
 					notePath: input.activeNote.path,
 					selection: input.activeNote.selection
 						? {
-								fromLine: input.activeNote.selection.from.line + 1,
+								fromLine:
+									input.activeNote.selection.from.line + 1,
 								toLine: input.activeNote.selection.to.line + 1,
 							}
 						: undefined,
@@ -366,7 +364,8 @@ async function handleSendError(
 				severity: "error",
 				title: "No Authentication Methods",
 				message: "No authentication methods available for this agent.",
-				suggestion: "Please check your agent configuration in settings.",
+				suggestion:
+					"Please check your agent configuration in settings.",
 				occurredAt: new Date(),
 				sessionId,
 				originalError: error,
@@ -434,7 +433,9 @@ function isEmptyResponseError(error: unknown): boolean {
 		typeof errorData === "object" &&
 		"details" in errorData &&
 		typeof (errorData as { details: unknown }).details === "string" &&
-		(errorData as { details: string }).details.includes("empty response text")
+		(errorData as { details: string }).details.includes(
+			"empty response text",
+		)
 	) {
 		return true;
 	}

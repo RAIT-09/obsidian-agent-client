@@ -11,13 +11,14 @@
  * adapter layer, keeping the domain logic stable.
  */
 
-import type { ChatMessage, PermissionOption } from "../models/chat-message";
-import type { AgentError } from "../models/agent-error";
+import type { PermissionOption } from "../models/chat-message";
 import type {
 	AuthenticationMethod,
 	SessionModeState,
 	SessionModelState,
 } from "../models/chat-session";
+import type { SessionUpdate } from "../models/session-update";
+import type { AgentError } from "../models/agent-error";
 
 /**
  * Runtime configuration for launching an AI agent process.
@@ -180,34 +181,32 @@ export interface IAgentClient {
 	disconnect(): Promise<void>;
 
 	/**
-	 * Register callback for receiving messages from the agent.
+	 * Register callback for session updates.
 	 *
-	 * Called when the agent sends a message or updates an existing message
-	 * (e.g., streaming responses, tool call updates).
+	 * Called when the agent sends session update events such as:
+	 * - agent_message_chunk: Text chunk from agent's response
+	 * - agent_thought_chunk: Text chunk from agent's reasoning
+	 * - tool_call: New tool call event
+	 * - tool_call_update: Update to existing tool call
+	 * - plan: Agent's task plan
+	 * - available_commands_update: Slash commands changed
+	 * - current_mode_update: Mode changed
 	 *
-	 * @param callback - Function to call when agent sends a message
+	 * This is the unified callback for all session updates.
+	 *
+	 * @param callback - Function to call when agent sends a session update
 	 */
-	onMessage(callback: (message: ChatMessage) => void): void;
+	onSessionUpdate(callback: (update: SessionUpdate) => void): void;
 
 	/**
-	 * Register callback for errors.
+	 * Register callback for error notifications.
 	 *
-	 * Called when an error occurs during agent communication.
+	 * Called when errors occur during agent operations that cannot be
+	 * propagated via exceptions (e.g., process spawn errors, exit code 127).
 	 *
 	 * @param callback - Function to call when an error occurs
 	 */
 	onError(callback: (error: AgentError) => void): void;
-
-	/**
-	 * Register callback for permission requests.
-	 *
-	 * Called when the agent requests user permission to perform an operation.
-	 * The UI should present the options to the user and call respondToPermission
-	 * with the user's choice.
-	 *
-	 * @param callback - Function to call when agent requests permission
-	 */
-	onPermissionRequest(callback: (request: PermissionRequest) => void): void;
 
 	/**
 	 * Respond to a permission request.
