@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type {
 	ChatSession,
 	SessionState,
@@ -622,6 +622,18 @@ export function useAgentSession(
 		},
 		[agentClient, session.sessionId, session.models?.currentModelId],
 	);
+
+	// Register error callback for process-level errors
+	useEffect(() => {
+		agentClient.onError((error) => {
+			setSession((prev) => ({ ...prev, state: "error" }));
+			setErrorInfo({
+				title: error.title || "Agent Error",
+				message: error.message || "An error occurred",
+				suggestion: error.suggestion,
+			});
+		});
+	}, [agentClient]);
 
 	return {
 		session,

@@ -70,6 +70,9 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	private sessionUpdateCallback: ((update: SessionUpdate) => void) | null =
 		null;
 
+	// Error callback for process-level errors
+	private errorCallback: ((error: AgentError) => void) | null = null;
+
 	// Message update callback for permission UI updates
 	private updateMessage: (
 		toolCallId: string,
@@ -157,17 +160,9 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 		// Validate command
 		if (!config.command || config.command.trim().length === 0) {
-			const error: AgentError = {
-				id: crypto.randomUUID(),
-				category: "configuration",
-				severity: "error",
-				title: "Command Not Configured",
-				message: `Command not configured for agent "${config.displayName}" (${config.id}).`,
-				suggestion: "Please configure the agent command in settings.",
-				occurredAt: new Date(),
-				agentId: config.id,
-			};
-			throw new Error(error.message);
+			throw new Error(
+				`Command not configured for agent "${config.displayName}" (${config.id}). Please configure the agent command in settings.`,
+			);
 		}
 
 		const command = config.command.trim();
@@ -296,8 +291,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				...this.getErrorInfo(error, command, agentLabel),
 			};
 
-			// Note: Error is logged but not propagated via callback
-			// Errors during process lifecycle are handled by try-catch in calling code
+			this.errorCallback?.(agentError);
 		});
 
 		agentProcess.on("exit", (code, signal) => {
@@ -311,7 +305,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			if (code === 127) {
 				this.logger.error(`[AcpAdapter] Command not found: ${command}`);
 
-				const error: AgentError = {
+				const agentError: AgentError = {
 					id: crypto.randomUUID(),
 					category: "configuration",
 					severity: "error",
@@ -323,7 +317,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					code: code,
 				};
 
-				// Note: Error is logged but not propagated via callback
+				this.errorCallback?.(agentError);
 			}
 		});
 
@@ -414,19 +408,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			this.isInitializedFlag = false;
 			this.currentAgentId = null;
 
-			const agentError: AgentError = {
-				id: crypto.randomUUID(),
-				category: "connection",
-				severity: "error",
-				title: "Initialization Failed",
-				message: `Failed to initialize connection to ${agentLabel}: ${error instanceof Error ? error.message : String(error)}`,
-				suggestion:
-					"Please check the agent configuration and try again.",
-				occurredAt: new Date(),
-				agentId: config.id,
-				originalError: error,
-			};
-
 			throw error;
 		}
 	}
@@ -514,19 +495,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		} catch (error) {
 			this.logger.error("[AcpAdapter] New Session Error:", error);
 
-			const agentError: AgentError = {
-				id: crypto.randomUUID(),
-				category: "connection",
-				severity: "error",
-				title: "Session Creation Failed",
-				message: `Failed to create new session: ${error instanceof Error ? error.message : String(error)}`,
-				suggestion:
-					"Please try disconnecting and reconnecting to the agent.",
-				occurredAt: new Date(),
-				agentId: this.currentConfig?.id,
-				originalError: error,
-			};
-
 			throw error;
 		}
 	}
@@ -547,55 +515,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			return true;
 		} catch (error: unknown) {
 			this.logger.error("[AcpAdapter] Authentication Error:", error);
-
-			// Check if this is a rate limit error
-			const errorObj = error as Record<string, unknown> | null;
-			const isRateLimitError =
-				errorObj &&
-				typeof errorObj === "object" &&
-				"code" in errorObj &&
-				errorObj.code === 429;
-
-			let agentError: AgentError;
-
-			if (isRateLimitError) {
-				// Rate limit error
-				const errorMessage =
-					errorObj &&
-					"message" in errorObj &&
-					typeof errorObj.message === "string"
-						? errorObj.message
-						: null;
-				agentError = {
-					id: crypto.randomUUID(),
-					category: "rate_limit",
-					severity: "error",
-					title: "Rate Limit Exceeded",
-					message: errorMessage
-						? `Rate limit exceeded: ${errorMessage}`
-						: "Rate limit exceeded. Too many requests. Please try again later.",
-					suggestion:
-						"You have exceeded the API rate limit. Please wait a few moments before trying again.",
-					occurredAt: new Date(),
-					agentId: this.currentConfig?.id,
-					originalError: error,
-				};
-			} else {
-				// Authentication error
-				agentError = {
-					id: crypto.randomUUID(),
-					category: "authentication",
-					severity: "error",
-					title: "Authentication Failed",
-					message: `Authentication failed: ${error instanceof Error ? error.message : String(error)}`,
-					suggestion:
-						"Please check your API key or authentication credentials in settings.",
-					occurredAt: new Date(),
-					agentId: this.currentConfig?.id,
-					originalError: error,
-				};
-			}
-
 			return false;
 		}
 	}
@@ -667,19 +586,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					}
 				}
 			}
-
-			const agentError: AgentError = {
-				id: crypto.randomUUID(),
-				category: "communication",
-				severity: "error",
-				title: "Message Send Failed",
-				message: `Failed to send message: ${error instanceof Error ? error.message : String(error)}`,
-				suggestion: "Please check your connection and try again.",
-				occurredAt: new Date(),
-				agentId: this.currentConfig?.id,
-				sessionId: sessionId,
-				originalError: error,
-			};
 
 			throw error;
 		}
@@ -849,6 +755,16 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	 */
 	onSessionUpdate(callback: (update: SessionUpdate) => void): void {
 		this.sessionUpdateCallback = callback;
+	}
+
+	/**
+	 * Register callback for error notifications.
+	 *
+	 * Called when errors occur during agent operations that cannot be
+	 * propagated via exceptions (e.g., process spawn errors, exit code 127).
+	 */
+	onError(callback: (error: AgentError) => void): void {
+		this.errorCallback = callback;
 	}
 
 	/**

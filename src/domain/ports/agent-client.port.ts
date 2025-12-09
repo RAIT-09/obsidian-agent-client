@@ -18,6 +18,7 @@ import type {
 	SessionModelState,
 } from "../models/chat-session";
 import type { SessionUpdate } from "../models/session-update";
+import type { AgentError } from "../models/agent-error";
 
 /**
  * Runtime configuration for launching an AI agent process.
@@ -190,13 +191,22 @@ export interface IAgentClient {
 	 * - plan: Agent's task plan
 	 * - available_commands_update: Slash commands changed
 	 * - current_mode_update: Mode changed
-	 * - error: Error occurred during agent operations
 	 *
 	 * This is the unified callback for all session updates.
 	 *
 	 * @param callback - Function to call when agent sends a session update
 	 */
 	onSessionUpdate(callback: (update: SessionUpdate) => void): void;
+
+	/**
+	 * Register callback for error notifications.
+	 *
+	 * Called when errors occur during agent operations that cannot be
+	 * propagated via exceptions (e.g., process spawn errors, exit code 127).
+	 *
+	 * @param callback - Function to call when an error occurs
+	 */
+	onError(callback: (error: AgentError) => void): void;
 
 	/**
 	 * Respond to a permission request.
