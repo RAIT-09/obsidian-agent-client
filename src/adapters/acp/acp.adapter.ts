@@ -109,13 +109,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	/**
-	 * Emit an error via the session update callback.
-	 */
-	private emitError(error: AgentError): void {
-		this.sessionUpdateCallback?.({ type: "error", error });
-	}
-
-	/**
 	 * Set the update message callback for permission UI updates.
 	 *
 	 * This callback is used to update tool call messages when permission
@@ -174,7 +167,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				occurredAt: new Date(),
 				agentId: config.id,
 			};
-			this.emitError(error);
 			throw new Error(error.message);
 		}
 
@@ -304,7 +296,8 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				...this.getErrorInfo(error, command, agentLabel),
 			};
 
-			this.emitError(agentError);
+			// Note: Error is logged but not propagated via callback
+			// Errors during process lifecycle are handled by try-catch in calling code
 		});
 
 		agentProcess.on("exit", (code, signal) => {
@@ -330,7 +323,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					code: code,
 				};
 
-				this.emitError(error);
+				// Note: Error is logged but not propagated via callback
 			}
 		});
 
@@ -434,7 +427,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				originalError: error,
 			};
 
-			this.emitError(agentError);
 			throw error;
 		}
 	}
@@ -535,7 +527,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				originalError: error,
 			};
 
-			this.emitError(agentError);
 			throw error;
 		}
 	}
@@ -605,7 +596,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				};
 			}
 
-			this.emitError(agentError);
 			return false;
 		}
 	}
@@ -691,7 +681,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				originalError: error,
 			};
 
-			this.emitError(agentError);
 			throw error;
 		}
 	}
