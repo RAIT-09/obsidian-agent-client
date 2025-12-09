@@ -97,10 +97,10 @@ export interface PlanEntry {
 }
 
 /**
- * Update notification for an ongoing tool call.
- * Used in permission requests to show what operation is being requested.
+ * Tool call information for permission requests.
+ * Contains details about the operation being requested for user approval.
  */
-export interface ToolCallUpdate {
+export interface ToolCallInfo {
 	toolCallId: string;
 	title?: string | null;
 	status?: ToolCallStatus | null;
@@ -144,7 +144,7 @@ export type MessageContent =
 	| {
 			type: "text";
 			text: string;
-	}
+	  }
 	| {
 			type: "text_with_context";
 			text: string;
@@ -156,17 +156,17 @@ export type MessageContent =
 					toLine: number;
 				};
 			};
-	}
+	  }
 	| {
 			type: "agent_thought";
 			text: string;
-	}
+	  }
 	| {
 			type: "image";
 			data: string; // Base64 encoded image data
 			mimeType: string; // e.g., "image/png"
 			uri?: string; // Optional source URI
-	}
+	  }
 	| {
 			type: "tool_call";
 			toolCallId: string;
@@ -184,20 +184,20 @@ export type MessageContent =
 				isCancelled?: boolean;
 				isActive?: boolean;
 			};
-	}
+	  }
 	| {
 			type: "plan";
 			entries: PlanEntry[];
-	}
+	  }
 	| {
 			type: "permission_request";
-			toolCall: ToolCallUpdate;
+			toolCall: ToolCallInfo;
 			options: PermissionOption[];
 			selectedOptionId?: string;
 			isCancelled?: boolean;
 			isActive?: boolean;
-	}
+	  }
 	| {
 			type: "terminal";
 			terminalId: string;
-	};
+	  };

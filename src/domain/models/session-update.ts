@@ -27,7 +27,7 @@ import type { SlashCommand } from "./chat-session";
  * Text chunk from agent's message stream.
  * Used for streaming text responses.
  */
-export interface AgentMessageChunkUpdate {
+export interface AgentMessageChunk {
 	type: "agent_message_chunk";
 	text: string;
 }
@@ -36,16 +36,16 @@ export interface AgentMessageChunkUpdate {
  * Text chunk from agent's internal reasoning.
  * Used for streaming thought/reasoning content.
  */
-export interface AgentThoughtChunkUpdate {
+export interface AgentThoughtChunk {
 	type: "agent_thought_chunk";
 	text: string;
 }
 
 /**
  * New tool call event.
- * Creates or updates a tool call in the message history.
+ * Creates a new tool call in the message history.
  */
-export interface ToolCallUpdate {
+export interface ToolCall {
 	type: "tool_call";
 	toolCallId: string;
 	title?: string;
@@ -65,9 +65,9 @@ export interface ToolCallUpdate {
 /**
  * Tool call update event.
  * Updates an existing tool call with new information.
- * Semantically identical to ToolCallUpdate for processing purposes.
+ * Semantically identical to ToolCall for processing purposes.
  */
-export interface ToolCallUpdateUpdate {
+export interface ToolCallUpdate {
 	type: "tool_call_update";
 	toolCallId: string;
 	title?: string;
@@ -85,10 +85,10 @@ export interface ToolCallUpdateUpdate {
 }
 
 /**
- * Agent's execution plan update.
+ * Agent's execution plan.
  * Contains a list of tasks the agent intends to accomplish.
  */
-export interface PlanUpdate {
+export interface Plan {
 	type: "plan";
 	entries: PlanEntry[];
 }
@@ -131,10 +131,10 @@ export interface CurrentModeUpdate {
  * by the client in the same way (user messages are handled directly).
  */
 export type SessionUpdate =
-	| AgentMessageChunkUpdate
-	| AgentThoughtChunkUpdate
+	| AgentMessageChunk
+	| AgentThoughtChunk
+	| ToolCall
 	| ToolCallUpdate
-	| ToolCallUpdateUpdate
-	| PlanUpdate
+	| Plan
 	| AvailableCommandsUpdate
 	| CurrentModeUpdate;
