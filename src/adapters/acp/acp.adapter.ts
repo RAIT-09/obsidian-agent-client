@@ -1171,7 +1171,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 	killTerminal(
 		params: acp.KillTerminalCommandRequest,
-	): Promise<acp.KillTerminalResponse> {
+	): Promise<acp.KillTerminalCommandResponse> {
 		const success = this.terminalManager.killTerminal(params.terminalId);
 		if (!success) {
 			throw new Error(`Terminal ${params.terminalId} not found`);
