@@ -1,8 +1,19 @@
-# 🤖 Agent Client Plugin for Obsidian
+<h1 align="center">🤖 Agent Client Plugin for Obsidian</h1>
 
-[日本語はこちら](README.ja.md)
+<p align="center">
+  <img src="https://img.shields.io/github/downloads/RAIT-09/obsidian-agent-client/total" alt="GitHub Downloads">
+  <img src="https://img.shields.io/github/license/RAIT-09/obsidian-agent-client" alt="License">
+  <img src="https://img.shields.io/github/v/release/RAIT-09/obsidian-agent-client" alt="GitHub release">
+  <img src="https://img.shields.io/github/last-commit/RAIT-09/obsidian-agent-client" alt="GitHub last commit">
+</p>
 
-<a href="https://www.buymeacoffee.com/rait09" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="180" height="50" ></a>
+<p align="center">
+  <a href="README.ja.md">日本語はこちら</a>
+</p>
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/rait09" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="180" height="50" ></a>
+</p>
 
 Bring your AI agents directly into Obsidian! This plugin lets you chat with Claude Code, Codex, Gemini CLI, and other AI agents right from your vault. Your AI assistant is now just a side panel away. ✨
 
@@ -16,6 +27,7 @@ https://github.com/user-attachments/assets/567f22dc-dd32-446d-8fc5-c8cdec8b2744
 - 📝 **Note Mention Support**: Automatically include the active note in conversations, or manually use `@notename` to reference specific notes
 - ⚡ **Slash Command Support**: Use `/` commands to browse and trigger actions provided by your current agent
 - 🔄 **Multi-Agent Support**: Switch between Claude Code, Codex, Gemini CLI, and custom agents
+- 🎛️ **Mode & Model Switching**: Change AI models (e.g., Sonnet, Haiku) and agent modes (e.g., Plan Mode) directly from the chat
 - 💻 **Terminal Integration**: Let your agent execute terminal commands and return the results in chat
 - 🔐 **Permission Management**: Fine-grained control over agent actions
 
@@ -135,7 +147,10 @@ Built-in agents:
     └── API key: (optional)
 ```
 
-**Windows Example:**
+**Windows Example (Native):**
+
+> 💡 If using WSL Mode, refer to the macOS/Linux example instead.
+
 ```
 Settings:
 ├── Node.js path: C:\Program Files\nodejs\node.exe
@@ -152,6 +167,14 @@ Built-in agents:
     └── API key: (optional)
 ```
 
+### 🪟 WSL Mode (Recommended for Windows)
+
+WSL Mode runs agents inside Windows Subsystem for Linux, providing better compatibility and a more Unix-like environment.
+
+1. Enable **WSL Mode** in **Settings → Agent Client**
+2. Use Linux-style paths (e.g., `/usr/local/bin/node`, `/usr/local/bin/claude-code-acp`)
+3. Refer to the **macOS/Linux** examples above for path configuration
+
 ## 🚀 Usage
 
 - 🎯 Use the command palette: "Open agent chat"
@@ -159,6 +182,7 @@ Built-in agents:
 - 💬 Chat with your configured agent in the right panel
 - 📝 Reference notes using `@notename` syntax
 - 🔄 Switch agents using the dropdown in plugin settings
+- 🎛️ Change AI models and modes from the dropdowns below the input field
 
 ## 👨‍💻 Development
 
@@ -182,10 +206,10 @@ npm run format
 ```
 
 ## 🗺️ Roadmap
-
-- **Model Switching Support**: Change the active model for each agent directly from the chat interface
-- **Edit Tracking**: Automatically follow the agent’s edits — open affected notes and move the cursor as they edit
+- **Image Sending**: Send images to agents directly from the chat
+- **Edit Tracking**: Automatically follow the agent's edits — open affected notes and move the cursor as they edit
 - **Chat History Access**: Browse, search, and restore previous chat sessions with agents
+- **Multi-Instance Support**: Run multiple agents simultaneously in separate panels
 
 Have ideas or feature requests? Feel free to [open an issue](https://github.com/RAIT-09/obsidian-agent-client/issues) on GitHub!
 

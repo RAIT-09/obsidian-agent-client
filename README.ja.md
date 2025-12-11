@@ -1,6 +1,15 @@
-# 🤖 Agent Client Plugin for Obsidian
+<h1 align="center">🤖 Agent Client Plugin for Obsidian</h1>
 
-<a href="https://www.buymeacoffee.com/rait09" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="180" height="50" ></a>
+<p align="center">
+  <img src="https://img.shields.io/github/downloads/RAIT-09/obsidian-agent-client/total" alt="GitHub Downloads">
+  <img src="https://img.shields.io/github/license/RAIT-09/obsidian-agent-client" alt="License">
+  <img src="https://img.shields.io/github/v/release/RAIT-09/obsidian-agent-client" alt="GitHub release">
+  <img src="https://img.shields.io/github/last-commit/RAIT-09/obsidian-agent-client" alt="GitHub last commit">
+</p>
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/rait09" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="180" height="50" ></a>
+</p>
 
 AIエージェントをObsidianに直接統合しましょう！このプラグインを使えば、Claude Code、Codex、Gemini CLI、その他のAIエージェントと、あなたのVaultから直接チャットできます。AIアシスタントがサイドパネルですぐに利用可能になります✨
 
@@ -14,6 +23,7 @@ https://github.com/user-attachments/assets/567f22dc-dd32-446d-8fc5-c8cdec8b2744
 - 📝 **ノートメンション**: アクティブなノートを自動的にメンションしたり、`@ノート名`で特定のノートを手動でメンションできます
 - ⚡ **スラッシュコマンド**: `/`コマンドを使用して、エージェントが提供する機能を実行できます
 - 🔄 **複数のエージェントを切り替え**: Claude Code、Codex、Gemini CLI、その他のカスタムエージェント間で簡単に切り替えることができます
+- 🎛️ **モード・モデル切り替え**: チャット画面からAIモデル（例: Sonnet、Haiku）やエージェントモード（例: Plan Mode）を直接変更できます
 - 💻 **ターミナル統合**: エージェントがターミナルコマンドを実行し、結果をチャットで返すことができます
 - 🔐 **権限管理**: エージェントのアクションに対する細かい制御ができます
 
@@ -133,7 +143,10 @@ Built-in agents:
     └── API key: (任意)
 ```
 
-**Windowsの例:**
+**Windowsの例（ネイティブ）:**
+
+> 💡 WSL Modeを使用する場合は、上記のmacOS/Linuxの例を参照してください。
+
 ```
 Settings:
 ├── Node.js path: C:\Program Files\nodejs\node.exe
@@ -150,6 +163,14 @@ Built-in agents:
     └── API key: (任意)
 ```
 
+### 🪟 WSL Mode（Windowsユーザー向け推奨）
+
+WSL ModeはWindows Subsystem for Linux内でエージェントを実行し、より良い互換性とUnixライクな環境を提供します。
+
+1. **Settings → Agent Client**で**WSL Mode**を有効化
+2. Linuxスタイルのパスを使用（例: `/usr/local/bin/node`、`/usr/local/bin/claude-code-acp`）
+3. パス設定は上記の**macOS/Linuxの例**を参照
+
 ## 🚀 使用方法
 
 - 🎯 コマンドパレットを使用して開く: "Open agent chat"
@@ -157,6 +178,7 @@ Built-in agents:
 - 💬 右側パネルで設定したエージェントとチャットする
 - 📝 `@ノート名`でノートをメンションする
 - 🔄 プラグイン設定のドロップダウンメニューからエージェントを切り替える
+- 🎛️ 入力欄の下にあるドロップダウンからAIモデルやモードを変更する
 
 ## 👨‍💻 開発者向け
 
@@ -181,9 +203,10 @@ npm run format
 
 ## 🗺️ ロードマップ
 
-- **モデル切り替え機能**: チャット画面から各エージェントのモデルを直接変更する
+- **画像送信機能**: チャットから直接エージェントに画像を送信する
 - **編集の追跡機能**: エージェントの編集を自動で追跡 — 影響を受けるノートを開き、編集時にカーソルを移動する
 - **チャット履歴機能**: エージェントとの過去のチャットセッションを閲覧、検索、復元する
+- **マルチインスタンス対応**: 複数のエージェントを別々のパネルで同時に実行する
 
 アイデアや機能のリクエストがある場合は、ぜひお気軽に[issue](https://github.com/RAIT-09/obsidian-agent-client/issues)を開いてください！
 
