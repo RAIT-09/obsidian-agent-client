@@ -19,9 +19,7 @@ Bring your AI agents directly into Obsidian! This plugin lets you chat with Clau
 
 Built on [Agent Client Protocol (ACP)](https://github.com/zed-industries/agent-client-protocol) by Zed.
 
-
-https://github.com/user-attachments/assets/ad253acb-ff96-4a2c-95fa-6f8229fd951b
-
+https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 
 ## ✨ Features
 
