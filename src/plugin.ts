@@ -1,4 +1,5 @@
 import { Plugin, WorkspaceLeaf, Notice, requestUrl } from "obsidian";
+import * as semver from "semver";
 import { ChatView, VIEW_TYPE_CHAT } from "./components/chat/ChatView";
 import {
 	createSettingsStore,
@@ -469,18 +470,77 @@ export default class AgentClientPlugin extends Plugin {
 		this.settingsStore.set(this.settings);
 	}
 
-	async checkForUpdates(): Promise<boolean> {
+	/**
+	 * Fetch the latest stable release version from GitHub.
+	 */
+	private async fetchLatestStable(): Promise<string | null> {
 		const response = await requestUrl({
 			url: "https://api.github.com/repos/RAIT-09/obsidian-agent-client/releases/latest",
 		});
 		const data = response.json as { tag_name?: string };
-		const latestVersion = data.tag_name;
-		const currentVersion = this.manifest.version;
+		return data.tag_name ? semver.clean(data.tag_name) : null;
+	}
 
-		if (latestVersion !== currentVersion) {
-			new Notice(`[Agent Client] Update available: v${latestVersion}`);
-			return true;
+	/**
+	 * Fetch the latest prerelease version from GitHub.
+	 */
+	private async fetchLatestPrerelease(): Promise<string | null> {
+		const response = await requestUrl({
+			url: "https://api.github.com/repos/RAIT-09/obsidian-agent-client/releases",
+		});
+		const releases = response.json as Array<{
+			tag_name: string;
+			prerelease: boolean;
+		}>;
+
+		// Find the first prerelease (releases are sorted by date descending)
+		const latestPrerelease = releases.find((r) => r.prerelease);
+		return latestPrerelease
+			? semver.clean(latestPrerelease.tag_name)
+			: null;
+	}
+
+	/**
+	 * Check for plugin updates.
+	 * - Stable version users: compare with latest stable release
+	 * - Prerelease users: compare with both latest stable and latest prerelease
+	 */
+	async checkForUpdates(): Promise<boolean> {
+		const currentVersion =
+			semver.clean(this.manifest.version) || this.manifest.version;
+		const isCurrentPrerelease = semver.prerelease(currentVersion) !== null;
+
+		if (isCurrentPrerelease) {
+			// Prerelease user: check both stable and prerelease
+			const [latestStable, latestPrerelease] = await Promise.all([
+				this.fetchLatestStable(),
+				this.fetchLatestPrerelease(),
+			]);
+
+			const hasNewerStable =
+				latestStable && semver.gt(latestStable, currentVersion);
+			const hasNewerPrerelease =
+				latestPrerelease && semver.gt(latestPrerelease, currentVersion);
+
+			if (hasNewerStable || hasNewerPrerelease) {
+				// Prefer stable version notification if available
+				const newestVersion = hasNewerStable
+					? latestStable
+					: latestPrerelease;
+				new Notice(
+					`[Agent Client] Update available: v${newestVersion}`,
+				);
+				return true;
+			}
+		} else {
+			// Stable version user: check stable only
+			const latestStable = await this.fetchLatestStable();
+			if (latestStable && semver.gt(latestStable, currentVersion)) {
+				new Notice(`[Agent Client] Update available: v${latestStable}`);
+				return true;
+			}
 		}
+
 		return false;
 	}
 
