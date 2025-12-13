@@ -15,7 +15,7 @@ AIエージェントをObsidianに直接統合しましょう！このプラグ�
 
 このプラグインは、Zed の [Agent Client Protocol (ACP)](https://github.com/zed-industries/agent-client-protocol) で構築されています。
 
-https://github.com/user-attachments/assets/567f22dc-dd32-446d-8fc5-c8cdec8b2744
+https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 
 ## ✨ 主な機能
 
