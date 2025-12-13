@@ -241,13 +241,35 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			const commandString = [command, ...args]
 				.map((arg) => "'" + arg.replace(/'/g, "'\\''") + "'")
 				.join(" ");
+
+			// If nodePath is configured, prepend PATH export to ensure node is available.
+			// This is necessary because:
+			// 1. Login shells (-l) re-initialize PATH from shell config files, overwriting env.PATH
+			// 2. Even when the agent command uses an absolute path, scripts with shebang
+			//    "#!/usr/bin/env node" require node to be in PATH for the env command to find it
+			// Therefore, we must explicitly set PATH inside the shell command
+			let fullCommand = commandString;
+			if (
+				this.plugin.settings.nodePath &&
+				this.plugin.settings.nodePath.trim().length > 0
+			) {
+				const nodeDir = resolveCommandDirectory(
+					this.plugin.settings.nodePath.trim(),
+				);
+				if (nodeDir) {
+					// Escape single quotes in nodeDir for shell safety
+					const escapedNodeDir = nodeDir.replace(/'/g, "'\\''");
+					fullCommand = `export PATH='${escapedNodeDir}':"$PATH"; ${commandString}`;
+				}
+			}
+
 			spawnCommand = shell;
-			spawnArgs = ["-l", "-c", commandString];
+			spawnArgs = ["-l", "-c", fullCommand];
 			this.logger.log(
 				"[AcpAdapter] Using login shell:",
 				shell,
 				"with command:",
-				commandString,
+				fullCommand,
 			);
 		}
 
