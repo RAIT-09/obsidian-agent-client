@@ -8,7 +8,12 @@
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.css\"",
-		"format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"*.css\""
+		"format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"*.css\"",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"docs:dev": "vitepress dev docs",
+		"docs:build": "vitepress build docs",
+		"docs:preview": "vitepress preview docs"
 	},
 	"keywords": [],
 	"author": "",
@@ -20,7 +25,6 @@
 		"@types/semver": "^7.7.1",
 		"@typescript-eslint/parser": "^8.0.0",
 		"@typescript-eslint/utils": "^8.0.0",
-		"builtin-modules": "3.3.0",
 		"esbuild": "0.17.3",
 		"eslint": "^9.0.0",
 		"eslint-plugin-obsidianmd": "^0.1.9",
@@ -28,7 +32,8 @@
 		"prettier": "^3.4.2",
 		"tslib": "2.4.0",
 		"typescript": "^5.9.3",
-		"typescript-eslint": "^8.0.0"
+		"typescript-eslint": "^8.0.0",
+		"vitepress": "^1.6.4"
 	},
 	"dependencies": {
 		"@agentclientprotocol/sdk": "^0.8.0",

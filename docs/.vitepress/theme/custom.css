@@ -1,0 +1,111 @@
+/**
+ * Obsidian-inspired theme for VitePress
+ * Based on Obsidian's default dark/light themes
+ */
+
+:root {
+  /* Obsidian Purple accent */
+  --vp-c-brand-1: #a88bfa;
+  --vp-c-brand-2: #8b6ce7;
+  --vp-c-brand-3: #7c5fd6;
+  --vp-c-brand-soft: rgba(168, 139, 250, 0.14);
+
+  /* Light mode colors (Obsidian light theme inspired) */
+  --vp-c-bg: #ffffff;
+  --vp-c-bg-alt: #f6f6f6;
+  --vp-c-bg-elv: #ffffff;
+  --vp-c-bg-soft: #f6f6f6;
+
+  --vp-c-text-1: #2e3338;
+  --vp-c-text-2: #5c6166;
+  --vp-c-text-3: #86909c;
+
+  --vp-c-divider: #e5e5e5;
+  --vp-c-border: #e0e0e0;
+  --vp-c-gutter: #e5e5e5;
+
+  /* Code blocks */
+  --vp-code-block-bg: #f6f6f6;
+  --vp-code-line-highlight-color: rgba(168, 139, 250, 0.1);
+}
+
+.dark {
+  /* Obsidian Dark mode colors */
+  --vp-c-brand-1: #a88bfa;
+  --vp-c-brand-2: #9575f3;
+  --vp-c-brand-3: #8466e5;
+  --vp-c-brand-soft: rgba(168, 139, 250, 0.16);
+
+  --vp-c-bg: #1e1e1e;
+  --vp-c-bg-alt: #181818;
+  --vp-c-bg-elv: #252525;
+  --vp-c-bg-soft: #252525;
+
+  --vp-c-text-1: #dcddde;
+  --vp-c-text-2: #a3a3a3;
+  --vp-c-text-3: #787878;
+
+  --vp-c-divider: #2d2d2d;
+  --vp-c-border: #3d3d3d;
+  --vp-c-gutter: #2d2d2d;
+
+  /* Code blocks */
+  --vp-code-block-bg: #181818;
+  --vp-code-line-highlight-color: rgba(168, 139, 250, 0.15);
+}
+
+/* Hero section styling */
+.VPHero .name {
+  background: linear-gradient(135deg, #a88bfa 0%, #7c5fd6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Button styling */
+.VPButton.brand {
+  background-color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+
+.VPButton.brand:hover {
+  background-color: var(--vp-c-brand-2);
+  border-color: var(--vp-c-brand-2);
+}
+
+/* Sidebar active item */
+.VPSidebar .is-active > .link > .text {
+  color: var(--vp-c-brand-1);
+}
+
+/* Feature cards */
+.VPFeature {
+  border-radius: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.VPFeature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark .VPFeature:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Inline code */
+:not(pre) > code {
+  background-color: var(--vp-c-bg-soft);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--vp-c-brand-1);
+}
+
+/* Custom containers (tips, warnings) */
+.custom-block.tip {
+  border-color: var(--vp-c-brand-1);
+}
+
+.custom-block.warning {
+  border-color: #e5a84b;
+}
