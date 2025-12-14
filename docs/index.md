@@ -34,6 +34,12 @@ features:
     details: Let your agent execute commands and return results in chat
 ---
 
+<div style="max-width: 800px; margin: 2rem auto;">
+  <video controls autoplay loop muted playsinline style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+    <source src="/obsidian-agent-client/demo.mp4" type="video/mp4">
+  </video>
+</div>
+
 ## What is Agent Client?
 
 Agent Client is an Obsidian plugin that brings AI coding agents directly into your vault. Built on the [Agent Client Protocol (ACP)](https://github.com/agentclientprotocol/agent-client-protocol), it enables seamless communication with various AI agents.
