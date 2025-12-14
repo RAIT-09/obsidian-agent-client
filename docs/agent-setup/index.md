@@ -31,4 +31,4 @@ For Windows users, we recommend using **WSL Mode** for better compatibility:
 
 ## Switching Agents
 
-Once you have multiple agents configured, you can switch between them using the dropdown in the chat panel header.
+Once you have multiple agents configured, you can switch between them using the dropdown in Settings → Agent Client.
