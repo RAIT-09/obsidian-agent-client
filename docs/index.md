@@ -36,7 +36,7 @@ features:
 
 <div style="max-width: 800px; margin: 2rem auto;">
   <video controls autoplay loop muted playsinline style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-    <source src="/obsidian-agent-client/demo.mp4" type="video/mp4">
+    <source src="/demo.mp4" type="video/mp4">
   </video>
 </div>
 
