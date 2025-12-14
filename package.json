@@ -9,6 +9,8 @@
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.css\"",
 		"format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"*.css\"",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
 		"docs:dev": "vitepress dev docs",
 		"docs:build": "vitepress build docs",
 		"docs:preview": "vitepress preview docs"
