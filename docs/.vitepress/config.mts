@@ -9,6 +9,10 @@ export default defineConfig({
   base: "/obsidian-agent-client/",
 
   head: [
+    ["link", { rel: "icon", type: "image/x-icon", href: "/obsidian-agent-client/favicon.ico" }],
+    ["link", { rel: "icon", type: "image/png", sizes: "32x32", href: "/obsidian-agent-client/favicon-32x32.png" }],
+    ["link", { rel: "icon", type: "image/png", sizes: "16x16", href: "/obsidian-agent-client/favicon-16x16.png" }],
+    ["link", { rel: "apple-touch-icon", sizes: "180x180", href: "/obsidian-agent-client/apple-touch-icon.png" }],
     ["meta", { name: "og:type", content: "website" }],
     ["meta", { name: "og:title", content: "Agent Client for Obsidian" }],
     [
