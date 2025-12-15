@@ -31,6 +31,17 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			this.unsubscribe = null;
 		}
 
+		// Documentation link
+		const docContainer = containerEl.createDiv({
+			cls: "agent-client-doc-link",
+		});
+		docContainer.createSpan({ text: "Need help? Check out the " });
+		docContainer.createEl("a", {
+			text: "documentation",
+			href: "https://rait-09.github.io/obsidian-agent-client/",
+		});
+		docContainer.createSpan({ text: "." });
+
 		this.renderAgentSelector(containerEl);
 
 		// Subscribe to settings changes to update agent dropdown

@@ -7,6 +7,26 @@ If your plugin does not need CSS, delete this file.
 
 */
 
+/* ===== Settings Tab Documentation Link ===== */
+.agent-client-doc-link {
+	padding: 12px 16px;
+	margin-bottom: 16px;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	font-size: 14px;
+	color: var(--text-muted);
+}
+
+.agent-client-doc-link a {
+	color: var(--text-accent);
+	text-decoration: none;
+}
+
+.agent-client-doc-link a:hover {
+	text-decoration: underline;
+}
+
 /* ===== Settings Tab Custom Agent Block ===== */
 .agent-client-custom-agent {
 	padding: 16px;
