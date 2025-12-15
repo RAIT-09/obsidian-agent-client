@@ -66,7 +66,7 @@ export class NoteMentionService {
 			const recentFiles = this.files
 				.slice()
 				.sort((a, b) => (b.stat?.mtime || 0) - (a.stat?.mtime || 0))
-				.slice(0, 5);
+				.slice(0, 20);
 			this.logger.log(
 				"[DEBUG] Recent files:",
 				recentFiles.map((f) => f.name),
@@ -114,7 +114,7 @@ export class NoteMentionService {
 		return scored
 			.filter((item) => item.score > -Infinity)
 			.sort((a, b) => b.score - a.score)
-			.slice(0, 5)
+			.slice(0, 20)
 			.map((item) => item.file);
 	}
 
