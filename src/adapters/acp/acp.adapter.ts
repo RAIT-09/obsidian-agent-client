@@ -13,6 +13,7 @@ import type {
 	PermissionOption,
 } from "../../domain/models/chat-message";
 import type { SessionUpdate } from "../../domain/models/session-update";
+import type { PromptContent } from "../../domain/models/prompt-content";
 import type { AgentError } from "../../domain/models/agent-error";
 import { AcpTypeConverter } from "./acp-type-converter";
 import { TerminalManager } from "../../shared/terminal-manager";
@@ -544,7 +545,10 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	/**
 	 * Send a message to the agent in a specific session.
 	 */
-	async sendMessage(sessionId: string, message: string): Promise<void> {
+	async sendPrompt(
+		sessionId: string,
+		content: PromptContent[],
+	): Promise<void> {
 		if (!this.connection) {
 			throw new Error(
 				"Connection not initialized. Call initialize() first.",
@@ -555,20 +559,22 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.resetCurrentMessage();
 
 		try {
-			this.logger.log(`[AcpAdapter] ✅ Sending Message...: ${message}`);
+			// Convert domain PromptContent to ACP ContentBlock
+			const acpContent = content.map((c) =>
+				AcpTypeConverter.toAcpContentBlock(c),
+			);
+
+			this.logger.log(
+				`[AcpAdapter] Sending prompt with ${content.length} content blocks`,
+			);
 
 			const promptResult = await this.connection.prompt({
 				sessionId: sessionId,
-				prompt: [
-					{
-						type: "text",
-						text: message,
-					},
-				],
+				prompt: acpContent,
 			});
 
 			this.logger.log(
-				`[AcpAdapter] ✅ Agent completed with: ${promptResult.stopReason}`,
+				`[AcpAdapter] Agent completed with: ${promptResult.stopReason}`,
 			);
 		} catch (error: unknown) {
 			this.logger.error("[AcpAdapter] Prompt Error:", error);

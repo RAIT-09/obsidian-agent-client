@@ -251,13 +251,17 @@ function ChatComponent({
 	}, [plugin]);
 
 	const handleSendMessage = useCallback(
-		async (content: string) => {
+		async (
+			content: string,
+			images?: import("../../domain/models/prompt-content").ImagePromptContent[],
+		) => {
 			await chat.sendMessage(content, {
 				activeNote: autoMention.activeNote,
 				vaultBasePath:
 					(plugin.app.vault.adapter as VaultAdapterWithBasePath)
 						.basePath || "",
 				isAutoMentionDisabled: autoMention.isDisabled,
+				images,
 			});
 		},
 		[chat, autoMention, plugin],

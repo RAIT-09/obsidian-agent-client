@@ -1,6 +1,6 @@
 import * as React from "react";
 const { useRef, useState, useEffect, useCallback, useMemo } = React;
-import { setIcon, DropdownComponent } from "obsidian";
+import { setIcon, DropdownComponent, Notice } from "obsidian";
 
 import type AgentClientPlugin from "../../plugin";
 import type { ChatView } from "./ChatView";
@@ -10,11 +10,36 @@ import type {
 	SessionModeState,
 	SessionModelState,
 } from "../../domain/models/chat-session";
+import type { ImagePromptContent } from "../../domain/models/prompt-content";
 import type { UseMentionsReturn } from "../../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../../hooks/useSlashCommands";
 import type { UseAutoMentionReturn } from "../../hooks/useAutoMention";
 import { SuggestionDropdown } from "./SuggestionDropdown";
+import { ImagePreviewStrip, type AttachedImage } from "./ImagePreviewStrip";
 import { Logger } from "../../shared/logger";
+
+// ============================================================================
+// Image Constants
+// ============================================================================
+
+/** Maximum image size in MB */
+const MAX_IMAGE_SIZE_MB = 5;
+
+/** Maximum image size in bytes */
+const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+
+/** Maximum number of images per message */
+const MAX_IMAGE_COUNT = 10;
+
+/** Supported image MIME types (whitelist) */
+const SUPPORTED_IMAGE_TYPES = [
+	"image/png",
+	"image/jpeg",
+	"image/gif",
+	"image/webp",
+] as const;
+
+type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
 
 /**
  * Props for ChatInput component
@@ -42,8 +67,11 @@ export interface ChatInputProps {
 	plugin: AgentClientPlugin;
 	/** View instance for event registration */
 	view: ChatView;
-	/** Callback to send a message */
-	onSendMessage: (content: string) => Promise<void>;
+	/** Callback to send a message with optional images */
+	onSendMessage: (
+		content: string,
+		images?: ImagePromptContent[],
+	) => Promise<void>;
 	/** Callback to stop the current generation */
 	onStopGeneration: () => Promise<void>;
 	/** Callback when restored message has been consumed */
@@ -96,6 +124,7 @@ export function ChatInput({
 	const [inputValue, setInputValue] = useState("");
 	const [hintText, setHintText] = useState<string | null>(null);
 	const [commandText, setCommandText] = useState<string>("");
+	const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
 
 	// Refs
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -104,6 +133,112 @@ export function ChatInput({
 	const modeDropdownInstance = useRef<DropdownComponent | null>(null);
 	const modelDropdownRef = useRef<HTMLDivElement>(null);
 	const modelDropdownInstance = useRef<DropdownComponent | null>(null);
+
+	/**
+	 * Add an image to the attached images list.
+	 * Simple addition - validation is done in handlePaste.
+	 */
+	const addImage = useCallback((image: AttachedImage) => {
+		setAttachedImages((prev) => {
+			// Safety check for race conditions
+			if (prev.length >= MAX_IMAGE_COUNT) {
+				return prev;
+			}
+			return [...prev, image];
+		});
+	}, []);
+
+	/**
+	 * Remove an image from the attached images list.
+	 */
+	const removeImage = useCallback((id: string) => {
+		setAttachedImages((prev) => prev.filter((img) => img.id !== id));
+	}, []);
+
+	/**
+	 * Convert a File to Base64 string.
+	 */
+	const fileToBase64 = useCallback(async (file: File): Promise<string> => {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const result = reader.result as string;
+				// Extract base64 part from "data:image/png;base64,..."
+				const base64 = result.split(",")[1];
+				resolve(base64);
+			};
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
+	}, []);
+
+	/**
+	 * Handle paste event for image attachment.
+	 *
+	 * v3 design:
+	 * - Check file size before Base64 conversion (memory efficiency)
+	 * - Use MIME type whitelist (security)
+	 * - Track added count locally for multiple image paste
+	 */
+	const handlePaste = useCallback(
+		async (e: React.ClipboardEvent) => {
+			const items = e.clipboardData?.items;
+			if (!items) return;
+
+			// Track added count for multiple image paste
+			let addedCount = 0;
+
+			// Convert DataTransferItemList to array for iteration
+			const itemsArray = Array.from(items);
+
+			for (const item of itemsArray) {
+				// Step 1: Check MIME type whitelist
+				if (
+					!SUPPORTED_IMAGE_TYPES.includes(
+						item.type as SupportedImageType,
+					)
+				) {
+					continue;
+				}
+
+				e.preventDefault();
+
+				const file = item.getAsFile();
+				if (!file) continue;
+
+				// Step 2: Check image count (before conversion)
+				if (attachedImages.length + addedCount >= MAX_IMAGE_COUNT) {
+					new Notice(
+						`[Agent Client] Maximum ${MAX_IMAGE_COUNT} images allowed`,
+					);
+					break;
+				}
+
+				// Step 3: Check file size (before conversion - key v3 improvement)
+				if (file.size > MAX_IMAGE_SIZE_BYTES) {
+					new Notice(
+						`[Agent Client] Image too large (max ${MAX_IMAGE_SIZE_MB}MB)`,
+					);
+					continue;
+				}
+
+				// Step 4: Convert to Base64 after validation passes
+				try {
+					const base64 = await fileToBase64(file);
+					addImage({
+						id: crypto.randomUUID(),
+						data: base64,
+						mimeType: file.type,
+					});
+					addedCount++;
+				} catch (error) {
+					console.error("Failed to convert image:", error);
+					new Notice("[Agent Client] Failed to attach image");
+				}
+			}
+		},
+		[attachedImages.length, addImage, fileToBase64],
+	);
 
 	/**
 	 * Common logic for setting cursor position after text replacement.
@@ -242,18 +377,36 @@ export function ChatInput({
 			return;
 		}
 
-		if (!inputValue.trim()) return;
+		// Allow sending if there's text OR images
+		if (!inputValue.trim() && attachedImages.length === 0) return;
 
-		// Save input value before clearing
+		// Save input value and images before clearing
 		const messageToSend = inputValue;
+		const imagesToSend: ImagePromptContent[] = attachedImages.map(
+			(img) => ({
+				type: "image",
+				data: img.data,
+				mimeType: img.mimeType,
+			}),
+		);
 
-		// Clear input and hint state immediately
+		// Clear input, images, and hint state immediately
 		setInputValue("");
+		setAttachedImages([]);
 		setHintText(null);
 		setCommandText("");
 
-		await onSendMessage(messageToSend);
-	}, [isSending, inputValue, onSendMessage, onStopGeneration]);
+		await onSendMessage(
+			messageToSend,
+			imagesToSend.length > 0 ? imagesToSend : undefined,
+		);
+	}, [
+		isSending,
+		inputValue,
+		attachedImages,
+		onSendMessage,
+		onStopGeneration,
+	]);
 
 	/**
 	 * Handle dropdown keyboard navigation.
@@ -570,9 +723,11 @@ export function ChatInput({
 		}
 	}, [currentModelId]);
 
-	// Button disabled state
+	// Button disabled state - also allow sending if images are attached
 	const isButtonDisabled =
-		!isSending && (inputValue.trim() === "" || !isSessionReady);
+		!isSending &&
+		((inputValue.trim() === "" && attachedImages.length === 0) ||
+			!isSessionReady);
 
 	// Placeholder text
 	const placeholder = `Message ${agentLabel} - @ to mention notes${availableCommands.length > 0 ? ", / for commands" : ""}`;
@@ -660,6 +815,7 @@ export function ChatInput({
 						value={inputValue}
 						onChange={handleInputChange}
 						onKeyDown={handleKeyPress}
+						onPaste={(e) => void handlePaste(e)}
 						placeholder={placeholder}
 						className={`chat-input-textarea ${autoMentionEnabled && autoMention.activeNote ? "has-auto-mention" : ""}`}
 						rows={1}
@@ -671,6 +827,12 @@ export function ChatInput({
 						</div>
 					)}
 				</div>
+
+				{/* Image Preview Strip */}
+				<ImagePreviewStrip
+					images={attachedImages}
+					onRemove={removeImage}
+				/>
 
 				{/* Input Actions (Mode Selector + Model Selector + Send Button) */}
 				<div className="chat-input-actions">

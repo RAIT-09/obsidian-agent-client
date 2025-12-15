@@ -19,6 +19,7 @@ import type {
 } from "../models/chat-session";
 import type { SessionUpdate } from "../models/session-update";
 import type { AgentError } from "../models/agent-error";
+import type { PromptContent } from "../models/prompt-content";
 
 /**
  * Runtime configuration for launching an AI agent process.
@@ -151,17 +152,18 @@ export interface IAgentClient {
 	authenticate(methodId: string): Promise<boolean>;
 
 	/**
-	 * Send a message to the agent.
+	 * Send a prompt to the agent.
 	 *
-	 * The agent will process the message and respond via the onMessage callback.
-	 * May also trigger permission requests via onPermissionRequest callback.
+	 * The prompt can contain multiple content blocks (text, images).
+	 * The agent will process the prompt and respond via the onSessionUpdate callback.
+	 * May also trigger permission requests.
 	 *
 	 * @param sessionId - Session identifier
-	 * @param message - Message text to send
+	 * @param content - Array of content blocks to send (text and/or images)
 	 * @returns Promise resolving when agent completes processing
 	 * @throws AgentError if sending fails
 	 */
-	sendMessage(sessionId: string, message: string): Promise<void>;
+	sendPrompt(sessionId: string, content: PromptContent[]): Promise<void>;
 
 	/**
 	 * Cancel ongoing agent operations.
