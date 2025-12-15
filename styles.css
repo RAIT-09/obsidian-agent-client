@@ -844,6 +844,7 @@ If your plugin does not need CSS, delete this file.
 	bottom: 100%;
 	left: 0;
 	right: 0;
+	max-height: 250px;
 	background-color: var(--background-secondary);
 	border: 2px solid var(--background-modifier-border);
 	border-radius: 8px;

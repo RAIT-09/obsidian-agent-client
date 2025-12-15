@@ -80,6 +80,15 @@ export function SuggestionDropdown({
 		view.registerDomEvent(document, "mousedown", handleClickOutside);
 	}, [onClose, view]);
 
+	// Scroll selected item into view
+	useEffect(() => {
+		if (!dropdownRef.current) return;
+		const selectedElement = dropdownRef.current.children[selectedIndex] as
+			| HTMLElement
+			| undefined;
+		selectedElement?.scrollIntoView({ block: "nearest" });
+	}, [selectedIndex]);
+
 	if (items.length === 0) {
 		return null;
 	}
