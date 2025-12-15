@@ -428,20 +428,25 @@ export function ChatInput({
 	}, []);
 
 	// Restore message when provided (e.g., after cancellation)
+	// Only restore if input is empty to avoid overwriting user's new input
 	useEffect(() => {
 		if (restoredMessage) {
-			setInputValue(restoredMessage);
+			if (!inputValue.trim()) {
+				setInputValue(restoredMessage);
+				// Focus and place cursor at end
+				window.setTimeout(() => {
+					if (textareaRef.current) {
+						textareaRef.current.focus();
+						textareaRef.current.selectionStart =
+							restoredMessage.length;
+						textareaRef.current.selectionEnd =
+							restoredMessage.length;
+					}
+				}, 0);
+			}
 			onRestoredMessageConsumed();
-			// Focus and place cursor at end
-			window.setTimeout(() => {
-				if (textareaRef.current) {
-					textareaRef.current.focus();
-					textareaRef.current.selectionStart = restoredMessage.length;
-					textareaRef.current.selectionEnd = restoredMessage.length;
-				}
-			}, 0);
 		}
-	}, [restoredMessage, onRestoredMessageConsumed]);
+	}, [restoredMessage, onRestoredMessageConsumed, inputValue]);
 
 	// Stable references for callbacks
 	const onModeChangeRef = useRef(onModeChange);
