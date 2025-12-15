@@ -1125,7 +1125,6 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	gap: 8px;
 	padding: 8px 12px;
-	border-top: 1px solid var(--background-modifier-border);
 	background-color: var(--background-primary);
 	overflow-x: auto;
 	scrollbar-width: thin;
