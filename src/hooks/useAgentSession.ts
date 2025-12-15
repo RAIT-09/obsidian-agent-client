@@ -327,6 +327,7 @@ export function useAgentSession(
 			availableCommands: undefined,
 			modes: undefined,
 			models: undefined,
+			promptCapabilities: undefined,
 			createdAt: new Date(),
 			lastActivityAt: new Date(),
 		}));
@@ -362,11 +363,19 @@ export function useAgentSession(
 				agentClient.getCurrentAgentId() !== activeAgentId;
 
 			let authMethods: AuthenticationMethod[] = [];
+			let promptCapabilities:
+				| {
+						image?: boolean;
+						audio?: boolean;
+						embeddedContext?: boolean;
+				  }
+				| undefined;
 
 			if (needsInitialize) {
 				// Initialize connection to agent (spawn process + protocol handshake)
 				const initResult = await agentClient.initialize(agentConfig);
 				authMethods = initResult.authMethods;
+				promptCapabilities = initResult.promptCapabilities;
 			}
 
 			// Create new session (lightweight operation)
@@ -381,6 +390,11 @@ export function useAgentSession(
 				authMethods: authMethods,
 				modes: sessionResult.modes,
 				models: sessionResult.models,
+				// Only update promptCapabilities if we re-initialized
+				// Otherwise, keep the previous value (from the same agent)
+				promptCapabilities: needsInitialize
+					? promptCapabilities
+					: prev.promptCapabilities,
 				lastActivityAt: new Date(),
 			}));
 		} catch (error) {

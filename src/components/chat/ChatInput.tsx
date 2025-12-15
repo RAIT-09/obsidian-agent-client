@@ -84,6 +84,8 @@ export interface ChatInputProps {
 	models?: SessionModelState;
 	/** Callback when model is changed */
 	onModelChange?: (modelId: string) => void;
+	/** Whether the agent supports image attachments */
+	supportsImages?: boolean;
 }
 
 /**
@@ -117,6 +119,7 @@ export function ChatInput({
 	onModeChange,
 	models,
 	onModelChange,
+	supportsImages = false,
 }: ChatInputProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 
@@ -185,6 +188,21 @@ export function ChatInput({
 			const items = e.clipboardData?.items;
 			if (!items) return;
 
+			// Check if clipboard contains any images
+			const hasImages = Array.from(items).some((item) =>
+				SUPPORTED_IMAGE_TYPES.includes(item.type as SupportedImageType),
+			);
+
+			// Show notice if agent doesn't support images but user tried to paste one
+			if (hasImages && !supportsImages) {
+				new Notice(
+					"[Agent Client] This agent does not support image attachments",
+				);
+				return;
+			}
+
+			if (!supportsImages) return;
+
 			// Track added count for multiple image paste
 			let addedCount = 0;
 
@@ -237,7 +255,7 @@ export function ChatInput({
 				}
 			}
 		},
-		[attachedImages.length, addImage, fileToBase64],
+		[supportsImages, attachedImages.length, addImage, fileToBase64],
 	);
 
 	/**
@@ -828,11 +846,13 @@ export function ChatInput({
 					)}
 				</div>
 
-				{/* Image Preview Strip */}
-				<ImagePreviewStrip
-					images={attachedImages}
-					onRemove={removeImage}
-				/>
+				{/* Image Preview Strip (only shown when agent supports images) */}
+				{supportsImages && (
+					<ImagePreviewStrip
+						images={attachedImages}
+						onRemove={removeImage}
+					/>
+				)}
 
 				{/* Input Actions (Mode Selector + Model Selector + Send Button) */}
 				<div className="chat-input-actions">

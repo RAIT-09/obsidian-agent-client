@@ -532,6 +532,7 @@ function ChatComponent({
 				onModeChange={(modeId) => void agentSession.setMode(modeId)}
 				models={session.models}
 				onModelChange={(modelId) => void agentSession.setModel(modelId)}
+				supportsImages={session.promptCapabilities?.image ?? false}
 			/>
 		</div>
 	);

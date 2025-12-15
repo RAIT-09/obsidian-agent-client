@@ -81,6 +81,23 @@ export interface PermissionRequest {
 }
 
 /**
+ * Capabilities for prompt content types.
+ *
+ * Describes which content types the agent supports in prompts.
+ * All capabilities default to false if not specified.
+ */
+export interface PromptCapabilities {
+	/** Agent supports image content in prompts */
+	image?: boolean;
+
+	/** Agent supports audio content in prompts */
+	audio?: boolean;
+
+	/** Agent supports embedded context (Resource) in prompts */
+	embeddedContext?: boolean;
+}
+
+/**
  * Result of initializing a connection to an agent.
  */
 export interface InitializeResult {
@@ -89,6 +106,12 @@ export interface InitializeResult {
 
 	/** Protocol version supported by the agent (ACP uses number) */
 	protocolVersion: number;
+
+	/**
+	 * Prompt capabilities supported by the agent.
+	 * Indicates which content types can be included in prompts.
+	 */
+	promptCapabilities?: PromptCapabilities;
 }
 
 /**

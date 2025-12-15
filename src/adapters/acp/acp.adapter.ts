@@ -415,14 +415,26 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				"[AcpAdapter] Auth methods:",
 				initResult.authMethods,
 			);
+			this.logger.log(
+				"[AcpAdapter] Agent capabilities:",
+				initResult.agentCapabilities,
+			);
 
 			// Mark as initialized and store agent ID
 			this.isInitializedFlag = true;
 			this.currentAgentId = config.id;
 
+			// Extract prompt capabilities from agent capabilities
+			const promptCaps = initResult.agentCapabilities?.promptCapabilities;
+
 			return {
 				protocolVersion: initResult.protocolVersion,
 				authMethods: initResult.authMethods || [],
+				promptCapabilities: {
+					image: promptCaps?.image ?? false,
+					audio: promptCaps?.audio ?? false,
+					embeddedContext: promptCaps?.embeddedContext ?? false,
+				},
 			};
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Initialization Error:", error);
