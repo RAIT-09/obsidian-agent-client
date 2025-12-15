@@ -86,6 +86,8 @@ export interface ChatInputProps {
 	onModelChange?: (modelId: string) => void;
 	/** Whether the agent supports image attachments */
 	supportsImages?: boolean;
+	/** Current agent ID (used to clear images on agent switch) */
+	agentId: string;
 }
 
 /**
@@ -120,6 +122,7 @@ export function ChatInput({
 	models,
 	onModelChange,
 	supportsImages = false,
+	agentId,
 }: ChatInputProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 
@@ -136,6 +139,11 @@ export function ChatInput({
 	const modeDropdownInstance = useRef<DropdownComponent | null>(null);
 	const modelDropdownRef = useRef<HTMLDivElement>(null);
 	const modelDropdownInstance = useRef<DropdownComponent | null>(null);
+
+	// Clear attached images when agent changes
+	useEffect(() => {
+		setAttachedImages([]);
+	}, [agentId]);
 
 	/**
 	 * Add an image to the attached images list.
