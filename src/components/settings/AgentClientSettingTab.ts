@@ -94,6 +94,30 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		new Setting(containerEl)
+			.setName("Send message shortcut")
+			.setDesc(
+				"Choose the keyboard shortcut to send messages. Note: If using Cmd/Ctrl+Enter, you may need to remove any hotkeys assigned to Cmd/Ctrl+Enter (Settings → Hotkeys).",
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption(
+						"enter",
+						"Enter to send, Shift+Enter for newline",
+					)
+					.addOption(
+						"cmd-enter",
+						"Cmd/Ctrl+Enter to send, Enter for newline",
+					)
+					.setValue(this.plugin.settings.sendMessageShortcut)
+					.onChange(async (value) => {
+						this.plugin.settings.sendMessageShortcut = value as
+							| "enter"
+							| "cmd-enter";
+						await this.plugin.saveSettings();
+					}),
+			);
+
 		// Windows WSL Settings (Windows only)
 		if (Platform.isWin) {
 			new Setting(containerEl)
