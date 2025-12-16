@@ -23,6 +23,13 @@ import {
 // Re-export for backward compatibility
 export type { AgentEnvVar, CustomAgentSettings };
 
+/**
+ * Send message shortcut configuration.
+ * - 'enter': Enter to send, Shift+Enter for newline (default)
+ * - 'cmd-enter': Cmd/Ctrl+Enter to send, Enter for newline
+ */
+export type SendMessageShortcut = "enter" | "cmd-enter";
+
 export interface AgentClientPluginSettings {
 	gemini: GeminiAgentSettings;
 	claude: ClaudeAgentSettings;
@@ -43,6 +50,8 @@ export interface AgentClientPluginSettings {
 	// WSL settings (Windows only)
 	windowsWslMode: boolean;
 	windowsWslDistribution?: string;
+	// Input behavior
+	sendMessageShortcut: SendMessageShortcut;
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -85,6 +94,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	},
 	windowsWslMode: false,
 	windowsWslDistribution: undefined,
+	sendMessageShortcut: "enter",
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -455,6 +465,11 @@ export default class AgentClientPlugin extends Plugin {
 				typeof rawSettings.windowsWslDistribution === "string"
 					? rawSettings.windowsWslDistribution
 					: DEFAULT_SETTINGS.windowsWslDistribution,
+			sendMessageShortcut:
+				rawSettings.sendMessageShortcut === "enter" ||
+				rawSettings.sendMessageShortcut === "cmd-enter"
+					? rawSettings.sendMessageShortcut
+					: DEFAULT_SETTINGS.sendMessageShortcut,
 		};
 
 		this.ensureActiveAgentId();

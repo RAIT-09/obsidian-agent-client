@@ -15,6 +15,7 @@ import type { UseSlashCommandsReturn } from "../../hooks/useSlashCommands";
 import type { UseAutoMentionReturn } from "../../hooks/useAutoMention";
 import { SuggestionDropdown } from "./SuggestionDropdown";
 import { Logger } from "../../shared/logger";
+import { useSettings } from "../../hooks/useSettings";
 
 /**
  * Props for ChatInput component
@@ -91,6 +92,7 @@ export function ChatInput({
 	onModelChange,
 }: ChatInputProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
+	const settings = useSettings(plugin);
 
 	// Local state
 	const [inputValue, setInputValue] = useState("");
@@ -326,25 +328,30 @@ export function ChatInput({
 	/**
 	 * Handle keyboard events in the textarea.
 	 */
-	const handleKeyPress = useCallback(
+	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
 			// Handle dropdown navigation first
 			if (handleDropdownKeyPress(e)) {
 				return;
 			}
 
-			// Normal input handling
-			if (
-				e.key === "Enter" &&
-				!e.shiftKey &&
-				!e.nativeEvent.isComposing
-			) {
-				e.preventDefault();
-				const buttonDisabled =
-					!isSending && (inputValue.trim() === "" || !isSessionReady);
-				if (!buttonDisabled && !isSending) {
-					void handleSendOrStop();
+			// Normal input handling - check if should send based on shortcut setting
+			if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+				const shouldSend =
+					settings.sendMessageShortcut === "enter"
+						? !e.shiftKey // Enter mode: send unless Shift is pressed
+						: e.metaKey || e.ctrlKey; // Cmd+Enter mode: send only with Cmd/Ctrl
+
+				if (shouldSend) {
+					e.preventDefault();
+					const buttonDisabled =
+						!isSending &&
+						(inputValue.trim() === "" || !isSessionReady);
+					if (!buttonDisabled && !isSending) {
+						void handleSendOrStop();
+					}
 				}
+				// If not shouldSend, allow default behavior (newline)
 			}
 		},
 		[
@@ -353,6 +360,7 @@ export function ChatInput({
 			inputValue,
 			isSessionReady,
 			handleSendOrStop,
+			settings.sendMessageShortcut,
 		],
 	);
 
@@ -659,7 +667,7 @@ export function ChatInput({
 						ref={textareaRef}
 						value={inputValue}
 						onChange={handleInputChange}
-						onKeyDown={handleKeyPress}
+						onKeyDown={handleKeyDown}
 						placeholder={placeholder}
 						className={`chat-input-textarea ${autoMentionEnabled && autoMention.activeNote ? "has-auto-mention" : ""}`}
 						rows={1}
