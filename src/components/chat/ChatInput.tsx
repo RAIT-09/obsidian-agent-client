@@ -133,9 +133,11 @@ export function ChatInput({
 	const [hintText, setHintText] = useState<string | null>(null);
 	const [commandText, setCommandText] = useState<string>("");
 	const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+	const [isDraggingOver, setIsDraggingOver] = useState(false);
 
 	// Refs
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const dragCounterRef = useRef(0);
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
 	const modeDropdownRef = useRef<HTMLDivElement>(null);
 	const modeDropdownInstance = useRef<DropdownComponent | null>(null);
@@ -186,55 +188,15 @@ export function ChatInput({
 	}, []);
 
 	/**
-	 * Handle paste event for image attachment.
-	 *
-	 * v3 design:
-	 * - Check file size before Base64 conversion (memory efficiency)
-	 * - Use MIME type whitelist (security)
-	 * - Track added count locally for multiple image paste
+	 * Process and attach image files.
+	 * Common logic for paste and drop handlers.
 	 */
-	const handlePaste = useCallback(
-		async (e: React.ClipboardEvent) => {
-			const items = e.clipboardData?.items;
-			if (!items) return;
-
-			// Check if clipboard contains any images
-			const hasImages = Array.from(items).some((item) =>
-				SUPPORTED_IMAGE_TYPES.includes(item.type as SupportedImageType),
-			);
-
-			// Show notice if agent doesn't support images but user tried to paste one
-			if (hasImages && !supportsImages) {
-				new Notice(
-					"[Agent Client] This agent does not support image attachments",
-				);
-				return;
-			}
-
-			if (!supportsImages) return;
-
-			// Track added count for multiple image paste
+	const processImageFiles = useCallback(
+		async (files: File[]) => {
 			let addedCount = 0;
 
-			// Convert DataTransferItemList to array for iteration
-			const itemsArray = Array.from(items);
-
-			for (const item of itemsArray) {
-				// Step 1: Check MIME type whitelist
-				if (
-					!SUPPORTED_IMAGE_TYPES.includes(
-						item.type as SupportedImageType,
-					)
-				) {
-					continue;
-				}
-
-				e.preventDefault();
-
-				const file = item.getAsFile();
-				if (!file) continue;
-
-				// Step 2: Check image count (before conversion)
+			for (const file of files) {
+				// Check image count
 				if (attachedImages.length + addedCount >= MAX_IMAGE_COUNT) {
 					new Notice(
 						`[Agent Client] Maximum ${MAX_IMAGE_COUNT} images allowed`,
@@ -242,7 +204,7 @@ export function ChatInput({
 					break;
 				}
 
-				// Step 3: Check file size (before conversion - key v3 improvement)
+				// Check file size (before conversion - memory efficiency)
 				if (file.size > MAX_IMAGE_SIZE_BYTES) {
 					new Notice(
 						`[Agent Client] Image too large (max ${MAX_IMAGE_SIZE_MB}MB)`,
@@ -250,7 +212,7 @@ export function ChatInput({
 					continue;
 				}
 
-				// Step 4: Convert to Base64 after validation passes
+				// Convert to Base64 and add
 				try {
 					const base64 = await fileToBase64(file);
 					addImage({
@@ -265,7 +227,110 @@ export function ChatInput({
 				}
 			}
 		},
-		[supportsImages, attachedImages.length, addImage, fileToBase64],
+		[attachedImages.length, addImage, fileToBase64],
+	);
+
+	/**
+	 * Handle paste event for image attachment.
+	 */
+	const handlePaste = useCallback(
+		async (e: React.ClipboardEvent) => {
+			const items = e.clipboardData?.items;
+			if (!items) return;
+
+			// Extract image files from clipboard
+			const imageFiles: File[] = [];
+			for (const item of Array.from(items)) {
+				if (
+					SUPPORTED_IMAGE_TYPES.includes(
+						item.type as SupportedImageType,
+					)
+				) {
+					const file = item.getAsFile();
+					if (file) imageFiles.push(file);
+				}
+			}
+
+			if (imageFiles.length === 0) return;
+
+			e.preventDefault();
+
+			if (!supportsImages) {
+				new Notice(
+					"[Agent Client] This agent does not support image attachments",
+				);
+				return;
+			}
+
+			await processImageFiles(imageFiles);
+		},
+		[supportsImages, processImageFiles],
+	);
+
+	/**
+	 * Handle drag over event to allow drop.
+	 */
+	const handleDragOver = useCallback((e: React.DragEvent) => {
+		if (e.dataTransfer?.types.includes("Files")) {
+			e.preventDefault();
+			e.dataTransfer.dropEffect = "copy";
+		}
+	}, []);
+
+	/**
+	 * Handle drag enter event for visual feedback.
+	 * Uses counter to handle child element enter/leave correctly.
+	 */
+	const handleDragEnter = useCallback((e: React.DragEvent) => {
+		if (e.dataTransfer?.types.includes("Files")) {
+			e.preventDefault();
+			dragCounterRef.current++;
+			if (dragCounterRef.current === 1) {
+				setIsDraggingOver(true);
+			}
+		}
+	}, []);
+
+	/**
+	 * Handle drag leave event to reset visual feedback.
+	 */
+	const handleDragLeave = useCallback((e: React.DragEvent) => {
+		dragCounterRef.current--;
+		if (dragCounterRef.current === 0) {
+			setIsDraggingOver(false);
+		}
+	}, []);
+
+	/**
+	 * Handle drop event for image files.
+	 */
+	const handleDrop = useCallback(
+		async (e: React.DragEvent) => {
+			dragCounterRef.current = 0;
+			setIsDraggingOver(false);
+
+			const files = e.dataTransfer?.files;
+			if (!files || files.length === 0) return;
+
+			// Filter to supported image types
+			const imageFiles = Array.from(files).filter((file) =>
+				SUPPORTED_IMAGE_TYPES.includes(file.type as SupportedImageType),
+			);
+
+			if (imageFiles.length === 0) return;
+
+			e.preventDefault();
+
+			if (!supportsImages) {
+				new Notice(
+					"[Agent Client] This agent does not support image attachments",
+				);
+				return;
+			}
+
+			await processImageFiles(imageFiles);
+		},
+		[supportsImages, processImageFiles],
 	);
 
 	/**
@@ -795,7 +860,13 @@ export function ChatInput({
 			)}
 
 			{/* Input Box - flexbox container with border */}
-			<div className="chat-input-box">
+			<div
+				className={`chat-input-box ${isDraggingOver ? "dragging-over" : ""}`}
+				onDragOver={handleDragOver}
+				onDragEnter={handleDragEnter}
+				onDragLeave={handleDragLeave}
+				onDrop={(e) => void handleDrop(e)}
+			>
 				{/* Auto-mention Badge */}
 				{autoMentionEnabled && autoMention.activeNote && (
 					<div className="auto-mention-inline">

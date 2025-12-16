@@ -481,6 +481,10 @@ If your plugin does not need CSS, delete this file.
 	box-shadow: 0 0 0 1.5px var(--background-modifier-border);
 }
 
+.chat-input-box.dragging-over {
+	background-color: var(--background-secondary);
+}
+
 /* Auto-mention inline display */
 .auto-mention-inline {
 	display: flex;
@@ -489,7 +493,7 @@ If your plugin does not need CSS, delete this file.
 	gap: 4px;
 	padding: 6px 12px;
 	border-bottom: 1px solid var(--background-modifier-border);
-	background-color: var(--background-primary);
+	background-color: transparent;
 }
 
 .mention-badge {
@@ -1125,7 +1129,7 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	gap: 8px;
 	padding: 8px 12px;
-	background-color: var(--background-primary);
+	background-color: transparent;
 	overflow-x: auto;
 	scrollbar-width: thin;
 	-ms-overflow-style: none;
