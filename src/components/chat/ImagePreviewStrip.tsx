@@ -1,4 +1,5 @@
 import * as React from "react";
+import { setIcon } from "obsidian";
 
 /**
  * Attached image with unique ID for React key stability
@@ -38,9 +39,12 @@ export function ImagePreviewStrip({
 						onClick={() => onRemove(image.id)}
 						title="Remove image"
 						type="button"
-					>
-						&times;
-					</button>
+						ref={(el) => {
+							if (el) {
+								setIcon(el, "x");
+							}
+						}}
+					/>
 				</div>
 			))}
 		</div>

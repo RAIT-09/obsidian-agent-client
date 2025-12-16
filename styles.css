@@ -1169,16 +1169,20 @@ If your plugin does not need CSS, delete this file.
 	padding: 0;
 	border: none;
 	border-radius: 50%;
-	background-color: var(--background-modifier-error);
-	color: white;
-	font-size: 12px;
-	font-weight: bold;
+	background-color: var(--background-secondary);
+	color: var(--text-muted);
 	cursor: pointer;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	opacity: 0;
 	transition: opacity 0.15s ease;
+	box-shadow: none !important;
+}
+
+.image-preview-remove svg {
+	width: 12px;
+	height: 12px;
 }
 
 .image-preview-item:hover .image-preview-remove {
