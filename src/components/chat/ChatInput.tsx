@@ -474,7 +474,7 @@ export function ChatInput({
 		if (!inputValue.trim() && attachedImages.length === 0) return;
 
 		// Save input value and images before clearing
-		const messageToSend = inputValue;
+		const messageToSend = inputValue.trim();
 		const imagesToSend: ImagePromptContent[] = attachedImages.map(
 			(img) => ({
 				type: "image",
