@@ -251,13 +251,17 @@ function ChatComponent({
 	}, [plugin]);
 
 	const handleSendMessage = useCallback(
-		async (content: string) => {
+		async (
+			content: string,
+			images?: import("../../domain/models/prompt-content").ImagePromptContent[],
+		) => {
 			await chat.sendMessage(content, {
 				activeNote: autoMention.activeNote,
 				vaultBasePath:
 					(plugin.app.vault.adapter as VaultAdapterWithBasePath)
 						.basePath || "",
 				isAutoMentionDisabled: autoMention.isDisabled,
+				images,
 			});
 		},
 		[chat, autoMention, plugin],
@@ -528,6 +532,8 @@ function ChatComponent({
 				onModeChange={(modeId) => void agentSession.setMode(modeId)}
 				models={session.models}
 				onModelChange={(modelId) => void agentSession.setModel(modelId)}
+				supportsImages={session.promptCapabilities?.image ?? false}
+				agentId={session.agentId}
 			/>
 		</div>
 	);

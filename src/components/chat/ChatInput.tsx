@@ -1,6 +1,6 @@
 import * as React from "react";
 const { useRef, useState, useEffect, useCallback, useMemo } = React;
-import { setIcon, DropdownComponent } from "obsidian";
+import { setIcon, DropdownComponent, Notice } from "obsidian";
 
 import type AgentClientPlugin from "../../plugin";
 import type { ChatView } from "./ChatView";
@@ -10,12 +10,37 @@ import type {
 	SessionModeState,
 	SessionModelState,
 } from "../../domain/models/chat-session";
+import type { ImagePromptContent } from "../../domain/models/prompt-content";
 import type { UseMentionsReturn } from "../../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../../hooks/useSlashCommands";
 import type { UseAutoMentionReturn } from "../../hooks/useAutoMention";
 import { SuggestionDropdown } from "./SuggestionDropdown";
+import { ImagePreviewStrip, type AttachedImage } from "./ImagePreviewStrip";
 import { Logger } from "../../shared/logger";
 import { useSettings } from "../../hooks/useSettings";
+
+// ============================================================================
+// Image Constants
+// ============================================================================
+
+/** Maximum image size in MB */
+const MAX_IMAGE_SIZE_MB = 5;
+
+/** Maximum image size in bytes */
+const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+
+/** Maximum number of images per message */
+const MAX_IMAGE_COUNT = 10;
+
+/** Supported image MIME types (whitelist) */
+const SUPPORTED_IMAGE_TYPES = [
+	"image/png",
+	"image/jpeg",
+	"image/gif",
+	"image/webp",
+] as const;
+
+type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
 
 /**
  * Props for ChatInput component
@@ -43,8 +68,11 @@ export interface ChatInputProps {
 	plugin: AgentClientPlugin;
 	/** View instance for event registration */
 	view: ChatView;
-	/** Callback to send a message */
-	onSendMessage: (content: string) => Promise<void>;
+	/** Callback to send a message with optional images */
+	onSendMessage: (
+		content: string,
+		images?: ImagePromptContent[],
+	) => Promise<void>;
 	/** Callback to stop the current generation */
 	onStopGeneration: () => Promise<void>;
 	/** Callback when restored message has been consumed */
@@ -57,6 +85,10 @@ export interface ChatInputProps {
 	models?: SessionModelState;
 	/** Callback when model is changed */
 	onModelChange?: (modelId: string) => void;
+	/** Whether the agent supports image attachments */
+	supportsImages?: boolean;
+	/** Current agent ID (used to clear images on agent switch) */
+	agentId: string;
 }
 
 /**
@@ -90,6 +122,8 @@ export function ChatInput({
 	onModeChange,
 	models,
 	onModelChange,
+	supportsImages = false,
+	agentId,
 }: ChatInputProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 	const settings = useSettings(plugin);
@@ -98,14 +132,206 @@ export function ChatInput({
 	const [inputValue, setInputValue] = useState("");
 	const [hintText, setHintText] = useState<string | null>(null);
 	const [commandText, setCommandText] = useState<string>("");
+	const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+	const [isDraggingOver, setIsDraggingOver] = useState(false);
 
 	// Refs
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const dragCounterRef = useRef(0);
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
 	const modeDropdownRef = useRef<HTMLDivElement>(null);
 	const modeDropdownInstance = useRef<DropdownComponent | null>(null);
 	const modelDropdownRef = useRef<HTMLDivElement>(null);
 	const modelDropdownInstance = useRef<DropdownComponent | null>(null);
+
+	// Clear attached images when agent changes
+	useEffect(() => {
+		setAttachedImages([]);
+	}, [agentId]);
+
+	/**
+	 * Add an image to the attached images list.
+	 * Simple addition - validation is done in handlePaste.
+	 */
+	const addImage = useCallback((image: AttachedImage) => {
+		setAttachedImages((prev) => {
+			// Safety check for race conditions
+			if (prev.length >= MAX_IMAGE_COUNT) {
+				return prev;
+			}
+			return [...prev, image];
+		});
+	}, []);
+
+	/**
+	 * Remove an image from the attached images list.
+	 */
+	const removeImage = useCallback((id: string) => {
+		setAttachedImages((prev) => prev.filter((img) => img.id !== id));
+	}, []);
+
+	/**
+	 * Convert a File to Base64 string.
+	 */
+	const fileToBase64 = useCallback(async (file: File): Promise<string> => {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const result = reader.result as string;
+				// Extract base64 part from "data:image/png;base64,..."
+				const base64 = result.split(",")[1];
+				resolve(base64);
+			};
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
+	}, []);
+
+	/**
+	 * Process and attach image files.
+	 * Common logic for paste and drop handlers.
+	 */
+	const processImageFiles = useCallback(
+		async (files: File[]) => {
+			let addedCount = 0;
+
+			for (const file of files) {
+				// Check image count
+				if (attachedImages.length + addedCount >= MAX_IMAGE_COUNT) {
+					new Notice(
+						`[Agent Client] Maximum ${MAX_IMAGE_COUNT} images allowed`,
+					);
+					break;
+				}
+
+				// Check file size (before conversion - memory efficiency)
+				if (file.size > MAX_IMAGE_SIZE_BYTES) {
+					new Notice(
+						`[Agent Client] Image too large (max ${MAX_IMAGE_SIZE_MB}MB)`,
+					);
+					continue;
+				}
+
+				// Convert to Base64 and add
+				try {
+					const base64 = await fileToBase64(file);
+					addImage({
+						id: crypto.randomUUID(),
+						data: base64,
+						mimeType: file.type,
+					});
+					addedCount++;
+				} catch (error) {
+					console.error("Failed to convert image:", error);
+					new Notice("[Agent Client] Failed to attach image");
+				}
+			}
+		},
+		[attachedImages.length, addImage, fileToBase64],
+	);
+
+	/**
+	 * Handle paste event for image attachment.
+	 */
+	const handlePaste = useCallback(
+		async (e: React.ClipboardEvent) => {
+			const items = e.clipboardData?.items;
+			if (!items) return;
+
+			// Extract image files from clipboard
+			const imageFiles: File[] = [];
+			for (const item of Array.from(items)) {
+				if (
+					SUPPORTED_IMAGE_TYPES.includes(
+						item.type as SupportedImageType,
+					)
+				) {
+					const file = item.getAsFile();
+					if (file) imageFiles.push(file);
+				}
+			}
+
+			if (imageFiles.length === 0) return;
+
+			e.preventDefault();
+
+			if (!supportsImages) {
+				new Notice(
+					"[Agent Client] This agent does not support image attachments",
+				);
+				return;
+			}
+
+			await processImageFiles(imageFiles);
+		},
+		[supportsImages, processImageFiles],
+	);
+
+	/**
+	 * Handle drag over event to allow drop.
+	 */
+	const handleDragOver = useCallback((e: React.DragEvent) => {
+		if (e.dataTransfer?.types.includes("Files")) {
+			e.preventDefault();
+			e.dataTransfer.dropEffect = "copy";
+		}
+	}, []);
+
+	/**
+	 * Handle drag enter event for visual feedback.
+	 * Uses counter to handle child element enter/leave correctly.
+	 */
+	const handleDragEnter = useCallback((e: React.DragEvent) => {
+		if (e.dataTransfer?.types.includes("Files")) {
+			e.preventDefault();
+			dragCounterRef.current++;
+			if (dragCounterRef.current === 1) {
+				setIsDraggingOver(true);
+			}
+		}
+	}, []);
+
+	/**
+	 * Handle drag leave event to reset visual feedback.
+	 */
+	const handleDragLeave = useCallback((e: React.DragEvent) => {
+		dragCounterRef.current--;
+		if (dragCounterRef.current === 0) {
+			setIsDraggingOver(false);
+		}
+	}, []);
+
+	/**
+	 * Handle drop event for image files.
+	 */
+	const handleDrop = useCallback(
+		async (e: React.DragEvent) => {
+			dragCounterRef.current = 0;
+			setIsDraggingOver(false);
+
+			const files = e.dataTransfer?.files;
+			if (!files || files.length === 0) return;
+
+			// Filter to supported image types
+			const imageFiles = Array.from(files).filter((file) =>
+				SUPPORTED_IMAGE_TYPES.includes(file.type as SupportedImageType),
+			);
+
+			if (imageFiles.length === 0) return;
+
+			e.preventDefault();
+
+			if (!supportsImages) {
+				new Notice(
+					"[Agent Client] This agent does not support image attachments",
+				);
+				return;
+			}
+
+			await processImageFiles(imageFiles);
+		},
+		[supportsImages, processImageFiles],
+	);
 
 	/**
 	 * Common logic for setting cursor position after text replacement.
@@ -227,12 +453,13 @@ export function ChatInput({
 				// Stop button - always active when sending
 				svg.classList.add("icon-sending");
 			} else {
-				// Send button - active when has input
-				const hasInput = inputValue.trim() !== "";
-				svg.classList.add(hasInput ? "icon-active" : "icon-inactive");
+				// Send button - active when has input (text or images)
+				const hasContent =
+					inputValue.trim() !== "" || attachedImages.length > 0;
+				svg.classList.add(hasContent ? "icon-active" : "icon-inactive");
 			}
 		},
-		[isSending, inputValue],
+		[isSending, inputValue, attachedImages.length],
 	);
 
 	/**
@@ -244,18 +471,36 @@ export function ChatInput({
 			return;
 		}
 
-		if (!inputValue.trim()) return;
+		// Allow sending if there's text OR images
+		if (!inputValue.trim() && attachedImages.length === 0) return;
 
-		// Save input value before clearing
+		// Save input value and images before clearing
 		const messageToSend = inputValue.trim();
+		const imagesToSend: ImagePromptContent[] = attachedImages.map(
+			(img) => ({
+				type: "image",
+				data: img.data,
+				mimeType: img.mimeType,
+			}),
+		);
 
-		// Clear input and hint state immediately
+		// Clear input, images, and hint state immediately
 		setInputValue("");
+		setAttachedImages([]);
 		setHintText(null);
 		setCommandText("");
 
-		await onSendMessage(messageToSend);
-	}, [isSending, inputValue, onSendMessage, onStopGeneration]);
+		await onSendMessage(
+			messageToSend,
+			imagesToSend.length > 0 ? imagesToSend : undefined,
+		);
+	}, [
+		isSending,
+		inputValue,
+		attachedImages,
+		onSendMessage,
+		onStopGeneration,
+	]);
 
 	/**
 	 * Handle dropdown keyboard navigation.
@@ -416,7 +661,7 @@ export function ChatInput({
 		}
 	}, [isSending, updateIconColor]);
 
-	// Update icon color when input changes
+	// Update icon color when input or attached images change
 	useEffect(() => {
 		if (sendButtonRef.current) {
 			const svg = sendButtonRef.current.querySelector("svg");
@@ -424,7 +669,7 @@ export function ChatInput({
 				updateIconColor(svg);
 			}
 		}
-	}, [inputValue, updateIconColor]);
+	}, [inputValue, attachedImages.length, updateIconColor]);
 
 	// Auto-focus textarea on mount
 	useEffect(() => {
@@ -578,9 +823,11 @@ export function ChatInput({
 		}
 	}, [currentModelId]);
 
-	// Button disabled state
+	// Button disabled state - also allow sending if images are attached
 	const isButtonDisabled =
-		!isSending && (inputValue.trim() === "" || !isSessionReady);
+		!isSending &&
+		((inputValue.trim() === "" && attachedImages.length === 0) ||
+			!isSessionReady);
 
 	// Placeholder text
 	const placeholder = `Message ${agentLabel} - @ to mention notes${availableCommands.length > 0 ? ", / for commands" : ""}`;
@@ -614,7 +861,13 @@ export function ChatInput({
 			)}
 
 			{/* Input Box - flexbox container with border */}
-			<div className="chat-input-box">
+			<div
+				className={`chat-input-box ${isDraggingOver ? "dragging-over" : ""}`}
+				onDragOver={handleDragOver}
+				onDragEnter={handleDragEnter}
+				onDragLeave={handleDragLeave}
+				onDrop={(e) => void handleDrop(e)}
+			>
 				{/* Auto-mention Badge */}
 				{autoMentionEnabled && autoMention.activeNote && (
 					<div className="auto-mention-inline">
@@ -668,6 +921,7 @@ export function ChatInput({
 						value={inputValue}
 						onChange={handleInputChange}
 						onKeyDown={handleKeyDown}
+						onPaste={(e) => void handlePaste(e)}
 						placeholder={placeholder}
 						className={`chat-input-textarea ${autoMentionEnabled && autoMention.activeNote ? "has-auto-mention" : ""}`}
 						rows={1}
@@ -679,6 +933,14 @@ export function ChatInput({
 						</div>
 					)}
 				</div>
+
+				{/* Image Preview Strip (only shown when agent supports images) */}
+				{supportsImages && (
+					<ImagePreviewStrip
+						images={attachedImages}
+						onRemove={removeImage}
+					/>
+				)}
 
 				{/* Input Actions (Mode Selector + Model Selector + Send Button) */}
 				<div className="chat-input-actions">

@@ -9,8 +9,9 @@ import type { IVaultAccess } from "../domain/ports/vault-access.port";
 import type { NoteMetadata } from "../domain/ports/vault-access.port";
 import type { AuthenticationMethod } from "../domain/models/chat-session";
 import type { ErrorInfo } from "../domain/models/agent-error";
+import type { ImagePromptContent } from "../domain/models/prompt-content";
 import type { IMentionService } from "../shared/mention-utils";
-import { prepareMessage, sendPreparedMessage } from "../shared/message-service";
+import { preparePrompt, sendPreparedPrompt } from "../shared/message-service";
 import { Platform } from "obsidian";
 
 // ============================================================================
@@ -30,6 +31,8 @@ export interface SendMessageOptions {
 	vaultBasePath: string;
 	/** Whether auto-mention is temporarily disabled */
 	isAutoMentionDisabled?: boolean;
+	/** Attached images */
+	images?: ImagePromptContent[];
 }
 
 /**
@@ -430,10 +433,11 @@ export function useChat(
 				return;
 			}
 
-			// Phase 1: Prepare message using message-service
-			const prepared = await prepareMessage(
+			// Phase 1: Prepare prompt using message-service
+			const prepared = await preparePrompt(
 				{
 					message: content,
+					images: options.images,
 					activeNote: options.activeNote,
 					vaultBasePath: options.vaultBasePath,
 					isAutoMentionDisabled: options.isAutoMentionDisabled,
@@ -443,24 +447,38 @@ export function useChat(
 				mentionService,
 			);
 
-			// Phase 2: Add user message to UI immediately
+			// Phase 2: Build user message for UI
+			const userMessageContent: MessageContent[] = [];
+
+			// Text part (with or without auto-mention context)
+			if (prepared.autoMentionContext) {
+				userMessageContent.push({
+					type: "text_with_context",
+					text: content,
+					autoMentionContext: prepared.autoMentionContext,
+				});
+			} else {
+				userMessageContent.push({
+					type: "text",
+					text: content,
+				});
+			}
+
+			// Image parts
+			if (options.images && options.images.length > 0) {
+				for (const img of options.images) {
+					userMessageContent.push({
+						type: "image",
+						data: img.data,
+						mimeType: img.mimeType,
+					});
+				}
+			}
+
 			const userMessage: ChatMessage = {
 				id: crypto.randomUUID(),
 				role: "user",
-				content: prepared.autoMentionContext
-					? [
-							{
-								type: "text_with_context",
-								text: prepared.displayMessage,
-								autoMentionContext: prepared.autoMentionContext,
-							},
-						]
-					: [
-							{
-								type: "text",
-								text: prepared.displayMessage,
-							},
-						],
+				content: userMessageContent,
 				timestamp: new Date(),
 			};
 			addMessage(userMessage);
@@ -469,13 +487,13 @@ export function useChat(
 			setIsSending(true);
 			setLastUserMessage(content);
 
-			// Phase 4: Send prepared message to agent using message-service
+			// Phase 4: Send prepared prompt to agent using message-service
 			try {
-				const result = await sendPreparedMessage(
+				const result = await sendPreparedPrompt(
 					{
 						sessionId: sessionContext.sessionId,
-						agentMessage: prepared.agentMessage,
-						displayMessage: prepared.displayMessage,
+						agentContent: prepared.agentContent,
+						displayContent: prepared.displayContent,
 						authMethods: sessionContext.authMethods,
 					},
 					agentClient,

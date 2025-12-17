@@ -1,14 +1,14 @@
 /**
  * Message Service
  *
- * Pure functions for message preparation and sending.
+ * Pure functions for prompt preparation and sending.
  * Extracted from SendMessageUseCase for better separation of concerns.
  *
  * Responsibilities:
  * - Process mentions (@[[note]] syntax)
  * - Add auto-mention for active note
  * - Convert mentions to file paths
- * - Send message to agent via IAgentClient
+ * - Send prompt to agent via IAgentClient
  * - Handle authentication errors with retry logic
  */
 
@@ -20,6 +20,10 @@ import type {
 } from "../domain/ports/vault-access.port";
 import type { AgentError } from "../domain/models/agent-error";
 import type { AuthenticationMethod } from "../domain/models/chat-session";
+import type {
+	PromptContent,
+	ImagePromptContent,
+} from "../domain/models/prompt-content";
 import { extractMentionedNotes, type IMentionService } from "./mention-utils";
 import { convertWindowsPathToWsl } from "./wsl-utils";
 
@@ -28,11 +32,14 @@ import { convertWindowsPathToWsl } from "./wsl-utils";
 // ============================================================================
 
 /**
- * Input for preparing a message
+ * Input for preparing a prompt
  */
-export interface PrepareMessageInput {
+export interface PreparePromptInput {
 	/** User's message text (may contain @mentions) */
 	message: string;
+
+	/** Attached images */
+	images?: ImagePromptContent[];
 
 	/** Currently active note (for auto-mention feature) */
 	activeNote?: NoteMetadata | null;
@@ -48,14 +55,14 @@ export interface PrepareMessageInput {
 }
 
 /**
- * Result of preparing a message
+ * Result of preparing a prompt
  */
-export interface PrepareMessageResult {
-	/** The processed message text (without auto-mention syntax in text) */
-	displayMessage: string;
+export interface PreparePromptResult {
+	/** Content for UI display (original text + images) */
+	displayContent: PromptContent[];
 
-	/** The message text to send to agent (with mentions converted to paths) */
-	agentMessage: string;
+	/** Content to send to agent (processed text + images) */
+	agentContent: PromptContent[];
 
 	/** Auto-mention context metadata (if auto-mention is active) */
 	autoMentionContext?: {
@@ -69,34 +76,34 @@ export interface PrepareMessageResult {
 }
 
 /**
- * Input for sending a prepared message
+ * Input for sending a prepared prompt
  */
-export interface SendPreparedMessageInput {
+export interface SendPreparedPromptInput {
 	/** Current session ID */
 	sessionId: string;
 
-	/** The prepared agent message (from prepareMessage) */
-	agentMessage: string;
+	/** The prepared agent content (from preparePrompt) */
+	agentContent: PromptContent[];
 
-	/** The display message (for error reporting) */
-	displayMessage: string;
+	/** The display content (for error reporting) */
+	displayContent: PromptContent[];
 
 	/** Available authentication methods */
 	authMethods: AuthenticationMethod[];
 }
 
 /**
- * Result of sending a message
+ * Result of sending a prompt
  */
-export interface SendMessageResult {
-	/** Whether the message was sent successfully */
+export interface SendPromptResult {
+	/** Whether the prompt was sent successfully */
 	success: boolean;
 
-	/** The processed message text (with auto-mention added if applicable) */
-	displayMessage: string;
+	/** The display content */
+	displayContent: PromptContent[];
 
-	/** The message text sent to agent (with mentions converted to paths) */
-	agentMessage: string;
+	/** The agent content sent */
+	agentContent: PromptContent[];
 
 	/** Error information if sending failed */
 	error?: AgentError;
@@ -104,7 +111,7 @@ export interface SendMessageResult {
 	/** Whether authentication is required */
 	requiresAuth?: boolean;
 
-	/** Whether the message was successfully sent after retry */
+	/** Whether the prompt was successfully sent after retry */
 	retriedSuccessfully?: boolean;
 }
 
@@ -116,22 +123,22 @@ const MAX_NOTE_LENGTH = 10000; // Maximum characters per note
 const MAX_SELECTION_LENGTH = 10000; // Maximum characters for selection
 
 // ============================================================================
-// Message Preparation Functions
+// Prompt Preparation Functions
 // ============================================================================
 
 /**
- * Prepare a message for sending to the agent.
+ * Prepare a prompt for sending to the agent.
  *
  * Processes the message by:
  * - Building context blocks for mentioned notes
  * - Adding auto-mention context for active note
- * - Creating agent message with context + user message
+ * - Creating agent content with context + user message + images
  */
-export async function prepareMessage(
-	input: PrepareMessageInput,
+export async function preparePrompt(
+	input: PreparePromptInput,
 	vaultAccess: IVaultAccess,
 	mentionService: IMentionService,
-): Promise<PrepareMessageResult> {
+): Promise<PreparePromptResult> {
 	// Step 1: Extract all mentioned notes from the message
 	const mentionedNotes = extractMentionedNotes(input.message, mentionService);
 
@@ -181,13 +188,30 @@ export async function prepareMessage(
 		contextBlocks.push(autoMentionContextBlock);
 	}
 
-	// Step 4: Build agent message (context blocks + original message)
-	const agentMessage =
+	// Step 4: Build agent message text (context blocks + original message)
+	const agentMessageText =
 		contextBlocks.length > 0
 			? contextBlocks.join("\n") + "\n\n" + input.message
 			: input.message;
 
-	// Step 5: Build auto-mention context metadata
+	// Step 5: Build content arrays
+	// Only include text block if there's actual text content
+	// (API rejects empty text blocks)
+	const displayContent: PromptContent[] = [
+		...(input.message
+			? [{ type: "text" as const, text: input.message }]
+			: []),
+		...(input.images || []),
+	];
+
+	const agentContent: PromptContent[] = [
+		...(agentMessageText
+			? [{ type: "text" as const, text: agentMessageText }]
+			: []),
+		...(input.images || []),
+	];
+
+	// Step 6: Build auto-mention context metadata
 	const autoMentionContext =
 		input.activeNote && !input.isAutoMentionDisabled
 			? {
@@ -204,8 +228,8 @@ export async function prepareMessage(
 			: undefined;
 
 	return {
-		displayMessage: input.message,
-		agentMessage,
+		displayContent,
+		agentContent,
 		autoMentionContext,
 	};
 }
@@ -265,30 +289,30 @@ This is what the user is currently focusing on.
 }
 
 // ============================================================================
-// Message Sending Functions
+// Prompt Sending Functions
 // ============================================================================
 
 /**
- * Send a prepared message to the agent.
+ * Send a prepared prompt to the agent.
  */
-export async function sendPreparedMessage(
-	input: SendPreparedMessageInput,
+export async function sendPreparedPrompt(
+	input: SendPreparedPromptInput,
 	agentClient: IAgentClient,
-): Promise<SendMessageResult> {
+): Promise<SendPromptResult> {
 	try {
-		await agentClient.sendMessage(input.sessionId, input.agentMessage);
+		await agentClient.sendPrompt(input.sessionId, input.agentContent);
 
 		return {
 			success: true,
-			displayMessage: input.displayMessage,
-			agentMessage: input.agentMessage,
+			displayContent: input.displayContent,
+			agentContent: input.agentContent,
 		};
 	} catch (error) {
 		return await handleSendError(
 			error,
 			input.sessionId,
-			input.agentMessage,
-			input.displayMessage,
+			input.agentContent,
+			input.displayContent,
 			input.authMethods,
 			agentClient,
 		);
@@ -300,22 +324,22 @@ export async function sendPreparedMessage(
 // ============================================================================
 
 /**
- * Handle errors that occur during message sending.
+ * Handle errors that occur during prompt sending.
  */
 async function handleSendError(
 	error: unknown,
 	sessionId: string,
-	agentMessage: string,
-	displayMessage: string,
+	agentContent: PromptContent[],
+	displayContent: PromptContent[],
 	authMethods: AuthenticationMethod[],
 	agentClient: IAgentClient,
-): Promise<SendMessageResult> {
+): Promise<SendPromptResult> {
 	// Check for "empty response text" error - ignore silently
 	if (isEmptyResponseError(error)) {
 		return {
 			success: true,
-			displayMessage,
-			agentMessage,
+			displayContent,
+			agentContent,
 		};
 	}
 
@@ -335,8 +359,8 @@ async function handleSendError(
 
 		return {
 			success: false,
-			displayMessage,
-			agentMessage,
+			displayContent,
+			agentContent,
 			error: {
 				id: crypto.randomUUID(),
 				category: "rate_limit",
@@ -356,8 +380,8 @@ async function handleSendError(
 	if (!authMethods || authMethods.length === 0) {
 		return {
 			success: false,
-			displayMessage,
-			agentMessage,
+			displayContent,
+			agentContent,
 			error: {
 				id: crypto.randomUUID(),
 				category: "authentication",
@@ -377,8 +401,8 @@ async function handleSendError(
 	if (authMethods.length === 1) {
 		const retryResult = await retryWithAuthentication(
 			sessionId,
-			agentMessage,
-			displayMessage,
+			agentContent,
+			displayContent,
 			authMethods[0].id,
 			agentClient,
 		);
@@ -391,8 +415,8 @@ async function handleSendError(
 	// Multiple auth methods or retry failed
 	return {
 		success: false,
-		displayMessage,
-		agentMessage,
+		displayContent,
+		agentContent,
 		requiresAuth: true,
 		error: {
 			id: crypto.randomUUID(),
@@ -444,15 +468,15 @@ function isEmptyResponseError(error: unknown): boolean {
 }
 
 /**
- * Retry sending message after authentication.
+ * Retry sending prompt after authentication.
  */
 async function retryWithAuthentication(
 	sessionId: string,
-	agentMessage: string,
-	displayMessage: string,
+	agentContent: PromptContent[],
+	displayContent: PromptContent[],
 	authMethodId: string,
 	agentClient: IAgentClient,
-): Promise<SendMessageResult | null> {
+): Promise<SendPromptResult | null> {
 	try {
 		const authSuccess = await agentClient.authenticate(authMethodId);
 
@@ -460,19 +484,19 @@ async function retryWithAuthentication(
 			return null;
 		}
 
-		await agentClient.sendMessage(sessionId, agentMessage);
+		await agentClient.sendPrompt(sessionId, agentContent);
 
 		return {
 			success: true,
-			displayMessage,
-			agentMessage,
+			displayContent,
+			agentContent,
 			retriedSuccessfully: true,
 		};
 	} catch (retryError) {
 		return {
 			success: false,
-			displayMessage,
-			agentMessage,
+			displayContent,
+			agentContent,
 			error: {
 				id: crypto.randomUUID(),
 				category: "communication",

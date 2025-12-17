@@ -93,6 +93,17 @@ export function MessageContentRenderer({
 				/>
 			);
 
+		case "image":
+			return (
+				<div className="message-image">
+					<img
+						src={`data:${content.mimeType};base64,${content.data}`}
+						alt="Attached image"
+						className="message-image-thumbnail"
+					/>
+				</div>
+			);
+
 		default:
 			return <span>Unsupported content type</span>;
 	}

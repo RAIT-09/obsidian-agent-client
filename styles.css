@@ -481,6 +481,10 @@ If your plugin does not need CSS, delete this file.
 	box-shadow: 0 0 0 1.5px var(--background-modifier-border);
 }
 
+.chat-input-box.dragging-over {
+	background-color: var(--background-secondary);
+}
+
 /* Auto-mention inline display */
 .auto-mention-inline {
 	display: flex;
@@ -489,7 +493,7 @@ If your plugin does not need CSS, delete this file.
 	gap: 4px;
 	padding: 6px 12px;
 	border-bottom: 1px solid var(--background-modifier-border);
-	background-color: var(--background-primary);
+	background-color: transparent;
 }
 
 .mention-badge {
@@ -1118,4 +1122,116 @@ If your plugin does not need CSS, delete this file.
 	overflow-wrap: break-word;
 	word-wrap: break-word;
 	word-break: break-word;
+}
+
+/* ===== Image Preview Strip ===== */
+.image-preview-strip {
+	display: flex;
+	gap: 8px;
+	padding: 8px 12px;
+	background-color: transparent;
+	overflow-x: auto;
+	scrollbar-width: thin;
+	-ms-overflow-style: none;
+}
+
+.image-preview-strip::-webkit-scrollbar {
+	height: 4px;
+}
+
+.image-preview-strip::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.image-preview-strip::-webkit-scrollbar-thumb {
+	background-color: var(--background-modifier-border);
+	border-radius: 2px;
+}
+
+.image-preview-item {
+	position: relative;
+	flex-shrink: 0;
+	width: 64px;
+	height: 64px;
+}
+
+.image-preview-thumbnail {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: center;
+	border-radius: 8px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.image-preview-remove {
+	position: absolute;
+	top: -6px;
+	right: -6px;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background-color: var(--background-secondary);
+	color: var(--text-muted);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+	box-shadow: none !important;
+}
+
+.image-preview-remove svg {
+	width: 12px;
+	height: 12px;
+}
+
+.image-preview-item:hover .image-preview-remove {
+	opacity: 1;
+}
+
+/* ===== Message Image (in chat history) ===== */
+.message-image {
+	display: inline-block;
+	margin: 4px 4px 4px 0;
+}
+
+.message-image-thumbnail {
+	width: 120px;
+	height: 120px;
+	object-fit: cover;
+	object-position: center;
+	border-radius: 8px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+/* ===== Message Images Strip (horizontal scroll in chat history) ===== */
+.message-images-strip {
+	display: flex;
+	gap: 8px;
+	padding: 8px 0;
+	overflow-x: auto;
+	scrollbar-width: thin;
+	-ms-overflow-style: none;
+}
+
+.message-images-strip::-webkit-scrollbar {
+	height: 4px;
+}
+
+.message-images-strip::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.message-images-strip::-webkit-scrollbar-thumb {
+	background-color: var(--background-modifier-border);
+	border-radius: 2px;
+}
+
+.message-images-strip .message-image {
+	flex-shrink: 0;
+	margin: 0;
 }
