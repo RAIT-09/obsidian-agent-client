@@ -244,10 +244,7 @@ export function useChat(
 					) {
 						updatedMessage.content[existingContentIndex] = {
 							type: content.type,
-							text:
-								existingContent.text +
-								(content.type === "agent_thought" ? "\n" : "") +
-								content.text,
+							text: existingContent.text + content.text,
 						};
 					}
 				} else {
