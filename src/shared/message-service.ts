@@ -195,13 +195,19 @@ export async function preparePrompt(
 			: input.message;
 
 	// Step 5: Build content arrays
+	// Only include text block if there's actual text content
+	// (API rejects empty text blocks)
 	const displayContent: PromptContent[] = [
-		{ type: "text", text: input.message },
+		...(input.message
+			? [{ type: "text" as const, text: input.message }]
+			: []),
 		...(input.images || []),
 	];
 
 	const agentContent: PromptContent[] = [
-		{ type: "text", text: agentMessageText },
+		...(agentMessageText
+			? [{ type: "text" as const, text: agentMessageText }]
+			: []),
 		...(input.images || []),
 	];
 
