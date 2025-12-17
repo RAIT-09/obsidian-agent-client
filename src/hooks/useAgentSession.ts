@@ -327,7 +327,9 @@ export function useAgentSession(
 			availableCommands: undefined,
 			modes: undefined,
 			models: undefined,
-			promptCapabilities: undefined,
+			// Keep promptCapabilities from previous session if same agent
+			// It will be updated if re-initialization is needed
+			promptCapabilities: prev.promptCapabilities,
 			createdAt: new Date(),
 			lastActivityAt: new Date(),
 		}));
