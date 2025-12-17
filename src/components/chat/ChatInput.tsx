@@ -453,12 +453,13 @@ export function ChatInput({
 				// Stop button - always active when sending
 				svg.classList.add("icon-sending");
 			} else {
-				// Send button - active when has input
-				const hasInput = inputValue.trim() !== "";
-				svg.classList.add(hasInput ? "icon-active" : "icon-inactive");
+				// Send button - active when has input (text or images)
+				const hasContent =
+					inputValue.trim() !== "" || attachedImages.length > 0;
+				svg.classList.add(hasContent ? "icon-active" : "icon-inactive");
 			}
 		},
-		[isSending, inputValue],
+		[isSending, inputValue, attachedImages.length],
 	);
 
 	/**
@@ -660,7 +661,7 @@ export function ChatInput({
 		}
 	}, [isSending, updateIconColor]);
 
-	// Update icon color when input changes
+	// Update icon color when input or attached images change
 	useEffect(() => {
 		if (sendButtonRef.current) {
 			const svg = sendButtonRef.current.querySelector("svg");
@@ -668,7 +669,7 @@ export function ChatInput({
 				updateIconColor(svg);
 			}
 		}
-	}, [inputValue, updateIconColor]);
+	}, [inputValue, attachedImages.length, updateIconColor]);
 
 	// Auto-focus textarea on mount
 	useEffect(() => {
