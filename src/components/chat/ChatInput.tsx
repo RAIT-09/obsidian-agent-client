@@ -247,7 +247,7 @@ export function ChatInput({
 		if (!inputValue.trim()) return;
 
 		// Save input value before clearing
-		const messageToSend = inputValue;
+		const messageToSend = inputValue.trim();
 
 		// Clear input and hint state immediately
 		setInputValue("");
