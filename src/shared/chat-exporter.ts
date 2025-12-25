@@ -14,6 +14,12 @@ interface ConvertContext {
 	exportFilePath: string;
 	/** Counter for image numbering */
 	imageIndex: number;
+	/** Whether to include images in export */
+	includeImages: boolean;
+	/** Where to save images */
+	imageLocation: "obsidian" | "custom" | "base64";
+	/** Custom folder for images */
+	imageCustomFolder: string;
 }
 
 export class ChatExporter {
@@ -146,9 +152,13 @@ tags: [agent-client]
 		agentLabel: string,
 		exportFilePath: string,
 	): Promise<string> {
+		const settings = this.plugin.settings.exportSettings;
 		const context: ConvertContext = {
 			exportFilePath,
 			imageIndex: 0,
+			includeImages: settings.includeImages,
+			imageLocation: settings.imageLocation,
+			imageCustomFolder: settings.imageCustomFolder,
 		};
 
 		let markdown = `# ${agentLabel}\n\n`;
@@ -213,12 +223,22 @@ tags: [agent-client]
 				return this.convertPermissionRequestToMarkdown(content);
 
 			case "image":
+				// Skip if images are not included
+				if (!context.includeImages) {
+					return "";
+				}
+
 				// External URI - use as-is
 				if (content.uri) {
 					return `![Image](${content.uri})\n\n`;
 				}
 
-				// Base64 image - save as attachment
+				// Base64 embedding mode
+				if (context.imageLocation === "base64") {
+					return `![Image](data:${content.mimeType};base64,${content.data})\n\n`;
+				}
+
+				// Save as attachment (obsidian or custom)
 				try {
 					context.imageIndex++;
 					const attachmentPath = await this.saveImageAsAttachment(
@@ -226,6 +246,8 @@ tags: [agent-client]
 						content.mimeType,
 						context.exportFilePath,
 						context.imageIndex,
+						context.imageLocation,
+						context.imageCustomFolder,
 					);
 					return `![[${attachmentPath}]]\n\n`;
 				} catch (error) {
@@ -346,6 +368,8 @@ tags: [agent-client]
 		mimeType: string,
 		exportFilePath: string,
 		imageIndex: number,
+		imageLocation: "obsidian" | "custom",
+		imageCustomFolder: string,
 	): Promise<string> {
 		const ext = this.getExtensionFromMimeType(mimeType);
 
@@ -354,30 +378,51 @@ tags: [agent-client]
 		const baseName = exportFileName.split("/").pop() || "image";
 		const imageFileName = `${baseName}_${String(imageIndex).padStart(3, "0")}.${ext}`;
 
-		// Get path respecting Obsidian's attachment folder settings
-		const attachmentPath =
-			await this.plugin.app.fileManager.getAvailablePathForAttachment(
-				imageFileName,
-				exportFilePath,
-			);
+		let attachmentPath: string;
 
-		// Check if file already exists by comparing paths
-		// getAvailablePathForAttachment returns the original name if it doesn't exist,
-		// or adds a suffix (e.g., "image_001 1.png") if it does exist.
-		if (attachmentPath.endsWith(imageFileName)) {
-			// File doesn't exist yet - save it
-			const binaryData = this.base64ToArrayBuffer(base64Data);
-			await this.plugin.app.vault.createBinary(
-				attachmentPath,
-				binaryData,
-			);
-			this.logger.log(`Image saved as attachment: ${attachmentPath}`);
+		if (imageLocation === "custom") {
+			// Save to custom folder
+			const folder = imageCustomFolder || "Agent Client";
+			await this.ensureFolderExists(folder);
+			attachmentPath = `${folder}/${imageFileName}`;
+
+			// Check if file already exists
+			const existingFile =
+				this.plugin.app.vault.getAbstractFileByPath(attachmentPath);
+			if (existingFile instanceof TFile) {
+				this.logger.log(
+					`Image already exists, skipping: ${attachmentPath}`,
+				);
+				return attachmentPath;
+			}
 		} else {
-			// File exists - return the original path (without suffix)
-			const originalPath = attachmentPath.replace(/ \d+(\.[^.]+)$/, "$1");
-			this.logger.log(`Image already exists, skipping: ${originalPath}`);
-			return originalPath;
+			// Use Obsidian's attachment folder settings
+			attachmentPath =
+				await this.plugin.app.fileManager.getAvailablePathForAttachment(
+					imageFileName,
+					exportFilePath,
+				);
+
+			// Check if file already exists by comparing paths
+			// getAvailablePathForAttachment returns the original name if it doesn't exist,
+			// or adds a suffix (e.g., "image_001 1.png") if it does exist.
+			if (!attachmentPath.endsWith(imageFileName)) {
+				// File exists - return the original path (without suffix)
+				const originalPath = attachmentPath.replace(
+					/ \d+(\.[^.]+)$/,
+					"$1",
+				);
+				this.logger.log(
+					`Image already exists, skipping: ${originalPath}`,
+				);
+				return originalPath;
+			}
 		}
+
+		// Save the image
+		const binaryData = this.base64ToArrayBuffer(base64Data);
+		await this.plugin.app.vault.createBinary(attachmentPath, binaryData);
+		this.logger.log(`Image saved as attachment: ${attachmentPath}`);
 
 		return attachmentPath;
 	}

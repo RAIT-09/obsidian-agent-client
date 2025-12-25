@@ -46,6 +46,9 @@ export interface AgentClientPluginSettings {
 		autoExportOnNewChat: boolean;
 		autoExportOnCloseChat: boolean;
 		openFileAfterExport: boolean;
+		includeImages: boolean;
+		imageLocation: "obsidian" | "custom" | "base64";
+		imageCustomFolder: string;
 	};
 	// WSL settings (Windows only)
 	windowsWslMode: boolean;
@@ -91,6 +94,9 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		autoExportOnNewChat: false,
 		autoExportOnCloseChat: false,
 		openFileAfterExport: true,
+		includeImages: true,
+		imageLocation: "obsidian",
+		imageCustomFolder: "Agent Client",
 	},
 	windowsWslMode: false,
 	windowsWslDistribution: undefined,
@@ -453,6 +459,21 @@ export default class AgentClientPlugin extends Plugin {
 								? rawExport.openFileAfterExport
 								: DEFAULT_SETTINGS.exportSettings
 										.openFileAfterExport,
+						includeImages:
+							typeof rawExport.includeImages === "boolean"
+								? rawExport.includeImages
+								: DEFAULT_SETTINGS.exportSettings.includeImages,
+						imageLocation:
+							rawExport.imageLocation === "obsidian" ||
+							rawExport.imageLocation === "custom" ||
+							rawExport.imageLocation === "base64"
+								? rawExport.imageLocation
+								: DEFAULT_SETTINGS.exportSettings.imageLocation,
+						imageCustomFolder:
+							typeof rawExport.imageCustomFolder === "string"
+								? rawExport.imageCustomFolder
+								: DEFAULT_SETTINGS.exportSettings
+										.imageCustomFolder,
 					};
 				}
 				return DEFAULT_SETTINGS.exportSettings;
