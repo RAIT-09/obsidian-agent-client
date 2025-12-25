@@ -249,7 +249,9 @@ tags: [agent-client]
 						context.imageLocation,
 						context.imageCustomFolder,
 					);
-					return `![[${attachmentPath}]]\n\n`;
+					// Use filename only (Obsidian resolves it)
+					const fileName = attachmentPath.split("/").pop();
+					return `![[${fileName}]]\n\n`;
 				} catch (error) {
 					this.logger.error(
 						`Failed to save image as attachment: ${error}`,
