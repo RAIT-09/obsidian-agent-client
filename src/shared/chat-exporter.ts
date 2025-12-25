@@ -6,6 +6,16 @@ import type {
 import { Logger } from "./logger";
 import { TFile } from "obsidian";
 
+/**
+ * Context for content conversion, tracking state across messages.
+ */
+interface ConvertContext {
+	/** Path of the export markdown file */
+	exportFilePath: string;
+	/** Counter for image numbering */
+	imageIndex: number;
+}
+
 export class ChatExporter {
 	private logger: Logger;
 
@@ -42,11 +52,10 @@ export class ChatExporter {
 				sessionId,
 				effectiveTimestamp,
 			);
-			const chatContent = this.convertMessagesToMarkdown(
+			const chatContent = await this.convertMessagesToMarkdown(
 				messages,
 				agentLabel,
-				sessionId,
-				effectiveTimestamp,
+				filePath,
 			);
 			const fullContent = `${frontmatter}\n\n${chatContent}`;
 
@@ -132,12 +141,16 @@ tags: [agent-client]
 ---`;
 	}
 
-	private convertMessagesToMarkdown(
+	private async convertMessagesToMarkdown(
 		messages: ChatMessage[],
 		agentLabel: string,
-		sessionId: string,
-		timestamp: Date,
-	): string {
+		exportFilePath: string,
+	): Promise<string> {
+		const context: ConvertContext = {
+			exportFilePath,
+			imageIndex: 0,
+		};
+
 		let markdown = `# ${agentLabel}\n\n`;
 
 		for (const message of messages) {
@@ -147,7 +160,10 @@ tags: [agent-client]
 			markdown += `## ${timeStr} - ${role}\n\n`;
 
 			for (const content of message.content) {
-				markdown += this.convertContentToMarkdown(content);
+				markdown += await this.convertContentToMarkdown(
+					content,
+					context,
+				);
 			}
 
 			markdown += "\n---\n\n";
@@ -156,7 +172,10 @@ tags: [agent-client]
 		return markdown;
 	}
 
-	private convertContentToMarkdown(content: MessageContent): string {
+	private async convertContentToMarkdown(
+		content: MessageContent,
+		context: ConvertContext,
+	): Promise<string> {
 		switch (content.type) {
 			case "text":
 				return content.text + "\n\n";
@@ -194,11 +213,28 @@ tags: [agent-client]
 				return this.convertPermissionRequestToMarkdown(content);
 
 			case "image":
+				// External URI - use as-is
 				if (content.uri) {
 					return `![Image](${content.uri})\n\n`;
 				}
-				// Base64 image
-				return `![Image](data:${content.mimeType};base64,${content.data})\n\n`;
+
+				// Base64 image - save as attachment
+				try {
+					context.imageIndex++;
+					const attachmentPath = await this.saveImageAsAttachment(
+						content.data,
+						content.mimeType,
+						context.exportFilePath,
+						context.imageIndex,
+					);
+					return `![[${attachmentPath}]]\n\n`;
+				} catch (error) {
+					this.logger.error(
+						`Failed to save image as attachment: ${error}`,
+					);
+					// Fallback to base64 embedding
+					return `![Image](data:${content.mimeType};base64,${content.data})\n\n`;
+				}
 
 			default:
 				return "";
@@ -298,5 +334,62 @@ tags: [agent-client]
 	): string {
 		const status = content.isCancelled ? "Cancelled" : "Requested";
 		return `### ⚠️ Permission: ${content.toolCall.title || "Unknown"} (${status})\n\n`;
+	}
+
+	/**
+	 * Save a base64-encoded image as an attachment file.
+	 * Uses Obsidian's attachment settings to determine the save location.
+	 */
+	private async saveImageAsAttachment(
+		base64Data: string,
+		mimeType: string,
+		exportFilePath: string,
+		imageIndex: number,
+	): Promise<string> {
+		const ext = this.getExtensionFromMimeType(mimeType);
+
+		// Generate image filename based on export filename
+		const exportFileName = exportFilePath.replace(/\.md$/, "");
+		const baseName = exportFileName.split("/").pop() || "image";
+		const imageFileName = `${baseName}_${String(imageIndex).padStart(3, "0")}.${ext}`;
+
+		// Get path respecting Obsidian's attachment folder settings
+		const attachmentPath =
+			await this.plugin.app.fileManager.getAvailablePathForAttachment(
+				imageFileName,
+				exportFilePath,
+			);
+
+		// Convert base64 to binary and save
+		const binaryData = this.base64ToArrayBuffer(base64Data);
+		await this.plugin.app.vault.createBinary(attachmentPath, binaryData);
+
+		this.logger.log(`Image saved as attachment: ${attachmentPath}`);
+		return attachmentPath;
+	}
+
+	/**
+	 * Get file extension from MIME type.
+	 */
+	private getExtensionFromMimeType(mimeType: string): string {
+		const map: Record<string, string> = {
+			"image/png": "png",
+			"image/jpeg": "jpg",
+			"image/gif": "gif",
+			"image/webp": "webp",
+		};
+		return map[mimeType] || "png";
+	}
+
+	/**
+	 * Convert base64 string to ArrayBuffer.
+	 */
+	private base64ToArrayBuffer(base64: string): ArrayBuffer {
+		const binaryString = atob(base64);
+		const bytes = new Uint8Array(binaryString.length);
+		for (let i = 0; i < binaryString.length; i++) {
+			bytes[i] = binaryString.charCodeAt(i);
+		}
+		return bytes.buffer;
 	}
 }
