@@ -491,7 +491,7 @@ function ChatComponent({
 	// Render
 	// ============================================================
 	return (
-		<div className="chat-view-container">
+		<div className="agent-client-chat-view-container">
 			<ChatHeader
 				agentLabel={activeAgentLabel}
 				isUpdateAvailable={isUpdateAvailable}

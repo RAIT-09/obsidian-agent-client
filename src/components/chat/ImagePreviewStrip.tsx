@@ -26,16 +26,16 @@ export function ImagePreviewStrip({
 	if (images.length === 0) return null;
 
 	return (
-		<div className="image-preview-strip">
+		<div className="agent-client-image-preview-strip">
 			{images.map((image) => (
-				<div key={image.id} className="image-preview-item">
+				<div key={image.id} className="agent-client-image-preview-item">
 					<img
 						src={`data:${image.mimeType};base64,${image.data}`}
 						alt="Attached image"
-						className="image-preview-thumbnail"
+						className="agent-client-image-preview-thumbnail"
 					/>
 					<button
-						className="image-preview-remove"
+						className="agent-client-image-preview-remove"
 						onClick={() => onRemove(image.id)}
 						title="Remove image"
 						type="button"

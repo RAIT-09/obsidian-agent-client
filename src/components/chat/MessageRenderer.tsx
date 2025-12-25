@@ -66,13 +66,16 @@ export function MessageRenderer({
 
 	return (
 		<div
-			className={`message-renderer ${message.role === "user" ? "message-user" : "message-assistant"}`}
+			className={`agent-client-message-renderer ${message.role === "user" ? "agent-client-message-user" : "agent-client-message-assistant"}`}
 		>
 			{groups.map((group, idx) => {
 				if (group.type === "images") {
 					// Render images in horizontal scroll container
 					return (
-						<div key={idx} className="message-images-strip">
+						<div
+							key={idx}
+							className="agent-client-message-images-strip"
+						>
 							{group.items.map((content, imgIdx) => (
 								<MessageContentRenderer
 									key={imgIdx}

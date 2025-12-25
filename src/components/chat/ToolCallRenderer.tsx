@@ -81,21 +81,21 @@ export function ToolCallRenderer({
 	};
 
 	return (
-		<div className="message-tool-call">
+		<div className="agent-client-message-tool-call">
 			{/* Header */}
-			<div className="message-tool-call-header">
-				<div className="message-tool-call-title">
-					<span className="message-tool-call-icon">
+			<div className="agent-client-message-tool-call-header">
+				<div className="agent-client-message-tool-call-title">
+					<span className="agent-client-message-tool-call-icon">
 						{getKindIcon(kind)}
 					</span>
 					{title}
 				</div>
 				{locations && locations.length > 0 && (
-					<div className="message-tool-call-locations">
+					<div className="agent-client-message-tool-call-locations">
 						{locations.map((loc, idx) => (
 							<span
 								key={idx}
-								className="message-tool-call-location"
+								className="agent-client-message-tool-call-location"
 							>
 								{toRelativePath(loc.path, vaultPath)}
 								{loc.line != null && `:${loc.line}`}
@@ -103,12 +103,14 @@ export function ToolCallRenderer({
 						))}
 					</div>
 				)}
-				<div className="message-tool-call-status">Status: {status}</div>
+				<div className="agent-client-message-tool-call-status">
+					Status: {status}
+				</div>
 			</div>
 
 			{/* Kind-specific details */}
 			{/* kind && (
-				<div className="message-tool-call-details">
+				<div className="agent-client-message-tool-call-details">
 					<ToolCallDetails
 						kind={kind}
 						locations={locations}
@@ -145,7 +147,7 @@ export function ToolCallRenderer({
 						// Handle content blocks (text, image, etc.)
 						if ("text" in item.content) {
 							return (
-								<div key={index} className="tool-call-content">
+								<div key={index} className="agent-client-tool-call-content">
 									<MarkdownTextRenderer
 										text={item.content.text}
 										app={plugin.app}
@@ -220,12 +222,12 @@ function ReadDetails({
 	if (!locations || locations.length === 0) return null;
 
 	return (
-		<div className="tool-call-read-details">
+		<div className="agent-client-tool-call-read-details">
 			{locations.map((loc, idx) => (
-				<div key={idx} className="tool-call-location">
+				<div key={idx} className="agent-client-tool-call-location">
 					📄 {loc.path}
 					{loc.line !== null && loc.line !== undefined && (
-						<span className="tool-call-line">:{loc.line}</span>
+						<span className="agent-client-tool-call-line">:{loc.line}</span>
 					)}
 				</div>
 			))}
@@ -243,9 +245,9 @@ function EditDetails({
 	if (!locations || locations.length === 0) return null;
 
 	return (
-		<div className="tool-call-edit-details">
+		<div className="agent-client-tool-call-edit-details">
 			{locations.map((loc, idx) => (
-				<div key={idx} className="tool-call-location">
+				<div key={idx} className="agent-client-tool-call-location">
 					📝 Editing: {loc.path}
 				</div>
 			))}
@@ -263,9 +265,9 @@ function DeleteDetails({
 	if (!locations || locations.length === 0) return null;
 
 	return (
-		<div className="tool-call-delete-details">
+		<div className="agent-client-tool-call-delete-details">
 			{locations.map((loc, idx) => (
-				<div key={idx} className="tool-call-location">
+				<div key={idx} className="agent-client-tool-call-location">
 					🗑️ Deleting: {loc.path}
 				</div>
 			))}
@@ -290,7 +292,7 @@ function MoveDetails({
 		elements.push(<div key="to">To: {String(rawInput.to)}</div>);
 	}
 
-	return <div className="tool-call-move-details">{elements}</div>;
+	return <div className="agent-client-tool-call-move-details">{elements}</div>;
 }
 
 function SearchDetails({
@@ -305,20 +307,20 @@ function SearchDetails({
 	const elements = [];
 	if (rawInput.query) {
 		elements.push(
-			<div key="query" className="tool-call-search-query">
+			<div key="query" className="agent-client-tool-call-search-query">
 				🔍 Query: "{String(rawInput.query)}"
 			</div>,
 		);
 	}
 	if (rawInput.pattern) {
 		elements.push(
-			<div key="pattern" className="tool-call-search-pattern">
+			<div key="pattern" className="agent-client-tool-call-search-pattern">
 				Pattern: {String(rawInput.pattern)}
 			</div>,
 		);
 	}
 
-	return <div className="tool-call-search-details">{elements}</div>;
+	return <div className="agent-client-tool-call-search-details">{elements}</div>;
 }
 
 function ExecuteDetails({
@@ -333,20 +335,20 @@ function ExecuteDetails({
 	const elements = [];
 	if (rawInput.command) {
 		elements.push(
-			<div key="command" className="tool-call-execute-command">
+			<div key="command" className="agent-client-tool-call-execute-command">
 				💻 Command: <code>{String(rawInput.command)}</code>
 			</div>,
 		);
 	}
 	if (rawInput.cwd) {
 		elements.push(
-			<div key="cwd" className="tool-call-execute-cwd">
+			<div key="cwd" className="agent-client-tool-call-execute-cwd">
 				Directory: {String(rawInput.cwd)}
 			</div>,
 		);
 	}
 
-	return <div className="tool-call-execute-details">{elements}</div>;
+	return <div className="agent-client-tool-call-execute-details">{elements}</div>;
 }
 
 function FetchDetails({
@@ -361,20 +363,20 @@ function FetchDetails({
 	const elements = [];
 	if (rawInput.url) {
 		elements.push(
-			<div key="url" className="tool-call-fetch-url">
+			<div key="url" className="agent-client-tool-call-fetch-url">
 				🌐 URL: {String(rawInput.url)}
 			</div>,
 		);
 	}
 	if (rawInput.query) {
 		elements.push(
-			<div key="query" className="tool-call-fetch-query">
+			<div key="query" className="agent-client-tool-call-fetch-query">
 				🔍 Search: "{String(rawInput.query)}"
 			</div>,
 		);
 	}
 
-	return <div className="tool-call-fetch-details">{elements}</div>;
+	return <div className="agent-client-tool-call-fetch-details">{elements}</div>;
 }
 */
 
@@ -399,12 +401,19 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 		) {
 			// New file
 			return (
-				<div className="tool-call-diff-new-file">
-					<div className="diff-line-info">New file</div>
+				<div className="agent-client-tool-call-diff-new-file">
+					<div className="agent-client-diff-line-info">New file</div>
 					{diff.newText.split("\n").map((line, idx) => (
-						<div key={idx} className="diff-line diff-line-added">
-							<span className="diff-line-marker">+</span>
-							<span className="diff-line-content">{line}</span>
+						<div
+							key={idx}
+							className="agent-client-diff-line agent-client-diff-line-added"
+						>
+							<span className="agent-client-diff-line-marker">
+								+
+							</span>
+							<span className="agent-client-diff-line-content">
+								{line}
+							</span>
 						</div>
 					))}
 				</div>
@@ -420,9 +429,14 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 		// Show removed lines
 		oldLines.forEach((line, idx) => {
 			elements.push(
-				<div key={`old-${idx}`} className="diff-line diff-line-removed">
-					<span className="diff-line-marker">-</span>
-					<span className="diff-line-content">{line}</span>
+				<div
+					key={`old-${idx}`}
+					className="agent-client-diff-line agent-client-diff-line-removed"
+				>
+					<span className="agent-client-diff-line-marker">-</span>
+					<span className="agent-client-diff-line-content">
+						{line}
+					</span>
 				</div>,
 			);
 		});
@@ -430,9 +444,14 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 		// Show added lines
 		newLines.forEach((line, idx) => {
 			elements.push(
-				<div key={`new-${idx}`} className="diff-line diff-line-added">
-					<span className="diff-line-marker">+</span>
-					<span className="diff-line-content">{line}</span>
+				<div
+					key={`new-${idx}`}
+					className="agent-client-diff-line agent-client-diff-line-added"
+				>
+					<span className="agent-client-diff-line-marker">+</span>
+					<span className="agent-client-diff-line-content">
+						{line}
+					</span>
 				</div>,
 			);
 		});
@@ -441,8 +460,10 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 	};
 
 	return (
-		<div className="tool-call-diff">
-			<div className="tool-call-diff-content">{renderDiff()}</div>
+		<div className="agent-client-tool-call-diff">
+			<div className="agent-client-tool-call-diff-content">
+				{renderDiff()}
+			</div>
 		</div>
 	);
 }

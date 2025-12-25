@@ -105,16 +105,16 @@ export function SuggestionDropdown({
 			return (
 				<div
 					key={note.path}
-					className={`mention-dropdown-item ${isSelected ? "selected" : ""} ${hasBorder ? "has-border" : ""}`}
+					className={`agent-client-mention-dropdown-item ${isSelected ? "agent-client-selected" : ""} ${hasBorder ? "agent-client-has-border" : ""}`}
 					onClick={() => onSelect(note)}
 					onMouseEnter={() => {
 						// Could update selected index on hover
 					}}
 				>
-					<div className="mention-dropdown-item-name">
+					<div className="agent-client-mention-dropdown-item-name">
 						{note.name}
 					</div>
-					<div className="mention-dropdown-item-path">
+					<div className="agent-client-mention-dropdown-item-path">
 						{note.path}
 					</div>
 				</div>
@@ -125,16 +125,16 @@ export function SuggestionDropdown({
 			return (
 				<div
 					key={command.name}
-					className={`mention-dropdown-item ${isSelected ? "selected" : ""} ${hasBorder ? "has-border" : ""}`}
+					className={`agent-client-mention-dropdown-item ${isSelected ? "agent-client-selected" : ""} ${hasBorder ? "agent-client-has-border" : ""}`}
 					onClick={() => onSelect(command)}
 					onMouseEnter={() => {
 						// Could update selected index on hover
 					}}
 				>
-					<div className="mention-dropdown-item-name">
+					<div className="agent-client-mention-dropdown-item-name">
 						/{command.name}
 					</div>
-					<div className="mention-dropdown-item-path">
+					<div className="agent-client-mention-dropdown-item-path">
 						{command.description}
 						{command.hint && ` (${command.hint})`}
 					</div>
@@ -144,7 +144,7 @@ export function SuggestionDropdown({
 	};
 
 	return (
-		<div ref={dropdownRef} className="mention-dropdown">
+		<div ref={dropdownRef} className="agent-client-mention-dropdown">
 			{items.map((item, index) => renderItem(item, index))}
 		</div>
 	);

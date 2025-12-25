@@ -405,12 +405,12 @@ export function ChatInput({
 		if (textarea) {
 			// Remove previous dynamic height classes
 			textarea.classList.remove(
-				"textarea-auto-height",
-				"textarea-expanded",
+				"agent-client-textarea-auto-height",
+				"agent-client-textarea-expanded",
 			);
 
 			// Temporarily use auto to measure
-			textarea.classList.add("textarea-auto-height");
+			textarea.classList.add("agent-client-textarea-auto-height");
 			const scrollHeight = textarea.scrollHeight;
 			const minHeight = 80;
 			const maxHeight = 300;
@@ -423,7 +423,7 @@ export function ChatInput({
 
 			// Apply expanded class if needed
 			if (calculatedHeight > minHeight) {
-				textarea.classList.add("textarea-expanded");
+				textarea.classList.add("agent-client-textarea-expanded");
 				// Set CSS variable for dynamic height
 				textarea.style.setProperty(
 					"--textarea-height",
@@ -433,7 +433,7 @@ export function ChatInput({
 				textarea.style.removeProperty("--textarea-height");
 			}
 
-			textarea.classList.remove("textarea-auto-height");
+			textarea.classList.remove("agent-client-textarea-auto-height");
 		}
 	}, []);
 
@@ -444,19 +444,23 @@ export function ChatInput({
 		(svg: SVGElement) => {
 			// Remove all state classes
 			svg.classList.remove(
-				"icon-sending",
-				"icon-active",
-				"icon-inactive",
+				"agent-client-icon-sending",
+				"agent-client-icon-active",
+				"agent-client-icon-inactive",
 			);
 
 			if (isSending) {
 				// Stop button - always active when sending
-				svg.classList.add("icon-sending");
+				svg.classList.add("agent-client-icon-sending");
 			} else {
 				// Send button - active when has input (text or images)
 				const hasContent =
 					inputValue.trim() !== "" || attachedImages.length > 0;
-				svg.classList.add(hasContent ? "icon-active" : "icon-inactive");
+				svg.classList.add(
+					hasContent
+						? "agent-client-icon-active"
+						: "agent-client-icon-inactive",
+				);
 			}
 		},
 		[isSending, inputValue, attachedImages.length],
@@ -837,7 +841,7 @@ export function ChatInput({
 	const placeholder = `Message ${agentLabel} - @ to mention notes${availableCommands.length > 0 ? ", / for commands" : ""}`;
 
 	return (
-		<div className="chat-input-container">
+		<div className="agent-client-chat-input-container">
 			{/* Mention Dropdown */}
 			{mentions.isOpen && (
 				<SuggestionDropdown
@@ -866,7 +870,7 @@ export function ChatInput({
 
 			{/* Input Box - flexbox container with border */}
 			<div
-				className={`chat-input-box ${isDraggingOver ? "dragging-over" : ""}`}
+				className={`agent-client-chat-input-box ${isDraggingOver ? "agent-client-dragging-over" : ""}`}
 				onDragOver={handleDragOver}
 				onDragEnter={handleDragEnter}
 				onDragLeave={handleDragLeave}
@@ -874,13 +878,13 @@ export function ChatInput({
 			>
 				{/* Auto-mention Badge */}
 				{autoMentionEnabled && autoMention.activeNote && (
-					<div className="auto-mention-inline">
+					<div className="agent-client-auto-mention-inline">
 						<span
-							className={`mention-badge ${autoMention.isDisabled ? "disabled" : ""}`}
+							className={`agent-client-mention-badge ${autoMention.isDisabled ? "agent-client-disabled" : ""}`}
 						>
 							@{autoMention.activeNote.name}
 							{autoMention.activeNote.selection && (
-								<span className="selection-indicator">
+								<span className="agent-client-selection-indicator">
 									{":"}
 									{autoMention.activeNote.selection.from
 										.line + 1}
@@ -891,7 +895,7 @@ export function ChatInput({
 							)}
 						</span>
 						<button
-							className="auto-mention-toggle-btn"
+							className="agent-client-auto-mention-toggle-btn"
 							onClick={(e) => {
 								const newDisabledState =
 									!autoMention.isDisabled;
@@ -919,7 +923,7 @@ export function ChatInput({
 				)}
 
 				{/* Textarea with Hint Overlay */}
-				<div className="textarea-wrapper">
+				<div className="agent-client-textarea-wrapper">
 					<textarea
 						ref={textareaRef}
 						value={inputValue}
@@ -927,13 +931,20 @@ export function ChatInput({
 						onKeyDown={handleKeyDown}
 						onPaste={(e) => void handlePaste(e)}
 						placeholder={placeholder}
-						className={`chat-input-textarea ${autoMentionEnabled && autoMention.activeNote ? "has-auto-mention" : ""}`}
+						className={`agent-client-chat-input-textarea ${autoMentionEnabled && autoMention.activeNote ? "has-auto-mention" : ""}`}
 						rows={1}
 					/>
 					{hintText && (
-						<div className="hint-overlay" aria-hidden="true">
-							<span className="invisible">{commandText}</span>
-							<span className="hint-text">{hintText}</span>
+						<div
+							className="agent-client-hint-overlay"
+							aria-hidden="true"
+						>
+							<span className="agent-client-invisible">
+								{commandText}
+							</span>
+							<span className="agent-client-hint-text">
+								{hintText}
+							</span>
 						</div>
 					)}
 				</div>
@@ -947,12 +958,12 @@ export function ChatInput({
 				)}
 
 				{/* Input Actions (Mode Selector + Model Selector + Send Button) */}
-				<div className="chat-input-actions">
+				<div className="agent-client-chat-input-actions">
 					{/* Mode Selector */}
 					{modes && modes.availableModes.length > 1 && (
 						<div
 							ref={modeDropdownRef}
-							className="mode-selector"
+							className="agent-client-mode-selector"
 							title={
 								modes.availableModes.find(
 									(m) => m.id === modes.currentModeId,
@@ -960,7 +971,7 @@ export function ChatInput({
 							}
 						>
 							<span
-								className="mode-selector-icon"
+								className="agent-client-mode-selector-icon"
 								ref={(el) => {
 									if (el) setIcon(el, "chevron-down");
 								}}
@@ -972,7 +983,7 @@ export function ChatInput({
 					{models && models.availableModels.length > 1 && (
 						<div
 							ref={modelDropdownRef}
-							className="model-selector"
+							className="agent-client-model-selector"
 							title={
 								models.availableModels.find(
 									(m) => m.modelId === models.currentModelId,
@@ -980,7 +991,7 @@ export function ChatInput({
 							}
 						>
 							<span
-								className="model-selector-icon"
+								className="agent-client-model-selector-icon"
 								ref={(el) => {
 									if (el) setIcon(el, "chevron-down");
 								}}
@@ -993,7 +1004,7 @@ export function ChatInput({
 						ref={sendButtonRef}
 						onClick={() => void handleSendOrStop()}
 						disabled={isButtonDisabled}
-						className={`chat-send-button ${isSending ? "sending" : ""} ${isButtonDisabled ? "disabled" : ""}`}
+						className={`agent-client-chat-send-button ${isSending ? "sending" : ""} ${isButtonDisabled ? "agent-client-disabled" : ""}`}
 						title={
 							!isSessionReady
 								? "Connecting..."

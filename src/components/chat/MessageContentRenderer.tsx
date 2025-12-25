@@ -65,12 +65,17 @@ export function MessageContentRenderer({
 
 		case "plan":
 			return (
-				<div className="message-plan">
-					<div className="message-plan-title">📋 Plan</div>
+				<div className="agent-client-message-plan">
+					<div className="agent-client-message-plan-title">
+						📋 Plan
+					</div>
 					{content.entries.map((entry, idx) => (
-						<div key={idx} className="message-plan-entry">
+						<div
+							key={idx}
+							className="agent-client-message-plan-entry"
+						>
 							<span
-								className={`message-plan-entry-icon status-${entry.status}`}
+								className={`agent-client-message-plan-entry-icon agent-client-status-${entry.status}`}
 							>
 								{entry.status === "completed"
 									? "✓"
@@ -95,11 +100,11 @@ export function MessageContentRenderer({
 
 		case "image":
 			return (
-				<div className="message-image">
+				<div className="agent-client-message-image">
 					<img
 						src={`data:${content.mimeType};base64,${content.data}`}
 						alt="Attached image"
-						className="message-image-thumbnail"
+						className="agent-client-message-image-thumbnail"
 					/>
 				</div>
 			);
