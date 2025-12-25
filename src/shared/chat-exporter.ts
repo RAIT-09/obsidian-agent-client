@@ -339,6 +339,7 @@ tags: [agent-client]
 	/**
 	 * Save a base64-encoded image as an attachment file.
 	 * Uses Obsidian's attachment settings to determine the save location.
+	 * Skips saving if the file already exists.
 	 */
 	private async saveImageAsAttachment(
 		base64Data: string,
@@ -360,11 +361,24 @@ tags: [agent-client]
 				exportFilePath,
 			);
 
-		// Convert base64 to binary and save
-		const binaryData = this.base64ToArrayBuffer(base64Data);
-		await this.plugin.app.vault.createBinary(attachmentPath, binaryData);
+		// Check if file already exists by comparing paths
+		// getAvailablePathForAttachment returns the original name if it doesn't exist,
+		// or adds a suffix (e.g., "image_001 1.png") if it does exist.
+		if (attachmentPath.endsWith(imageFileName)) {
+			// File doesn't exist yet - save it
+			const binaryData = this.base64ToArrayBuffer(base64Data);
+			await this.plugin.app.vault.createBinary(
+				attachmentPath,
+				binaryData,
+			);
+			this.logger.log(`Image saved as attachment: ${attachmentPath}`);
+		} else {
+			// File exists - return the original path (without suffix)
+			const originalPath = attachmentPath.replace(/ \d+(\.[^.]+)$/, "$1");
+			this.logger.log(`Image already exists, skipping: ${originalPath}`);
+			return originalPath;
+		}
 
-		this.logger.log(`Image saved as attachment: ${attachmentPath}`);
 		return attachmentPath;
 	}
 
