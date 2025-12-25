@@ -589,9 +589,12 @@ export function ChatInput({
 
 				if (shouldSend) {
 					e.preventDefault();
+					// Use same logic as isButtonDisabled: allow sending if images are attached
 					const buttonDisabled =
 						!isSending &&
-						(inputValue.trim() === "" || !isSessionReady);
+						((inputValue.trim() === "" &&
+							attachedImages.length === 0) ||
+							!isSessionReady);
 					if (!buttonDisabled && !isSending) {
 						void handleSendOrStop();
 					}
@@ -606,6 +609,7 @@ export function ChatInput({
 			isSessionReady,
 			handleSendOrStop,
 			settings.sendMessageShortcut,
+			attachedImages.length,
 		],
 	);
 
