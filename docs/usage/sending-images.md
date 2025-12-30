@@ -4,10 +4,12 @@ Attach images to your messages to provide visual context to the AI agent.
 
 ## Agent Support
 
-::: warning
-Not all agents support image attachments. If your agent doesn't support images, you'll see a notification when attempting to attach one:
+Image attachments are agent-specific. Not all agents support image attachments.
 
-> [Agent Client] This agent does not support image attachments
+::: tip
+If your agent doesn't support images, you'll see a notification when attempting to attach one:
+
+`[Agent Client] This agent does not support image attachments`
 :::
 
 ## Attaching Images
