@@ -60,10 +60,3 @@ If you exceed these limits, a notification will inform you:
 - `[Agent Client] Image too large (max 5MB)`
 - `[Agent Client] Maximum 10 images allowed`
 :::
-
-## Use Cases
-
-- **Screenshots**: Share UI bugs, error messages, or design references
-- **Diagrams**: Include architecture diagrams or flowcharts
-- **Documents**: Share images of documents or handwritten notes
-- **Context**: Provide visual context for your questions
