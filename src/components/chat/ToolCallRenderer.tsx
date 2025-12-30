@@ -398,6 +398,42 @@ interface DiffLine {
 	wordDiff?: { type: "added" | "removed" | "context"; value: string }[];
 }
 
+// Helper function to map diff parts to our internal format
+function mapDiffParts(
+	parts: Diff.Change[],
+): { type: "added" | "removed" | "context"; value: string }[] {
+	return parts.map((part) => ({
+		type: part.added ? "added" : part.removed ? "removed" : "context",
+		value: part.value,
+	}));
+}
+
+// Helper function to render word-level diffs
+function renderWordDiff(
+	wordDiff: { type: "added" | "removed" | "context"; value: string }[],
+) {
+	return (
+		<>
+			{wordDiff.map((part, partIdx) => {
+				if (part.type === "added") {
+					return (
+						<span key={partIdx} className="diff-word-added">
+							{part.value}
+						</span>
+					);
+				} else if (part.type === "removed") {
+					return (
+						<span key={partIdx} className="diff-word-removed">
+							{part.value}
+						</span>
+					);
+				}
+				return <span key={partIdx}>{part.value}</span>;
+			})}
+		</>
+	);
+}
+
 function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 	// Generate diff using the diff library
 	const diffLines = useMemo(() => {
@@ -481,22 +517,9 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 			// If we have a removed line followed by an added line, compute word diff
 			if (current.type === "removed" && next.type === "added") {
 				const wordDiff = Diff.diffWords(current.content, next.content);
-				current.wordDiff = wordDiff.map((part) => ({
-					type: part.added
-						? "added"
-						: part.removed
-							? "removed"
-							: "context",
-					value: part.value,
-				}));
-				next.wordDiff = wordDiff.map((part) => ({
-					type: part.added
-						? "added"
-						: part.removed
-							? "removed"
-							: "context",
-					value: part.value,
-				}));
+				const mappedDiff = mapDiffParts(wordDiff);
+				current.wordDiff = mappedDiff;
+				next.wordDiff = mappedDiff;
 			}
 		}
 
@@ -538,34 +561,9 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 				</span>
 				<span className="diff-line-marker">{marker}</span>
 				<span className="diff-line-content">
-					{line.wordDiff ? (
-						<>
-							{line.wordDiff.map((part, partIdx) => {
-								if (part.type === "added") {
-									return (
-										<span
-											key={partIdx}
-											className="diff-word-added"
-										>
-											{part.value}
-										</span>
-									);
-								} else if (part.type === "removed") {
-									return (
-										<span
-											key={partIdx}
-											className="diff-word-removed"
-										>
-											{part.value}
-										</span>
-									);
-								}
-								return <span key={partIdx}>{part.value}</span>;
-							})}
-						</>
-					) : (
-						line.content
-					)}
+					{line.wordDiff
+						? renderWordDiff(line.wordDiff)
+						: line.content}
 				</span>
 			</div>
 		);
