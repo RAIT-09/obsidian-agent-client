@@ -390,12 +390,31 @@ interface DiffRendererProps {
 	plugin: AgentClientPlugin;
 }
 
+/**
+ * Represents a single line in a diff view
+ * @property type - The type of change: added, removed, or unchanged context
+ * @property oldLineNumber - Line number in the old file (undefined for added lines)
+ * @property newLineNumber - Line number in the new file (undefined for removed lines)
+ * @property content - The text content of the line
+ * @property wordDiff - Optional word-level diff for lines that were modified (adjacent removed+added pairs)
+ */
 interface DiffLine {
 	type: "added" | "removed" | "context";
 	oldLineNumber?: number;
 	newLineNumber?: number;
 	content: string;
 	wordDiff?: { type: "added" | "removed" | "context"; value: string }[];
+}
+
+/**
+ * Check if the diff represents a new file (no old content)
+ */
+function isNewFile(diff: DiffRendererProps["diff"]): boolean {
+	return (
+		diff.oldText === null ||
+		diff.oldText === undefined ||
+		diff.oldText === ""
+	);
 }
 
 // Helper function to map diff parts to our internal format
@@ -413,18 +432,22 @@ function renderWordDiff(
 	wordDiff: { type: "added" | "removed" | "context"; value: string }[],
 	lineType: "added" | "removed",
 ) {
+	// Filter parts based on line type to avoid rendering null elements
+	const filteredParts = wordDiff.filter((part) => {
+		// For removed lines, skip added parts
+		if (lineType === "removed" && part.type === "added") {
+			return false;
+		}
+		// For added lines, skip removed parts
+		if (lineType === "added" && part.type === "removed") {
+			return false;
+		}
+		return true;
+	});
+
 	return (
 		<>
-			{wordDiff.map((part, partIdx) => {
-				// For removed lines, skip added parts
-				if (lineType === "removed" && part.type === "added") {
-					return null;
-				}
-				// For added lines, skip removed parts
-				if (lineType === "added" && part.type === "removed") {
-					return null;
-				}
-
+			{filteredParts.map((part, partIdx) => {
 				if (part.type === "added") {
 					return (
 						<span key={partIdx} className="diff-word-added">
@@ -450,11 +473,7 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 
 	// Generate diff using the diff library
 	const diffLines = useMemo(() => {
-		if (
-			diff.oldText === null ||
-			diff.oldText === undefined ||
-			diff.oldText === ""
-		) {
+		if (isNewFile(diff)) {
 			// New file - all lines are added
 			const lines = diff.newText.split("\n");
 			return lines.map(
@@ -467,10 +486,11 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 		}
 
 		// Use structuredPatch to get a proper unified diff
+		// At this point, oldText is guaranteed to be a non-empty string
 		const patch = Diff.structuredPatch(
 			"old",
 			"new",
-			diff.oldText,
+			diff.oldText!,
 			diff.newText,
 			"",
 			"",
@@ -585,9 +605,7 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 
 	return (
 		<div className="tool-call-diff">
-			{diff.oldText === null ||
-			diff.oldText === undefined ||
-			diff.oldText === "" ? (
+			{isNewFile(diff) ? (
 				<div className="diff-line-info">New file</div>
 			) : null}
 			<div className="tool-call-diff-content">
