@@ -67,6 +67,7 @@ export default defineConfig({
         items: [
           { text: "Basic Usage", link: "/usage/" },
           { text: "Note Mentions", link: "/usage/mentions" },
+          { text: "Sending Images", link: "/usage/sending-images" },
           { text: "Slash Commands", link: "/usage/slash-commands" },
           { text: "Mode Selection", link: "/usage/mode-selection" },
           { text: "Model Selection", link: "/usage/model-selection" },
