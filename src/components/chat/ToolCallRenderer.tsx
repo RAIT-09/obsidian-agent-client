@@ -411,10 +411,20 @@ function mapDiffParts(
 // Helper function to render word-level diffs
 function renderWordDiff(
 	wordDiff: { type: "added" | "removed" | "context"; value: string }[],
+	lineType: "added" | "removed",
 ) {
 	return (
 		<>
 			{wordDiff.map((part, partIdx) => {
+				// For removed lines, skip added parts
+				if (lineType === "removed" && part.type === "added") {
+					return null;
+				}
+				// For added lines, skip removed parts
+				if (lineType === "added" && part.type === "removed") {
+					return null;
+				}
+
 				if (part.type === "added") {
 					return (
 						<span key={partIdx} className="diff-word-added">
@@ -435,6 +445,9 @@ function renderWordDiff(
 }
 
 function DiffRenderer({ diff, plugin }: DiffRendererProps) {
+	// Number of context lines to show around changes
+	const CONTEXT_LINES = 3;
+
 	// Generate diff using the diff library
 	const diffLines = useMemo(() => {
 		if (
@@ -461,7 +474,7 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 			diff.newText,
 			"",
 			"",
-			{ context: 3 }, // Show 3 lines of context
+			{ context: CONTEXT_LINES },
 		);
 
 		const result: DiffLine[] = [];
@@ -470,8 +483,9 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 
 		// Process hunks
 		for (const hunk of patch.hunks) {
-			// Add hunk header if there are multiple hunks or skipped lines
-			if (result.length > 0 || hunk.oldStart > 1 || hunk.newStart > 1) {
+			// Add hunk header only if there are multiple hunks
+			// (helps users see gaps between different sections of changes)
+			if (patch.hunks.length > 1) {
 				result.push({
 					type: "context",
 					content: `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`,
@@ -561,8 +575,8 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 				</span>
 				<span className="diff-line-marker">{marker}</span>
 				<span className="diff-line-content">
-					{line.wordDiff
-						? renderWordDiff(line.wordDiff)
+					{line.wordDiff && line.type !== "context"
+						? renderWordDiff(line.wordDiff, line.type)
 						: line.content}
 				</span>
 			</div>
