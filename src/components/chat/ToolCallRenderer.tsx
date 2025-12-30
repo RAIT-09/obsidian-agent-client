@@ -486,11 +486,12 @@ function DiffRenderer({ diff, plugin }: DiffRendererProps) {
 		}
 
 		// Use structuredPatch to get a proper unified diff
-		// At this point, oldText is guaranteed to be a non-empty string
+		// At this point, oldText is guaranteed to be a non-empty string (checked by isNewFile)
+		const oldText = diff.oldText || "";
 		const patch = Diff.structuredPatch(
 			"old",
 			"new",
-			diff.oldText!,
+			oldText,
 			diff.newText,
 			"",
 			"",
