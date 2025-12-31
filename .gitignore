@@ -41,3 +41,4 @@ docs/.vitepress/cache/
 
 # Personal developer logs
 devlog/
+.obsidian/
