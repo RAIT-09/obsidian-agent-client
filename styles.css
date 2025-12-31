@@ -1023,7 +1023,7 @@ If your plugin does not need CSS, delete this file.
 	max-width: 100%;
 }
 
-.agent-client-markdown-text-renderer .agent-client-markdown-rendered {
+.agent-client-markdown-text-renderer .markdown-rendered {
 	font-size: inherit;
 	overflow-wrap: break-word;
 	word-wrap: break-word;

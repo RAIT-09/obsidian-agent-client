@@ -14,7 +14,7 @@ export function MarkdownTextRenderer({ text, app }: MarkdownTextRendererProps) {
 		const el = containerRef.current;
 		if (!el) return;
 		el.empty?.();
-		el.classList.add("agent-client-markdown-rendered");
+		el.classList.add("markdown-rendered");
 
 		// Create a temporary component for the markdown renderer lifecycle
 		const component = new Component();
