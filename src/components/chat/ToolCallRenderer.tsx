@@ -6,6 +6,7 @@ import type AgentClientPlugin from "../../plugin";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { PermissionRequestSection } from "./PermissionRequestSection";
 import { toRelativePath } from "../../shared/path-utils";
+import * as Diff from "diff";
 // import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 
 interface ToolCallRendererProps {
@@ -389,60 +390,228 @@ interface DiffRendererProps {
 	plugin: AgentClientPlugin;
 }
 
+/**
+ * Represents a single line in a diff view
+ * @property type - The type of change: added, removed, or unchanged context
+ * @property oldLineNumber - Line number in the old file (undefined for added lines)
+ * @property newLineNumber - Line number in the new file (undefined for removed lines)
+ * @property content - The text content of the line
+ * @property wordDiff - Optional word-level diff for lines that were modified (adjacent removed+added pairs)
+ */
+interface DiffLine {
+	type: "added" | "removed" | "context";
+	oldLineNumber?: number;
+	newLineNumber?: number;
+	content: string;
+	wordDiff?: { type: "added" | "removed" | "context"; value: string }[];
+}
+
+/**
+ * Check if the diff represents a new file (no old content)
+ */
+function isNewFile(diff: DiffRendererProps["diff"]): boolean {
+	return (
+		diff.oldText === null ||
+		diff.oldText === undefined ||
+		diff.oldText === ""
+	);
+}
+
+// Helper function to map diff parts to our internal format
+function mapDiffParts(
+	parts: Diff.Change[],
+): { type: "added" | "removed" | "context"; value: string }[] {
+	return parts.map((part) => ({
+		type: part.added ? "added" : part.removed ? "removed" : "context",
+		value: part.value,
+	}));
+}
+
+// Helper function to render word-level diffs
+function renderWordDiff(
+	wordDiff: { type: "added" | "removed" | "context"; value: string }[],
+	lineType: "added" | "removed",
+) {
+	// Filter parts based on line type to avoid rendering null elements
+	const filteredParts = wordDiff.filter((part) => {
+		// For removed lines, skip added parts
+		if (lineType === "removed" && part.type === "added") {
+			return false;
+		}
+		// For added lines, skip removed parts
+		if (lineType === "added" && part.type === "removed") {
+			return false;
+		}
+		return true;
+	});
+
+	return (
+		<>
+			{filteredParts.map((part, partIdx) => {
+				if (part.type === "added") {
+					return (
+						<span key={partIdx} className="diff-word-added">
+							{part.value}
+						</span>
+					);
+				} else if (part.type === "removed") {
+					return (
+						<span key={partIdx} className="diff-word-removed">
+							{part.value}
+						</span>
+					);
+				}
+				return <span key={partIdx}>{part.value}</span>;
+			})}
+		</>
+	);
+}
+
 function DiffRenderer({ diff, plugin }: DiffRendererProps) {
-	// Simple line-based diff
-	const renderDiff = () => {
-		if (
-			diff.oldText === null ||
-			diff.oldText === undefined ||
-			diff.oldText === ""
-		) {
-			// New file
+	// Number of context lines to show around changes
+	const CONTEXT_LINES = 3;
+
+	// Generate diff using the diff library
+	const diffLines = useMemo(() => {
+		if (isNewFile(diff)) {
+			// New file - all lines are added
+			const lines = diff.newText.split("\n");
+			return lines.map(
+				(line, idx): DiffLine => ({
+					type: "added",
+					newLineNumber: idx + 1,
+					content: line,
+				}),
+			);
+		}
+
+		// Use structuredPatch to get a proper unified diff
+		// At this point, oldText is guaranteed to be a non-empty string (checked by isNewFile)
+		const oldText = diff.oldText || "";
+		const patch = Diff.structuredPatch(
+			"old",
+			"new",
+			oldText,
+			diff.newText,
+			"",
+			"",
+			{ context: CONTEXT_LINES },
+		);
+
+		const result: DiffLine[] = [];
+		let oldLineNum = 0;
+		let newLineNum = 0;
+
+		// Process hunks
+		for (const hunk of patch.hunks) {
+			// Add hunk header only if there are multiple hunks
+			// (helps users see gaps between different sections of changes)
+			if (patch.hunks.length > 1) {
+				result.push({
+					type: "context",
+					content: `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`,
+				});
+			}
+
+			oldLineNum = hunk.oldStart;
+			newLineNum = hunk.newStart;
+
+			for (const line of hunk.lines) {
+				const marker = line[0];
+				const content = line.substring(1);
+
+				if (marker === "+") {
+					result.push({
+						type: "added",
+						newLineNumber: newLineNum++,
+						content,
+					});
+				} else if (marker === "-") {
+					result.push({
+						type: "removed",
+						oldLineNumber: oldLineNum++,
+						content,
+					});
+				} else {
+					// Context line (unchanged)
+					result.push({
+						type: "context",
+						oldLineNumber: oldLineNum++,
+						newLineNumber: newLineNum++,
+						content,
+					});
+				}
+			}
+		}
+
+		// Add word-level diff for modified lines that are adjacent
+		for (let i = 0; i < result.length - 1; i++) {
+			const current = result[i];
+			const next = result[i + 1];
+
+			// If we have a removed line followed by an added line, compute word diff
+			if (current.type === "removed" && next.type === "added") {
+				const wordDiff = Diff.diffWords(current.content, next.content);
+				const mappedDiff = mapDiffParts(wordDiff);
+				current.wordDiff = mappedDiff;
+				next.wordDiff = mappedDiff;
+			}
+		}
+
+		return result;
+	}, [diff.oldText, diff.newText]);
+
+	const renderLine = (line: DiffLine, idx: number) => {
+		const isHunkHeader =
+			line.type === "context" && line.content.startsWith("@@");
+
+		if (isHunkHeader) {
 			return (
-				<div className="tool-call-diff-new-file">
-					<div className="diff-line-info">New file</div>
-					{diff.newText.split("\n").map((line, idx) => (
-						<div key={idx} className="diff-line diff-line-added">
-							<span className="diff-line-marker">+</span>
-							<span className="diff-line-content">{line}</span>
-						</div>
-					))}
+				<div key={idx} className="diff-hunk-header">
+					{line.content}
 				</div>
 			);
 		}
 
-		const oldLines = diff.oldText.split("\n");
-		const newLines = diff.newText.split("\n");
+		let lineClass = "diff-line";
+		let marker = " ";
 
-		// Simple comparison: show removed lines then added lines
-		const elements: React.ReactElement[] = [];
+		if (line.type === "added") {
+			lineClass += " diff-line-added";
+			marker = "+";
+		} else if (line.type === "removed") {
+			lineClass += " diff-line-removed";
+			marker = "-";
+		} else {
+			lineClass += " diff-line-context";
+		}
 
-		// Show removed lines
-		oldLines.forEach((line, idx) => {
-			elements.push(
-				<div key={`old-${idx}`} className="diff-line diff-line-removed">
-					<span className="diff-line-marker">-</span>
-					<span className="diff-line-content">{line}</span>
-				</div>,
-			);
-		});
-
-		// Show added lines
-		newLines.forEach((line, idx) => {
-			elements.push(
-				<div key={`new-${idx}`} className="diff-line diff-line-added">
-					<span className="diff-line-marker">+</span>
-					<span className="diff-line-content">{line}</span>
-				</div>,
-			);
-		});
-
-		return elements;
+		return (
+			<div key={idx} className={lineClass}>
+				<span className="diff-line-number diff-line-number-old">
+					{line.oldLineNumber ?? ""}
+				</span>
+				<span className="diff-line-number diff-line-number-new">
+					{line.newLineNumber ?? ""}
+				</span>
+				<span className="diff-line-marker">{marker}</span>
+				<span className="diff-line-content">
+					{line.wordDiff && line.type !== "context"
+						? renderWordDiff(line.wordDiff, line.type)
+						: line.content}
+				</span>
+			</div>
+		);
 	};
 
 	return (
 		<div className="tool-call-diff">
-			<div className="tool-call-diff-content">{renderDiff()}</div>
+			{isNewFile(diff) ? (
+				<div className="diff-line-info">New file</div>
+			) : null}
+			<div className="tool-call-diff-content">
+				{diffLines.map((line, idx) => renderLine(line, idx))}
+			</div>
 		</div>
 	);
 }
