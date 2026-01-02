@@ -467,10 +467,10 @@ function renderWordDiff(
 	);
 }
 
-function DiffRenderer({ diff }: DiffRendererProps) {
-	// Number of context lines to show around changes
-	const CONTEXT_LINES = 3;
+// Number of context lines to show around changes
+const CONTEXT_LINES = 3;
 
+function DiffRenderer({ diff }: DiffRendererProps) {
 	// Generate diff using the diff library
 	const diffLines = useMemo(() => {
 		if (isNewFile(diff)) {
