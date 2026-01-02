@@ -40,4 +40,4 @@ docs/.vitepress/dist/
 docs/.vitepress/cache/
 
 # Personal developer logs
-devlog/
+dev/

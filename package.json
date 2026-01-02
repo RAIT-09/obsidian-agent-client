@@ -39,6 +39,7 @@
 		"@agentclientprotocol/sdk": "^0.11.0",
 		"@codemirror/state": "^6.5.2",
 		"@codemirror/view": "^6.38.7",
+		"diff": "^8.0.2",
 		"react": "^19.1.1",
 		"react-dom": "^19.1.1",
 		"semver": "^7.7.3"
