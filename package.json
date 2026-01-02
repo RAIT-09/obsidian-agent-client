@@ -19,7 +19,6 @@
 	"author": "",
 	"license": "Apache-2.0",
 	"devDependencies": {
-		"@types/diff": "^7.0.2",
 		"@types/node": "^16.11.6",
 		"@types/react": "^19.1.13",
 		"@types/react-dom": "^19.1.9",
