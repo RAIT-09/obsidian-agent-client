@@ -467,7 +467,7 @@ function renderWordDiff(
 	);
 }
 
-function DiffRenderer({ diff, plugin }: DiffRendererProps) {
+function DiffRenderer({ diff }: DiffRendererProps) {
 	// Number of context lines to show around changes
 	const CONTEXT_LINES = 3;
 
