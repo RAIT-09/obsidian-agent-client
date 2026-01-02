@@ -596,7 +596,7 @@ function DiffRenderer({ diff }: DiffRendererProps) {
 				</span>
 				<span className="diff-line-marker">{marker}</span>
 				<span className="diff-line-content">
-					{line.wordDiff
+					{line.wordDiff && (line.type === "added" || line.type === "removed")
 						? renderWordDiff(line.wordDiff, line.type)
 						: line.content}
 				</span>
