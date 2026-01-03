@@ -18,19 +18,15 @@ export class NoteMentionService {
 		// Listen for vault changes to keep index up to date
 		this.eventRefs.push(
 			this.plugin.app.vault.on("create", (file) => {
-				if (file instanceof TFile) {
-					this.rebuildIndex();
-				}
+				this.rebuildIndex();
 			}),
 		);
 		this.eventRefs.push(
 			this.plugin.app.vault.on("delete", () => this.rebuildIndex()),
 		);
 		this.eventRefs.push(
-			this.plugin.app.vault.on("rename", (file) => {
-				if (file instanceof TFile) {
-					this.rebuildIndex();
-				}
+			this.plugin.app.vault.on("rename", () => {
+				this.rebuildIndex();
 			}),
 		);
 	}
@@ -58,7 +54,7 @@ export class NoteMentionService {
 			"[DEBUG] NoteMentionService.searchNotes called with:",
 			query,
 		);
-		this.logger.log("[DEBUG] Total files indexed:", this.files.length);
+		this.logger.log(`[DEBUG] Total indexed files: ${this.files.length}`);
 
 		if (!query.trim()) {
 			this.logger.log("[DEBUG] Empty query, returning recent files");
@@ -67,6 +63,7 @@ export class NoteMentionService {
 				.slice()
 				.sort((a, b) => (b.stat?.mtime || 0) - (a.stat?.mtime || 0))
 				.slice(0, 20);
+
 			this.logger.log(
 				"[DEBUG] Recent files:",
 				recentFiles.map((f) => f.name),
@@ -78,7 +75,7 @@ export class NoteMentionService {
 		const fuzzySearch = prepareFuzzySearch(query.trim());
 
 		// Score each file based on multiple fields
-		const scored: Array<{ file: TFile; score: number }> = this.files.map(
+		const scoredFiles: Array<{ item: TFile; score: number }> = this.files.map(
 			(file) => {
 				const basename = file.basename;
 				const path = file.path;
@@ -107,15 +104,16 @@ export class NoteMentionService {
 					}
 				}
 
-				return { file, score: bestScore };
+				return { item: file, score: bestScore };
 			},
 		);
 
-		return scored
+		// Sort and return top matches
+		return scoredFiles
 			.filter((item) => item.score > -Infinity)
 			.sort((a, b) => b.score - a.score)
 			.slice(0, 20)
-			.map((item) => item.file);
+			.map((item) => item.item);
 	}
 
 	getAllFiles(): TFile[] {

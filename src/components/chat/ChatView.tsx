@@ -725,6 +725,30 @@ function ChatComponent({
 		handleStopGeneration,
 	]);
 
+	// Get current session title from session history
+	const currentSessionTitle = useMemo(() => {
+		if (!session.sessionId) return null;
+		const sessionInfo = sessionHistory.sessions.find(
+			(s) => s.sessionId === session.sessionId,
+		);
+		return sessionInfo?.title || null;
+	}, [session.sessionId, sessionHistory.sessions]);
+
+	// Handle session rename
+	const handleRenameCurrentSession = useCallback(
+		async (sessionId: string, newTitle: string) => {
+			try {
+				logger.log(`[ChatView] Renaming current session: ${sessionId} to "${newTitle}"`);
+				await sessionHistory.renameSession(sessionId, newTitle);
+				new Notice("[Agent Client] Session renamed");
+			} catch (error) {
+				new Notice("[Agent Client] Failed to rename session");
+				logger.error("Session rename error:", error);
+			}
+		},
+		[sessionHistory, logger],
+	);
+
 	// ============================================================
 	// Render
 	// ============================================================
@@ -734,10 +758,13 @@ function ChatComponent({
 				agentLabel={activeAgentLabel}
 				isUpdateAvailable={isUpdateAvailable}
 				hasHistoryCapability={hasHistoryCapability}
+				sessionTitle={currentSessionTitle}
+				sessionId={session.sessionId}
 				onNewChat={() => void handleNewChat()}
 				onExportChat={() => void handleExportChat()}
 				onOpenSettings={handleOpenSettings}
 				onOpenHistory={handleOpenHistory}
+				onRenameSession={handleRenameCurrentSession}
 			/>
 
 			<ChatMessages

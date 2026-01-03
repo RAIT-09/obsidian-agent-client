@@ -196,11 +196,11 @@ export class SessionHistoryModal extends Modal {
 				cls: "session-history-item-actions",
 			});
 
-			// Resume button
-			const resumeButton = actionsContainer.createEl("button", {
-				text: "Resume",
-				cls: "session-history-action-button session-history-resume-button",
+			// Resume button (icon)
+			const resumeButton = actionsContainer.createDiv({
+				cls: "session-history-action-icon session-history-resume-icon",
 			});
+			setIcon(resumeButton, "play");
 			resumeButton.setAttribute("aria-label", "Resume session (continue original)");
 			resumeButton.addEventListener("click", (e) => {
 				e.stopPropagation();
@@ -212,11 +212,11 @@ export class SessionHistoryModal extends Modal {
 				);
 			});
 
-			// Fork button
-			const forkButton = actionsContainer.createEl("button", {
-				text: "Fork",
-				cls: "session-history-action-button session-history-fork-button",
+			// Fork button (icon)
+			const forkButton = actionsContainer.createDiv({
+				cls: "session-history-action-icon session-history-fork-icon",
 			});
+			setIcon(forkButton, "git-branch");
 			forkButton.setAttribute("aria-label", "Fork session (create new branch)");
 			forkButton.addEventListener("click", (e) => {
 				e.stopPropagation();
@@ -228,9 +228,9 @@ export class SessionHistoryModal extends Modal {
 				);
 			});
 
-			// Rename button
+			// Rename button (icon)
 			const renameButton = actionsContainer.createDiv({
-				cls: "session-history-item-rename",
+				cls: "session-history-action-icon session-history-rename-icon",
 			});
 			setIcon(renameButton, "pencil");
 			renameButton.setAttribute("aria-label", "Rename session");
@@ -245,9 +245,9 @@ export class SessionHistoryModal extends Modal {
 				}
 			});
 
-			// Delete button
+			// Delete button (icon)
 			const deleteButton = actionsContainer.createDiv({
-				cls: "session-history-item-delete",
+				cls: "session-history-action-icon session-history-delete-icon",
 			});
 			setIcon(deleteButton, "trash-2");
 			deleteButton.setAttribute("aria-label", "Delete session");
