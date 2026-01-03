@@ -38,3 +38,6 @@ data.json
 # VitePress build output
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+
+# Personal developer logs
+dev/
