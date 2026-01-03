@@ -187,6 +187,11 @@ function ChatComponent({
 				return;
 			}
 
+			// Cancel ongoing generation before starting new chat
+			if (chat.isSending) {
+				await agentSession.cancelOperation();
+			}
+
 			logger.log(
 				`[Debug] Creating new session${isAgentSwitch ? ` with agent: ${requestedAgentId}` : ""}...`,
 			);
