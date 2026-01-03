@@ -767,7 +767,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		);
 
 		try {
-			await this.connection.setSessionModel({
+			await this.connection.unstable_setSessionModel({
 				sessionId,
 				modelId,
 			});
