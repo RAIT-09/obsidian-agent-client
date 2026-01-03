@@ -1045,7 +1045,7 @@ If your plugin does not need CSS, delete this file.
 	overflow: auto;
 }
 
-.diff-line-info {
+.agent-client-diff-line-info {
 	padding: 4px 12px;
 	background-color: var(--background-secondary);
 	color: var(--text-muted);
@@ -1053,14 +1053,14 @@ If your plugin does not need CSS, delete this file.
 	font-style: italic;
 }
 
-.diff-line {
+.agent-client-diff-line {
 	display: flex;
 	align-items: flex-start;
 	line-height: 1.5;
 	user-select: text;
 }
 
-.diff-line-number {
+.agent-client-diff-line-number {
 	display: inline-block;
 	width: 40px;
 	padding: 2px 8px;
@@ -1071,15 +1071,15 @@ If your plugin does not need CSS, delete this file.
 	font-size: 11px;
 }
 
-.diff-line-number-old {
+.agent-client-diff-line-number-old {
 	border-right: 1px solid var(--background-modifier-border);
 }
 
-.diff-line-number-new {
+.agent-client-diff-line-number-new {
 	border-right: 1px solid var(--background-modifier-border);
 }
 
-.diff-line-marker {
+.agent-client-diff-line-marker {
 	display: inline-block;
 	width: 20px;
 	padding: 2px 4px;
@@ -1112,16 +1112,16 @@ If your plugin does not need CSS, delete this file.
 	color: var(--color-red);
 }
 
-.diff-line-context {
+.agent-client-diff-line-context {
 	background-color: transparent;
 }
 
-.diff-line-context .diff-line-marker {
+.agent-client-diff-line-context .agent-client-diff-line-marker {
 	color: var(--text-faint);
 }
 
 /* Hunk header styling */
-.diff-hunk-header {
+.agent-client-diff-hunk-header {
 	padding: 4px 12px;
 	background-color: var(--background-secondary-alt);
 	color: var(--text-muted);
@@ -1132,12 +1132,12 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* Word-level diff highlighting */
-.diff-word-added {
+.agent-client-diff-word-added {
 	background-color: rgba(46, 160, 67, 0.4);
 	font-weight: 600;
 }
 
-.diff-word-removed {
+.agent-client-diff-word-removed {
 	background-color: rgba(248, 81, 73, 0.4);
 	font-weight: 600;
 	text-decoration: line-through;

@@ -452,13 +452,19 @@ function renderWordDiff(
 			{filteredParts.map((part, partIdx) => {
 				if (part.type === "added") {
 					return (
-						<span key={partIdx} className="diff-word-added">
+						<span
+							key={partIdx}
+							className="agent-client-diff-word-added"
+						>
 							{part.value}
 						</span>
 					);
 				} else if (part.type === "removed") {
 					return (
-						<span key={partIdx} className="diff-word-removed">
+						<span
+							key={partIdx}
+							className="agent-client-diff-word-removed"
+						>
 							{part.value}
 						</span>
 					);
@@ -569,35 +575,35 @@ function DiffRenderer({ diff }: DiffRendererProps) {
 
 		if (isHunkHeader) {
 			return (
-				<div key={idx} className="diff-hunk-header">
+				<div key={idx} className="agent-client-diff-hunk-header">
 					{line.content}
 				</div>
 			);
 		}
 
-		let lineClass = "diff-line";
+		let lineClass = "agent-client-diff-line";
 		let marker = " ";
 
 		if (line.type === "added") {
-			lineClass += " diff-line-added";
+			lineClass += " agent-client-diff-line-added";
 			marker = "+";
 		} else if (line.type === "removed") {
-			lineClass += " diff-line-removed";
+			lineClass += " agent-client-diff-line-removed";
 			marker = "-";
 		} else {
-			lineClass += " diff-line-context";
+			lineClass += " agent-client-diff-line-context";
 		}
 
 		return (
 			<div key={idx} className={lineClass}>
-				<span className="diff-line-number diff-line-number-old">
+				<span className="agent-client-diff-line-number agent-client-diff-line-number-old">
 					{line.oldLineNumber ?? ""}
 				</span>
-				<span className="diff-line-number diff-line-number-new">
+				<span className="agent-client-diff-line-number agent-client-diff-line-number-new">
 					{line.newLineNumber ?? ""}
 				</span>
-				<span className="diff-line-marker">{marker}</span>
-				<span className="diff-line-content">
+				<span className="agent-client-diff-line-marker">{marker}</span>
+				<span className="agent-client-diff-line-content">
 					{line.wordDiff &&
 					(line.type === "added" || line.type === "removed")
 						? renderWordDiff(line.wordDiff, line.type)
@@ -608,11 +614,11 @@ function DiffRenderer({ diff }: DiffRendererProps) {
 	};
 
 	return (
-		<div className="tool-call-diff">
+		<div className="agent-client-tool-call-diff">
 			{isNewFile(diff) ? (
-				<div className="diff-line-info">New file</div>
+				<div className="agent-client-diff-line-info">New file</div>
 			) : null}
-			<div className="tool-call-diff-content">
+			<div className="agent-client-tool-call-diff-content">
 				{diffLines.map((line, idx) => renderLine(line, idx))}
 			</div>
 		</div>
