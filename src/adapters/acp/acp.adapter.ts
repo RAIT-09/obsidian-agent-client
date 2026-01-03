@@ -876,13 +876,15 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	 */
 	sessionUpdate(params: acp.SessionNotification): Promise<void> {
 		const update = params.update;
-		this.logger.log("[AcpAdapter] sessionUpdate:", update);
+		const sessionId = params.sessionId;
+		this.logger.log("[AcpAdapter] sessionUpdate:", { sessionId, update });
 
 		switch (update.sessionUpdate) {
 			case "agent_message_chunk":
 				if (update.content.type === "text") {
 					this.sessionUpdateCallback?.({
 						type: "agent_message_chunk",
+						sessionId,
 						text: update.content.text,
 					});
 				}
@@ -892,6 +894,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				if (update.content.type === "text") {
 					this.sessionUpdateCallback?.({
 						type: "agent_thought_chunk",
+						sessionId,
 						text: update.content.text,
 					});
 				}
@@ -901,6 +904,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			case "tool_call_update": {
 				this.sessionUpdateCallback?.({
 					type: update.sessionUpdate,
+					sessionId,
 					toolCallId: update.toolCallId,
 					title: update.title ?? undefined,
 					status: update.status || "pending",
@@ -914,6 +918,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			case "plan":
 				this.sessionUpdateCallback?.({
 					type: "plan",
+					sessionId,
 					entries: update.entries,
 				});
 				break;
@@ -934,6 +939,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 				this.sessionUpdateCallback?.({
 					type: "available_commands_update",
+					sessionId,
 					commands,
 				});
 				break;
@@ -946,6 +952,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 				this.sessionUpdateCallback?.({
 					type: "current_mode_update",
+					sessionId,
 					currentModeId: update.currentModeId,
 				});
 				break;
@@ -1065,6 +1072,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		// Generate unique ID for this permission request
 		const requestId = crypto.randomUUID();
 		const toolCallId = params.toolCall?.toolCallId || crypto.randomUUID();
+		const sessionId = params.sessionId;
 
 		const normalizedOptions: PermissionOption[] = params.options.map(
 			(option) => {
@@ -1106,6 +1114,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		const toolCallInfo = params.toolCall;
 		this.sessionUpdateCallback?.({
 			type: "tool_call",
+			sessionId,
 			toolCallId: toolCallId,
 			title: toolCallInfo?.title ?? undefined,
 			status: toolCallInfo?.status || "pending",

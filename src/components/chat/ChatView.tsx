@@ -187,6 +187,11 @@ function ChatComponent({
 				return;
 			}
 
+			// Cancel ongoing generation before starting new chat
+			if (chat.isSending) {
+				await agentSession.cancelOperation();
+			}
+
 			logger.log(
 				`[Debug] Creating new session${isAgentSwitch ? ` with agent: ${requestedAgentId}` : ""}...`,
 			);
@@ -341,6 +346,14 @@ function ChatComponent({
 	// Register unified session update callback
 	useEffect(() => {
 		acpAdapter.onSessionUpdate((update) => {
+			// Filter by sessionId - ignore updates from old sessions
+			if (session.sessionId && update.sessionId !== session.sessionId) {
+				logger.log(
+					`[ChatView] Ignoring update for old session: ${update.sessionId} (current: ${session.sessionId})`,
+				);
+				return;
+			}
+
 			// Route message-related updates to useChat
 			chat.handleSessionUpdate(update);
 
@@ -353,6 +366,8 @@ function ChatComponent({
 		});
 	}, [
 		acpAdapter,
+		session.sessionId,
+		logger,
 		chat.handleSessionUpdate,
 		agentSession.updateAvailableCommands,
 		agentSession.updateCurrentMode,
