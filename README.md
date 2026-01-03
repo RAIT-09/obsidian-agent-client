@@ -24,6 +24,7 @@ https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 ## ✨ Features
 
 - 🔗 **Direct Agent Integration**: Chat with AI coding agents in a dedicated right-side panel
+- 🖼️ **Image Attachments**: Paste or drag-and-drop images into the chat to send them with your message
 - 📝 **Note Mention Support**: Automatically include the active note in conversations, or manually use `@notename` to reference specific notes
 - ⚡ **Slash Command Support**: Use `/` commands to browse and trigger actions provided by your current agent
 - 🔄 **Multi-Agent Support**: Switch between Claude Code, Codex, Gemini CLI, and custom agents
@@ -206,7 +207,6 @@ npm run format
 ```
 
 ## 🗺️ Roadmap
-- **Image Sending**: Send images to agents directly from the chat
 - **Edit Tracking**: Automatically follow the agent's edits — open affected notes and move the cursor as they edit
 - **Chat History Access**: Browse, search, and restore previous chat sessions with agents
 - **Multi-Instance Support**: Run multiple agents simultaneously in separate panels
