@@ -64,6 +64,19 @@ export interface UseChatReturn {
 	clearMessages: () => void;
 
 	/**
+	 * Set initial messages from loaded session history.
+	 * Converts conversation history to ChatMessage format.
+	 * @param history - Conversation history from loadSession
+	 */
+	setInitialMessages: (
+		history: Array<{
+			role: string;
+			content: Array<{ type: string; text: string }>;
+			timestamp?: string;
+		}>,
+	) => void;
+
+	/**
 	 * Clear the current error.
 	 */
 	clearError: () => void;
@@ -406,6 +419,36 @@ export function useChat(
 	}, []);
 
 	/**
+	 * Set initial messages from loaded session history.
+	 * Converts conversation history to ChatMessage format.
+	 */
+	const setInitialMessages = useCallback(
+		(
+			history: Array<{
+				role: string;
+				content: Array<{ type: string; text: string }>;
+				timestamp?: string;
+			}>,
+		): void => {
+			// Convert conversation history to ChatMessage format
+			const chatMessages: ChatMessage[] = history.map((msg) => ({
+				id: crypto.randomUUID(),
+				role: msg.role as "user" | "assistant",
+				content: msg.content.map((c) => ({
+					type: c.type as "text",
+					text: c.text,
+				})),
+				timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+			}));
+
+			setMessages(chatMessages);
+			setIsSending(false);
+			setErrorInfo(null);
+		},
+		[],
+	);
+
+	/**
 	 * Clear the current error.
 	 */
 	const clearError = useCallback((): void => {
@@ -546,6 +589,7 @@ export function useChat(
 		errorInfo,
 		sendMessage,
 		clearMessages,
+		setInitialMessages,
 		clearError,
 		addMessage,
 		updateLastMessage,

@@ -18,7 +18,7 @@ export class NoteMentionService {
 		// Listen for vault changes to keep index up to date
 		this.eventRefs.push(
 			this.plugin.app.vault.on("create", (file) => {
-				if (file instanceof TFile && file.extension === "md") {
+				if (file instanceof TFile) {
 					this.rebuildIndex();
 				}
 			}),
@@ -28,7 +28,7 @@ export class NoteMentionService {
 		);
 		this.eventRefs.push(
 			this.plugin.app.vault.on("rename", (file) => {
-				if (file instanceof TFile && file.extension === "md") {
+				if (file instanceof TFile) {
 					this.rebuildIndex();
 				}
 			}),
@@ -46,7 +46,7 @@ export class NoteMentionService {
 	}
 
 	private rebuildIndex() {
-		this.files = this.plugin.app.vault.getMarkdownFiles();
+		this.files = this.plugin.app.vault.getFiles();
 		this.lastBuild = Date.now();
 		this.logger.log(
 			`[NoteMentionService] Rebuilt index with ${this.files.length} files`,
