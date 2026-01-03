@@ -20,6 +20,19 @@ import type {
 import type { SlashCommand } from "./chat-session";
 
 // ============================================================================
+// Base Type
+// ============================================================================
+
+/**
+ * Base interface for all session updates.
+ * Contains the session ID that the update belongs to.
+ */
+interface SessionUpdateBase {
+	/** The session ID this update belongs to */
+	sessionId: string;
+}
+
+// ============================================================================
 // Session Update Types
 // ============================================================================
 
@@ -27,7 +40,7 @@ import type { SlashCommand } from "./chat-session";
  * Text chunk from agent's message stream.
  * Used for streaming text responses.
  */
-export interface AgentMessageChunk {
+export interface AgentMessageChunk extends SessionUpdateBase {
 	type: "agent_message_chunk";
 	text: string;
 }
@@ -36,7 +49,7 @@ export interface AgentMessageChunk {
  * Text chunk from agent's internal reasoning.
  * Used for streaming thought/reasoning content.
  */
-export interface AgentThoughtChunk {
+export interface AgentThoughtChunk extends SessionUpdateBase {
 	type: "agent_thought_chunk";
 	text: string;
 }
@@ -45,7 +58,7 @@ export interface AgentThoughtChunk {
  * New tool call event.
  * Creates a new tool call in the message history.
  */
-export interface ToolCall {
+export interface ToolCall extends SessionUpdateBase {
 	type: "tool_call";
 	toolCallId: string;
 	title?: string;
@@ -67,7 +80,7 @@ export interface ToolCall {
  * Updates an existing tool call with new information.
  * Semantically identical to ToolCall for processing purposes.
  */
-export interface ToolCallUpdate {
+export interface ToolCallUpdate extends SessionUpdateBase {
 	type: "tool_call_update";
 	toolCallId: string;
 	title?: string;
@@ -88,7 +101,7 @@ export interface ToolCallUpdate {
  * Agent's execution plan.
  * Contains a list of tasks the agent intends to accomplish.
  */
-export interface Plan {
+export interface Plan extends SessionUpdateBase {
 	type: "plan";
 	entries: PlanEntry[];
 }
@@ -97,7 +110,7 @@ export interface Plan {
  * Update to available slash commands.
  * Sent when the agent's available commands change.
  */
-export interface AvailableCommandsUpdate {
+export interface AvailableCommandsUpdate extends SessionUpdateBase {
 	type: "available_commands_update";
 	commands: SlashCommand[];
 }
@@ -106,7 +119,7 @@ export interface AvailableCommandsUpdate {
  * Update to current session mode.
  * Sent when the agent switches to a different mode.
  */
-export interface CurrentModeUpdate {
+export interface CurrentModeUpdate extends SessionUpdateBase {
 	type: "current_mode_update";
 	currentModeId: string;
 }
@@ -129,6 +142,10 @@ export interface CurrentModeUpdate {
  *
  * Note: user_message_chunk is not included as it's not typically processed
  * by the client in the same way (user messages are handled directly).
+ *
+ * All session update types include a sessionId field to identify which
+ * session the update belongs to. This enables filtering/routing of updates
+ * in multi-session scenarios.
  */
 export type SessionUpdate =
 	| AgentMessageChunk
