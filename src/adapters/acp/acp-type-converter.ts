@@ -1,5 +1,6 @@
 import * as acp from "@agentclientprotocol/sdk";
 import type { ToolCallContent } from "../../domain/models/chat-message";
+import type { PromptContent } from "../../domain/models/prompt-content";
 
 /**
  * Type converter between ACP Protocol types and Domain types.
@@ -43,5 +44,27 @@ export class AcpTypeConverter {
 		}
 
 		return converted.length > 0 ? converted : undefined;
+	}
+
+	/**
+	 * Convert domain PromptContent to ACP ContentBlock.
+	 *
+	 * This converts our domain-layer prompt content to the ACP protocol format
+	 * for sending to the agent.
+	 *
+	 * @param content - Domain prompt content (text or image)
+	 * @returns ACP ContentBlock for use with the prompt API
+	 */
+	static toAcpContentBlock(content: PromptContent): acp.ContentBlock {
+		switch (content.type) {
+			case "text":
+				return { type: "text", text: content.text };
+			case "image":
+				return {
+					type: "image",
+					data: content.data,
+					mimeType: content.mimeType,
+				};
+		}
 	}
 }

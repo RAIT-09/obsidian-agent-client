@@ -39,13 +39,13 @@ export function PermissionRequestSection({
 	);
 
 	return (
-		<div className="message-permission-request">
+		<div className="agent-client-message-permission-request">
 			{isActive && !isSelected && !isCancelled && (
-				<div className="message-permission-request-options">
+				<div className="agent-client-message-permission-request-options">
 					{permissionRequest.options.map((option) => (
 						<button
 							key={option.optionId}
-							className={`permission-option ${option.kind ? `permission-kind-${option.kind}` : ""}`}
+							className={`agent-client-permission-option ${option.kind ? `agent-client-permission-kind-${option.kind}` : ""}`}
 							onClick={() => {
 								// Update local UI state immediately for feedback
 								if (onOptionSelected) {
@@ -71,12 +71,12 @@ export function PermissionRequestSection({
 				</div>
 			)}
 			{isSelected && selectedOption && (
-				<div className="message-permission-request-result selected">
+				<div className="agent-client-message-permission-request-result agent-client-selected">
 					✓ Selected: {selectedOption.name}
 				</div>
 			)}
 			{isCancelled && (
-				<div className="message-permission-request-result cancelled">
+				<div className="agent-client-message-permission-request-result agent-client-cancelled">
 					⚠ Cancelled: Permission request was cancelled
 				</div>
 			)}

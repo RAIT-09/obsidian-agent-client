@@ -33,7 +33,7 @@ export function TextWithMentions({
 		parts.push(
 			<span
 				key="auto-mention"
-				className="text-mention"
+				className="agent-client-text-mention"
 				onClick={() => {
 					void plugin.app.workspace.openLinkText(
 						autoMentionContext.notePath,
@@ -69,7 +69,7 @@ export function TextWithMentions({
 			parts.push(
 				<span
 					key={match.index}
-					className="text-mention"
+					className="agent-client-text-mention"
 					onClick={() => {
 						void plugin.app.workspace.openLinkText(file.path, "");
 					}}
@@ -90,5 +90,5 @@ export function TextWithMentions({
 		parts.push(text.slice(lastIndex));
 	}
 
-	return <div className="text-with-mentions">{parts}</div>;
+	return <div className="agent-client-text-with-mentions">{parts}</div>;
 }

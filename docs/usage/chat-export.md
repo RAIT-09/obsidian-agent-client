@@ -21,6 +21,9 @@ Configure export options in **Settings → Agent Client → Export**:
 | **Auto-export on new chat** | Automatically export when starting a new chat |
 | **Auto-export on close chat** | Automatically export when closing the chat view |
 | **Open note after export** | Automatically open the exported note |
+| **Include images** | Save images attached in messages (default: enabled) |
+| **Image location** | Where to save images: Obsidian's attachment folder, custom folder, or embed as Base64 |
+| **Custom image folder** | Folder path for images when using custom location (only shown when "Custom folder" is selected) |
 
 ## Export Format
 
@@ -62,6 +65,7 @@ This is an Obsidian plugin that integrates AI coding agents (Claude Code, Codex,
 ## What Gets Exported
 
 - **Messages**: Full conversation history with timestamps
+- **Images**: Attached images (saved as files or embedded, based on settings)
 - **Tool calls**: Tool name, locations, status, and diffs
 - **Thinking**: Agent's reasoning (as collapsible callouts)
 - **Plans**: Task plans with status indicators

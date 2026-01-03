@@ -103,27 +103,31 @@ export function TerminalRenderer({
 	}, [isRunning]);
 
 	return (
-		<div className="terminal-renderer">
-			<div className="terminal-renderer-header">
+		<div className="agent-client-terminal-renderer">
+			<div className="agent-client-terminal-renderer-header">
 				🖥️ Terminal {terminalId.slice(0, 8)}
 				{isRunning ? (
-					<span className="terminal-status running">● RUNNING</span>
+					<span className="agent-client-terminal-status agent-client-running">
+						● RUNNING
+					</span>
 				) : isCancelled ? (
-					<span className="terminal-status cancelled">
+					<span className="agent-client-terminal-status agent-client-cancelled">
 						● CANCELLED
 					</span>
 				) : (
-					<span className="terminal-status finished">● FINISHED</span>
+					<span className="agent-client-terminal-status agent-client-finished">
+						● FINISHED
+					</span>
 				)}
 			</div>
 
-			<div className="terminal-renderer-output">
+			<div className="agent-client-terminal-renderer-output">
 				{output || (isRunning ? "Waiting for output..." : "No output")}
 			</div>
 
 			{exitStatus && (
 				<div
-					className={`terminal-renderer-exit ${exitStatus.exitCode === 0 ? "success" : "error"}`}
+					className={`agent-client-terminal-renderer-exit ${exitStatus.exitCode === 0 ? "agent-client-success" : "agent-client-error"}`}
 				>
 					Exit Code: {exitStatus.exitCode}
 					{exitStatus.signal && ` | Signal: ${exitStatus.signal}`}

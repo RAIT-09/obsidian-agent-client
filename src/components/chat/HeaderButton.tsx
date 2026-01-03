@@ -26,7 +26,7 @@ export function HeaderButton({
 			ref={buttonRef}
 			title={tooltip}
 			onClick={onClick}
-			className="header-button"
+			className="agent-client-header-button"
 		/>
 	);
 }

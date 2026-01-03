@@ -13,17 +13,17 @@ export function CollapsibleThought({ text, plugin }: CollapsibleThoughtProps) {
 
 	return (
 		<div
-			className="collapsible-thought"
+			className="agent-client-collapsible-thought"
 			onClick={() => setIsExpanded(!isExpanded)}
 		>
-			<div className="collapsible-thought-header">
+			<div className="agent-client-collapsible-thought-header">
 				💡Thinking
-				<span className="collapsible-thought-icon">
+				<span className="agent-client-collapsible-thought-icon">
 					{isExpanded ? "▼" : "▶"}
 				</span>
 			</div>
 			{isExpanded && (
-				<div className="collapsible-thought-content">
+				<div className="agent-client-collapsible-thought-content">
 					<MarkdownTextRenderer text={text} app={plugin.app} />
 				</div>
 			)}

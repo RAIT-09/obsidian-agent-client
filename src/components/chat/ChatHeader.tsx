@@ -33,12 +33,16 @@ export function ChatHeader({
 	onOpenSettings,
 }: ChatHeaderProps) {
 	return (
-		<div className="chat-view-header">
-			<h3 className="chat-view-header-title">{agentLabel}</h3>
+		<div className="agent-client-chat-view-header">
+			<h3 className="agent-client-chat-view-header-title">
+				{agentLabel}
+			</h3>
 			{isUpdateAvailable && (
-				<p className="chat-view-header-update">Update available!</p>
+				<p className="agent-client-chat-view-header-update">
+					Update available!
+				</p>
 			)}
-			<div className="chat-view-header-actions">
+			<div className="agent-client-chat-view-header-actions">
 				<HeaderButton
 					iconName="plus"
 					tooltip="New chat"

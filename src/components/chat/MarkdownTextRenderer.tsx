@@ -28,5 +28,10 @@ export function MarkdownTextRenderer({ text, app }: MarkdownTextRendererProps) {
 		};
 	}, [text, app]);
 
-	return <div ref={containerRef} className="markdown-text-renderer" />;
+	return (
+		<div
+			ref={containerRef}
+			className="agent-client-markdown-text-renderer"
+		/>
+	);
 }

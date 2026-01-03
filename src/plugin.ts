@@ -23,6 +23,13 @@ import {
 // Re-export for backward compatibility
 export type { AgentEnvVar, CustomAgentSettings };
 
+/**
+ * Send message shortcut configuration.
+ * - 'enter': Enter to send, Shift+Enter for newline (default)
+ * - 'cmd-enter': Cmd/Ctrl+Enter to send, Enter for newline
+ */
+export type SendMessageShortcut = "enter" | "cmd-enter";
+
 export interface AgentClientPluginSettings {
 	gemini: GeminiAgentSettings;
 	claude: ClaudeAgentSettings;
@@ -39,10 +46,15 @@ export interface AgentClientPluginSettings {
 		autoExportOnNewChat: boolean;
 		autoExportOnCloseChat: boolean;
 		openFileAfterExport: boolean;
+		includeImages: boolean;
+		imageLocation: "obsidian" | "custom" | "base64";
+		imageCustomFolder: string;
 	};
 	// WSL settings (Windows only)
 	windowsWslMode: boolean;
 	windowsWslDistribution?: string;
+	// Input behavior
+	sendMessageShortcut: SendMessageShortcut;
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -82,9 +94,13 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		autoExportOnNewChat: false,
 		autoExportOnCloseChat: false,
 		openFileAfterExport: true,
+		includeImages: true,
+		imageLocation: "obsidian",
+		imageCustomFolder: "Agent Client",
 	},
 	windowsWslMode: false,
 	windowsWslDistribution: undefined,
+	sendMessageShortcut: "enter",
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -443,6 +459,21 @@ export default class AgentClientPlugin extends Plugin {
 								? rawExport.openFileAfterExport
 								: DEFAULT_SETTINGS.exportSettings
 										.openFileAfterExport,
+						includeImages:
+							typeof rawExport.includeImages === "boolean"
+								? rawExport.includeImages
+								: DEFAULT_SETTINGS.exportSettings.includeImages,
+						imageLocation:
+							rawExport.imageLocation === "obsidian" ||
+							rawExport.imageLocation === "custom" ||
+							rawExport.imageLocation === "base64"
+								? rawExport.imageLocation
+								: DEFAULT_SETTINGS.exportSettings.imageLocation,
+						imageCustomFolder:
+							typeof rawExport.imageCustomFolder === "string"
+								? rawExport.imageCustomFolder
+								: DEFAULT_SETTINGS.exportSettings
+										.imageCustomFolder,
 					};
 				}
 				return DEFAULT_SETTINGS.exportSettings;
@@ -455,6 +486,11 @@ export default class AgentClientPlugin extends Plugin {
 				typeof rawSettings.windowsWslDistribution === "string"
 					? rawSettings.windowsWslDistribution
 					: DEFAULT_SETTINGS.windowsWslDistribution,
+			sendMessageShortcut:
+				rawSettings.sendMessageShortcut === "enter" ||
+				rawSettings.sendMessageShortcut === "cmd-enter"
+					? rawSettings.sendMessageShortcut
+					: DEFAULT_SETTINGS.sendMessageShortcut,
 		};
 
 		this.ensureActiveAgentId();

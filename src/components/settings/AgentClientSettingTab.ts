@@ -94,6 +94,30 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		new Setting(containerEl)
+			.setName("Send message shortcut")
+			.setDesc(
+				"Choose the keyboard shortcut to send messages. Note: If using Cmd/Ctrl+Enter, you may need to remove any hotkeys assigned to Cmd/Ctrl+Enter (Settings → Hotkeys).",
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption(
+						"enter",
+						"Enter to send, Shift+Enter for newline",
+					)
+					.addOption(
+						"cmd-enter",
+						"Cmd/Ctrl+Enter to send, Enter for newline",
+					)
+					.setValue(this.plugin.settings.sendMessageShortcut)
+					.onChange(async (value) => {
+						this.plugin.settings.sendMessageShortcut = value as
+							| "enter"
+							| "cmd-enter";
+						await this.plugin.saveSettings();
+					}),
+			);
+
 		// Windows WSL Settings (Windows only)
 		if (Platform.isWin) {
 			new Setting(containerEl)
@@ -180,6 +204,70 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName("Include images")
+			.setDesc("Include images in exported markdown files")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.exportSettings.includeImages)
+					.onChange(async (value) => {
+						this.plugin.settings.exportSettings.includeImages =
+							value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (this.plugin.settings.exportSettings.includeImages) {
+			new Setting(containerEl)
+				.setName("Image location")
+				.setDesc("Where to save exported images")
+				.addDropdown((dropdown) =>
+					dropdown
+						.addOption(
+							"obsidian",
+							"Use Obsidian's attachment setting",
+						)
+						.addOption("custom", "Save to custom folder")
+						.addOption(
+							"base64",
+							"Embed as Base64 (not recommended)",
+						)
+						.setValue(
+							this.plugin.settings.exportSettings.imageLocation,
+						)
+						.onChange(async (value) => {
+							this.plugin.settings.exportSettings.imageLocation =
+								value as "obsidian" | "custom" | "base64";
+							await this.plugin.saveSettings();
+							this.display();
+						}),
+				);
+
+			if (
+				this.plugin.settings.exportSettings.imageLocation === "custom"
+			) {
+				new Setting(containerEl)
+					.setName("Custom image folder")
+					.setDesc(
+						"Folder path for exported images (relative to vault root)",
+					)
+					.addText((text) =>
+						text
+							.setPlaceholder("Agent Client")
+							.setValue(
+								this.plugin.settings.exportSettings
+									.imageCustomFolder,
+							)
+							.onChange(async (value) => {
+								this.plugin.settings.exportSettings.imageCustomFolder =
+									value;
+								await this.plugin.saveSettings();
+							}),
+					);
+			}
+		}
 
 		new Setting(containerEl)
 			.setName("Auto-export on new chat")

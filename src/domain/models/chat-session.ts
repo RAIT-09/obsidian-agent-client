@@ -209,6 +209,17 @@ export interface ChatSession {
 	 */
 	models?: SessionModelState;
 
+	/**
+	 * Prompt capabilities supported by the agent.
+	 * Indicates which content types (image, audio, etc.) can be included in prompts.
+	 * Set during initialization and persists for the session lifetime.
+	 */
+	promptCapabilities?: {
+		image?: boolean;
+		audio?: boolean;
+		embeddedContext?: boolean;
+	};
+
 	/** Timestamp when the session was created */
 	createdAt: Date;
 
