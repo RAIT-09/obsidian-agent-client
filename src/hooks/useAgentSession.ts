@@ -58,6 +58,20 @@ export interface UseAgentSessionReturn {
 	createSession: () => Promise<void>;
 
 	/**
+	 * Load a previous session by ID.
+	 * Restores conversation history and creates a new session for future prompts.
+	 * @param sessionId - ID of the session to load
+	 * @param fork - Whether to fork the session (create new branch) or resume original (default: true)
+	 * @returns Promise resolving to conversation history
+	 */
+	loadSession: (
+		sessionId: string,
+		fork?: boolean,
+	) => Promise<
+		Array<{ role: string; content: Array<{ type: string; text: string }> }>
+	>;
+
+	/**
 	 * Restart the current session.
 	 * Alias for createSession (closes current and creates new).
 	 */
@@ -412,6 +426,118 @@ export function useAgentSession(
 	}, [agentClient, settingsAccess, workingDirectory]);
 
 	/**
+	 * Load a previous session by ID.
+	 * Restores conversation history and creates a new session for future prompts.
+	 *
+	 * @param sessionId - ID of the session to load
+	 * @param fork - Whether to fork the session (create new branch) or resume original (default: true)
+	 */
+	const loadSession = useCallback(
+		async (sessionId: string, fork: boolean = true) => {
+			// Get current settings and agent info
+			const settings = settingsAccess.getSnapshot();
+			const activeAgentId = getActiveAgentId(settings);
+			const currentAgent = getCurrentAgent(settings);
+
+			// Reset to initializing state immediately
+			setSession((prev) => ({
+				...prev,
+				sessionId: null,
+				state: "initializing",
+				agentId: activeAgentId,
+				agentDisplayName: currentAgent.displayName,
+				authMethods: [],
+				availableCommands: undefined,
+				modes: undefined,
+				models: undefined,
+				promptCapabilities: prev.promptCapabilities,
+				createdAt: new Date(),
+				lastActivityAt: new Date(),
+			}));
+			setErrorInfo(null);
+
+			try {
+				// Find agent settings
+				const agentSettings = findAgentSettings(settings, activeAgentId);
+
+				if (!agentSettings) {
+					setSession((prev) => ({ ...prev, state: "error" }));
+					setErrorInfo({
+						title: "Agent Not Found",
+						message: `Agent with ID "${activeAgentId}" not found in settings`,
+						suggestion:
+							"Please check your agent configuration in settings.",
+					});
+					return [];
+				}
+
+				// Build AgentConfig with API key injection
+				const agentConfig = buildAgentConfigWithApiKey(
+					settings,
+					agentSettings,
+					activeAgentId,
+					workingDirectory,
+				);
+
+				// Check if initialization is needed
+				const needsInitialize =
+					!agentClient.isInitialized() ||
+					agentClient.getCurrentAgentId() !== activeAgentId;
+
+				let authMethods: AuthenticationMethod[] = [];
+				let promptCapabilities:
+					| {
+							image?: boolean;
+							audio?: boolean;
+							embeddedContext?: boolean;
+					  }
+					| undefined;
+
+				if (needsInitialize) {
+					// Initialize connection to agent
+					const initResult = await agentClient.initialize(agentConfig);
+					authMethods = initResult.authMethods;
+					promptCapabilities = initResult.promptCapabilities;
+				}
+
+				// Load the session
+				const loadResult = await agentClient.loadSession(
+					sessionId,
+					workingDirectory,
+					fork,
+				);
+
+				// Success - update to ready state with new session ID
+				setSession((prev) => ({
+					...prev,
+					sessionId: loadResult.newSessionId || loadResult.sessionId,
+					state: "ready",
+					authMethods: authMethods,
+					modes: loadResult.modes,
+					models: loadResult.models,
+					promptCapabilities: needsInitialize
+						? promptCapabilities
+						: prev.promptCapabilities,
+					lastActivityAt: new Date(),
+				}));
+
+				// Return conversation history for chat hook to populate messages
+				return loadResult.conversationHistory || [];
+			} catch (error) {
+				// Error - update to error state
+				setSession((prev) => ({ ...prev, state: "error" }));
+				setErrorInfo({
+					title: "Session Loading Failed",
+					message: `Failed to load session: ${error instanceof Error ? error.message : String(error)}`,
+					suggestion: "Please try again or create a new session.",
+				});
+				return [];
+			}
+		},
+		[agentClient, settingsAccess, workingDirectory],
+	);
+
+	/**
 	 * Restart the current session.
 	 */
 	const restartSession = useCallback(async () => {
@@ -656,6 +782,7 @@ export function useAgentSession(
 		isReady,
 		errorInfo,
 		createSession,
+		loadSession,
 		restartSession,
 		closeSession,
 		cancelOperation,
