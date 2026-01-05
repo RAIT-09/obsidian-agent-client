@@ -1,0 +1,40 @@
+name: Question
+description: Ask a question about usage or configuration
+labels: ["question"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question? We're happy to help!
+
+        You may also want to check the [documentation](https://rait-09.github.io/obsidian-agent-client/) first.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What would you like to know?
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What I tried
+      description: What have you already tried or looked into?
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: If relevant, provide your OS, Obsidian version, plugin version, and agent
+      placeholder: |
+        - OS: macOS
+        - Obsidian: 1.5.0
+        - Plugin: 0.5.1
+        - Agent: Claude Code
+    validations:
+      required: false
