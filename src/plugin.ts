@@ -142,24 +142,16 @@ export default class AgentClientPlugin extends Plugin {
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
 
 		// Clean up ACP session when Obsidian quits
+		// Note: We don't wait for disconnect to complete to avoid blocking quit
 		this.registerEvent(
-			this.app.workspace.on(
-				"quit",
-				(tasks: {
-					addPromise: (promise: Promise<unknown>) => void;
-				}) => {
-					if (this._acpAdapter) {
-						tasks.addPromise(
-							this._acpAdapter.disconnect().catch((error) => {
-								console.warn(
-									"[AgentClient] Quit cleanup error:",
-									error,
-								);
-							}),
-						);
-					}
-				},
-			),
+			this.app.workspace.on("quit", () => {
+				if (this._acpAdapter) {
+					// Fire and forget - don't block Obsidian from quitting
+					this._acpAdapter.disconnect().catch((error) => {
+						console.warn("[AgentClient] Quit cleanup error:", error);
+					});
+				}
+			}),
 		);
 	}
 
