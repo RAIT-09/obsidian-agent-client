@@ -86,6 +86,11 @@ function ChatComponent({
 	const acpAdapter = useMemo(() => new AcpAdapter(plugin), [plugin]);
 	const acpClientRef = useRef<IAcpClient>(acpAdapter);
 
+	// Register adapter with plugin for quit cleanup
+	useEffect(() => {
+		plugin.acpAdapter = acpAdapter;
+	}, [plugin, acpAdapter]);
+
 	const vaultAccessAdapter = useMemo(() => {
 		return new ObsidianVaultAdapter(plugin, noteMentionService);
 	}, [plugin, noteMentionService]);
