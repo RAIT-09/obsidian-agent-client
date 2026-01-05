@@ -6,6 +6,7 @@ import {
 	type SettingsStore,
 } from "./adapters/obsidian/settings-store.adapter";
 import { AgentClientSettingTab } from "./components/settings/AgentClientSettingTab";
+import { AcpAdapter } from "./adapters/acp/acp.adapter";
 import {
 	sanitizeArgs,
 	normalizeEnvVars,
@@ -107,8 +108,7 @@ export default class AgentClientPlugin extends Plugin {
 	settings: AgentClientPluginSettings;
 	settingsStore!: SettingsStore;
 
-	// Active ACP adapter instance (shared across use cases)
-	acpAdapter: import("./adapters/acp/acp.adapter").AcpAdapter | null = null;
+	private _acpAdapter: AcpAdapter | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -148,9 +148,9 @@ export default class AgentClientPlugin extends Plugin {
 				(tasks: {
 					addPromise: (promise: Promise<unknown>) => void;
 				}) => {
-					if (this.acpAdapter) {
+					if (this._acpAdapter) {
 						tasks.addPromise(
-							this.acpAdapter.disconnect().catch((error) => {
+							this._acpAdapter.disconnect().catch((error) => {
 								console.warn(
 									"[AgentClient] Quit cleanup error:",
 									error,
@@ -164,6 +164,13 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	onunload() {}
+
+	getOrCreateAdapter(): AcpAdapter {
+		if (!this._acpAdapter) {
+			this._acpAdapter = new AcpAdapter(this);
+		}
+		return this._acpAdapter;
+	}
 
 	async activateView() {
 		const { workspace } = this.app;
