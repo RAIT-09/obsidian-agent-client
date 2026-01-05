@@ -1,0 +1,57 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature!
+
+        **Before submitting, please consider the project scope:**
+        - Features achievable via MCP or other standard protocols are out of scope (they should be provided as MCP servers)
+        - Agent-specific features are out of scope (they should be handled via agent config files)
+
+        See [CONTRIBUTING.md](../CONTRIBUTING.md) for more details.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: A brief summary of the feature (one line)
+      placeholder: e.g., Add keyboard shortcut to send message
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why do you need this feature? What problem does it solve?
+      placeholder: I often find myself...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How would you like this to work?
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you considered any alternative solutions or workarounds?
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any other context, screenshots, or references
+    validations:
+      required: false
