@@ -24,7 +24,7 @@ export function CollapsibleThought({ text, plugin }: CollapsibleThoughtProps) {
 			</div>
 			{isExpanded && (
 				<div className="agent-client-collapsible-thought-content">
-					<MarkdownTextRenderer text={text} app={plugin.app} />
+					<MarkdownTextRenderer text={text} plugin={plugin} />
 				</div>
 			)}
 		</div>
