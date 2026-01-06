@@ -6,6 +6,7 @@ import {
 	type SettingsStore,
 } from "./adapters/obsidian/settings-store.adapter";
 import { AgentClientSettingTab } from "./components/settings/AgentClientSettingTab";
+import { AcpAdapter } from "./adapters/acp/acp.adapter";
 import {
 	sanitizeArgs,
 	normalizeEnvVars,
@@ -107,8 +108,7 @@ export default class AgentClientPlugin extends Plugin {
 	settings: AgentClientPluginSettings;
 	settingsStore!: SettingsStore;
 
-	// Active ACP adapter instance (shared across use cases)
-	acpAdapter: import("./adapters/acp/acp.adapter").AcpAdapter | null = null;
+	private _acpAdapter: AcpAdapter | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -140,9 +140,29 @@ export default class AgentClientPlugin extends Plugin {
 		this.registerPermissionCommands();
 
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
+
+		// Clean up ACP session when Obsidian quits
+		// Note: We don't wait for disconnect to complete to avoid blocking quit
+		this.registerEvent(
+			this.app.workspace.on("quit", () => {
+				if (this._acpAdapter) {
+					// Fire and forget - don't block Obsidian from quitting
+					this._acpAdapter.disconnect().catch((error) => {
+						console.warn("[AgentClient] Quit cleanup error:", error);
+					});
+				}
+			}),
+		);
 	}
 
 	onunload() {}
+
+	getOrCreateAdapter(): AcpAdapter {
+		if (!this._acpAdapter) {
+			this._acpAdapter = new AcpAdapter(this);
+		}
+		return this._acpAdapter;
+	}
 
 	async activateView() {
 		const { workspace } = this.app;
