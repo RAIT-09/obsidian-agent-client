@@ -1,13 +1,17 @@
 import * as React from "react";
 const { useRef, useEffect } = React;
-import { Component, MarkdownRenderer, type App } from "obsidian";
+import { Component, MarkdownRenderer } from "obsidian";
+import type AgentClientPlugin from "../../plugin";
 
 interface MarkdownTextRendererProps {
 	text: string;
-	app: App;
+	plugin: AgentClientPlugin;
 }
 
-export function MarkdownTextRenderer({ text, app }: MarkdownTextRendererProps) {
+export function MarkdownTextRenderer({
+	text,
+	plugin,
+}: MarkdownTextRendererProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -21,12 +25,27 @@ export function MarkdownTextRenderer({ text, app }: MarkdownTextRendererProps) {
 		component.load();
 
 		// Render markdown
-		void MarkdownRenderer.render(app, text, el, "", component);
+		void MarkdownRenderer.render(plugin.app, text, el, "", component);
+
+		// Handle internal link clicks
+		const handleInternalLinkClick = (e: MouseEvent) => {
+			const target = e.target as HTMLElement;
+			const link = target.closest("a.internal-link");
+			if (link) {
+				e.preventDefault();
+				const href = link.getAttribute("data-href");
+				if (href) {
+					void plugin.app.workspace.openLinkText(href, "");
+				}
+			}
+		};
+		el.addEventListener("click", handleInternalLinkClick);
 
 		return () => {
+			el.removeEventListener("click", handleInternalLinkClick);
 			component.unload();
 		};
-	}, [text, app]);
+	}, [text, plugin]);
 
 	return (
 		<div
