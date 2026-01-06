@@ -148,7 +148,10 @@ export default class AgentClientPlugin extends Plugin {
 				if (this._acpAdapter) {
 					// Fire and forget - don't block Obsidian from quitting
 					this._acpAdapter.disconnect().catch((error) => {
-						console.warn("[AgentClient] Quit cleanup error:", error);
+						console.warn(
+							"[AgentClient] Quit cleanup error:",
+							error,
+						);
 					});
 				}
 			}),
