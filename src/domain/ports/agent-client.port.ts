@@ -98,6 +98,51 @@ export interface PromptCapabilities {
 }
 
 /**
+ * MCP (Model Context Protocol) capabilities supported by the agent.
+ */
+export interface McpCapabilities {
+	/** Agent supports connecting to MCP servers over HTTP */
+	http?: boolean;
+
+	/** Agent supports connecting to MCP servers over SSE (deprecated) */
+	sse?: boolean;
+}
+
+/**
+ * Full agent capabilities from ACP initialization.
+ *
+ * Contains all capability information returned by the agent,
+ * including session features, MCP support, and prompt capabilities.
+ */
+export interface AgentCapabilities {
+	/** Whether the agent supports session/load for resuming sessions */
+	loadSession?: boolean;
+
+	/** MCP connection capabilities */
+	mcpCapabilities?: McpCapabilities;
+
+	/** Prompt content type capabilities */
+	promptCapabilities?: PromptCapabilities;
+}
+
+/**
+ * Information about the agent implementation.
+ *
+ * Provided by the agent during initialization for identification
+ * and debugging purposes.
+ */
+export interface AgentInfo {
+	/** Programmatic identifier for the agent */
+	name: string;
+
+	/** Human-readable display name */
+	title?: string;
+
+	/** Version string (e.g., "1.0.0") */
+	version?: string;
+}
+
+/**
  * Result of initializing a connection to an agent.
  */
 export interface InitializeResult {
@@ -110,8 +155,21 @@ export interface InitializeResult {
 	/**
 	 * Prompt capabilities supported by the agent.
 	 * Indicates which content types can be included in prompts.
+	 * (Convenience accessor - same as agentCapabilities.promptCapabilities)
 	 */
 	promptCapabilities?: PromptCapabilities;
+
+	/**
+	 * Full agent capabilities from initialization.
+	 * Contains loadSession, mcpCapabilities, and promptCapabilities.
+	 */
+	agentCapabilities?: AgentCapabilities;
+
+	/**
+	 * Information about the agent implementation.
+	 * Contains name, title, and version.
+	 */
+	agentInfo?: AgentInfo;
 }
 
 /**

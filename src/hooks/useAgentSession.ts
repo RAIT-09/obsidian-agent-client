@@ -327,9 +327,11 @@ export function useAgentSession(
 			availableCommands: undefined,
 			modes: undefined,
 			models: undefined,
-			// Keep promptCapabilities from previous session if same agent
-			// It will be updated if re-initialization is needed
+			// Keep capabilities/info from previous session if same agent
+			// They will be updated if re-initialization is needed
 			promptCapabilities: prev.promptCapabilities,
+			agentCapabilities: prev.agentCapabilities,
+			agentInfo: prev.agentInfo,
 			createdAt: new Date(),
 			lastActivityAt: new Date(),
 		}));
@@ -372,12 +374,35 @@ export function useAgentSession(
 						embeddedContext?: boolean;
 				  }
 				| undefined;
+			let agentCapabilities:
+				| {
+						loadSession?: boolean;
+						mcpCapabilities?: {
+							http?: boolean;
+							sse?: boolean;
+						};
+						promptCapabilities?: {
+							image?: boolean;
+							audio?: boolean;
+							embeddedContext?: boolean;
+						};
+				  }
+				| undefined;
+			let agentInfo:
+				| {
+						name: string;
+						title?: string;
+						version?: string;
+				  }
+				| undefined;
 
 			if (needsInitialize) {
 				// Initialize connection to agent (spawn process + protocol handshake)
 				const initResult = await agentClient.initialize(agentConfig);
 				authMethods = initResult.authMethods;
 				promptCapabilities = initResult.promptCapabilities;
+				agentCapabilities = initResult.agentCapabilities;
+				agentInfo = initResult.agentInfo;
 			}
 
 			// Create new session (lightweight operation)
@@ -392,11 +417,15 @@ export function useAgentSession(
 				authMethods: authMethods,
 				modes: sessionResult.modes,
 				models: sessionResult.models,
-				// Only update promptCapabilities if we re-initialized
+				// Only update capabilities/info if we re-initialized
 				// Otherwise, keep the previous value (from the same agent)
 				promptCapabilities: needsInitialize
 					? promptCapabilities
 					: prev.promptCapabilities,
+				agentCapabilities: needsInitialize
+					? agentCapabilities
+					: prev.agentCapabilities,
+				agentInfo: needsInitialize ? agentInfo : prev.agentInfo,
 				lastActivityAt: new Date(),
 			}));
 		} catch (error) {
@@ -487,13 +516,16 @@ export function useAgentSession(
 			await settingsAccess.updateSettings({ activeAgentId: agentId });
 
 			// Update session with new agent ID
-			// Clear availableCommands, modes, and models (new agent will send its own)
+			// Clear agent-specific data (new agent will send its own)
 			setSession((prev) => ({
 				...prev,
 				agentId,
 				availableCommands: undefined,
 				modes: undefined,
 				models: undefined,
+				promptCapabilities: undefined,
+				agentCapabilities: undefined,
+				agentInfo: undefined,
 			}));
 		},
 		[settingsAccess],
