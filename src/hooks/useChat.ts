@@ -108,6 +108,12 @@ export interface UseChatReturn {
 export interface SessionContext {
 	sessionId: string | null;
 	authMethods: AuthenticationMethod[];
+	/** Prompt capabilities from agent initialization */
+	promptCapabilities?: {
+		image?: boolean;
+		audio?: boolean;
+		embeddedContext?: boolean;
+	};
 }
 
 /**
@@ -442,6 +448,9 @@ export function useChat(
 					vaultBasePath: options.vaultBasePath,
 					isAutoMentionDisabled: options.isAutoMentionDisabled,
 					convertToWsl: shouldConvertToWsl,
+					supportsEmbeddedContext:
+						sessionContext.promptCapabilities?.embeddedContext ??
+						false,
 				},
 				vaultAccess,
 				mentionService,
@@ -534,6 +543,7 @@ export function useChat(
 			mentionService,
 			sessionContext.sessionId,
 			sessionContext.authMethods,
+			sessionContext.promptCapabilities,
 			shouldConvertToWsl,
 			addMessage,
 		],

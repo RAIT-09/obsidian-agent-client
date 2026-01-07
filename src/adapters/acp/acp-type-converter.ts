@@ -52,7 +52,7 @@ export class AcpTypeConverter {
 	 * This converts our domain-layer prompt content to the ACP protocol format
 	 * for sending to the agent.
 	 *
-	 * @param content - Domain prompt content (text or image)
+	 * @param content - Domain prompt content (text, image, or resource)
 	 * @returns ACP ContentBlock for use with the prompt API
 	 */
 	static toAcpContentBlock(content: PromptContent): acp.ContentBlock {
@@ -64,6 +64,16 @@ export class AcpTypeConverter {
 					type: "image",
 					data: content.data,
 					mimeType: content.mimeType,
+				};
+			case "resource":
+				return {
+					type: "resource",
+					resource: {
+						uri: content.resource.uri,
+						mimeType: content.resource.mimeType,
+						text: content.resource.text,
+					},
+					annotations: content.annotations,
 				};
 		}
 	}
