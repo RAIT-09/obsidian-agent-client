@@ -136,6 +136,23 @@ export interface SettingsContext {
 	windowsWslMode: boolean;
 }
 
+/**
+ * Optional callbacks for useChat hook.
+ */
+export interface UseChatCallbacks {
+	/**
+	 * Called when the first message is successfully sent in a session.
+	 * Used to save session metadata for local session history.
+	 *
+	 * @param sessionId - Current session ID
+	 * @param messageContent - Content of the first user message
+	 */
+	onFirstMessageSent?: (
+		sessionId: string,
+		messageContent: string,
+	) => Promise<void>;
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -203,6 +220,7 @@ function mergeToolCallContent(
  * @param mentionService - Mention service for parsing mentions
  * @param sessionContext - Session information (sessionId, authMethods)
  * @param settingsContext - Settings information (windowsWslMode)
+ * @param callbacks - Optional callbacks (onFirstMessageSent)
  */
 export function useChat(
 	agentClient: IAgentClient,
@@ -210,6 +228,7 @@ export function useChat(
 	mentionService: IMentionService,
 	sessionContext: SessionContext,
 	settingsContext: SettingsContext,
+	callbacks?: UseChatCallbacks,
 ): UseChatReturn {
 	// Message state
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -618,6 +637,20 @@ export function useChat(
 					// Success - clear stored message
 					setIsSending(false);
 					setLastUserMessage(null);
+
+					// Call onFirstMessageSent if this was the first message
+					// messages.length is 0 before addMessage, so check if this is the first
+					if (
+						messages.length === 0 &&
+						callbacks?.onFirstMessageSent &&
+						sessionContext.sessionId
+					) {
+						// Fire and forget - don't block on session save
+						void callbacks.onFirstMessageSent(
+							sessionContext.sessionId,
+							content,
+						);
+					}
 				} else {
 					// Error from message-service
 					setIsSending(false);
@@ -652,6 +685,8 @@ export function useChat(
 			sessionContext.promptCapabilities,
 			shouldConvertToWsl,
 			addMessage,
+			messages.length,
+			callbacks,
 		],
 	);
 

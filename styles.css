@@ -1548,3 +1548,14 @@ If your plugin does not need CSS, delete this file.
 	border: none;
 	border-top: 1px solid var(--background-modifier-border);
 }
+
+/* Local sessions banner */
+.session-history-local-banner {
+	padding: 8px 12px;
+	margin-bottom: 12px;
+	background: var(--background-secondary);
+	border-radius: 4px;
+	font-size: 12px;
+	color: var(--text-muted);
+	border-left: 3px solid var(--interactive-accent);
+}

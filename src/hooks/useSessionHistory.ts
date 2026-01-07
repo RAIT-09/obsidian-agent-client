@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useMemo } from "react";
 import type { IAgentClient } from "../domain/ports/agent-client.port";
+import type { ISettingsAccess } from "../domain/ports/settings-access.port";
 import type {
 	SessionInfo,
 	ListSessionsResult,
@@ -46,6 +47,8 @@ export interface UseSessionHistoryOptions {
 	agentClient: IAgentClient;
 	/** Current session (used to access agentCapabilities) */
 	session: ChatSession;
+	/** Settings access for local session storage */
+	settingsAccess: ISettingsAccess;
 	/** Callback invoked when a session is loaded/resumed/forked */
 	onSessionLoad: SessionLoadCallback;
 }
@@ -64,7 +67,7 @@ export interface UseSessionHistoryReturn {
 	hasMore: boolean;
 
 	// Capability flags (from session.agentCapabilities)
-	/** Whether session history UI should be shown (canList) */
+	/** Whether session history UI should be shown */
 	canShowSessionHistory: boolean;
 	/** Whether session/load is supported (stable) */
 	canLoad: boolean;
@@ -74,6 +77,8 @@ export interface UseSessionHistoryReturn {
 	canFork: boolean;
 	/** Whether session/list is supported (unstable) */
 	canList: boolean;
+	/** Whether sessions are from local storage (agent doesn't support list) */
+	isUsingLocalSessions: boolean;
 
 	/**
 	 * Fetch sessions list from agent.
@@ -156,7 +161,7 @@ const CACHE_EXPIRY_MS = 5 * 60 * 1000;
 export function useSessionHistory(
 	options: UseSessionHistoryOptions,
 ): UseSessionHistoryReturn {
-	const { agentClient, session, onSessionLoad } = options;
+	const { agentClient, session, settingsAccess, onSessionLoad } = options;
 
 	// Derive capability flags from session.agentCapabilities
 	const capabilities: SessionCapabilityFlags = useMemo(
@@ -196,13 +201,31 @@ export function useSessionHistory(
 	}, []);
 
 	/**
-	 * Fetch sessions list from agent.
+	 * Fetch sessions list from agent or local storage.
+	 * Uses agent's session/list if supported, otherwise falls back to local storage.
 	 * Replaces existing sessions in state.
 	 */
 	const fetchSessions = useCallback(
 		async (cwd?: string) => {
-			// Guard: Check if list is supported
+			// If agent doesn't support list, use local sessions
 			if (!capabilities.canList) {
+				// Get locally saved sessions for this agent
+				const localSessions = settingsAccess.getSavedSessions(
+					session.agentId,
+					cwd,
+				);
+
+				// Convert SavedSessionInfo to SessionInfo format
+				const sessionInfos: SessionInfo[] = localSessions.map((s) => ({
+					sessionId: s.sessionId,
+					cwd: s.cwd,
+					title: s.title,
+					updatedAt: s.updatedAt,
+				}));
+
+				setSessions(sessionInfos);
+				setNextCursor(undefined); // No pagination for local sessions
+				setError(null);
 				return;
 			}
 
@@ -243,7 +266,13 @@ export function useSessionHistory(
 				setLoading(false);
 			}
 		},
-		[agentClient, capabilities.canList, isCacheValid],
+		[
+			agentClient,
+			capabilities.canList,
+			isCacheValid,
+			settingsAccess,
+			session.agentId,
+		],
 	);
 
 	/**
@@ -396,6 +425,7 @@ export function useSessionHistory(
 		canResume: capabilities.canResume,
 		canFork: capabilities.canFork,
 		canList: capabilities.canList,
+		isUsingLocalSessions: !capabilities.canList,
 
 		// Methods
 		fetchSessions,

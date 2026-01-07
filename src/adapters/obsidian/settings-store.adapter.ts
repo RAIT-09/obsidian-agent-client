@@ -9,6 +9,7 @@
 import type { ISettingsAccess } from "../../domain/ports/settings-access.port";
 import type { AgentClientPluginSettings } from "../../plugin";
 import type AgentClientPlugin from "../../plugin";
+import type { SavedSessionInfo } from "../../domain/models/session-info";
 
 /** Listener callback invoked when settings change */
 type Listener = () => void;
@@ -67,6 +68,9 @@ export class SettingsStore implements ISettingsAccess {
 		const next = { ...this.state, ...updates };
 		this.state = next;
 
+		// Sync with plugin.settings (required for saveSettings to persist correctly)
+		this.plugin.settings = next;
+
 		// Notify all subscribers
 		for (const listener of this.listeners) {
 			listener();
@@ -102,6 +106,86 @@ export class SettingsStore implements ISettingsAccess {
 		// Delegate to async updateSettings
 		// Note: Fire-and-forget - callers don't expect this to be async
 		void this.updateSettings(next);
+	}
+
+	// ============================================================
+	// Session Storage Methods
+	// ============================================================
+
+	/** Maximum number of saved sessions to keep */
+	private static readonly MAX_SAVED_SESSIONS = 50;
+
+	/**
+	 * Save a session to local storage.
+	 *
+	 * Updates existing session if sessionId matches.
+	 * Maintains max 50 sessions, removing oldest when exceeded.
+	 *
+	 * @param info - Session metadata to save
+	 * @returns Promise that resolves when session is saved
+	 */
+	async saveSession(info: SavedSessionInfo): Promise<void> {
+		const sessions = [...(this.state.savedSessions || [])];
+
+		// Find existing session by sessionId
+		const existingIndex = sessions.findIndex(
+			(s) => s.sessionId === info.sessionId,
+		);
+
+		if (existingIndex >= 0) {
+			// Update existing session
+			sessions[existingIndex] = info;
+		} else {
+			// Add new session at the beginning
+			sessions.unshift(info);
+
+			// Remove oldest sessions if exceeding limit
+			if (sessions.length > SettingsStore.MAX_SAVED_SESSIONS) {
+				sessions.pop();
+			}
+		}
+
+		await this.updateSettings({ savedSessions: sessions });
+	}
+
+	/**
+	 * Get saved sessions, optionally filtered by agentId and/or cwd.
+	 *
+	 * Returns sessions sorted by updatedAt (newest first).
+	 *
+	 * @param agentId - Optional filter by agent ID
+	 * @param cwd - Optional filter by working directory
+	 * @returns Array of saved session metadata
+	 */
+	getSavedSessions(agentId?: string, cwd?: string): SavedSessionInfo[] {
+		let sessions = this.state.savedSessions || [];
+
+		if (agentId) {
+			sessions = sessions.filter((s) => s.agentId === agentId);
+		}
+		if (cwd) {
+			sessions = sessions.filter((s) => s.cwd === cwd);
+		}
+
+		// Sort by updatedAt descending (newest first)
+		return [...sessions].sort(
+			(a, b) =>
+				new Date(b.updatedAt).getTime() -
+				new Date(a.updatedAt).getTime(),
+		);
+	}
+
+	/**
+	 * Delete a saved session by sessionId.
+	 *
+	 * @param sessionId - ID of session to delete
+	 * @returns Promise that resolves when session is deleted
+	 */
+	async deleteSession(sessionId: string): Promise<void> {
+		const sessions = (this.state.savedSessions || []).filter(
+			(s) => s.sessionId !== sessionId,
+		);
+		await this.updateSettings({ savedSessions: sessions });
 	}
 }
 

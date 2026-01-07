@@ -109,6 +109,30 @@ function ChatComponent({
 		isReady: isSessionReady,
 	} = agentSession;
 
+	// Callback to save session locally when first message is sent
+	const handleFirstMessageSent = useCallback(
+		async (sessionId: string, messageContent: string) => {
+			if (!session.agentId) return;
+
+			const title =
+				messageContent.length > 50
+					? messageContent.substring(0, 50) + "..."
+					: messageContent;
+
+			await plugin.settingsStore.saveSession({
+				sessionId,
+				agentId: session.agentId,
+				cwd: vaultPath,
+				title,
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+			});
+
+			logger.log(`[ChatView] Session saved locally: ${sessionId}`);
+		},
+		[session.agentId, vaultPath, plugin.settingsStore, logger],
+	);
+
 	const chat = useChat(
 		acpAdapter,
 		vaultAccessAdapter,
@@ -120,6 +144,9 @@ function ChatComponent({
 		},
 		{
 			windowsWslMode: settings.windowsWslMode,
+		},
+		{
+			onFirstMessageSent: handleFirstMessageSent,
 		},
 	);
 
@@ -166,6 +193,7 @@ function ChatComponent({
 	const sessionHistory = useSessionHistory({
 		agentClient: acpAdapter,
 		session,
+		settingsAccess: plugin.settingsStore,
 		onSessionLoad: handleSessionLoad,
 	});
 
@@ -314,6 +342,7 @@ function ChatComponent({
 				canLoad: sessionHistory.canLoad,
 				canResume: sessionHistory.canResume,
 				canFork: sessionHistory.canFork,
+				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
 				// Debug mode
 				debugMode: settings.debugMode,
 				// Callbacks
@@ -383,6 +412,7 @@ function ChatComponent({
 				canLoad: sessionHistory.canLoad,
 				canResume: sessionHistory.canResume,
 				canFork: sessionHistory.canFork,
+				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
 				// Debug mode
 				debugMode: settings.debugMode,
 				// Callbacks
@@ -436,6 +466,7 @@ function ChatComponent({
 		sessionHistory.canLoad,
 		sessionHistory.canResume,
 		sessionHistory.canFork,
+		sessionHistory.isUsingLocalSessions,
 		settings.debugMode,
 		historyModal,
 		vaultPath,

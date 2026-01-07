@@ -56,6 +56,8 @@ export interface AgentClientPluginSettings {
 	windowsWslDistribution?: string;
 	// Input behavior
 	sendMessageShortcut: SendMessageShortcut;
+	// Locally saved session metadata (for agents without session/list support)
+	savedSessions: import("./domain/models/session-info").SavedSessionInfo[];
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -102,6 +104,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	windowsWslMode: false,
 	windowsWslDistribution: undefined,
 	sendMessageShortcut: "enter",
+	savedSessions: [],
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -514,6 +517,9 @@ export default class AgentClientPlugin extends Plugin {
 				rawSettings.sendMessageShortcut === "cmd-enter"
 					? rawSettings.sendMessageShortcut
 					: DEFAULT_SETTINGS.sendMessageShortcut,
+			savedSessions: Array.isArray(rawSettings.savedSessions)
+				? rawSettings.savedSessions
+				: DEFAULT_SETTINGS.savedSessions,
 		};
 
 		this.ensureActiveAgentId();

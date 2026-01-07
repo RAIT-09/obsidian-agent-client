@@ -7,6 +7,7 @@
  */
 
 import type { AgentClientPluginSettings } from "../../plugin";
+import type { SavedSessionInfo } from "../models/session-info";
 
 /**
  * Interface for accessing and managing plugin settings.
@@ -49,4 +50,38 @@ export interface ISettingsAccess {
 	 * @returns Unsubscribe function to remove the listener
 	 */
 	subscribe(listener: () => void): () => void;
+
+	// ============================================================
+	// Session Storage Methods
+	// ============================================================
+
+	/**
+	 * Save a session to local storage.
+	 *
+	 * Updates existing session if sessionId matches.
+	 * Maintains max 50 sessions, removing oldest when exceeded.
+	 *
+	 * @param info - Session metadata to save
+	 * @returns Promise that resolves when session is saved
+	 */
+	saveSession(info: SavedSessionInfo): Promise<void>;
+
+	/**
+	 * Get saved sessions, optionally filtered by agentId and/or cwd.
+	 *
+	 * Returns sessions sorted by updatedAt (newest first).
+	 *
+	 * @param agentId - Optional filter by agent ID
+	 * @param cwd - Optional filter by working directory
+	 * @returns Array of saved session metadata
+	 */
+	getSavedSessions(agentId?: string, cwd?: string): SavedSessionInfo[];
+
+	/**
+	 * Delete a saved session by sessionId.
+	 *
+	 * @param sessionId - ID of session to delete
+	 * @returns Promise that resolves when session is deleted
+	 */
+	deleteSession(sessionId: string): Promise<void>;
 }

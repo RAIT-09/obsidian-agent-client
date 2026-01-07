@@ -26,6 +26,9 @@ export interface SessionHistoryModalProps {
 	/** Whether session/fork is supported (unstable) */
 	canFork: boolean;
 
+	/** Whether using locally saved sessions (instead of agent session/list) */
+	isUsingLocalSessions: boolean;
+
 	/** Whether debug mode is enabled (shows manual input form) */
 	debugMode: boolean;
 
@@ -99,8 +102,15 @@ export class SessionHistoryModal extends Modal {
 	 */
 	private render() {
 		const { contentEl } = this;
-		const { sessions, loading, error, hasMore, canList, debugMode } =
-			this.props;
+		const {
+			sessions,
+			loading,
+			error,
+			hasMore,
+			canList,
+			isUsingLocalSessions,
+			debugMode,
+		} = this.props;
 
 		// Clear previous content (except title)
 		const title = contentEl.querySelector("h2");
@@ -114,8 +124,19 @@ export class SessionHistoryModal extends Modal {
 			this.renderDebugForm(contentEl);
 		}
 
-		// Only show list UI if canList is true
-		if (!canList) {
+		// Show local sessions banner if using locally saved sessions
+		if (isUsingLocalSessions) {
+			const banner = contentEl.createDiv({
+				cls: "session-history-local-banner",
+			});
+			banner.createSpan({
+				text: "Locally saved sessions (agent doesn't support session/list)",
+			});
+		}
+
+		// Show list UI if canList is true OR using local sessions
+		const canShowList = canList || isUsingLocalSessions;
+		if (!canShowList) {
 			if (!debugMode) {
 				// Show message that list is not available
 				const messageContainer = contentEl.createDiv({
