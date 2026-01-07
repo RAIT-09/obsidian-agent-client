@@ -154,32 +154,35 @@ export class SessionHistoryModal extends Modal {
 			return;
 		}
 
-		// Filter toggle container
-		const filterContainer = contentEl.createDiv({
-			cls: "session-history-filter",
-		});
+		// Filter toggle container - only show when using agent's session/list
+		// (local sessions are already filtered by agentId and cwd)
+		if (canList && !isUsingLocalSessions) {
+			const filterContainer = contentEl.createDiv({
+				cls: "session-history-filter",
+			});
 
-		// Filter toggle checkbox
-		const filterLabel = filterContainer.createEl("label", {
-			cls: "session-history-filter-label",
-		});
+			// Filter toggle checkbox
+			const filterLabel = filterContainer.createEl("label", {
+				cls: "session-history-filter-label",
+			});
 
-		const filterCheckbox = filterLabel.createEl("input", {
-			type: "checkbox",
-		});
-		filterCheckbox.checked = this.filterByCurrentVault;
-		filterCheckbox.addEventListener("change", () => {
-			this.filterByCurrentVault = filterCheckbox.checked;
-			// Fetch sessions with or without cwd filter
-			const cwd = this.filterByCurrentVault
-				? this.props.currentCwd
-				: undefined;
-			this.props.onFetchSessions(cwd);
-		});
+			const filterCheckbox = filterLabel.createEl("input", {
+				type: "checkbox",
+			});
+			filterCheckbox.checked = this.filterByCurrentVault;
+			filterCheckbox.addEventListener("change", () => {
+				this.filterByCurrentVault = filterCheckbox.checked;
+				// Fetch sessions with or without cwd filter
+				const cwd = this.filterByCurrentVault
+					? this.props.currentCwd
+					: undefined;
+				this.props.onFetchSessions(cwd);
+			});
 
-		filterLabel.createSpan({
-			text: "Show current vault only",
-		});
+			filterLabel.createSpan({
+				text: "Show current vault only",
+			});
+		}
 
 		// Display error if present
 		if (error) {
