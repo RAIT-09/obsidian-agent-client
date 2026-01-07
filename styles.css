@@ -1329,13 +1329,13 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* ===== Session History Modal ===== */
-.session-history-filter {
+.agent-client-session-history-filter {
 	margin-bottom: 16px;
 	padding-bottom: 12px;
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.session-history-filter-label {
+.agent-client-session-history-filter-label {
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -1344,17 +1344,17 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-normal);
 }
 
-.session-history-filter-label input[type="checkbox"] {
+.agent-client-session-history-filter-label input[type="checkbox"] {
 	cursor: pointer;
 }
 
-.session-history-list {
+.agent-client-session-history-list {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
 }
 
-.session-history-item {
+.agent-client-session-history-item {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -1365,16 +1365,16 @@ If your plugin does not need CSS, delete this file.
 	transition: background-color 0.2s;
 }
 
-.session-history-item:hover {
+.agent-client-session-history-item:hover {
 	background: var(--background-modifier-hover);
 }
 
-.session-history-item-content {
+.agent-client-session-history-item-content {
 	flex: 1;
 	min-width: 0;
 }
 
-.session-history-item-title {
+.agent-client-session-history-item-title {
 	font-weight: 500;
 	font-size: 14px;
 	color: var(--text-normal);
@@ -1384,18 +1384,18 @@ If your plugin does not need CSS, delete this file.
 	white-space: nowrap;
 }
 
-.session-history-item-metadata {
+.agent-client-session-history-item-metadata {
 	display: flex;
 	align-items: center;
 	gap: 8px;
 }
 
-.session-history-item-timestamp {
+.agent-client-session-history-item-timestamp {
 	font-size: 12px;
 	color: var(--text-muted);
 }
 
-.session-history-item-actions {
+.agent-client-session-history-item-actions {
 	display: flex;
 	align-items: center;
 	gap: 6px;
@@ -1403,7 +1403,7 @@ If your plugin does not need CSS, delete this file.
 	margin-left: 12px;
 }
 
-.session-history-action-icon {
+.agent-client-session-history-action-icon {
 	width: 24px;
 	height: 24px;
 	display: flex;
@@ -1415,46 +1415,46 @@ If your plugin does not need CSS, delete this file.
 	transition: all 0.2s;
 }
 
-.session-history-action-icon:hover {
+.agent-client-session-history-action-icon:hover {
 	background: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
 
-.session-history-action-icon svg {
+.agent-client-session-history-action-icon svg {
 	width: 16px;
 	height: 16px;
 }
 
-.session-history-resume-icon:hover {
+.agent-client-session-history-resume-icon:hover {
 	color: var(--text-accent);
 }
 
-.session-history-fork-icon:hover {
+.agent-client-session-history-fork-icon:hover {
 	color: var(--text-accent);
 }
 
-.session-history-rename-icon:hover {
+.agent-client-session-history-rename-icon:hover {
 	color: var(--color-yellow);
 }
 
-.session-history-delete-icon:hover {
+.agent-client-session-history-delete-icon:hover {
 	color: var(--text-error);
 }
 
-.session-history-loading,
-.session-history-empty,
-.session-history-error {
+.agent-client-session-history-loading,
+.agent-client-session-history-empty,
+.agent-client-session-history-error {
 	padding: 32px;
 	text-align: center;
 	color: var(--text-muted);
 }
 
-.session-history-error-text {
+.agent-client-session-history-error-text {
 	color: var(--text-error);
 	margin-bottom: 12px;
 }
 
-.session-history-retry-button {
+.agent-client-session-history-retry-button {
 	padding: 6px 12px;
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);
@@ -1463,12 +1463,12 @@ If your plugin does not need CSS, delete this file.
 	cursor: pointer;
 }
 
-.session-history-load-more {
+.agent-client-session-history-load-more {
 	margin-top: 16px;
 	text-align: center;
 }
 
-.session-history-load-more-button {
+.agent-client-session-history-load-more-button {
 	padding: 8px 16px;
 	background: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
@@ -1478,17 +1478,17 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-normal);
 }
 
-.session-history-load-more-button:hover {
+.agent-client-session-history-load-more-button:hover {
 	background: var(--background-modifier-hover);
 }
 
-.session-history-load-more-button:disabled {
+.agent-client-session-history-load-more-button:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
 }
 
 /* Debug mode manual input form */
-.session-history-debug {
+.agent-client-session-history-debug {
 	margin-bottom: 16px;
 	padding: 12px;
 	background: var(--background-secondary);
@@ -1496,24 +1496,24 @@ If your plugin does not need CSS, delete this file.
 	border: 1px dashed var(--text-muted);
 }
 
-.session-history-debug h3 {
+.agent-client-session-history-debug h3 {
 	margin: 0 0 12px 0;
 	font-size: 14px;
 	color: var(--text-muted);
 }
 
-.session-history-debug-group {
+.agent-client-session-history-debug-group {
 	margin-bottom: 10px;
 }
 
-.session-history-debug-group label {
+.agent-client-session-history-debug-group label {
 	display: block;
 	margin-bottom: 4px;
 	font-size: 12px;
 	color: var(--text-muted);
 }
 
-.session-history-debug-input {
+.agent-client-session-history-debug-input {
 	width: 100%;
 	padding: 6px 8px;
 	font-size: 13px;
@@ -1523,13 +1523,13 @@ If your plugin does not need CSS, delete this file.
 	background: var(--background-primary);
 }
 
-.session-history-debug-actions {
+.agent-client-session-history-debug-actions {
 	display: flex;
 	gap: 8px;
 	margin-top: 12px;
 }
 
-.session-history-debug-button {
+.agent-client-session-history-debug-button {
 	padding: 6px 12px;
 	font-size: 13px;
 	border-radius: 4px;
@@ -1539,18 +1539,18 @@ If your plugin does not need CSS, delete this file.
 	border: none;
 }
 
-.session-history-debug-button:hover {
+.agent-client-session-history-debug-button:hover {
 	background: var(--interactive-accent-hover);
 }
 
-.session-history-debug-separator {
+.agent-client-session-history-debug-separator {
 	margin: 16px 0;
 	border: none;
 	border-top: 1px solid var(--background-modifier-border);
 }
 
 /* Local sessions banner */
-.session-history-local-banner {
+.agent-client-session-history-local-banner {
 	padding: 8px 12px;
 	margin-bottom: 12px;
 	background: var(--background-secondary);

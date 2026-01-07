@@ -127,7 +127,7 @@ export class SessionHistoryModal extends Modal {
 		// Show local sessions banner if using locally saved sessions
 		if (isUsingLocalSessions) {
 			const banner = contentEl.createDiv({
-				cls: "session-history-local-banner",
+				cls: "agent-client-session-history-local-banner",
 			});
 			banner.createSpan({
 				text: "Locally saved sessions (agent doesn't support session/list)",
@@ -140,15 +140,15 @@ export class SessionHistoryModal extends Modal {
 			if (!debugMode) {
 				// Show message that list is not available
 				const messageContainer = contentEl.createDiv({
-					cls: "session-history-empty",
+					cls: "agent-client-session-history-empty",
 				});
 				messageContainer.createEl("p", {
 					text: "Session list is not available for this agent.",
-					cls: "session-history-empty-text",
+					cls: "agent-client-session-history-empty-text",
 				});
 				messageContainer.createEl("p", {
 					text: "Enable Debug Mode in settings to manually enter session IDs.",
-					cls: "session-history-empty-text",
+					cls: "agent-client-session-history-empty-text",
 				});
 			}
 			return;
@@ -158,12 +158,12 @@ export class SessionHistoryModal extends Modal {
 		// (local sessions are already filtered by agentId and cwd)
 		if (canList && !isUsingLocalSessions) {
 			const filterContainer = contentEl.createDiv({
-				cls: "session-history-filter",
+				cls: "agent-client-session-history-filter",
 			});
 
 			// Filter toggle checkbox
 			const filterLabel = filterContainer.createEl("label", {
-				cls: "session-history-filter-label",
+				cls: "agent-client-session-history-filter-label",
 			});
 
 			const filterCheckbox = filterLabel.createEl("input", {
@@ -187,17 +187,17 @@ export class SessionHistoryModal extends Modal {
 		// Display error if present
 		if (error) {
 			const errorContainer = contentEl.createDiv({
-				cls: "session-history-error",
+				cls: "agent-client-session-history-error",
 			});
 
 			errorContainer.createEl("p", {
 				text: error,
-				cls: "session-history-error-text",
+				cls: "agent-client-session-history-error-text",
 			});
 
 			const retryButton = errorContainer.createEl("button", {
 				text: "Retry",
-				cls: "session-history-retry-button",
+				cls: "agent-client-session-history-retry-button",
 			});
 			retryButton.addEventListener("click", () => {
 				const cwd = this.filterByCurrentVault
@@ -212,7 +212,7 @@ export class SessionHistoryModal extends Modal {
 		// Display loading indicator if loading and no sessions yet
 		if (loading && sessions.length === 0) {
 			const loadingContainer = contentEl.createDiv({
-				cls: "session-history-loading",
+				cls: "agent-client-session-history-loading",
 			});
 			loadingContainer.createEl("p", {
 				text: "Loading sessions...",
@@ -223,33 +223,33 @@ export class SessionHistoryModal extends Modal {
 		// Display empty state if no sessions
 		if (sessions.length === 0) {
 			const emptyContainer = contentEl.createDiv({
-				cls: "session-history-empty",
+				cls: "agent-client-session-history-empty",
 			});
 			emptyContainer.createEl("p", {
 				text: "No previous sessions",
-				cls: "session-history-empty-text",
+				cls: "agent-client-session-history-empty-text",
 			});
 			return;
 		}
 
 		// Render session list
 		const listContainer = contentEl.createDiv({
-			cls: "session-history-list",
+			cls: "agent-client-session-history-list",
 		});
 
 		sessions.forEach((session) => {
 			const sessionItem = listContainer.createDiv({
-				cls: "session-history-item",
+				cls: "agent-client-session-history-item",
 			});
 
 			// Session content container (for title and metadata)
 			const contentContainer = sessionItem.createDiv({
-				cls: "session-history-item-content",
+				cls: "agent-client-session-history-item-content",
 			});
 
 			// Session title
 			const titleEl = contentContainer.createDiv({
-				cls: "session-history-item-title",
+				cls: "agent-client-session-history-item-title",
 			});
 			titleEl.createSpan({
 				text: this.truncateTitle(session.title ?? "Untitled Session"),
@@ -257,13 +257,13 @@ export class SessionHistoryModal extends Modal {
 
 			// Session metadata container
 			const metadataEl = contentContainer.createDiv({
-				cls: "session-history-item-metadata",
+				cls: "agent-client-session-history-item-metadata",
 			});
 
 			// Relative timestamp (only if updatedAt is available)
 			if (session.updatedAt) {
 				const timestampEl = metadataEl.createSpan({
-					cls: "session-history-item-timestamp",
+					cls: "agent-client-session-history-item-timestamp",
 				});
 				timestampEl.setText(
 					this.formatRelativeTime(new Date(session.updatedAt)),
@@ -272,13 +272,13 @@ export class SessionHistoryModal extends Modal {
 
 			// Actions container
 			const actionsContainer = sessionItem.createDiv({
-				cls: "session-history-item-actions",
+				cls: "agent-client-session-history-item-actions",
 			});
 
 			// Load button (stable - with history replay)
 			if (this.props.canLoad) {
 				const loadButton = actionsContainer.createDiv({
-					cls: "session-history-action-icon session-history-load-icon",
+					cls: "agent-client-session-history-action-icon agent-client-session-history-load-icon",
 				});
 				setIcon(loadButton, "file-text");
 				loadButton.setAttribute(
@@ -295,7 +295,7 @@ export class SessionHistoryModal extends Modal {
 			// Resume button (unstable - without history replay)
 			if (this.props.canResume) {
 				const resumeButton = actionsContainer.createDiv({
-					cls: "session-history-action-icon session-history-resume-icon",
+					cls: "agent-client-session-history-action-icon agent-client-session-history-resume-icon",
 				});
 				setIcon(resumeButton, "play");
 				resumeButton.setAttribute(
@@ -312,7 +312,7 @@ export class SessionHistoryModal extends Modal {
 			// Fork button (unstable - create new branch)
 			if (this.props.canFork) {
 				const forkButton = actionsContainer.createDiv({
-					cls: "session-history-action-icon session-history-fork-icon",
+					cls: "agent-client-session-history-action-icon agent-client-session-history-fork-icon",
 				});
 				setIcon(forkButton, "git-branch");
 				forkButton.setAttribute(
@@ -330,12 +330,12 @@ export class SessionHistoryModal extends Modal {
 		// Pagination: Load more button
 		if (hasMore) {
 			const loadMoreContainer = contentEl.createDiv({
-				cls: "session-history-load-more",
+				cls: "agent-client-session-history-load-more",
 			});
 
 			const loadMoreButton = loadMoreContainer.createEl("button", {
 				text: loading ? "Loading..." : "Load more",
-				cls: "session-history-load-more-button",
+				cls: "agent-client-session-history-load-more-button",
 			});
 
 			if (loading) {
@@ -354,14 +354,14 @@ export class SessionHistoryModal extends Modal {
 	 */
 	private renderDebugForm(container: HTMLElement) {
 		const debugContainer = container.createDiv({
-			cls: "session-history-debug",
+			cls: "agent-client-session-history-debug",
 		});
 
 		debugContainer.createEl("h3", { text: "Debug: Manual Session Input" });
 
 		// Session ID input
 		const sessionIdGroup = debugContainer.createDiv({
-			cls: "session-history-debug-group",
+			cls: "agent-client-session-history-debug-group",
 		});
 		sessionIdGroup.createEl("label", {
 			text: "Session ID:",
@@ -370,7 +370,7 @@ export class SessionHistoryModal extends Modal {
 		const sessionIdInput = sessionIdGroup.createEl("input", {
 			type: "text",
 			placeholder: "Enter session ID...",
-			cls: "session-history-debug-input",
+			cls: "agent-client-session-history-debug-input",
 			attr: { id: "debug-session-id" },
 		});
 		sessionIdInput.value = this.debugSessionId;
@@ -380,7 +380,7 @@ export class SessionHistoryModal extends Modal {
 
 		// CWD input
 		const cwdGroup = debugContainer.createDiv({
-			cls: "session-history-debug-group",
+			cls: "agent-client-session-history-debug-group",
 		});
 		cwdGroup.createEl("label", {
 			text: "Working Directory (cwd):",
@@ -389,7 +389,7 @@ export class SessionHistoryModal extends Modal {
 		const cwdInput = cwdGroup.createEl("input", {
 			type: "text",
 			placeholder: "Enter working directory...",
-			cls: "session-history-debug-input",
+			cls: "agent-client-session-history-debug-input",
 			attr: { id: "debug-cwd" },
 		});
 		cwdInput.value = this.debugCwd;
@@ -399,13 +399,13 @@ export class SessionHistoryModal extends Modal {
 
 		// Action buttons - in debug mode, show all buttons regardless of capabilities
 		const actionsContainer = debugContainer.createDiv({
-			cls: "session-history-debug-actions",
+			cls: "agent-client-session-history-debug-actions",
 		});
 
 		// Load button
 		const loadButton = actionsContainer.createEl("button", {
 			text: "Load",
-			cls: "session-history-debug-button",
+			cls: "agent-client-session-history-debug-button",
 		});
 		loadButton.addEventListener("click", () => {
 			if (this.debugSessionId.trim()) {
@@ -420,7 +420,7 @@ export class SessionHistoryModal extends Modal {
 		// Resume button
 		const resumeButton = actionsContainer.createEl("button", {
 			text: "Resume",
-			cls: "session-history-debug-button",
+			cls: "agent-client-session-history-debug-button",
 		});
 		resumeButton.addEventListener("click", () => {
 			if (this.debugSessionId.trim()) {
@@ -435,7 +435,7 @@ export class SessionHistoryModal extends Modal {
 		// Fork button
 		const forkButton = actionsContainer.createEl("button", {
 			text: "Fork",
-			cls: "session-history-debug-button",
+			cls: "agent-client-session-history-debug-button",
 		});
 		forkButton.addEventListener("click", () => {
 			if (this.debugSessionId.trim()) {
@@ -449,7 +449,7 @@ export class SessionHistoryModal extends Modal {
 
 		// Separator
 		debugContainer.createEl("hr", {
-			cls: "session-history-debug-separator",
+			cls: "agent-client-session-history-debug-separator",
 		});
 	}
 
