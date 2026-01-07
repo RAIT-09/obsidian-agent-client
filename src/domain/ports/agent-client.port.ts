@@ -20,6 +20,10 @@ import type {
 import type { SessionUpdate } from "../models/session-update";
 import type { AgentError } from "../models/agent-error";
 import type { PromptContent } from "../models/prompt-content";
+import type {
+	SessionInfo,
+	LoadSessionResult,
+} from "../models/session-info";
 
 /**
  * Runtime configuration for launching an AI agent process.
@@ -344,4 +348,73 @@ export interface IAgentClient {
 	 * @param modelId - The model ID to set
 	 */
 	setSessionModel(sessionId: string, modelId: string): Promise<void>;
+
+	/**
+	 * Check if the agent supports session management.
+	 *
+	 * Session management includes listing previous sessions and loading/resuming them.
+	 * This method tests if the agent implements the session/list and session/load methods.
+	 *
+	 * @returns Promise resolving to true if session management is supported
+	 */
+	supportsSessionManagement(): Promise<boolean>;
+
+	/**
+	 * List previous chat sessions.
+	 *
+	 * Returns a paginated list of session metadata for browsing history.
+	 * Only available if supportsSessionManagement() returns true.
+	 *
+	 * @param cursor - Optional pagination cursor from previous listSessions call
+	 * @returns Promise resolving to array of session info and optional next cursor
+	 * @throws Error if session management is not supported
+	 */
+	listSessions(cursor?: string): Promise<{
+		sessions: SessionInfo[];
+		nextCursor?: string;
+	}>;
+
+	/**
+	 * Load a previous chat session.
+	 *
+	 * Resumes a previous session by its ID, restoring the conversation history
+	 * and context. Only available if supportsSessionManagement() returns true.
+	 *
+	 * @param sessionId - ID of the session to load
+	 * @param workingDirectory - Working directory for the session
+	 * @param fork - Whether to fork the session (create new branch) or resume original (default: true)
+	 * @returns Promise resolving to session result with modes, models, and conversation history
+	 * @throws Error if session management is not supported or session not found
+	 */
+	loadSession(
+		sessionId: string,
+		workingDirectory: string,
+		fork?: boolean,
+	): Promise<LoadSessionResult>;
+
+	/**
+	 * Delete a session.
+	 *
+	 * Removes the session from storage and deletes associated files.
+	 * Only available if supportsSessionManagement() returns true.
+	 *
+	 * @param sessionId - ID of the session to delete
+	 * @param workingDirectory - Working directory for the session
+	 * @returns Promise resolving when deletion is complete
+	 * @throws Error if session management is not supported or session not found
+	 */
+	deleteSession(sessionId: string, workingDirectory: string): Promise<void>;
+
+	/**
+	 * Rename a session.
+	 *
+	 * Updates the session title in storage.
+	 * Only available if supportsSessionManagement() returns true.
+	 *
+	 * @param sessionId - ID of the session to rename
+	 * @param newTitle - New title for the session
+	 * @returns Promise resolving when rename is complete
+	 * @throws Error if session management is not supported or session not found
+	 */
+	renameSession(sessionId: string, newTitle: string): Promise<void>;
 }

@@ -9,6 +9,7 @@ import type AgentClientPlugin from "../../plugin";
 import { ChatHeader } from "./ChatHeader";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
+import { SessionHistoryModal } from "./SessionHistoryModal";
 
 // Service imports
 import { NoteMentionService } from "../../adapters/obsidian/mention-service";
@@ -30,6 +31,7 @@ import { useAgentSession } from "../../hooks/useAgentSession";
 import { useChat } from "../../hooks/useChat";
 import { usePermission } from "../../hooks/usePermission";
 import { useAutoExport } from "../../hooks/useAutoExport";
+import { useSessionHistory } from "../../hooks/useSessionHistory";
 
 // Type definitions for Obsidian internal APIs
 interface VaultAdapterWithBasePath {
@@ -134,6 +136,37 @@ function ChatComponent({
 
 	const autoExport = useAutoExport(plugin);
 
+	// Session history hook with callback for session load
+	const handleSessionLoad = useCallback(
+		(
+			sessionId: string,
+			modes?: any,
+			models?: any,
+			conversationHistory?: Array<{
+				role: string;
+				content: Array<{ type: string; text: string }>;
+				timestamp?: string;
+			}>,
+		) => {
+			// Log that session was loaded
+			logger.log(`[ChatView] Session loaded: ${sessionId}`, {
+				modes,
+				models,
+				historyMessages: conversationHistory?.length || 0,
+			});
+
+			// Populate messages from conversation history
+			if (conversationHistory && conversationHistory.length > 0) {
+				chat.setInitialMessages(conversationHistory);
+				logger.log(
+					`[ChatView] Loaded ${conversationHistory.length} messages from session history`,
+				);
+			}
+		},
+		[logger, chat],
+	);
+	const sessionHistory = useSessionHistory(acpAdapter, handleSessionLoad);
+
 	// Combined error info (session errors take precedence)
 	const errorInfo =
 		sessionErrorInfo || chat.errorInfo || permission.errorInfo;
@@ -143,6 +176,7 @@ function ChatComponent({
 	// ============================================================
 	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
 	const [restoredMessage, setRestoredMessage] = useState<string | null>(null);
+	const [historyModal, setHistoryModal] = useState<SessionHistoryModal | null>(null);
 
 	// ============================================================
 	// Computed Values
@@ -169,6 +203,50 @@ function ChatComponent({
 		);
 		return custom?.displayName || custom?.id || activeId;
 	}, [session.agentId, plugin.settings]);
+
+	// Check if session history is supported
+	const [hasHistoryCapability, setHasHistoryCapability] = useState(false);
+
+	// Detect session management capability when session is ready
+	useEffect(() => {
+		logger.log(
+			`[ChatView] Capability detection triggered - isSessionReady: ${isSessionReady}`,
+		);
+
+		if (!isSessionReady) {
+			logger.log(
+				"[ChatView] Session not ready, setting hasHistoryCapability to false",
+			);
+			setHasHistoryCapability(false);
+			return;
+		}
+
+		logger.log("[ChatView] Session ready, checking session management support...");
+
+		// Check if agent supports session management
+		void (async () => {
+			try {
+				logger.log("[ChatView] Calling supportsSessionManagement()...");
+				const supported = await acpAdapter.supportsSessionManagement();
+				logger.log(
+					`[ChatView] supportsSessionManagement() returned: ${supported}`,
+				);
+				setHasHistoryCapability(supported);
+				if (supported) {
+					logger.log("[ChatView] Session management IS supported - History button should appear");
+				} else {
+					logger.log(
+						"[ChatView] Session management NOT supported by this agent",
+					);
+				}
+			} catch (error) {
+				logger.log(
+					`[ChatView] Error checking session management support: ${error}`,
+				);
+				setHasHistoryCapability(false);
+			}
+		})();
+	}, [isSessionReady, acpAdapter, logger]);
 
 	// ============================================================
 	// Callbacks
@@ -214,6 +292,9 @@ function ChatComponent({
 			autoMention.toggle(false);
 			chat.clearMessages();
 			await agentSession.restartSession();
+
+			// Invalidate session history cache when creating new session
+			sessionHistory.invalidateCache();
 		},
 		[
 			messages,
@@ -223,6 +304,7 @@ function ChatComponent({
 			autoMention,
 			chat,
 			agentSession,
+			sessionHistory,
 		],
 	);
 
@@ -255,6 +337,147 @@ function ChatComponent({
 		appWithSettings.setting.open();
 		appWithSettings.setting.openTabById(plugin.manifest.id);
 	}, [plugin]);
+
+	const handleOpenHistory = useCallback(() => {
+		// Create modal if it doesn't exist
+		if (!historyModal) {
+			const modal = new SessionHistoryModal(plugin.app, {
+				sessions: sessionHistory.sessions,
+				loading: sessionHistory.loading,
+				error: sessionHistory.error,
+				hasMore: sessionHistory.hasMore,
+				currentCwd: vaultPath,
+				onLoadSession: async (sessionId: string, workingDirectory: string, fork: boolean) => {
+					try {
+						logger.log(`[ChatView] Loading session: ${sessionId} (fork: ${fork})`);
+
+						// Clear existing messages before loading
+						chat.clearMessages();
+
+						// Load the session (updates session state and returns history)
+						const conversationHistory = await agentSession.loadSession(sessionId, fork);
+
+						// Populate messages from conversation history
+						if (conversationHistory && conversationHistory.length > 0) {
+							chat.setInitialMessages(conversationHistory);
+							logger.log(
+								`[ChatView] Loaded ${conversationHistory.length} messages from session`,
+							);
+						}
+
+						const mode = fork ? "forked" : "resumed";
+						new Notice(
+							`[Agent Client] Session ${mode} with ${conversationHistory?.length || 0} messages`,
+						);
+					} catch (error) {
+						new Notice("[Agent Client] Failed to load session");
+						logger.error("Session load error:", error);
+					}
+				},
+				onRenameSession: async (sessionId: string, newTitle: string) => {
+					try {
+						logger.log(`[ChatView] Renaming session: ${sessionId} to "${newTitle}"`);
+						await sessionHistory.renameSession(sessionId, newTitle);
+						new Notice("[Agent Client] Session renamed");
+					} catch (error) {
+						new Notice("[Agent Client] Failed to rename session");
+						logger.error("Session rename error:", error);
+					}
+				},
+				onDeleteSession: async (sessionId: string, workingDirectory: string) => {
+					try {
+						logger.log(`[ChatView] Deleting session: ${sessionId}`);
+						await sessionHistory.deleteSession(sessionId, workingDirectory);
+						new Notice("[Agent Client] Session deleted");
+					} catch (error) {
+						new Notice("[Agent Client] Failed to delete session");
+						logger.error("Session delete error:", error);
+					}
+				},
+				onLoadMore: () => {
+					void sessionHistory.loadMoreSessions();
+				},
+				onFetchSessions: (cwd?: string) => {
+					void sessionHistory.fetchSessions(cwd);
+				},
+			});
+			setHistoryModal(modal);
+			modal.open();
+
+			// Fetch sessions when modal opens
+			void sessionHistory.fetchSessions(vaultPath);
+		} else {
+			historyModal.open();
+			// Fetch sessions when modal reopens (in case they've changed)
+			void sessionHistory.fetchSessions(vaultPath);
+		}
+	}, [historyModal, plugin.app, sessionHistory, vaultPath, chat, logger]);
+
+	// Update modal props when session history state changes
+	useEffect(() => {
+		if (historyModal) {
+			historyModal.updateProps({
+				sessions: sessionHistory.sessions,
+				loading: sessionHistory.loading,
+				error: sessionHistory.error,
+				hasMore: sessionHistory.hasMore,
+				currentCwd: vaultPath,
+				onLoadSession: async (sessionId: string, workingDirectory: string, fork: boolean) => {
+					try {
+						logger.log(`[ChatView] Loading session: ${sessionId} (fork: ${fork})`);
+
+						// Clear existing messages before loading
+						chat.clearMessages();
+
+						// Load the session (updates session state and returns history)
+						const conversationHistory = await agentSession.loadSession(sessionId, fork);
+
+						// Populate messages from conversation history
+						if (conversationHistory && conversationHistory.length > 0) {
+							chat.setInitialMessages(conversationHistory);
+							logger.log(
+								`[ChatView] Loaded ${conversationHistory.length} messages from session`,
+							);
+						}
+
+						const mode = fork ? "forked" : "resumed";
+						new Notice(
+							`[Agent Client] Session ${mode} with ${conversationHistory?.length || 0} messages`,
+						);
+					} catch (error) {
+						new Notice("[Agent Client] Failed to load session");
+						logger.error("Session load error:", error);
+					}
+				},
+				onRenameSession: async (sessionId: string, newTitle: string) => {
+					try {
+						logger.log(`[ChatView] Renaming session: ${sessionId} to "${newTitle}"`);
+						await sessionHistory.renameSession(sessionId, newTitle);
+						new Notice("[Agent Client] Session renamed");
+					} catch (error) {
+						new Notice("[Agent Client] Failed to rename session");
+						logger.error("Session rename error:", error);
+					}
+				},
+				onDeleteSession: async (sessionId: string, workingDirectory: string) => {
+					try {
+						logger.log(`[ChatView] Deleting session: ${sessionId}`);
+						await sessionHistory.deleteSession(sessionId, workingDirectory);
+						new Notice("[Agent Client] Session deleted");
+					} catch (error) {
+						new Notice("[Agent Client] Failed to delete session");
+						logger.error("Session delete error:", error);
+					}
+				},
+				onLoadMore: () => {
+					void sessionHistory.loadMoreSessions();
+				},
+				onFetchSessions: (cwd?: string) => {
+					void sessionHistory.fetchSessions(cwd);
+				},
+			});
+		}
+	}, [sessionHistory.sessions, sessionHistory.loading, sessionHistory.error, sessionHistory.hasMore, historyModal, vaultPath, chat, logger]);
 
 	const handleSendMessage = useCallback(
 		async (
@@ -503,6 +726,30 @@ function ChatComponent({
 		handleStopGeneration,
 	]);
 
+	// Get current session title from session history
+	const currentSessionTitle = useMemo(() => {
+		if (!session.sessionId) return null;
+		const sessionInfo = sessionHistory.sessions.find(
+			(s) => s.sessionId === session.sessionId,
+		);
+		return sessionInfo?.title || null;
+	}, [session.sessionId, sessionHistory.sessions]);
+
+	// Handle session rename
+	const handleRenameCurrentSession = useCallback(
+		async (sessionId: string, newTitle: string) => {
+			try {
+				logger.log(`[ChatView] Renaming current session: ${sessionId} to "${newTitle}"`);
+				await sessionHistory.renameSession(sessionId, newTitle);
+				new Notice("[Agent Client] Session renamed");
+			} catch (error) {
+				new Notice("[Agent Client] Failed to rename session");
+				logger.error("Session rename error:", error);
+			}
+		},
+		[sessionHistory, logger],
+	);
+
 	// ============================================================
 	// Render
 	// ============================================================
@@ -511,9 +758,14 @@ function ChatComponent({
 			<ChatHeader
 				agentLabel={activeAgentLabel}
 				isUpdateAvailable={isUpdateAvailable}
+				hasHistoryCapability={hasHistoryCapability}
+				sessionTitle={currentSessionTitle}
+				sessionId={session.sessionId}
 				onNewChat={() => void handleNewChat()}
 				onExportChat={() => void handleExportChat()}
 				onOpenSettings={handleOpenSettings}
+				onOpenHistory={handleOpenHistory}
+				onRenameSession={handleRenameCurrentSession}
 			/>
 
 			<ChatMessages
