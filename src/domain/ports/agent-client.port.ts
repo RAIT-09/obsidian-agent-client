@@ -22,7 +22,10 @@ import type { AgentError } from "../models/agent-error";
 import type { PromptContent } from "../models/prompt-content";
 import type {
 	SessionInfo,
+	ListSessionsResult,
 	LoadSessionResult,
+	ResumeSessionResult,
+	ForkSessionResult,
 } from "../models/session-info";
 
 /**
@@ -113,14 +116,30 @@ export interface McpCapabilities {
 }
 
 /**
+ * Session-related capabilities (unstable features).
+ * From agentCapabilities.sessionCapabilities in initialize response.
+ */
+export interface SessionCapabilities {
+	/** session/resume support (unstable) */
+	resume?: Record<string, unknown>;
+	/** session/fork support (unstable) */
+	fork?: Record<string, unknown>;
+	/** session/list support (unstable) */
+	list?: Record<string, unknown>;
+}
+
+/**
  * Full agent capabilities from ACP initialization.
  *
  * Contains all capability information returned by the agent,
  * including session features, MCP support, and prompt capabilities.
  */
 export interface AgentCapabilities {
-	/** Whether the agent supports session/load for resuming sessions */
+	/** Whether the agent supports session/load for resuming sessions (stable) */
 	loadSession?: boolean;
+
+	/** Session management capabilities (unstable features) */
+	sessionCapabilities?: SessionCapabilities;
 
 	/** MCP connection capabilities */
 	mcpCapabilities?: McpCapabilities;
@@ -165,7 +184,7 @@ export interface InitializeResult {
 
 	/**
 	 * Full agent capabilities from initialization.
-	 * Contains loadSession, mcpCapabilities, and promptCapabilities.
+	 * Contains loadSession, sessionCapabilities, mcpCapabilities, and promptCapabilities.
 	 */
 	agentCapabilities?: AgentCapabilities;
 
@@ -273,6 +292,7 @@ export interface IAgentClient {
 	 * Called when the agent sends session update events such as:
 	 * - agent_message_chunk: Text chunk from agent's response
 	 * - agent_thought_chunk: Text chunk from agent's reasoning
+	 * - user_message_chunk: Text chunk from user message (for session/load history replay)
 	 * - tool_call: New tool call event
 	 * - tool_call_update: Update to existing tool call
 	 * - plan: Agent's task plan
@@ -349,72 +369,56 @@ export interface IAgentClient {
 	 */
 	setSessionModel(sessionId: string, modelId: string): Promise<void>;
 
-	/**
-	 * Check if the agent supports session management.
-	 *
-	 * Session management includes listing previous sessions and loading/resuming them.
-	 * This method tests if the agent implements the session/list and session/load methods.
-	 *
-	 * @returns Promise resolving to true if session management is supported
-	 */
-	supportsSessionManagement(): Promise<boolean>;
+	// ========================================================================
+	// Session Management Methods
+	// ========================================================================
 
 	/**
-	 * List previous chat sessions.
+	 * List available sessions (unstable).
 	 *
-	 * Returns a paginated list of session metadata for browsing history.
-	 * Only available if supportsSessionManagement() returns true.
+	 * Only available if session.agentCapabilities.sessionCapabilities?.list is defined.
 	 *
-	 * @param cursor - Optional pagination cursor from previous listSessions call
-	 * @returns Promise resolving to array of session info and optional next cursor
-	 * @throws Error if session management is not supported
+	 * @param cwd - Optional filter by working directory
+	 * @param cursor - Pagination cursor from previous call
+	 * @returns Promise resolving to sessions array and optional next cursor
 	 */
-	listSessions(cursor?: string): Promise<{
-		sessions: SessionInfo[];
-		nextCursor?: string;
-	}>;
+	listSessions(cwd?: string, cursor?: string): Promise<ListSessionsResult>;
 
 	/**
-	 * Load a previous chat session.
+	 * Load a previous session with history replay (stable).
 	 *
-	 * Resumes a previous session by its ID, restoring the conversation history
-	 * and context. Only available if supportsSessionManagement() returns true.
+	 * Conversation history is received via onSessionUpdate callback
+	 * as user_message_chunk, agent_message_chunk, tool_call, etc.
 	 *
-	 * @param sessionId - ID of the session to load
-	 * @param workingDirectory - Working directory for the session
-	 * @param fork - Whether to fork the session (create new branch) or resume original (default: true)
-	 * @returns Promise resolving to session result with modes, models, and conversation history
-	 * @throws Error if session management is not supported or session not found
+	 * Only available if session.agentCapabilities.loadSession is true.
+	 *
+	 * @param sessionId - Session to load
+	 * @param cwd - Working directory
+	 * @returns Promise resolving to session result with modes and models
 	 */
-	loadSession(
-		sessionId: string,
-		workingDirectory: string,
-		fork?: boolean,
-	): Promise<LoadSessionResult>;
+	loadSession(sessionId: string, cwd: string): Promise<LoadSessionResult>;
 
 	/**
-	 * Delete a session.
+	 * Resume a session without history replay (unstable).
 	 *
-	 * Removes the session from storage and deletes associated files.
-	 * Only available if supportsSessionManagement() returns true.
+	 * Use when client manages its own history storage.
+	 * Only available if session.agentCapabilities.sessionCapabilities?.resume is defined.
 	 *
-	 * @param sessionId - ID of the session to delete
-	 * @param workingDirectory - Working directory for the session
-	 * @returns Promise resolving when deletion is complete
-	 * @throws Error if session management is not supported or session not found
+	 * @param sessionId - Session to resume
+	 * @param cwd - Working directory
+	 * @returns Promise resolving to session result with modes and models
 	 */
-	deleteSession(sessionId: string, workingDirectory: string): Promise<void>;
+	resumeSession(sessionId: string, cwd: string): Promise<ResumeSessionResult>;
 
 	/**
-	 * Rename a session.
+	 * Fork a session to create a new branch (unstable).
 	 *
-	 * Updates the session title in storage.
-	 * Only available if supportsSessionManagement() returns true.
+	 * Creates a new session with inherited context from the original.
+	 * Only available if session.agentCapabilities.sessionCapabilities?.fork is defined.
 	 *
-	 * @param sessionId - ID of the session to rename
-	 * @param newTitle - New title for the session
-	 * @returns Promise resolving when rename is complete
-	 * @throws Error if session management is not supported or session not found
+	 * @param sessionId - Session to fork from
+	 * @param cwd - Working directory
+	 * @returns Promise resolving to session result with new sessionId
 	 */
-	renameSession(sessionId: string, newTitle: string): Promise<void>;
+	forkSession(sessionId: string, cwd: string): Promise<ForkSessionResult>;
 }

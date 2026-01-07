@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect } from "react";
 import type {
 	ChatSession,
 	SessionState,
+	SessionModeState,
+	SessionModelState,
 	SlashCommand,
 	AuthenticationMethod,
 } from "../domain/models/chat-session";
@@ -59,17 +61,14 @@ export interface UseAgentSessionReturn {
 
 	/**
 	 * Load a previous session by ID.
-	 * Restores conversation history and creates a new session for future prompts.
+	 * Restores conversation context via session/load.
+	 *
+	 * Note: Conversation history is received via session/update notifications
+	 * (user_message_chunk, agent_message_chunk, etc.), not returned from this function.
+	 *
 	 * @param sessionId - ID of the session to load
-	 * @param fork - Whether to fork the session (create new branch) or resume original (default: true)
-	 * @returns Promise resolving to conversation history
 	 */
-	loadSession: (
-		sessionId: string,
-		fork?: boolean,
-	) => Promise<
-		Array<{ role: string; content: Array<{ type: string; text: string }> }>
-	>;
+	loadSession: (sessionId: string) => Promise<void>;
 
 	/**
 	 * Restart the current session.
@@ -101,6 +100,19 @@ export interface UseAgentSessionReturn {
 	 * @returns Array of agent info with id and displayName
 	 */
 	getAvailableAgents: () => AgentInfo[];
+
+	/**
+	 * Update session state after loading/resuming/forking a session.
+	 * Called by useSessionHistory after a successful session operation.
+	 * @param sessionId - New session ID
+	 * @param modes - Session modes (optional)
+	 * @param models - Session models (optional)
+	 */
+	updateSessionFromLoad: (
+		sessionId: string,
+		modes?: SessionModeState,
+		models?: SessionModelState,
+	) => void;
 
 	/**
 	 * Callback to update available slash commands.
@@ -458,11 +470,13 @@ export function useAgentSession(
 	 * Load a previous session by ID.
 	 * Restores conversation history and creates a new session for future prompts.
 	 *
+	 * Note: Conversation history is received via session/update notifications
+	 * (user_message_chunk, agent_message_chunk, etc.), not returned from this function.
+	 *
 	 * @param sessionId - ID of the session to load
-	 * @param fork - Whether to fork the session (create new branch) or resume original (default: true)
 	 */
 	const loadSession = useCallback(
-		async (sessionId: string, fork: boolean = true) => {
+		async (sessionId: string) => {
 			// Get current settings and agent info
 			const settings = settingsAccess.getSnapshot();
 			const activeAgentId = getActiveAgentId(settings);
@@ -487,7 +501,10 @@ export function useAgentSession(
 
 			try {
 				// Find agent settings
-				const agentSettings = findAgentSettings(settings, activeAgentId);
+				const agentSettings = findAgentSettings(
+					settings,
+					activeAgentId,
+				);
 
 				if (!agentSettings) {
 					setSession((prev) => ({ ...prev, state: "error" }));
@@ -497,7 +514,7 @@ export function useAgentSession(
 						suggestion:
 							"Please check your agent configuration in settings.",
 					});
-					return [];
+					return;
 				}
 
 				// Build AgentConfig with API key injection
@@ -521,25 +538,46 @@ export function useAgentSession(
 							embeddedContext?: boolean;
 					  }
 					| undefined;
+				let agentCapabilities:
+					| {
+							loadSession?: boolean;
+							sessionCapabilities?: {
+								resume?: Record<string, unknown>;
+								fork?: Record<string, unknown>;
+								list?: Record<string, unknown>;
+							};
+							mcpCapabilities?: {
+								http?: boolean;
+								sse?: boolean;
+							};
+							promptCapabilities?: {
+								image?: boolean;
+								audio?: boolean;
+								embeddedContext?: boolean;
+							};
+					  }
+					| undefined;
 
 				if (needsInitialize) {
 					// Initialize connection to agent
-					const initResult = await agentClient.initialize(agentConfig);
+					const initResult =
+						await agentClient.initialize(agentConfig);
 					authMethods = initResult.authMethods;
 					promptCapabilities = initResult.promptCapabilities;
+					agentCapabilities = initResult.agentCapabilities;
 				}
 
 				// Load the session
+				// Conversation history is received via session/update notifications
 				const loadResult = await agentClient.loadSession(
 					sessionId,
 					workingDirectory,
-					fork,
 				);
 
-				// Success - update to ready state with new session ID
+				// Success - update to ready state with session ID
 				setSession((prev) => ({
 					...prev,
-					sessionId: loadResult.newSessionId || loadResult.sessionId,
+					sessionId: loadResult.sessionId,
 					state: "ready",
 					authMethods: authMethods,
 					modes: loadResult.modes,
@@ -547,11 +585,11 @@ export function useAgentSession(
 					promptCapabilities: needsInitialize
 						? promptCapabilities
 						: prev.promptCapabilities,
+					agentCapabilities: needsInitialize
+						? agentCapabilities
+						: prev.agentCapabilities,
 					lastActivityAt: new Date(),
 				}));
-
-				// Return conversation history for chat hook to populate messages
-				return loadResult.conversationHistory || [];
 			} catch (error) {
 				// Error - update to error state
 				setSession((prev) => ({ ...prev, state: "error" }));
@@ -560,7 +598,6 @@ export function useAgentSession(
 					message: `Failed to load session: ${error instanceof Error ? error.message : String(error)}`,
 					suggestion: "Please try again or create a new session.",
 				});
-				return [];
 			}
 		},
 		[agentClient, settingsAccess, workingDirectory],
@@ -809,6 +846,28 @@ export function useAgentSession(
 		});
 	}, [agentClient]);
 
+	/**
+	 * Update session state after loading/resuming/forking a session.
+	 * Called by useSessionHistory after a successful session operation.
+	 */
+	const updateSessionFromLoad = useCallback(
+		(
+			sessionId: string,
+			modes?: SessionModeState,
+			models?: SessionModelState,
+		) => {
+			setSession((prev) => ({
+				...prev,
+				sessionId,
+				state: "ready",
+				modes: modes ?? prev.modes,
+				models: models ?? prev.models,
+				lastActivityAt: new Date(),
+			}));
+		},
+		[],
+	);
+
 	return {
 		session,
 		isReady,
@@ -820,6 +879,7 @@ export function useAgentSession(
 		cancelOperation,
 		switchAgent,
 		getAvailableAgents,
+		updateSessionFromLoad,
 		updateAvailableCommands,
 		updateCurrentMode,
 		setMode,

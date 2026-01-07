@@ -15,7 +15,12 @@ import type {
 import type { SessionUpdate } from "../../domain/models/session-update";
 import type { PromptContent } from "../../domain/models/prompt-content";
 import type { AgentError } from "../../domain/models/agent-error";
-import type { LoadSessionResult } from "../../domain/models/session-info";
+import type {
+	ListSessionsResult,
+	LoadSessionResult,
+	ResumeSessionResult,
+	ForkSessionResult,
+} from "../../domain/models/session-info";
 import { AcpTypeConverter } from "./acp-type-converter";
 import { TerminalManager } from "../../shared/terminal-manager";
 import { Logger } from "../../shared/logger";
@@ -430,9 +435,11 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			this.isInitializedFlag = true;
 			this.currentAgentId = config.id;
 
-			// Extract prompt capabilities from agent capabilities
+			// Extract capabilities from agent capabilities
 			const promptCaps = initResult.agentCapabilities?.promptCapabilities;
 			const mcpCaps = initResult.agentCapabilities?.mcpCapabilities;
+			const sessionCaps =
+				initResult.agentCapabilities?.sessionCapabilities;
 
 			return {
 				protocolVersion: initResult.protocolVersion,
@@ -447,6 +454,14 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				agentCapabilities: {
 					loadSession:
 						initResult.agentCapabilities?.loadSession ?? false,
+					// Session capabilities (unstable features)
+					sessionCapabilities: sessionCaps
+						? {
+								resume: sessionCaps.resume ?? undefined,
+								fork: sessionCaps.fork ?? undefined,
+								list: sessionCaps.list ?? undefined,
+							}
+						: undefined,
 					mcpCapabilities: mcpCaps
 						? {
 								http: mcpCaps.http ?? false,
@@ -1285,80 +1300,23 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		return Promise.resolve({});
 	}
 
-	/**
-	 * Check if the agent supports session management.
-	 *
-	 * Tests if the agent implements the session/list and session/load methods
-	 * by attempting a minimal session list call. If the agent returns error -32601
-	 * (Method not found), session management is not supported.
-	 *
-	 * This method is used by the UI to determine whether to show the History button
-	 * and other session management features.
-	 *
-	 * @returns Promise resolving to true if session management is supported
-	 */
-	async supportsSessionManagement(): Promise<boolean> {
-		this.logger.log(
-			"[AcpAdapter] supportsSessionManagement() called",
-		);
-
-		if (!this.connection) {
-			this.logger.log(
-				"[AcpAdapter] No connection - returning false",
-			);
-			return false;
-		}
-
-		this.logger.log(
-			"[AcpAdapter] Connection exists, testing unstable_listSessions...",
-		);
-
-		try {
-			// Attempt to list sessions with minimal parameters
-			// If the agent doesn't support it, this will throw a -32601 error
-			await this.connection.unstable_listSessions({
-				cwd: null,
-				cursor: null,
-			});
-			this.logger.log(
-				"[AcpAdapter] unstable_listSessions succeeded - session management IS supported",
-			);
-			return true;
-		} catch (error: any) {
-			this.logger.log(
-				`[AcpAdapter] unstable_listSessions failed - error code: ${error?.code}, message: ${error?.message}`,
-			);
-
-			// Check for "Method not found" error (code -32601)
-			if (error?.code === -32601) {
-				this.logger.log(
-					"[AcpAdapter] Error code -32601 detected - Agent does not support session management",
-				);
-				return false;
-			}
-			// Other errors might still indicate partial support
-			// (e.g., permission errors), so return true
-			this.logger.log(
-				"[AcpAdapter] Non-32601 error - assuming partial support, returning true",
-			);
-			return true;
-		}
-	}
+	// ========================================================================
+	// Session Management Methods
+	// ========================================================================
 
 	/**
-	 * List previous chat sessions.
+	 * List available sessions (unstable).
 	 *
-	 * Fetches a paginated list of session metadata for browsing history.
-	 * Returns sessions with title, working directory, and last update timestamp.
+	 * Only available if session.agentCapabilities.sessionCapabilities?.list is defined.
 	 *
-	 * @param cursor - Optional pagination cursor from previous call
+	 * @param cwd - Optional filter by working directory
+	 * @param cursor - Pagination cursor from previous call
 	 * @returns Promise resolving to sessions array and optional next cursor
-	 * @throws Error if not initialized or agent doesn't support session management
 	 */
-	async listSessions(cursor?: string): Promise<{
-		sessions: import("../../domain/models/session-info").SessionInfo[];
-		nextCursor?: string;
-	}> {
+	async listSessions(
+		cwd?: string,
+		cursor?: string,
+	): Promise<ListSessionsResult> {
 		if (!this.connection) {
 			throw new Error(
 				"ACP connection not initialized. Call initialize() first.",
@@ -1369,8 +1327,8 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			this.logger.log("[AcpAdapter] Listing sessions...");
 
 			const response = await this.connection.unstable_listSessions({
-				cwd: null, // null = all sessions regardless of working directory
-				cursor: cursor || null,
+				cwd: cwd ?? null,
+				cursor: cursor ?? null,
 			});
 
 			this.logger.log(
@@ -1380,12 +1338,11 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			return {
 				sessions: response.sessions.map((s) => ({
 					sessionId: s.sessionId,
-					title: s.title || "Untitled Session",
 					cwd: s.cwd,
-					workingDirectory: s.cwd, // Alias for backward compatibility
-					updatedAt: s.updatedAt || new Date().toISOString(),
+					title: s.title ?? undefined,
+					updatedAt: s.updatedAt ?? undefined,
 				})),
-				nextCursor: response.nextCursor || undefined,
+				nextCursor: response.nextCursor ?? undefined,
 			};
 		} catch (error) {
 			this.logger.error("[AcpAdapter] List Sessions Error:", error);
@@ -1394,20 +1351,18 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	/**
-	 * Load a previous chat session.
+	 * Load a previous session with history replay (stable).
 	 *
-	 * Resumes a session by its ID, restoring conversation history and context.
-	 * Creates a new session in the UI but connects to the existing agent session.
+	 * Conversation history is received via onSessionUpdate callback
+	 * as user_message_chunk, agent_message_chunk, tool_call, etc.
 	 *
-	 * @param sessionId - ID of the session to load
-	 * @param workingDirectory - Working directory for the session
+	 * @param sessionId - Session to load
+	 * @param cwd - Working directory
 	 * @returns Promise resolving to session result with modes and models
-	 * @throws Error if not initialized, session not found, or agent doesn't support loading
 	 */
 	async loadSession(
 		sessionId: string,
-		workingDirectory: string,
-		fork: boolean = true,
+		cwd: string,
 	): Promise<LoadSessionResult> {
 		if (!this.connection) {
 			throw new Error(
@@ -1416,35 +1371,51 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		}
 
 		try {
-			this.logger.log(
-				`[AcpAdapter] Loading session: ${sessionId} (fork: ${fork})...`,
-			);
+			this.logger.log(`[AcpAdapter] Loading session: ${sessionId}...`);
 
 			const response = await this.connection.loadSession({
 				sessionId,
-				cwd: workingDirectory,
+				cwd,
 				mcpServers: [],
-				_meta: {
-					fork,
-				},
 			});
 
-			// Extract conversation history and new session ID from _meta
-			const meta = response._meta as any;
-			const newSessionId = meta?.newSessionId || sessionId;
-			const conversationHistory = meta?.conversationHistory || [];
-			const forked = meta?.forked ?? fork;
+			// Conversation history is received via session/update notifications
+			// (user_message_chunk, agent_message_chunk, tool_call, etc.)
+			// and handled by the onSessionUpdate callback
 
-			this.logger.log(
-				`[AcpAdapter] Session loaded: ${sessionId}, new session: ${newSessionId}, forked: ${forked}, history messages: ${conversationHistory.length}`,
-			);
+			this.logger.log(`[AcpAdapter] Session loaded: ${sessionId}`);
+
+			// Convert modes/models to domain types
+			let modes: SessionModeState | undefined;
+			if (response.modes) {
+				modes = {
+					availableModes: response.modes.availableModes.map((m) => ({
+						id: m.id,
+						name: m.name,
+						description: m.description ?? undefined,
+					})),
+					currentModeId: response.modes.currentModeId,
+				};
+			}
+
+			let models: SessionModelState | undefined;
+			if (response.models) {
+				models = {
+					availableModels: response.models.availableModels.map(
+						(m) => ({
+							modelId: m.modelId,
+							name: m.name,
+							description: m.description ?? undefined,
+						}),
+					),
+					currentModelId: response.models.currentModelId,
+				};
+			}
 
 			return {
 				sessionId,
-				newSessionId,
-				modes: response.modes as any,
-				models: response.models as any,
-				conversationHistory,
+				modes,
+				models,
 			};
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Load Session Error:", error);
@@ -1453,12 +1424,18 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	/**
-	 * Delete a session.
+	 * Resume a session without history replay (unstable).
+	 *
+	 * Use when client manages its own history storage.
+	 *
+	 * @param sessionId - Session to resume
+	 * @param cwd - Working directory
+	 * @returns Promise resolving to session result with modes and models
 	 */
-	async deleteSession(
+	async resumeSession(
 		sessionId: string,
-		workingDirectory: string,
-	): Promise<void> {
+		cwd: string,
+	): Promise<ResumeSessionResult> {
 		if (!this.connection) {
 			throw new Error(
 				"ACP connection not initialized. Call initialize() first.",
@@ -1466,25 +1443,67 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		}
 
 		try {
-			this.logger.log(`[AcpAdapter] Deleting session: ${sessionId}...`);
+			this.logger.log(`[AcpAdapter] Resuming session: ${sessionId}...`);
 
-			// Use extMethod to call custom deleteSession on the agent
-			await this.connection.extMethod("deleteSession", {
+			const response = await this.connection.unstable_resumeSession({
 				sessionId,
-				cwd: workingDirectory,
+				cwd,
+				mcpServers: [],
 			});
 
-			this.logger.log(`[AcpAdapter] Session deleted: ${sessionId}`);
+			this.logger.log(`[AcpAdapter] Session resumed: ${sessionId}`);
+
+			// Convert modes/models to domain types
+			let modes: SessionModeState | undefined;
+			if (response.modes) {
+				modes = {
+					availableModes: response.modes.availableModes.map((m) => ({
+						id: m.id,
+						name: m.name,
+						description: m.description ?? undefined,
+					})),
+					currentModeId: response.modes.currentModeId,
+				};
+			}
+
+			let models: SessionModelState | undefined;
+			if (response.models) {
+				models = {
+					availableModels: response.models.availableModels.map(
+						(m) => ({
+							modelId: m.modelId,
+							name: m.name,
+							description: m.description ?? undefined,
+						}),
+					),
+					currentModelId: response.models.currentModelId,
+				};
+			}
+
+			return {
+				sessionId,
+				modes,
+				models,
+			};
 		} catch (error) {
-			this.logger.error("[AcpAdapter] Delete Session Error:", error);
+			this.logger.error("[AcpAdapter] Resume Session Error:", error);
 			throw error;
 		}
 	}
 
 	/**
-	 * Rename a session.
+	 * Fork a session to create a new branch (unstable).
+	 *
+	 * Creates a new session with inherited context from the original.
+	 *
+	 * @param sessionId - Session to fork from
+	 * @param cwd - Working directory
+	 * @returns Promise resolving to session result with new sessionId
 	 */
-	async renameSession(sessionId: string, newTitle: string): Promise<void> {
+	async forkSession(
+		sessionId: string,
+		cwd: string,
+	): Promise<ForkSessionResult> {
 		if (!this.connection) {
 			throw new Error(
 				"ACP connection not initialized. Call initialize() first.",
@@ -1492,19 +1511,53 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		}
 
 		try {
-			this.logger.log(
-				`[AcpAdapter] Renaming session: ${sessionId} to "${newTitle}"...`,
-			);
+			this.logger.log(`[AcpAdapter] Forking session: ${sessionId}...`);
 
-			// Use extMethod to call custom renameSession on the agent
-			await this.connection.extMethod("renameSession", {
+			const response = await this.connection.unstable_forkSession({
 				sessionId,
-				newTitle,
+				cwd,
+				mcpServers: [],
 			});
 
-			this.logger.log(`[AcpAdapter] Session renamed: ${sessionId}`);
+			const newSessionId = response.sessionId;
+			this.logger.log(
+				`[AcpAdapter] Session forked: ${sessionId} -> ${newSessionId}`,
+			);
+
+			// Convert modes/models to domain types
+			let modes: SessionModeState | undefined;
+			if (response.modes) {
+				modes = {
+					availableModes: response.modes.availableModes.map((m) => ({
+						id: m.id,
+						name: m.name,
+						description: m.description ?? undefined,
+					})),
+					currentModeId: response.modes.currentModeId,
+				};
+			}
+
+			let models: SessionModelState | undefined;
+			if (response.models) {
+				models = {
+					availableModels: response.models.availableModels.map(
+						(m) => ({
+							modelId: m.modelId,
+							name: m.name,
+							description: m.description ?? undefined,
+						}),
+					),
+					currentModelId: response.models.currentModelId,
+				};
+			}
+
+			return {
+				sessionId: newSessionId,
+				modes,
+				models,
+			};
 		} catch (error) {
-			this.logger.error("[AcpAdapter] Rename Session Error:", error);
+			this.logger.error("[AcpAdapter] Fork Session Error:", error);
 			throw error;
 		}
 	}

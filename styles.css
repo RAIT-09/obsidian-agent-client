@@ -1486,3 +1486,65 @@ If your plugin does not need CSS, delete this file.
 	opacity: 0.5;
 	cursor: not-allowed;
 }
+
+/* Debug mode manual input form */
+.session-history-debug {
+	margin-bottom: 16px;
+	padding: 12px;
+	background: var(--background-secondary);
+	border-radius: 6px;
+	border: 1px dashed var(--text-muted);
+}
+
+.session-history-debug h3 {
+	margin: 0 0 12px 0;
+	font-size: 14px;
+	color: var(--text-muted);
+}
+
+.session-history-debug-group {
+	margin-bottom: 10px;
+}
+
+.session-history-debug-group label {
+	display: block;
+	margin-bottom: 4px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.session-history-debug-input {
+	width: 100%;
+	padding: 6px 8px;
+	font-size: 13px;
+	font-family: var(--font-monospace);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+}
+
+.session-history-debug-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.session-history-debug-button {
+	padding: 6px 12px;
+	font-size: 13px;
+	border-radius: 4px;
+	cursor: pointer;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border: none;
+}
+
+.session-history-debug-button:hover {
+	background: var(--interactive-accent-hover);
+}
+
+.session-history-debug-separator {
+	margin: 16px 0;
+	border: none;
+	border-top: 1px solid var(--background-modifier-border);
+}

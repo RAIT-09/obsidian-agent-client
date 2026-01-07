@@ -1,40 +1,53 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import type { IAgentClient } from "../domain/ports/agent-client.port";
 import type {
 	SessionInfo,
 	ListSessionsResult,
-	LoadSessionResult,
 } from "../domain/models/session-info";
 import type {
+	ChatSession,
 	SessionModeState,
 	SessionModelState,
 } from "../domain/models/chat-session";
+import {
+	getSessionCapabilityFlags,
+	type SessionCapabilityFlags,
+} from "../shared/session-capability-utils";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 /**
- * Callback invoked when a session is successfully loaded.
+ * Callback invoked when a session is successfully loaded/resumed/forked.
  * Provides the loaded session metadata to integrate with chat state.
+ *
+ * Note: Conversation history for load is received via session/update notifications,
+ * not via this callback.
  */
 export interface SessionLoadCallback {
 	/**
-	 * @param sessionId - ID of the loaded session (or new session ID if different)
-	 * @param modes - Available modes from the loaded session
-	 * @param models - Available models from the loaded session
-	 * @param conversationHistory - Conversation history from the loaded session
+	 * @param sessionId - ID of the session (new session ID for fork)
+	 * @param modes - Available modes from the session
+	 * @param models - Available models from the session
 	 */
 	(
 		sessionId: string,
 		modes?: SessionModeState,
 		models?: SessionModelState,
-		conversationHistory?: Array<{
-			role: string;
-			content: Array<{ type: string; text: string }>;
-			timestamp?: string;
-		}>,
 	): void;
+}
+
+/**
+ * Options for useSessionHistory hook.
+ */
+export interface UseSessionHistoryOptions {
+	/** Agent client for session operations */
+	agentClient: IAgentClient;
+	/** Current session (used to access agentCapabilities) */
+	session: ChatSession;
+	/** Callback invoked when a session is loaded/resumed/forked */
+	onSessionLoad: SessionLoadCallback;
 }
 
 /**
@@ -50,6 +63,18 @@ export interface UseSessionHistoryReturn {
 	/** Whether there are more sessions to load */
 	hasMore: boolean;
 
+	// Capability flags (from session.agentCapabilities)
+	/** Whether session history UI should be shown (canList) */
+	canShowSessionHistory: boolean;
+	/** Whether session/load is supported (stable) */
+	canLoad: boolean;
+	/** Whether session/resume is supported (unstable) */
+	canResume: boolean;
+	/** Whether session/fork is supported (unstable) */
+	canFork: boolean;
+	/** Whether session/list is supported (unstable) */
+	canList: boolean;
+
 	/**
 	 * Fetch sessions list from agent.
 	 * Replaces existing sessions in state.
@@ -64,25 +89,29 @@ export interface UseSessionHistoryReturn {
 	loadMoreSessions: () => Promise<void>;
 
 	/**
-	 * Load a specific session by ID.
+	 * Load a specific session by ID (with history replay).
+	 * Only available if canLoad is true.
+	 * Conversation history is received via session/update notifications.
 	 * @param sessionId - Session to load
-	 * @param workingDirectory - Working directory for the session
+	 * @param cwd - Working directory for the session
 	 */
-	loadSession: (sessionId: string, workingDirectory: string) => Promise<void>;
+	loadSession: (sessionId: string, cwd: string) => Promise<void>;
 
 	/**
-	 * Delete a session by ID.
-	 * @param sessionId - Session to delete
-	 * @param workingDirectory - Working directory for the session
+	 * Resume a specific session by ID (without history replay).
+	 * Only available if canResume is true.
+	 * @param sessionId - Session to resume
+	 * @param cwd - Working directory for the session
 	 */
-	deleteSession: (sessionId: string, workingDirectory: string) => Promise<void>;
+	resumeSession: (sessionId: string, cwd: string) => Promise<void>;
 
 	/**
-	 * Rename a session by ID.
-	 * @param sessionId - Session to rename
-	 * @param newTitle - New title for the session
+	 * Fork a specific session to create a new branch.
+	 * Only available if canFork is true.
+	 * @param sessionId - Session to fork
+	 * @param cwd - Working directory for the session
 	 */
-	renameSession: (sessionId: string, newTitle: string) => Promise<void>;
+	forkSession: (sessionId: string, cwd: string) => Promise<void>;
 
 	/**
 	 * Invalidate the session cache.
@@ -115,17 +144,26 @@ const CACHE_EXPIRY_MS = 5 * 60 * 1000;
 /**
  * Hook for managing session history.
  *
- * Handles listing, loading, and caching of previous chat sessions.
+ * Handles listing, loading, resuming, forking, and caching of previous chat sessions.
  * Integrates with the agent client to fetch session metadata and
  * load previous conversations.
  *
- * @param agentClient - Agent client for session operations
- * @param onSessionLoad - Callback invoked when a session is loaded
+ * Capability detection is based on session.agentCapabilities, which is set
+ * during initialization and persists for the session lifetime.
+ *
+ * @param options - Hook options including agentClient, session, and onSessionLoad
  */
 export function useSessionHistory(
-	agentClient: IAgentClient,
-	onSessionLoad: SessionLoadCallback,
+	options: UseSessionHistoryOptions,
 ): UseSessionHistoryReturn {
+	const { agentClient, session, onSessionLoad } = options;
+
+	// Derive capability flags from session.agentCapabilities
+	const capabilities: SessionCapabilityFlags = useMemo(
+		() => getSessionCapabilityFlags(session.agentCapabilities),
+		[session.agentCapabilities],
+	);
+
 	// State
 	const [sessions, setSessions] = useState<SessionInfo[]>([]);
 	const [loading, setLoading] = useState(false);
@@ -163,6 +201,11 @@ export function useSessionHistory(
 	 */
 	const fetchSessions = useCallback(
 		async (cwd?: string) => {
+			// Guard: Check if list is supported
+			if (!capabilities.canList) {
+				return;
+			}
+
 			// Check cache first
 			if (isCacheValid(cwd)) {
 				setSessions(cacheRef.current!.sessions);
@@ -200,7 +243,7 @@ export function useSessionHistory(
 				setLoading(false);
 			}
 		},
-		[agentClient, isCacheValid],
+		[agentClient, capabilities.canList, isCacheValid],
 	);
 
 	/**
@@ -209,7 +252,7 @@ export function useSessionHistory(
 	 */
 	const loadMoreSessions = useCallback(async () => {
 		// Guard: Check if there's more to load
-		if (!nextCursor) {
+		if (!nextCursor || !capabilities.canList) {
 			return;
 		}
 
@@ -218,6 +261,7 @@ export function useSessionHistory(
 
 		try {
 			const result: ListSessionsResult = await agentClient.listSessions(
+				currentCwdRef.current,
 				nextCursor,
 			);
 
@@ -229,7 +273,10 @@ export function useSessionHistory(
 			if (cacheRef.current) {
 				cacheRef.current = {
 					...cacheRef.current,
-					sessions: [...sessions, ...result.sessions],
+					sessions: [
+						...cacheRef.current.sessions,
+						...result.sessions,
+					],
 					nextCursor: result.nextCursor,
 					timestamp: Date.now(),
 				};
@@ -241,30 +288,26 @@ export function useSessionHistory(
 		} finally {
 			setLoading(false);
 		}
-	}, [agentClient, nextCursor, sessions]);
+	}, [agentClient, capabilities.canList, nextCursor]);
 
 	/**
-	 * Load a specific session by ID.
+	 * Load a specific session by ID (with history replay).
+	 * Conversation history is received via session/update notifications.
 	 */
 	const loadSession = useCallback(
-		async (sessionId: string, workingDirectory: string) => {
+		async (sessionId: string, cwd: string) => {
 			setLoading(true);
 			setError(null);
 
 			try {
-				const result: LoadSessionResult = await agentClient.loadSession(
-					sessionId,
-					workingDirectory,
-				);
+				// IMPORTANT: Update session.sessionId BEFORE calling loadSession
+				// so that session/update notifications are not ignored
+				onSessionLoad(sessionId, undefined, undefined);
 
-				// Call the callback to integrate with chat state
-				// Use new session ID if provided (for future prompts)
-				onSessionLoad(
-					result.newSessionId || sessionId,
-					result.modes,
-					result.models,
-					result.conversationHistory,
-				);
+				const result = await agentClient.loadSession(sessionId, cwd);
+
+				// Update with modes/models from result
+				onSessionLoad(result.sessionId, result.modes, result.models);
 			} catch (err) {
 				const errorMessage =
 					err instanceof Error ? err.message : String(err);
@@ -278,67 +321,62 @@ export function useSessionHistory(
 	);
 
 	/**
-	 * Delete a session by ID.
+	 * Resume a specific session by ID (without history replay).
 	 */
-	const deleteSession = useCallback(
-		async (sessionId: string, workingDirectory: string) => {
+	const resumeSession = useCallback(
+		async (sessionId: string, cwd: string) => {
 			setLoading(true);
 			setError(null);
 
 			try {
-				await agentClient.deleteSession(sessionId, workingDirectory);
+				// IMPORTANT: Update session.sessionId BEFORE calling resumeSession
+				// so that session/update notifications are not ignored
+				onSessionLoad(sessionId, undefined, undefined);
 
-				// Remove from local state
-				setSessions((prev) =>
-					prev.filter((s) => s.sessionId !== sessionId),
-				);
+				const result = await agentClient.resumeSession(sessionId, cwd);
 
-				// Invalidate cache
-				invalidateCache();
+				// Update with modes/models from result
+				onSessionLoad(result.sessionId, result.modes, result.models);
 			} catch (err) {
 				const errorMessage =
 					err instanceof Error ? err.message : String(err);
-				setError(`Failed to delete session: ${errorMessage}`);
+				setError(`Failed to resume session: ${errorMessage}`);
 				throw err; // Re-throw to allow caller to handle
 			} finally {
 				setLoading(false);
 			}
 		},
-		[agentClient, invalidateCache],
+		[agentClient, onSessionLoad],
 	);
 
 	/**
-	 * Rename a session by ID.
+	 * Fork a specific session to create a new branch.
+	 * Note: For fork, we update sessionId AFTER the call since a new session ID is created.
 	 */
-	const renameSession = useCallback(
-		async (sessionId: string, newTitle: string) => {
+	const forkSession = useCallback(
+		async (sessionId: string, cwd: string) => {
 			setLoading(true);
 			setError(null);
 
 			try {
-				await agentClient.renameSession(sessionId, newTitle);
+				const result = await agentClient.forkSession(sessionId, cwd);
 
-				// Update local state with new title
-				setSessions((prev) =>
-					prev.map((s) =>
-						s.sessionId === sessionId
-							? { ...s, title: newTitle }
-							: s,
-					),
-				);
+				// Update with new session ID and modes/models from result
+				// For fork, the new session ID is returned in result
+				onSessionLoad(result.sessionId, result.modes, result.models);
 
-				// Invalidate cache
+				// Invalidate cache since a new session was created
 				invalidateCache();
 			} catch (err) {
 				const errorMessage =
 					err instanceof Error ? err.message : String(err);
-				setError(`Failed to rename session: ${errorMessage}`);
+				setError(`Failed to fork session: ${errorMessage}`);
 				throw err; // Re-throw to allow caller to handle
 			} finally {
 				setLoading(false);
 			}
 		},
-		[agentClient, invalidateCache],
+		[agentClient, onSessionLoad, invalidateCache],
 	);
 
 	return {
@@ -346,11 +384,25 @@ export function useSessionHistory(
 		loading,
 		error,
 		hasMore: nextCursor !== undefined,
+
+		// Capability flags
+		// Show session history UI if any session capability is available
+		canShowSessionHistory:
+			capabilities.canList ||
+			capabilities.canLoad ||
+			capabilities.canResume ||
+			capabilities.canFork,
+		canLoad: capabilities.canLoad,
+		canResume: capabilities.canResume,
+		canFork: capabilities.canFork,
+		canList: capabilities.canList,
+
+		// Methods
 		fetchSessions,
 		loadMoreSessions,
 		loadSession,
-		deleteSession,
-		renameSession,
+		resumeSession,
+		forkSession,
 		invalidateCache,
 	};
 }

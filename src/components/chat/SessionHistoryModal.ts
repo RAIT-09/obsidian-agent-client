@@ -16,12 +16,25 @@ export interface SessionHistoryModalProps {
 	/** Current working directory for filtering */
 	currentCwd: string;
 
-	/** Callback when a session is selected for loading */
-	onLoadSession: (sessionId: string, workingDirectory: string, fork: boolean) => void;
-	/** Callback when a session is renamed */
-	onRenameSession: (sessionId: string, newTitle: string) => void;
-	/** Callback when a session is deleted */
-	onDeleteSession: (sessionId: string, workingDirectory: string) => void;
+	// Capability flags (from useSessionHistory)
+	/** Whether session/list is supported (unstable) */
+	canList: boolean;
+	/** Whether session/load is supported (stable) */
+	canLoad: boolean;
+	/** Whether session/resume is supported (unstable) */
+	canResume: boolean;
+	/** Whether session/fork is supported (unstable) */
+	canFork: boolean;
+
+	/** Whether debug mode is enabled (shows manual input form) */
+	debugMode: boolean;
+
+	/** Callback when a session is selected for loading (with history replay) */
+	onLoadSession: (sessionId: string, cwd: string) => void;
+	/** Callback when a session is resumed (without history replay) */
+	onResumeSession: (sessionId: string, cwd: string) => void;
+	/** Callback when a session is forked (create new branch) */
+	onForkSession: (sessionId: string, cwd: string) => void;
 	/** Callback to load more sessions (pagination) */
 	onLoadMore: () => void;
 	/** Callback to fetch sessions with filter */
@@ -33,14 +46,27 @@ export interface SessionHistoryModalProps {
  *
  * Renders a list of previous chat sessions, allows filtering by working
  * directory, and supports pagination for large session lists.
+ *
+ * Buttons are conditionally displayed based on agent capabilities:
+ * - Load button: canLoad (stable, shows history)
+ * - Resume button: canResume (unstable, no history replay)
+ * - Fork button: canFork (unstable, create branch)
+ *
+ * In debug mode, shows a manual input form for testing session operations.
  */
 export class SessionHistoryModal extends Modal {
 	private props: SessionHistoryModalProps;
 	private filterByCurrentVault = true;
 
+	// Debug mode input values
+	private debugSessionId = "";
+	private debugCwd = "";
+
 	constructor(app: App, props: SessionHistoryModalProps) {
 		super(app);
 		this.props = props;
+		// Initialize debug cwd with current vault path
+		this.debugCwd = props.currentCwd;
 	}
 
 	/**
@@ -73,13 +99,38 @@ export class SessionHistoryModal extends Modal {
 	 */
 	private render() {
 		const { contentEl } = this;
-		const { sessions, loading, error, hasMore } = this.props;
+		const { sessions, loading, error, hasMore, canList, debugMode } =
+			this.props;
 
 		// Clear previous content (except title)
 		const title = contentEl.querySelector("h2");
 		contentEl.empty();
 		if (title) {
 			contentEl.appendChild(title);
+		}
+
+		// Debug mode: Manual input form
+		if (debugMode) {
+			this.renderDebugForm(contentEl);
+		}
+
+		// Only show list UI if canList is true
+		if (!canList) {
+			if (!debugMode) {
+				// Show message that list is not available
+				const messageContainer = contentEl.createDiv({
+					cls: "session-history-empty",
+				});
+				messageContainer.createEl("p", {
+					text: "Session list is not available for this agent.",
+					cls: "session-history-empty-text",
+				});
+				messageContainer.createEl("p", {
+					text: "Enable Debug Mode in settings to manually enter session IDs.",
+					cls: "session-history-empty-text",
+				});
+			}
+			return;
 		}
 
 		// Filter toggle container
@@ -115,7 +166,7 @@ export class SessionHistoryModal extends Modal {
 				cls: "session-history-error",
 			});
 
-			const errorText = errorContainer.createEl("p", {
+			errorContainer.createEl("p", {
 				text: error,
 				cls: "session-history-error-text",
 			});
@@ -177,7 +228,7 @@ export class SessionHistoryModal extends Modal {
 				cls: "session-history-item-title",
 			});
 			titleEl.createSpan({
-				text: this.truncateTitle(session.title),
+				text: this.truncateTitle(session.title ?? "Untitled Session"),
 			});
 
 			// Session metadata container
@@ -185,82 +236,71 @@ export class SessionHistoryModal extends Modal {
 				cls: "session-history-item-metadata",
 			});
 
-			// Relative timestamp
-			const timestampEl = metadataEl.createSpan({
-				cls: "session-history-item-timestamp",
-			});
-			timestampEl.setText(this.formatRelativeTime(new Date(session.updatedAt)));
+			// Relative timestamp (only if updatedAt is available)
+			if (session.updatedAt) {
+				const timestampEl = metadataEl.createSpan({
+					cls: "session-history-item-timestamp",
+				});
+				timestampEl.setText(
+					this.formatRelativeTime(new Date(session.updatedAt)),
+				);
+			}
 
 			// Actions container
 			const actionsContainer = sessionItem.createDiv({
 				cls: "session-history-item-actions",
 			});
 
-			// Resume button (icon)
-			const resumeButton = actionsContainer.createDiv({
-				cls: "session-history-action-icon session-history-resume-icon",
-			});
-			setIcon(resumeButton, "play");
-			resumeButton.setAttribute("aria-label", "Resume session (continue original)");
-			resumeButton.addEventListener("click", (e) => {
-				e.stopPropagation();
-				this.close();
-				this.props.onLoadSession(
-					session.sessionId,
-					session.workingDirectory || session.cwd,
-					false, // fork=false: resume original
+			// Load button (stable - with history replay)
+			if (this.props.canLoad) {
+				const loadButton = actionsContainer.createDiv({
+					cls: "session-history-action-icon session-history-load-icon",
+				});
+				setIcon(loadButton, "file-text");
+				loadButton.setAttribute(
+					"aria-label",
+					"Load session (with history)",
 				);
-			});
+				loadButton.addEventListener("click", (e) => {
+					e.stopPropagation();
+					this.close();
+					this.props.onLoadSession(session.sessionId, session.cwd);
+				});
+			}
 
-			// Fork button (icon)
-			const forkButton = actionsContainer.createDiv({
-				cls: "session-history-action-icon session-history-fork-icon",
-			});
-			setIcon(forkButton, "git-branch");
-			forkButton.setAttribute("aria-label", "Fork session (create new branch)");
-			forkButton.addEventListener("click", (e) => {
-				e.stopPropagation();
-				this.close();
-				this.props.onLoadSession(
-					session.sessionId,
-					session.workingDirectory || session.cwd,
-					true, // fork=true: create new branch
+			// Resume button (unstable - without history replay)
+			if (this.props.canResume) {
+				const resumeButton = actionsContainer.createDiv({
+					cls: "session-history-action-icon session-history-resume-icon",
+				});
+				setIcon(resumeButton, "play");
+				resumeButton.setAttribute(
+					"aria-label",
+					"Resume session (without history)",
 				);
-			});
+				resumeButton.addEventListener("click", (e) => {
+					e.stopPropagation();
+					this.close();
+					this.props.onResumeSession(session.sessionId, session.cwd);
+				});
+			}
 
-			// Rename button (icon)
-			const renameButton = actionsContainer.createDiv({
-				cls: "session-history-action-icon session-history-rename-icon",
-			});
-			setIcon(renameButton, "pencil");
-			renameButton.setAttribute("aria-label", "Rename session");
-			renameButton.addEventListener("click", (e) => {
-				e.stopPropagation();
-				const newTitle = prompt(`Rename session:`, session.title);
-				if (newTitle && newTitle.trim()) {
-					this.props.onRenameSession(
-						session.sessionId,
-						newTitle.trim(),
-					);
-				}
-			});
-
-			// Delete button (icon)
-			const deleteButton = actionsContainer.createDiv({
-				cls: "session-history-action-icon session-history-delete-icon",
-			});
-			setIcon(deleteButton, "trash-2");
-			deleteButton.setAttribute("aria-label", "Delete session");
-			deleteButton.addEventListener("click", (e) => {
-				e.stopPropagation();
-				// Confirm deletion
-				if (confirm(`Delete session "${session.title}"?`)) {
-					this.props.onDeleteSession(
-						session.sessionId,
-						session.workingDirectory || session.cwd,
-					);
-				}
-			});
+			// Fork button (unstable - create new branch)
+			if (this.props.canFork) {
+				const forkButton = actionsContainer.createDiv({
+					cls: "session-history-action-icon session-history-fork-icon",
+				});
+				setIcon(forkButton, "git-branch");
+				forkButton.setAttribute(
+					"aria-label",
+					"Fork session (create new branch)",
+				);
+				forkButton.addEventListener("click", (e) => {
+					e.stopPropagation();
+					this.close();
+					this.props.onForkSession(session.sessionId, session.cwd);
+				});
+			}
 		});
 
 		// Pagination: Load more button
@@ -282,6 +322,111 @@ export class SessionHistoryModal extends Modal {
 				this.props.onLoadMore();
 			});
 		}
+	}
+
+	/**
+	 * Render debug mode manual input form.
+	 * In debug mode, all buttons are shown regardless of capabilities.
+	 */
+	private renderDebugForm(container: HTMLElement) {
+		const debugContainer = container.createDiv({
+			cls: "session-history-debug",
+		});
+
+		debugContainer.createEl("h3", { text: "Debug: Manual Session Input" });
+
+		// Session ID input
+		const sessionIdGroup = debugContainer.createDiv({
+			cls: "session-history-debug-group",
+		});
+		sessionIdGroup.createEl("label", {
+			text: "Session ID:",
+			attr: { for: "debug-session-id" },
+		});
+		const sessionIdInput = sessionIdGroup.createEl("input", {
+			type: "text",
+			placeholder: "Enter session ID...",
+			cls: "session-history-debug-input",
+			attr: { id: "debug-session-id" },
+		});
+		sessionIdInput.value = this.debugSessionId;
+		sessionIdInput.addEventListener("input", () => {
+			this.debugSessionId = sessionIdInput.value;
+		});
+
+		// CWD input
+		const cwdGroup = debugContainer.createDiv({
+			cls: "session-history-debug-group",
+		});
+		cwdGroup.createEl("label", {
+			text: "Working Directory (cwd):",
+			attr: { for: "debug-cwd" },
+		});
+		const cwdInput = cwdGroup.createEl("input", {
+			type: "text",
+			placeholder: "Enter working directory...",
+			cls: "session-history-debug-input",
+			attr: { id: "debug-cwd" },
+		});
+		cwdInput.value = this.debugCwd;
+		cwdInput.addEventListener("input", () => {
+			this.debugCwd = cwdInput.value;
+		});
+
+		// Action buttons - in debug mode, show all buttons regardless of capabilities
+		const actionsContainer = debugContainer.createDiv({
+			cls: "session-history-debug-actions",
+		});
+
+		// Load button
+		const loadButton = actionsContainer.createEl("button", {
+			text: "Load",
+			cls: "session-history-debug-button",
+		});
+		loadButton.addEventListener("click", () => {
+			if (this.debugSessionId.trim()) {
+				this.close();
+				this.props.onLoadSession(
+					this.debugSessionId.trim(),
+					this.debugCwd.trim() || this.props.currentCwd,
+				);
+			}
+		});
+
+		// Resume button
+		const resumeButton = actionsContainer.createEl("button", {
+			text: "Resume",
+			cls: "session-history-debug-button",
+		});
+		resumeButton.addEventListener("click", () => {
+			if (this.debugSessionId.trim()) {
+				this.close();
+				this.props.onResumeSession(
+					this.debugSessionId.trim(),
+					this.debugCwd.trim() || this.props.currentCwd,
+				);
+			}
+		});
+
+		// Fork button
+		const forkButton = actionsContainer.createEl("button", {
+			text: "Fork",
+			cls: "session-history-debug-button",
+		});
+		forkButton.addEventListener("click", () => {
+			if (this.debugSessionId.trim()) {
+				this.close();
+				this.props.onForkSession(
+					this.debugSessionId.trim(),
+					this.debugCwd.trim() || this.props.currentCwd,
+				);
+			}
+		});
+
+		// Separator
+		debugContainer.createEl("hr", {
+			cls: "session-history-debug-separator",
+		});
 	}
 
 	/**

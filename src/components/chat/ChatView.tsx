@@ -137,35 +137,37 @@ function ChatComponent({
 	const autoExport = useAutoExport(plugin);
 
 	// Session history hook with callback for session load
+	// Session load callback - called when a session is loaded/resumed/forked from history
+	// Note: Conversation history is received via session/update notifications for load
 	const handleSessionLoad = useCallback(
 		(
 			sessionId: string,
-			modes?: any,
-			models?: any,
-			conversationHistory?: Array<{
-				role: string;
-				content: Array<{ type: string; text: string }>;
-				timestamp?: string;
-			}>,
+			modes?: import("../../domain/models/chat-session").SessionModeState,
+			models?: import("../../domain/models/chat-session").SessionModelState,
 		) => {
 			// Log that session was loaded
-			logger.log(`[ChatView] Session loaded: ${sessionId}`, {
-				modes,
-				models,
-				historyMessages: conversationHistory?.length || 0,
-			});
+			logger.log(
+				`[ChatView] Session loaded/resumed/forked: ${sessionId}`,
+				{
+					modes,
+					models,
+				},
+			);
 
-			// Populate messages from conversation history
-			if (conversationHistory && conversationHistory.length > 0) {
-				chat.setInitialMessages(conversationHistory);
-				logger.log(
-					`[ChatView] Loaded ${conversationHistory.length} messages from session history`,
-				);
-			}
+			// Update session state with new session ID and modes/models
+			// This is critical for session/update notifications to be accepted
+			agentSession.updateSessionFromLoad(sessionId, modes, models);
+
+			// Conversation history for load is received via session/update notifications
+			// and handled by the useChat hook
 		},
-		[logger, chat],
+		[logger, agentSession],
 	);
-	const sessionHistory = useSessionHistory(acpAdapter, handleSessionLoad);
+	const sessionHistory = useSessionHistory({
+		agentClient: acpAdapter,
+		session,
+		onSessionLoad: handleSessionLoad,
+	});
 
 	// Combined error info (session errors take precedence)
 	const errorInfo =
@@ -176,7 +178,8 @@ function ChatComponent({
 	// ============================================================
 	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
 	const [restoredMessage, setRestoredMessage] = useState<string | null>(null);
-	const [historyModal, setHistoryModal] = useState<SessionHistoryModal | null>(null);
+	const [historyModal, setHistoryModal] =
+		useState<SessionHistoryModal | null>(null);
 
 	// ============================================================
 	// Computed Values
@@ -204,49 +207,8 @@ function ChatComponent({
 		return custom?.displayName || custom?.id || activeId;
 	}, [session.agentId, plugin.settings]);
 
-	// Check if session history is supported
-	const [hasHistoryCapability, setHasHistoryCapability] = useState(false);
-
-	// Detect session management capability when session is ready
-	useEffect(() => {
-		logger.log(
-			`[ChatView] Capability detection triggered - isSessionReady: ${isSessionReady}`,
-		);
-
-		if (!isSessionReady) {
-			logger.log(
-				"[ChatView] Session not ready, setting hasHistoryCapability to false",
-			);
-			setHasHistoryCapability(false);
-			return;
-		}
-
-		logger.log("[ChatView] Session ready, checking session management support...");
-
-		// Check if agent supports session management
-		void (async () => {
-			try {
-				logger.log("[ChatView] Calling supportsSessionManagement()...");
-				const supported = await acpAdapter.supportsSessionManagement();
-				logger.log(
-					`[ChatView] supportsSessionManagement() returned: ${supported}`,
-				);
-				setHasHistoryCapability(supported);
-				if (supported) {
-					logger.log("[ChatView] Session management IS supported - History button should appear");
-				} else {
-					logger.log(
-						"[ChatView] Session management NOT supported by this agent",
-					);
-				}
-			} catch (error) {
-				logger.log(
-					`[ChatView] Error checking session management support: ${error}`,
-				);
-				setHasHistoryCapability(false);
-			}
-		})();
-	}, [isSessionReady, acpAdapter, logger]);
+	// Session history capability is derived from session.agentCapabilities via useSessionHistory
+	// No need for async capability detection - use sessionHistory.canShowSessionHistory
 
 	// ============================================================
 	// Callbacks
@@ -347,51 +309,45 @@ function ChatComponent({
 				error: sessionHistory.error,
 				hasMore: sessionHistory.hasMore,
 				currentCwd: vaultPath,
-				onLoadSession: async (sessionId: string, workingDirectory: string, fork: boolean) => {
+				// Capability flags
+				canList: sessionHistory.canList,
+				canLoad: sessionHistory.canLoad,
+				canResume: sessionHistory.canResume,
+				canFork: sessionHistory.canFork,
+				// Debug mode
+				debugMode: settings.debugMode,
+				// Callbacks
+				onLoadSession: async (sessionId: string, cwd: string) => {
 					try {
-						logger.log(`[ChatView] Loading session: ${sessionId} (fork: ${fork})`);
-
-						// Clear existing messages before loading
+						logger.log(`[ChatView] Loading session: ${sessionId}`);
 						chat.clearMessages();
-
-						// Load the session (updates session state and returns history)
-						const conversationHistory = await agentSession.loadSession(sessionId, fork);
-
-						// Populate messages from conversation history
-						if (conversationHistory && conversationHistory.length > 0) {
-							chat.setInitialMessages(conversationHistory);
-							logger.log(
-								`[ChatView] Loaded ${conversationHistory.length} messages from session`,
-							);
-						}
-
-						const mode = fork ? "forked" : "resumed";
-						new Notice(
-							`[Agent Client] Session ${mode} with ${conversationHistory?.length || 0} messages`,
-						);
+						await sessionHistory.loadSession(sessionId, cwd);
+						new Notice("[Agent Client] Session loaded");
 					} catch (error) {
 						new Notice("[Agent Client] Failed to load session");
 						logger.error("Session load error:", error);
 					}
 				},
-				onRenameSession: async (sessionId: string, newTitle: string) => {
+				onResumeSession: async (sessionId: string, cwd: string) => {
 					try {
-						logger.log(`[ChatView] Renaming session: ${sessionId} to "${newTitle}"`);
-						await sessionHistory.renameSession(sessionId, newTitle);
-						new Notice("[Agent Client] Session renamed");
+						logger.log(`[ChatView] Resuming session: ${sessionId}`);
+						chat.clearMessages();
+						await sessionHistory.resumeSession(sessionId, cwd);
+						new Notice("[Agent Client] Session resumed");
 					} catch (error) {
-						new Notice("[Agent Client] Failed to rename session");
-						logger.error("Session rename error:", error);
+						new Notice("[Agent Client] Failed to resume session");
+						logger.error("Session resume error:", error);
 					}
 				},
-				onDeleteSession: async (sessionId: string, workingDirectory: string) => {
+				onForkSession: async (sessionId: string, cwd: string) => {
 					try {
-						logger.log(`[ChatView] Deleting session: ${sessionId}`);
-						await sessionHistory.deleteSession(sessionId, workingDirectory);
-						new Notice("[Agent Client] Session deleted");
+						logger.log(`[ChatView] Forking session: ${sessionId}`);
+						chat.clearMessages();
+						await sessionHistory.forkSession(sessionId, cwd);
+						new Notice("[Agent Client] Session forked");
 					} catch (error) {
-						new Notice("[Agent Client] Failed to delete session");
-						logger.error("Session delete error:", error);
+						new Notice("[Agent Client] Failed to fork session");
+						logger.error("Session fork error:", error);
 					}
 				},
 				onLoadMore: () => {
@@ -422,51 +378,45 @@ function ChatComponent({
 				error: sessionHistory.error,
 				hasMore: sessionHistory.hasMore,
 				currentCwd: vaultPath,
-				onLoadSession: async (sessionId: string, workingDirectory: string, fork: boolean) => {
+				// Capability flags
+				canList: sessionHistory.canList,
+				canLoad: sessionHistory.canLoad,
+				canResume: sessionHistory.canResume,
+				canFork: sessionHistory.canFork,
+				// Debug mode
+				debugMode: settings.debugMode,
+				// Callbacks
+				onLoadSession: async (sessionId: string, cwd: string) => {
 					try {
-						logger.log(`[ChatView] Loading session: ${sessionId} (fork: ${fork})`);
-
-						// Clear existing messages before loading
+						logger.log(`[ChatView] Loading session: ${sessionId}`);
 						chat.clearMessages();
-
-						// Load the session (updates session state and returns history)
-						const conversationHistory = await agentSession.loadSession(sessionId, fork);
-
-						// Populate messages from conversation history
-						if (conversationHistory && conversationHistory.length > 0) {
-							chat.setInitialMessages(conversationHistory);
-							logger.log(
-								`[ChatView] Loaded ${conversationHistory.length} messages from session`,
-							);
-						}
-
-						const mode = fork ? "forked" : "resumed";
-						new Notice(
-							`[Agent Client] Session ${mode} with ${conversationHistory?.length || 0} messages`,
-						);
+						await sessionHistory.loadSession(sessionId, cwd);
+						new Notice("[Agent Client] Session loaded");
 					} catch (error) {
 						new Notice("[Agent Client] Failed to load session");
 						logger.error("Session load error:", error);
 					}
 				},
-				onRenameSession: async (sessionId: string, newTitle: string) => {
+				onResumeSession: async (sessionId: string, cwd: string) => {
 					try {
-						logger.log(`[ChatView] Renaming session: ${sessionId} to "${newTitle}"`);
-						await sessionHistory.renameSession(sessionId, newTitle);
-						new Notice("[Agent Client] Session renamed");
+						logger.log(`[ChatView] Resuming session: ${sessionId}`);
+						chat.clearMessages();
+						await sessionHistory.resumeSession(sessionId, cwd);
+						new Notice("[Agent Client] Session resumed");
 					} catch (error) {
-						new Notice("[Agent Client] Failed to rename session");
-						logger.error("Session rename error:", error);
+						new Notice("[Agent Client] Failed to resume session");
+						logger.error("Session resume error:", error);
 					}
 				},
-				onDeleteSession: async (sessionId: string, workingDirectory: string) => {
+				onForkSession: async (sessionId: string, cwd: string) => {
 					try {
-						logger.log(`[ChatView] Deleting session: ${sessionId}`);
-						await sessionHistory.deleteSession(sessionId, workingDirectory);
-						new Notice("[Agent Client] Session deleted");
+						logger.log(`[ChatView] Forking session: ${sessionId}`);
+						chat.clearMessages();
+						await sessionHistory.forkSession(sessionId, cwd);
+						new Notice("[Agent Client] Session forked");
 					} catch (error) {
-						new Notice("[Agent Client] Failed to delete session");
-						logger.error("Session delete error:", error);
+						new Notice("[Agent Client] Failed to fork session");
+						logger.error("Session fork error:", error);
 					}
 				},
 				onLoadMore: () => {
@@ -477,7 +427,21 @@ function ChatComponent({
 				},
 			});
 		}
-	}, [sessionHistory.sessions, sessionHistory.loading, sessionHistory.error, sessionHistory.hasMore, historyModal, vaultPath, chat, logger]);
+	}, [
+		sessionHistory.sessions,
+		sessionHistory.loading,
+		sessionHistory.error,
+		sessionHistory.hasMore,
+		sessionHistory.canList,
+		sessionHistory.canLoad,
+		sessionHistory.canResume,
+		sessionHistory.canFork,
+		settings.debugMode,
+		historyModal,
+		vaultPath,
+		chat,
+		logger,
+	]);
 
 	const handleSendMessage = useCallback(
 		async (
@@ -726,30 +690,6 @@ function ChatComponent({
 		handleStopGeneration,
 	]);
 
-	// Get current session title from session history
-	const currentSessionTitle = useMemo(() => {
-		if (!session.sessionId) return null;
-		const sessionInfo = sessionHistory.sessions.find(
-			(s) => s.sessionId === session.sessionId,
-		);
-		return sessionInfo?.title || null;
-	}, [session.sessionId, sessionHistory.sessions]);
-
-	// Handle session rename
-	const handleRenameCurrentSession = useCallback(
-		async (sessionId: string, newTitle: string) => {
-			try {
-				logger.log(`[ChatView] Renaming current session: ${sessionId} to "${newTitle}"`);
-				await sessionHistory.renameSession(sessionId, newTitle);
-				new Notice("[Agent Client] Session renamed");
-			} catch (error) {
-				new Notice("[Agent Client] Failed to rename session");
-				logger.error("Session rename error:", error);
-			}
-		},
-		[sessionHistory, logger],
-	);
-
 	// ============================================================
 	// Render
 	// ============================================================
@@ -758,14 +698,11 @@ function ChatComponent({
 			<ChatHeader
 				agentLabel={activeAgentLabel}
 				isUpdateAvailable={isUpdateAvailable}
-				hasHistoryCapability={hasHistoryCapability}
-				sessionTitle={currentSessionTitle}
-				sessionId={session.sessionId}
+				hasHistoryCapability={sessionHistory.canShowSessionHistory}
 				onNewChat={() => void handleNewChat()}
 				onExportChat={() => void handleExportChat()}
 				onOpenSettings={handleOpenSettings}
 				onOpenHistory={handleOpenHistory}
-				onRenameSession={handleRenameCurrentSession}
 			/>
 
 			<ChatMessages

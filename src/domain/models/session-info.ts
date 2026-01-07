@@ -1,21 +1,22 @@
+import type { SessionModeState, SessionModelState } from "./chat-session";
+
 /**
- * Session metadata for session history.
+ * Session metadata from session/list response.
+ * Matches ACP SessionInfo type.
  */
 export interface SessionInfo {
 	/** Unique session identifier */
 	sessionId: string;
-	/** Human-readable session title */
-	title: string;
 	/** Working directory for the session */
 	cwd: string;
-	/** Working directory (alias for cwd, for backward compatibility) */
-	workingDirectory?: string;
+	/** Human-readable session title */
+	title?: string;
 	/** ISO 8601 timestamp of last update */
-	updatedAt: string;
+	updatedAt?: string;
 }
 
 /**
- * Result of listing sessions.
+ * Result of session/list (unstable).
  */
 export interface ListSessionsResult {
 	/** Array of session metadata */
@@ -25,29 +26,46 @@ export interface ListSessionsResult {
 }
 
 /**
- * Message from conversation history.
+ * Result of session/load (stable).
+ *
+ * Note: Conversation history is received via session/update notifications
+ * (user_message_chunk, agent_message_chunk, tool_call, etc.),
+ * not in the response itself.
  */
-export interface ConversationMessage {
-	/** Message role (user or assistant) */
-	role: string;
-	/** Message content */
-	content: Array<{ type: string; text: string }>;
-	/** Message timestamp */
-	timestamp: string;
+export interface LoadSessionResult {
+	/** Session ID */
+	sessionId: string;
+	/** Session modes (if available) */
+	modes?: SessionModeState;
+	/** Session models (if available) */
+	models?: SessionModelState;
 }
 
 /**
- * Result of loading a session.
+ * Result of session/resume (unstable).
+ *
+ * Resumes a session without history replay.
+ * Use when client manages its own history storage.
  */
-export interface LoadSessionResult {
-	/** Original session ID that was loaded */
+export interface ResumeSessionResult {
+	/** Session ID */
 	sessionId: string;
-	/** New session ID for future prompts (if different from original) */
-	newSessionId?: string;
 	/** Session modes (if available) */
-	modes?: any;
+	modes?: SessionModeState;
 	/** Session models (if available) */
-	models?: any;
-	/** Conversation history from the loaded session */
-	conversationHistory?: ConversationMessage[];
+	models?: SessionModelState;
+}
+
+/**
+ * Result of session/fork (unstable).
+ *
+ * Creates a new session with inherited context from the original.
+ */
+export interface ForkSessionResult {
+	/** New session ID (different from original) */
+	sessionId: string;
+	/** Session modes (if available) */
+	modes?: SessionModeState;
+	/** Session models (if available) */
+	models?: SessionModelState;
 }
