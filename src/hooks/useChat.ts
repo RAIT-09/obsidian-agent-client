@@ -274,6 +274,62 @@ export function useChat(
 	}, []);
 
 	/**
+	 * Update or create the last user message with new content.
+	 * Used for session/load to reconstruct user messages from chunks.
+	 *
+	 * Similar to updateLastMessage but targets "user" role instead of "assistant".
+	 */
+	const updateUserMessage = useCallback((content: MessageContent): void => {
+		setMessages((prev) => {
+			// If no messages or last message is not user, create new user message
+			if (prev.length === 0 || prev[prev.length - 1].role !== "user") {
+				const newMessage: ChatMessage = {
+					id: crypto.randomUUID(),
+					role: "user",
+					content: [content],
+					timestamp: new Date(),
+				};
+				return [...prev, newMessage];
+			}
+
+			// Update existing last message
+			const lastMessage = prev[prev.length - 1];
+			const updatedMessage = { ...lastMessage };
+
+			if (content.type === "text") {
+				// Append to existing text content or create new
+				const existingContentIndex = updatedMessage.content.findIndex(
+					(c) => c.type === "text",
+				);
+				if (existingContentIndex >= 0) {
+					const existingContent =
+						updatedMessage.content[existingContentIndex];
+					if (existingContent.type === "text") {
+						updatedMessage.content[existingContentIndex] = {
+							type: "text",
+							text: existingContent.text + content.text,
+						};
+					}
+				} else {
+					updatedMessage.content.push(content);
+				}
+			} else {
+				// Replace or add non-text content
+				const existingIndex = updatedMessage.content.findIndex(
+					(c) => c.type === content.type,
+				);
+				if (existingIndex >= 0) {
+					updatedMessage.content[existingIndex] = content;
+				} else {
+					updatedMessage.content.push(content);
+				}
+			}
+
+			return [...prev.slice(0, -1), updatedMessage];
+		});
+	}, []);
+
+	/**
 	 * Update a specific message by tool call ID.
 	 * Only updates if the tool call exists in state.
 	 */
@@ -366,6 +422,13 @@ export function useChat(
 				case "agent_thought_chunk":
 					updateLastMessage({
 						type: "agent_thought",
+						text: update.text,
+					});
+					break;
+
+				case "user_message_chunk":
+					updateUserMessage({
+						type: "text",
 						text: update.text,
 					});
 					break;

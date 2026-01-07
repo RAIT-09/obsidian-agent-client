@@ -931,6 +931,18 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				}
 				break;
 
+			case "user_message_chunk":
+				// Used for session/load to reconstruct user messages
+				if (update.content.type === "text") {
+					this.sessionUpdateCallback?.({
+						type: "user_message_chunk",
+						sessionId,
+						text: update.content.text,
+					});
+				}
+				// Note: image, resource etc. ContentBlock types are not yet supported
+				break;
+
 			case "tool_call":
 			case "tool_call_update": {
 				this.sessionUpdateCallback?.({
