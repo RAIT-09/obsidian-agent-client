@@ -114,6 +114,7 @@ function ChatComponent({
 		{
 			sessionId: session.sessionId,
 			authMethods: session.authMethods,
+			promptCapabilities: session.promptCapabilities,
 		},
 		{
 			windowsWslMode: settings.windowsWslMode,
