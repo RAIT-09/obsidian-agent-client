@@ -237,11 +237,25 @@ async function preparePromptWithEmbeddedContext(
 		...(input.images || []),
 	];
 
+	// Build auto-mention prefix for session/load recovery
+	// This allows @[[note]] to be restored when loading a saved session
+	const autoMentionPrefix =
+		input.activeNote && !input.isAutoMentionDisabled
+			? input.activeNote.selection
+				? `@[[${input.activeNote.name}]]:${input.activeNote.selection.from.line + 1}-${input.activeNote.selection.to.line + 1}\n`
+				: `@[[${input.activeNote.name}]]\n`
+			: "";
+
 	const agentContent: PromptContent[] = [
 		...resourceBlocks,
 		...autoMentionBlocks,
-		...(input.message
-			? [{ type: "text" as const, text: input.message }]
+		...(input.message || autoMentionPrefix
+			? [
+					{
+						type: "text" as const,
+						text: autoMentionPrefix + input.message,
+					},
+				]
 			: []),
 		...(input.images || []),
 	];
@@ -326,11 +340,23 @@ async function preparePromptWithTextContext(
 		contextBlocks.push(autoMentionContextBlock);
 	}
 
-	// Build agent message text (context blocks + original message)
+	// Build auto-mention prefix for session/load recovery
+	// This allows @[[note]] to be restored when loading a saved session
+	const autoMentionPrefix =
+		input.activeNote && !input.isAutoMentionDisabled
+			? input.activeNote.selection
+				? `@[[${input.activeNote.name}]]:${input.activeNote.selection.from.line + 1}-${input.activeNote.selection.to.line + 1}\n`
+				: `@[[${input.activeNote.name}]]\n`
+			: "";
+
+	// Build agent message text (context blocks + auto-mention prefix + original message)
 	const agentMessageText =
 		contextBlocks.length > 0
-			? contextBlocks.join("\n") + "\n\n" + input.message
-			: input.message;
+			? contextBlocks.join("\n") +
+				"\n\n" +
+				autoMentionPrefix +
+				input.message
+			: autoMentionPrefix + input.message;
 
 	// Build content arrays
 	const displayContent: PromptContent[] = [
