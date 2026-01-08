@@ -358,6 +358,20 @@ export function SessionHistoryContent({
 		);
 	}
 
+	// Check if any session operation is available
+	const canPerformAnyOperation = canLoad || canResume || canFork;
+
+	// Show message if no session operations are supported
+	if (!canPerformAnyOperation && !debugMode) {
+		return (
+			<div className="agent-client-session-history-empty">
+				<p className="agent-client-session-history-empty-text">
+					This agent does not support session restoration.
+				</p>
+			</div>
+		);
+	}
+
 	const canShowList = canList || isUsingLocalSessions;
 
 	return (
