@@ -1519,3 +1519,27 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-muted);
 	border-left: 3px solid var(--interactive-accent);
 }
+
+/* Warning banner for agents that don't support restoration */
+.agent-client-session-history-warning-banner {
+	padding: 8px 12px;
+	margin-bottom: 12px;
+	background: var(--background-secondary);
+	border-radius: 4px;
+	border-left: 3px solid var(--text-warning);
+}
+
+.agent-client-session-history-warning-banner p {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+/* Delete button */
+.agent-client-session-history-delete-icon {
+	color: var(--text-muted);
+}
+
+.agent-client-session-history-delete-icon:hover {
+	color: var(--text-error);
+}

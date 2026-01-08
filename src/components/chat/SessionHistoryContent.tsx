@@ -43,6 +43,8 @@ export interface SessionHistoryContentProps {
 	onResumeSession: (sessionId: string, cwd: string) => Promise<void>;
 	/** Callback when a session is forked (create new branch) */
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
+	/** Callback when a session is deleted */
+	onDeleteSession: (sessionId: string) => Promise<void>;
 	/** Callback to load more sessions (pagination) */
 	onLoadMore: () => void;
 	/** Callback to fetch sessions with filter */
@@ -229,6 +231,7 @@ function SessionItem({
 	onLoadSession,
 	onResumeSession,
 	onForkSession,
+	onDeleteSession,
 	onClose,
 }: {
 	session: SessionInfo;
@@ -238,6 +241,7 @@ function SessionItem({
 	onLoadSession: (sessionId: string, cwd: string) => Promise<void>;
 	onResumeSession: (sessionId: string, cwd: string) => Promise<void>;
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
+	onDeleteSession: (sessionId: string) => Promise<void>;
 	onClose: () => void;
 }) {
 	const handleLoad = useCallback(() => {
@@ -254,6 +258,10 @@ function SessionItem({
 		onClose();
 		void onForkSession(session.sessionId, session.cwd);
 	}, [session, onForkSession, onClose]);
+
+	const handleDelete = useCallback(() => {
+		void onDeleteSession(session.sessionId);
+	}, [session.sessionId, onDeleteSession]);
 
 	return (
 		<div className="agent-client-session-history-item">
@@ -297,6 +305,12 @@ function SessionItem({
 						onClick={handleFork}
 					/>
 				)}
+				<IconButton
+					iconName="trash-2"
+					label="Delete session"
+					className="agent-client-session-history-action-icon agent-client-session-history-delete-icon"
+					onClick={handleDelete}
+				/>
 			</div>
 		</div>
 	);
@@ -328,6 +342,7 @@ export function SessionHistoryContent({
 	onLoadSession,
 	onResumeSession,
 	onForkSession,
+	onDeleteSession,
 	onLoadMore,
 	onFetchSessions,
 	onClose,
@@ -361,18 +376,11 @@ export function SessionHistoryContent({
 	// Check if any session operation is available
 	const canPerformAnyOperation = canLoad || canResume || canFork;
 
-	// Show message if no session operations are supported
-	if (!canPerformAnyOperation && !debugMode) {
-		return (
-			<div className="agent-client-session-history-empty">
-				<p className="agent-client-session-history-empty-text">
-					This agent does not support session restoration.
-				</p>
-			</div>
-		);
-	}
-
-	const canShowList = canList || isUsingLocalSessions;
+	// Show local sessions list (always show for delete functionality)
+	// - If agent supports list: use agent's session/list
+	// - If agent doesn't support list OR doesn't support restoration: use locally saved sessions
+	const canShowList =
+		canList || isUsingLocalSessions || !canPerformAnyOperation;
 
 	return (
 		<>
@@ -387,13 +395,21 @@ export function SessionHistoryContent({
 				/>
 			)}
 
+			{/* Warning banner for agents that don't support restoration */}
+			{!canPerformAnyOperation && (
+				<div className="agent-client-session-history-warning-banner">
+					<p>
+						This agent does not support session restoration.
+						Messages are saved locally but cannot be restored to the
+						agent.
+					</p>
+				</div>
+			)}
+
 			{/* Local sessions banner */}
-			{isUsingLocalSessions && (
+			{(isUsingLocalSessions || !canPerformAnyOperation) && (
 				<div className="agent-client-session-history-local-banner">
-					<span>
-						Locally saved sessions (agent doesn't support
-						session/list)
-					</span>
+					<span>Locally saved sessions</span>
 				</div>
 			)}
 
@@ -470,6 +486,7 @@ export function SessionHistoryContent({
 									onLoadSession={onLoadSession}
 									onResumeSession={onResumeSession}
 									onForkSession={onForkSession}
+									onDeleteSession={onDeleteSession}
 									onClose={onClose}
 								/>
 							))}

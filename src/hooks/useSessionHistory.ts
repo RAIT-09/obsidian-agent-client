@@ -133,6 +133,12 @@ export interface UseSessionHistoryReturn {
 	forkSession: (sessionId: string, cwd: string) => Promise<void>;
 
 	/**
+	 * Delete a session (local metadata + message file).
+	 * @param sessionId - Session to delete
+	 */
+	deleteSession: (sessionId: string) => Promise<void>;
+
+	/**
 	 * Invalidate the session cache.
 	 * Call this when creating a new session to refresh the list.
 	 */
@@ -220,15 +226,25 @@ export function useSessionHistory(
 		cacheRef.current = null;
 	}, []);
 
+	// Check if any restoration operation is available
+	const canPerformAnyOperation =
+		capabilities.canLoad || capabilities.canResume || capabilities.canFork;
+
 	/**
 	 * Fetch sessions list from agent or local storage.
 	 * Uses agent's session/list if supported, otherwise falls back to local storage.
+	 * For agents that don't support restoration, local sessions are used for deletion.
 	 * Replaces existing sessions in state.
 	 */
 	const fetchSessions = useCallback(
 		async (cwd?: string) => {
-			// If agent doesn't support list, use local sessions
-			if (!capabilities.canList) {
+			// Use local sessions if:
+			// - Agent doesn't support session/list, OR
+			// - Agent doesn't support any restoration operation (for delete only)
+			const shouldUseLocalSessions =
+				!capabilities.canList || !canPerformAnyOperation;
+
+			if (shouldUseLocalSessions) {
 				// Get locally saved sessions for this agent
 				const localSessions = settingsAccess.getSavedSessions(
 					session.agentId,
@@ -289,6 +305,7 @@ export function useSessionHistory(
 		[
 			agentClient,
 			capabilities.canList,
+			canPerformAnyOperation,
 			isCacheValid,
 			settingsAccess,
 			session.agentId,
@@ -450,6 +467,33 @@ export function useSessionHistory(
 		],
 	);
 
+	/**
+	 * Delete a session (local metadata + message file).
+	 * Removes from both local state and persistent storage.
+	 */
+	const deleteSession = useCallback(
+		async (sessionId: string) => {
+			try {
+				// Delete from persistent storage (metadata + message file)
+				await settingsAccess.deleteSession(sessionId);
+
+				// Remove from local state
+				setSessions((prev) =>
+					prev.filter((s) => s.sessionId !== sessionId),
+				);
+
+				// Invalidate cache to ensure consistency
+				invalidateCache();
+			} catch (err) {
+				const errorMessage =
+					err instanceof Error ? err.message : String(err);
+				setError(`Failed to delete session: ${errorMessage}`);
+				throw err; // Re-throw to allow caller to handle
+			}
+		},
+		[settingsAccess, invalidateCache],
+	);
+
 	return {
 		sessions,
 		loading,
@@ -475,6 +519,7 @@ export function useSessionHistory(
 		loadSession,
 		resumeSession,
 		forkSession,
+		deleteSession,
 		invalidateCache,
 	};
 }

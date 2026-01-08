@@ -381,6 +381,16 @@ function ChatComponent({
 						logger.error("Session fork error:", error);
 					}
 				},
+				onDeleteSession: async (sessionId: string) => {
+					try {
+						logger.log(`[ChatView] Deleting session: ${sessionId}`);
+						await sessionHistory.deleteSession(sessionId);
+						new Notice("[Agent Client] Session deleted");
+					} catch (error) {
+						new Notice("[Agent Client] Failed to delete session");
+						logger.error("Session delete error:", error);
+					}
+				},
 				onLoadMore: () => {
 					void sessionHistory.loadMoreSessions();
 				},
@@ -450,6 +460,16 @@ function ChatComponent({
 					} catch (error) {
 						new Notice("[Agent Client] Failed to fork session");
 						logger.error("Session fork error:", error);
+					}
+				},
+				onDeleteSession: async (sessionId: string) => {
+					try {
+						logger.log(`[ChatView] Deleting session: ${sessionId}`);
+						await sessionHistory.deleteSession(sessionId);
+						new Notice("[Agent Client] Session deleted");
+					} catch (error) {
+						new Notice("[Agent Client] Failed to delete session");
+						logger.error("Session delete error:", error);
 					}
 				},
 				onLoadMore: () => {
