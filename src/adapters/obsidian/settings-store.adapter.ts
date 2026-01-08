@@ -9,11 +9,32 @@
 import type { ISettingsAccess } from "../../domain/ports/settings-access.port";
 import type { AgentClientPluginSettings } from "../../plugin";
 import type AgentClientPlugin from "../../plugin";
-import type { ChatMessage } from "../../domain/models/chat-message";
+import type {
+	ChatMessage,
+	MessageContent,
+} from "../../domain/models/chat-message";
 import type { SavedSessionInfo } from "../../domain/models/session-info";
 
 /** Listener callback invoked when settings change */
 type Listener = () => void;
+
+/**
+ * Serialized format for session message files.
+ *
+ * Used for type-safe JSON parsing of session history files.
+ */
+interface SessionMessagesFile {
+	version: number;
+	sessionId: string;
+	agentId: string;
+	messages: Array<{
+		id: string;
+		role: "user" | "assistant";
+		content: MessageContent[];
+		timestamp: string;
+	}>;
+	savedAt: string;
+}
 
 /**
  * Observable store for plugin settings implementing ISettingsAccess port.
@@ -199,9 +220,16 @@ export class SettingsStore implements ISettingsAccess {
 	// Session Message History Methods
 	// ============================================================
 
-	/** Directory for session message files */
-	private static readonly SESSIONS_DIR =
-		".obsidian/plugins/agent-client/sessions";
+	/**
+	 * Get the sessions directory path.
+	 *
+	 * Uses Vault#configDir to respect user's custom config folder.
+	 *
+	 * @returns Path to sessions directory
+	 */
+	private getSessionsDir(): string {
+		return `${this.plugin.app.vault.configDir}/plugins/agent-client/sessions`;
+	}
 
 	/**
 	 * Ensure the sessions directory exists.
@@ -210,8 +238,9 @@ export class SettingsStore implements ISettingsAccess {
 	 */
 	private async ensureSessionsDir(): Promise<void> {
 		const adapter = this.plugin.app.vault.adapter;
-		if (!(await adapter.exists(SettingsStore.SESSIONS_DIR))) {
-			await adapter.mkdir(SettingsStore.SESSIONS_DIR);
+		const sessionsDir = this.getSessionsDir();
+		if (!(await adapter.exists(sessionsDir))) {
+			await adapter.mkdir(sessionsDir);
 		}
 	}
 
@@ -226,7 +255,7 @@ export class SettingsStore implements ISettingsAccess {
 	private getSessionFilePath(sessionId: string): string {
 		// Sanitize sessionId for safe file names (replace unsafe chars with _)
 		const safeId = sessionId.replace(/[^a-zA-Z0-9_-]/g, "_");
-		return `${SettingsStore.SESSIONS_DIR}/${safeId}.json`;
+		return `${this.getSessionsDir()}/${safeId}.json`;
 	}
 
 	/**
@@ -288,7 +317,18 @@ export class SettingsStore implements ISettingsAccess {
 
 		try {
 			const content = await adapter.read(filePath);
-			const data = JSON.parse(content);
+			const data = JSON.parse(content) as SessionMessagesFile;
+
+			// Validate structure
+			if (
+				typeof data.version !== "number" ||
+				!Array.isArray(data.messages)
+			) {
+				console.warn(
+					`[SettingsStore] Invalid session file structure: ${filePath}`,
+				);
+				return null;
+			}
 
 			// Version check for future compatibility
 			if (data.version !== 1) {
@@ -299,17 +339,10 @@ export class SettingsStore implements ISettingsAccess {
 			}
 
 			// Deserialize (convert timestamp: string → Date)
-			return data.messages.map(
-				(msg: {
-					id: string;
-					role: string;
-					content: unknown[];
-					timestamp: string;
-				}) => ({
-					...msg,
-					timestamp: new Date(msg.timestamp),
-				}),
-			);
+			return data.messages.map((msg) => ({
+				...msg,
+				timestamp: new Date(msg.timestamp),
+			}));
 		} catch (error) {
 			console.error(
 				`[SettingsStore] Failed to load session messages: ${error}`,
