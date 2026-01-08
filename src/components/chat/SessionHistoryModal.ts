@@ -29,6 +29,9 @@ export interface SessionHistoryModalProps {
 	/** Whether using locally saved sessions (instead of agent session/list) */
 	isUsingLocalSessions: boolean;
 
+	/** Whether the agent is ready (initialized) */
+	isAgentReady: boolean;
+
 	/** Whether debug mode is enabled (shows manual input form) */
 	debugMode: boolean;
 
@@ -109,6 +112,7 @@ export class SessionHistoryModal extends Modal {
 			hasMore,
 			canList,
 			isUsingLocalSessions,
+			isAgentReady,
 			debugMode,
 		} = this.props;
 
@@ -117,6 +121,17 @@ export class SessionHistoryModal extends Modal {
 		contentEl.empty();
 		if (title) {
 			contentEl.appendChild(title);
+		}
+
+		// Show preparing message if agent is not ready
+		if (!isAgentReady) {
+			const preparingContainer = contentEl.createDiv({
+				cls: "agent-client-session-history-loading",
+			});
+			preparingContainer.createEl("p", {
+				text: "Preparing agent...",
+			});
+			return;
 		}
 
 		// Debug mode: Manual input form

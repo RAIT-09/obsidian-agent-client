@@ -56,7 +56,7 @@ export function ChatHeader({
 					tooltip="New chat"
 					onClick={onNewChat}
 				/>
-				{hasHistoryCapability && onOpenHistory && (
+				{onOpenHistory && (
 					<HeaderButton
 						iconName="history"
 						tooltip="Session history"

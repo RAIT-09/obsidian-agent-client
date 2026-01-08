@@ -343,6 +343,7 @@ function ChatComponent({
 				canResume: sessionHistory.canResume,
 				canFork: sessionHistory.canFork,
 				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
+				isAgentReady: isSessionReady,
 				// Debug mode
 				debugMode: settings.debugMode,
 				// Callbacks
@@ -413,6 +414,7 @@ function ChatComponent({
 				canResume: sessionHistory.canResume,
 				canFork: sessionHistory.canFork,
 				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
+				isAgentReady: isSessionReady,
 				// Debug mode
 				debugMode: settings.debugMode,
 				// Callbacks
@@ -467,6 +469,7 @@ function ChatComponent({
 		sessionHistory.canResume,
 		sessionHistory.canFork,
 		sessionHistory.isUsingLocalSessions,
+		isSessionReady,
 		settings.debugMode,
 		historyModal,
 		vaultPath,
