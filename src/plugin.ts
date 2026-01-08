@@ -20,6 +20,7 @@ import {
 	CodexAgentSettings,
 	CustomAgentSettings,
 } from "./domain/models/agent-config";
+import type { SavedSessionInfo } from "./domain/models/session-info";
 
 // Re-export for backward compatibility
 export type { AgentEnvVar, CustomAgentSettings };
@@ -57,7 +58,7 @@ export interface AgentClientPluginSettings {
 	// Input behavior
 	sendMessageShortcut: SendMessageShortcut;
 	// Locally saved session metadata (for agents without session/list support)
-	savedSessions: import("./domain/models/session-info").SavedSessionInfo[];
+	savedSessions: SavedSessionInfo[];
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -518,7 +519,7 @@ export default class AgentClientPlugin extends Plugin {
 					? rawSettings.sendMessageShortcut
 					: DEFAULT_SETTINGS.sendMessageShortcut,
 			savedSessions: Array.isArray(rawSettings.savedSessions)
-				? rawSettings.savedSessions
+				? (rawSettings.savedSessions as SavedSessionInfo[])
 				: DEFAULT_SETTINGS.savedSessions,
 		};
 

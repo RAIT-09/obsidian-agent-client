@@ -38,11 +38,11 @@ export interface SessionHistoryContentProps {
 	debugMode: boolean;
 
 	/** Callback when a session is selected for loading (with history replay) */
-	onLoadSession: (sessionId: string, cwd: string) => void;
+	onLoadSession: (sessionId: string, cwd: string) => Promise<void>;
 	/** Callback when a session is resumed (without history replay) */
-	onResumeSession: (sessionId: string, cwd: string) => void;
+	onResumeSession: (sessionId: string, cwd: string) => Promise<void>;
 	/** Callback when a session is forked (create new branch) */
-	onForkSession: (sessionId: string, cwd: string) => void;
+	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
 	/** Callback to load more sessions (pagination) */
 	onLoadMore: () => void;
 	/** Callback to fetch sessions with filter */
@@ -135,9 +135,9 @@ function DebugForm({
 	onClose,
 }: {
 	currentCwd: string;
-	onLoadSession: (sessionId: string, cwd: string) => void;
-	onResumeSession: (sessionId: string, cwd: string) => void;
-	onForkSession: (sessionId: string, cwd: string) => void;
+	onLoadSession: (sessionId: string, cwd: string) => Promise<void>;
+	onResumeSession: (sessionId: string, cwd: string) => Promise<void>;
+	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
 	onClose: () => void;
 }) {
 	const [sessionId, setSessionId] = useState("");
@@ -146,21 +146,21 @@ function DebugForm({
 	const handleLoad = useCallback(() => {
 		if (sessionId.trim()) {
 			onClose();
-			onLoadSession(sessionId.trim(), cwd.trim() || currentCwd);
+			void onLoadSession(sessionId.trim(), cwd.trim() || currentCwd);
 		}
 	}, [sessionId, cwd, currentCwd, onLoadSession, onClose]);
 
 	const handleResume = useCallback(() => {
 		if (sessionId.trim()) {
 			onClose();
-			onResumeSession(sessionId.trim(), cwd.trim() || currentCwd);
+			void onResumeSession(sessionId.trim(), cwd.trim() || currentCwd);
 		}
 	}, [sessionId, cwd, currentCwd, onResumeSession, onClose]);
 
 	const handleFork = useCallback(() => {
 		if (sessionId.trim()) {
 			onClose();
-			onForkSession(sessionId.trim(), cwd.trim() || currentCwd);
+			void onForkSession(sessionId.trim(), cwd.trim() || currentCwd);
 		}
 	}, [sessionId, cwd, currentCwd, onForkSession, onClose]);
 
@@ -235,24 +235,24 @@ function SessionItem({
 	canLoad: boolean;
 	canResume: boolean;
 	canFork: boolean;
-	onLoadSession: (sessionId: string, cwd: string) => void;
-	onResumeSession: (sessionId: string, cwd: string) => void;
-	onForkSession: (sessionId: string, cwd: string) => void;
+	onLoadSession: (sessionId: string, cwd: string) => Promise<void>;
+	onResumeSession: (sessionId: string, cwd: string) => Promise<void>;
+	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
 	onClose: () => void;
 }) {
 	const handleLoad = useCallback(() => {
 		onClose();
-		onLoadSession(session.sessionId, session.cwd);
+		void onLoadSession(session.sessionId, session.cwd);
 	}, [session, onLoadSession, onClose]);
 
 	const handleResume = useCallback(() => {
 		onClose();
-		onResumeSession(session.sessionId, session.cwd);
+		void onResumeSession(session.sessionId, session.cwd);
 	}, [session, onResumeSession, onClose]);
 
 	const handleFork = useCallback(() => {
 		onClose();
-		onForkSession(session.sessionId, session.cwd);
+		void onForkSession(session.sessionId, session.cwd);
 	}, [session, onForkSession, onClose]);
 
 	return (

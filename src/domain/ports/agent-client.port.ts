@@ -21,7 +21,6 @@ import type { SessionUpdate } from "../models/session-update";
 import type { AgentError } from "../models/agent-error";
 import type { PromptContent } from "../models/prompt-content";
 import type {
-	SessionInfo,
 	ListSessionsResult,
 	LoadSessionResult,
 	ResumeSessionResult,
