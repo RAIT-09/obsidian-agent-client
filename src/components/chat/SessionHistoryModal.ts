@@ -55,7 +55,7 @@ export class SessionHistoryModal extends Modal {
 		contentEl.empty();
 
 		// Add modal title
-		contentEl.createEl("h2", { text: "Session History" });
+		contentEl.createEl("h2", { text: "Session history" });
 
 		// Create container for React content
 		const reactContainer = contentEl.createDiv();

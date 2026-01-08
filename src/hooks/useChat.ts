@@ -77,6 +77,14 @@ export interface UseChatReturn {
 	) => void;
 
 	/**
+	 * Set messages directly from local storage.
+	 * Unlike setInitialMessages which converts from ACP history format,
+	 * this accepts ChatMessage[] as-is (for resume/fork operations).
+	 * @param localMessages - Chat messages from local storage
+	 */
+	setMessagesFromLocal: (localMessages: ChatMessage[]) => void;
+
+	/**
 	 * Clear the current error.
 	 */
 	clearError: () => void;
@@ -537,6 +545,20 @@ export function useChat(
 	);
 
 	/**
+	 * Set messages directly from local storage.
+	 * Unlike setInitialMessages which converts from ACP history format,
+	 * this accepts ChatMessage[] as-is (for resume/fork operations).
+	 */
+	const setMessagesFromLocal = useCallback(
+		(localMessages: ChatMessage[]): void => {
+			setMessages(localMessages);
+			setIsSending(false);
+			setErrorInfo(null);
+		},
+		[],
+	);
+
+	/**
 	 * Clear the current error.
 	 */
 	const clearError = useCallback((): void => {
@@ -698,6 +720,7 @@ export function useChat(
 		sendMessage,
 		clearMessages,
 		setInitialMessages,
+		setMessagesFromLocal,
 		clearError,
 		addMessage,
 		updateLastMessage,

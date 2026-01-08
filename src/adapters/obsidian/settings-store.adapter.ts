@@ -9,6 +9,7 @@
 import type { ISettingsAccess } from "../../domain/ports/settings-access.port";
 import type { AgentClientPluginSettings } from "../../plugin";
 import type AgentClientPlugin from "../../plugin";
+import type { ChatMessage } from "../../domain/models/chat-message";
 import type { SavedSessionInfo } from "../../domain/models/session-info";
 
 /** Listener callback invoked when settings change */
@@ -178,14 +179,159 @@ export class SettingsStore implements ISettingsAccess {
 	/**
 	 * Delete a saved session by sessionId.
 	 *
+	 * Also deletes the associated message history file.
+	 *
 	 * @param sessionId - ID of session to delete
 	 * @returns Promise that resolves when session is deleted
 	 */
 	async deleteSession(sessionId: string): Promise<void> {
+		// Delete metadata from savedSessions
 		const sessions = (this.state.savedSessions || []).filter(
 			(s) => s.sessionId !== sessionId,
 		);
 		await this.updateSettings({ savedSessions: sessions });
+
+		// Also delete message history file
+		await this.deleteSessionMessages(sessionId);
+	}
+
+	// ============================================================
+	// Session Message History Methods
+	// ============================================================
+
+	/** Directory for session message files */
+	private static readonly SESSIONS_DIR =
+		".obsidian/plugins/agent-client/sessions";
+
+	/**
+	 * Ensure the sessions directory exists.
+	 *
+	 * Creates the directory if it doesn't exist.
+	 */
+	private async ensureSessionsDir(): Promise<void> {
+		const adapter = this.plugin.app.vault.adapter;
+		if (!(await adapter.exists(SettingsStore.SESSIONS_DIR))) {
+			await adapter.mkdir(SettingsStore.SESSIONS_DIR);
+		}
+	}
+
+	/**
+	 * Get the file path for a session's message history.
+	 *
+	 * Sanitizes sessionId to ensure safe file names.
+	 *
+	 * @param sessionId - Session ID
+	 * @returns File path for the session's messages
+	 */
+	private getSessionFilePath(sessionId: string): string {
+		// Sanitize sessionId for safe file names (replace unsafe chars with _)
+		const safeId = sessionId.replace(/[^a-zA-Z0-9_-]/g, "_");
+		return `${SettingsStore.SESSIONS_DIR}/${safeId}.json`;
+	}
+
+	/**
+	 * Save message history for a session.
+	 *
+	 * Saves the full ChatMessage[] to a separate file.
+	 * Overwrites existing file if present.
+	 *
+	 * @param sessionId - Session ID
+	 * @param agentId - Agent ID for validation
+	 * @param messages - Chat messages to save
+	 */
+	async saveSessionMessages(
+		sessionId: string,
+		agentId: string,
+		messages: ChatMessage[],
+	): Promise<void> {
+		await this.ensureSessionsDir();
+
+		// Serialize ChatMessage[] (convert timestamp: Date → string)
+		const serialized = messages.map((msg) => ({
+			...msg,
+			timestamp: msg.timestamp.toISOString(),
+		}));
+
+		const data = {
+			version: 1,
+			sessionId,
+			agentId,
+			messages: serialized,
+			savedAt: new Date().toISOString(),
+		};
+
+		const filePath = this.getSessionFilePath(sessionId);
+		await this.plugin.app.vault.adapter.write(
+			filePath,
+			JSON.stringify(data, null, 2),
+		);
+	}
+
+	/**
+	 * Load message history for a session.
+	 *
+	 * Reads from sessions/{sessionId}.json file.
+	 * Returns null if file doesn't exist or on error.
+	 *
+	 * @param sessionId - Session ID
+	 * @returns Chat messages or null if not found
+	 */
+	async loadSessionMessages(
+		sessionId: string,
+	): Promise<ChatMessage[] | null> {
+		const filePath = this.getSessionFilePath(sessionId);
+		const adapter = this.plugin.app.vault.adapter;
+
+		if (!(await adapter.exists(filePath))) {
+			return null;
+		}
+
+		try {
+			const content = await adapter.read(filePath);
+			const data = JSON.parse(content);
+
+			// Version check for future compatibility
+			if (data.version !== 1) {
+				console.warn(
+					`[SettingsStore] Unknown session file version: ${data.version}`,
+				);
+				return null;
+			}
+
+			// Deserialize (convert timestamp: string → Date)
+			return data.messages.map(
+				(msg: {
+					id: string;
+					role: string;
+					content: unknown[];
+					timestamp: string;
+				}) => ({
+					...msg,
+					timestamp: new Date(msg.timestamp),
+				}),
+			);
+		} catch (error) {
+			console.error(
+				`[SettingsStore] Failed to load session messages: ${error}`,
+			);
+			return null;
+		}
+	}
+
+	/**
+	 * Delete message history file for a session.
+	 *
+	 * Silently succeeds if file doesn't exist.
+	 *
+	 * @param sessionId - Session ID
+	 */
+	async deleteSessionMessages(sessionId: string): Promise<void> {
+		const filePath = this.getSessionFilePath(sessionId);
+		const adapter = this.plugin.app.vault.adapter;
+
+		if (await adapter.exists(filePath)) {
+			await adapter.remove(filePath);
+		}
 	}
 }
 

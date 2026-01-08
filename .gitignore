@@ -25,6 +25,7 @@ main.js
 
 # obsidian
 data.json
+sessions/
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store

@@ -10,6 +10,7 @@ import type {
 	SessionModeState,
 	SessionModelState,
 } from "../domain/models/chat-session";
+import type { ChatMessage } from "../domain/models/chat-message";
 import {
 	getSessionCapabilityFlags,
 	type SessionCapabilityFlags,
@@ -40,6 +41,17 @@ export interface SessionLoadCallback {
 }
 
 /**
+ * Callback invoked when messages should be restored from local storage.
+ * Used for resume/fork operations where the agent doesn't return history.
+ */
+export interface MessagesRestoreCallback {
+	/**
+	 * @param messages - Messages to restore
+	 */
+	(messages: ChatMessage[]): void;
+}
+
+/**
  * Options for useSessionHistory hook.
  */
 export interface UseSessionHistoryOptions {
@@ -51,6 +63,8 @@ export interface UseSessionHistoryOptions {
 	settingsAccess: ISettingsAccess;
 	/** Callback invoked when a session is loaded/resumed/forked */
 	onSessionLoad: SessionLoadCallback;
+	/** Callback invoked when messages should be restored from local storage (for resume/fork) */
+	onMessagesRestore?: MessagesRestoreCallback;
 }
 
 /**
@@ -161,7 +175,13 @@ const CACHE_EXPIRY_MS = 5 * 60 * 1000;
 export function useSessionHistory(
 	options: UseSessionHistoryOptions,
 ): UseSessionHistoryReturn {
-	const { agentClient, session, settingsAccess, onSessionLoad } = options;
+	const {
+		agentClient,
+		session,
+		settingsAccess,
+		onSessionLoad,
+		onMessagesRestore,
+	} = options;
 
 	// Derive capability flags from session.agentCapabilities
 	const capabilities: SessionCapabilityFlags = useMemo(
@@ -351,6 +371,7 @@ export function useSessionHistory(
 
 	/**
 	 * Resume a specific session by ID (without history replay).
+	 * Restores messages from local storage since agent doesn't return history.
 	 */
 	const resumeSession = useCallback(
 		async (sessionId: string, cwd: string) => {
@@ -366,6 +387,13 @@ export function useSessionHistory(
 
 				// Update with modes/models from result
 				onSessionLoad(result.sessionId, result.modes, result.models);
+
+				// Resume doesn't return history, so restore from local storage
+				const localMessages =
+					await settingsAccess.loadSessionMessages(sessionId);
+				if (localMessages && onMessagesRestore) {
+					onMessagesRestore(localMessages);
+				}
 			} catch (err) {
 				const errorMessage =
 					err instanceof Error ? err.message : String(err);
@@ -375,12 +403,13 @@ export function useSessionHistory(
 				setLoading(false);
 			}
 		},
-		[agentClient, onSessionLoad],
+		[agentClient, onSessionLoad, settingsAccess, onMessagesRestore],
 	);
 
 	/**
 	 * Fork a specific session to create a new branch.
 	 * Note: For fork, we update sessionId AFTER the call since a new session ID is created.
+	 * Restores messages from the original session's local storage since agent doesn't return history.
 	 */
 	const forkSession = useCallback(
 		async (sessionId: string, cwd: string) => {
@@ -394,6 +423,13 @@ export function useSessionHistory(
 				// For fork, the new session ID is returned in result
 				onSessionLoad(result.sessionId, result.modes, result.models);
 
+				// Fork doesn't return history, so restore from original session's local storage
+				const localMessages =
+					await settingsAccess.loadSessionMessages(sessionId);
+				if (localMessages && onMessagesRestore) {
+					onMessagesRestore(localMessages);
+				}
+
 				// Invalidate cache since a new session was created
 				invalidateCache();
 			} catch (err) {
@@ -405,7 +441,13 @@ export function useSessionHistory(
 				setLoading(false);
 			}
 		},
-		[agentClient, onSessionLoad, invalidateCache],
+		[
+			agentClient,
+			onSessionLoad,
+			settingsAccess,
+			onMessagesRestore,
+			invalidateCache,
+		],
 	);
 
 	return {

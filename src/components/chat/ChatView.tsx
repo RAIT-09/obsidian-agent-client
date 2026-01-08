@@ -195,6 +195,7 @@ function ChatComponent({
 		session,
 		settingsAccess: plugin.settingsStore,
 		onSessionLoad: handleSessionLoad,
+		onMessagesRestore: chat.setMessagesFromLocal,
 	});
 
 	// Combined error info (session errors take precedence)
@@ -611,6 +612,43 @@ function ChatComponent({
 				console.error("Failed to check for updates:", error);
 			});
 	}, [plugin]);
+
+	// ============================================================
+	// Effects - Save Session Messages on Turn End
+	// ============================================================
+	// Track previous isSending state to detect turn completion
+	const prevIsSendingRef = useRef<boolean>(false);
+
+	useEffect(() => {
+		const wasSending = prevIsSendingRef.current;
+		prevIsSendingRef.current = isSending;
+
+		// Save when turn ends (isSending: true → false) and has messages
+		if (
+			wasSending &&
+			!isSending &&
+			session.sessionId &&
+			session.agentId &&
+			messages.length > 0
+		) {
+			// Fire-and-forget save (don't block UI)
+			void plugin.settingsStore.saveSessionMessages(
+				session.sessionId,
+				session.agentId,
+				messages,
+			);
+			logger.log(
+				`[ChatView] Session messages saved: ${session.sessionId}`,
+			);
+		}
+	}, [
+		isSending,
+		session.sessionId,
+		session.agentId,
+		messages,
+		plugin.settingsStore,
+		logger,
+	]);
 
 	// ============================================================
 	// Effects - Auto-mention Active Note Tracking
