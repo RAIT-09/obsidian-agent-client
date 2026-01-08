@@ -1393,7 +1393,7 @@ If your plugin does not need CSS, delete this file.
 	height: 16px;
 }
 
-.agent-client-session-history-resume-icon:hover {
+.agent-client-session-history-restore-icon:hover {
 	color: var(--text-accent);
 }
 

@@ -83,10 +83,8 @@ export interface UseSessionHistoryReturn {
 	// Capability flags (from session.agentCapabilities)
 	/** Whether session history UI should be shown */
 	canShowSessionHistory: boolean;
-	/** Whether session/load is supported (stable) */
-	canLoad: boolean;
-	/** Whether session/resume is supported (unstable) */
-	canResume: boolean;
+	/** Whether session can be restored (load or resume supported) */
+	canRestore: boolean;
 	/** Whether session/fork is supported (unstable) */
 	canFork: boolean;
 	/** Whether session/list is supported (unstable) */
@@ -108,21 +106,13 @@ export interface UseSessionHistoryReturn {
 	loadMoreSessions: () => Promise<void>;
 
 	/**
-	 * Load a specific session by ID (with history replay).
-	 * Only available if canLoad is true.
-	 * Conversation history is received via session/update notifications.
-	 * @param sessionId - Session to load
+	 * Restore a specific session by ID.
+	 * Uses load if available (with history replay), otherwise resume (without history replay).
+	 * Only available if canRestore is true.
+	 * @param sessionId - Session to restore
 	 * @param cwd - Working directory for the session
 	 */
-	loadSession: (sessionId: string, cwd: string) => Promise<void>;
-
-	/**
-	 * Resume a specific session by ID (without history replay).
-	 * Only available if canResume is true.
-	 * @param sessionId - Session to resume
-	 * @param cwd - Working directory for the session
-	 */
-	resumeSession: (sessionId: string, cwd: string) => Promise<void>;
+	restoreSession: (sessionId: string, cwd: string) => Promise<void>;
 
 	/**
 	 * Fork a specific session to create a new branch.
@@ -357,70 +347,68 @@ export function useSessionHistory(
 	}, [agentClient, capabilities.canList, nextCursor]);
 
 	/**
-	 * Load a specific session by ID (with history replay).
-	 * Conversation history is received via session/update notifications.
+	 * Restore a specific session by ID.
+	 * Uses load if available (with history replay), otherwise resume (without history replay).
 	 */
-	const loadSession = useCallback(
+	const restoreSession = useCallback(
 		async (sessionId: string, cwd: string) => {
 			setLoading(true);
 			setError(null);
 
 			try {
-				// IMPORTANT: Update session.sessionId BEFORE calling loadSession
+				// IMPORTANT: Update session.sessionId BEFORE calling restore
 				// so that session/update notifications are not ignored
 				onSessionLoad(sessionId, undefined, undefined);
 
-				const result = await agentClient.loadSession(sessionId, cwd);
+				if (capabilities.canLoad) {
+					// Use load (with history replay from agent)
+					const result = await agentClient.loadSession(
+						sessionId,
+						cwd,
+					);
+					onSessionLoad(
+						result.sessionId,
+						result.modes,
+						result.models,
+					);
+				} else if (capabilities.canResume) {
+					// Use resume (without history replay, restore from local storage)
+					const result = await agentClient.resumeSession(
+						sessionId,
+						cwd,
+					);
+					onSessionLoad(
+						result.sessionId,
+						result.modes,
+						result.models,
+					);
 
-				// Update with modes/models from result
-				onSessionLoad(result.sessionId, result.modes, result.models);
-			} catch (err) {
-				const errorMessage =
-					err instanceof Error ? err.message : String(err);
-				setError(`Failed to load session: ${errorMessage}`);
-				throw err; // Re-throw to allow caller to handle
-			} finally {
-				setLoading(false);
-			}
-		},
-		[agentClient, onSessionLoad],
-	);
-
-	/**
-	 * Resume a specific session by ID (without history replay).
-	 * Restores messages from local storage since agent doesn't return history.
-	 */
-	const resumeSession = useCallback(
-		async (sessionId: string, cwd: string) => {
-			setLoading(true);
-			setError(null);
-
-			try {
-				// IMPORTANT: Update session.sessionId BEFORE calling resumeSession
-				// so that session/update notifications are not ignored
-				onSessionLoad(sessionId, undefined, undefined);
-
-				const result = await agentClient.resumeSession(sessionId, cwd);
-
-				// Update with modes/models from result
-				onSessionLoad(result.sessionId, result.modes, result.models);
-
-				// Resume doesn't return history, so restore from local storage
-				const localMessages =
-					await settingsAccess.loadSessionMessages(sessionId);
-				if (localMessages && onMessagesRestore) {
-					onMessagesRestore(localMessages);
+					// Resume doesn't return history, so restore from local storage
+					const localMessages =
+						await settingsAccess.loadSessionMessages(sessionId);
+					if (localMessages && onMessagesRestore) {
+						onMessagesRestore(localMessages);
+					}
+				} else {
+					throw new Error("Session restoration is not supported");
 				}
 			} catch (err) {
 				const errorMessage =
 					err instanceof Error ? err.message : String(err);
-				setError(`Failed to resume session: ${errorMessage}`);
+				setError(`Failed to restore session: ${errorMessage}`);
 				throw err; // Re-throw to allow caller to handle
 			} finally {
 				setLoading(false);
 			}
 		},
-		[agentClient, onSessionLoad, settingsAccess, onMessagesRestore],
+		[
+			agentClient,
+			capabilities.canLoad,
+			capabilities.canResume,
+			onSessionLoad,
+			settingsAccess,
+			onMessagesRestore,
+		],
 	);
 
 	/**
@@ -507,8 +495,7 @@ export function useSessionHistory(
 			capabilities.canLoad ||
 			capabilities.canResume ||
 			capabilities.canFork,
-		canLoad: capabilities.canLoad,
-		canResume: capabilities.canResume,
+		canRestore: capabilities.canLoad || capabilities.canResume,
 		canFork: capabilities.canFork,
 		canList: capabilities.canList,
 		isUsingLocalSessions: !capabilities.canList,
@@ -516,8 +503,7 @@ export function useSessionHistory(
 		// Methods
 		fetchSessions,
 		loadMoreSessions,
-		loadSession,
-		resumeSession,
+		restoreSession,
 		forkSession,
 		deleteSession,
 		invalidateCache,

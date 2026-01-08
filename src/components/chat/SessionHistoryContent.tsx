@@ -21,10 +21,8 @@ export interface SessionHistoryContentProps {
 	// Capability flags (from useSessionHistory)
 	/** Whether session/list is supported (unstable) */
 	canList: boolean;
-	/** Whether session/load is supported (stable) */
-	canLoad: boolean;
-	/** Whether session/resume is supported (unstable) */
-	canResume: boolean;
+	/** Whether session can be restored (load or resume supported) */
+	canRestore: boolean;
 	/** Whether session/fork is supported (unstable) */
 	canFork: boolean;
 
@@ -37,10 +35,8 @@ export interface SessionHistoryContentProps {
 	/** Whether debug mode is enabled (shows manual input form) */
 	debugMode: boolean;
 
-	/** Callback when a session is selected for loading (with history replay) */
-	onLoadSession: (sessionId: string, cwd: string) => Promise<void>;
-	/** Callback when a session is resumed (without history replay) */
-	onResumeSession: (sessionId: string, cwd: string) => Promise<void>;
+	/** Callback when a session is restored */
+	onRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	/** Callback when a session is forked (create new branch) */
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
 	/** Callback when a session is deleted */
@@ -131,33 +127,24 @@ function truncateTitle(title: string): string {
  */
 function DebugForm({
 	currentCwd,
-	onLoadSession,
-	onResumeSession,
+	onRestoreSession,
 	onForkSession,
 	onClose,
 }: {
 	currentCwd: string;
-	onLoadSession: (sessionId: string, cwd: string) => Promise<void>;
-	onResumeSession: (sessionId: string, cwd: string) => Promise<void>;
+	onRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
 	onClose: () => void;
 }) {
 	const [sessionId, setSessionId] = useState("");
 	const [cwd, setCwd] = useState(currentCwd);
 
-	const handleLoad = useCallback(() => {
+	const handleRestore = useCallback(() => {
 		if (sessionId.trim()) {
 			onClose();
-			void onLoadSession(sessionId.trim(), cwd.trim() || currentCwd);
+			void onRestoreSession(sessionId.trim(), cwd.trim() || currentCwd);
 		}
-	}, [sessionId, cwd, currentCwd, onLoadSession, onClose]);
-
-	const handleResume = useCallback(() => {
-		if (sessionId.trim()) {
-			onClose();
-			void onResumeSession(sessionId.trim(), cwd.trim() || currentCwd);
-		}
-	}, [sessionId, cwd, currentCwd, onResumeSession, onClose]);
+	}, [sessionId, cwd, currentCwd, onRestoreSession, onClose]);
 
 	const handleFork = useCallback(() => {
 		if (sessionId.trim()) {
@@ -197,15 +184,9 @@ function DebugForm({
 			<div className="agent-client-session-history-debug-actions">
 				<button
 					className="agent-client-session-history-debug-button"
-					onClick={handleLoad}
+					onClick={handleRestore}
 				>
-					Load
-				</button>
-				<button
-					className="agent-client-session-history-debug-button"
-					onClick={handleResume}
-				>
-					Resume
+					Restore
 				</button>
 				<button
 					className="agent-client-session-history-debug-button"
@@ -225,34 +206,25 @@ function DebugForm({
  */
 function SessionItem({
 	session,
-	canLoad,
-	canResume,
+	canRestore,
 	canFork,
-	onLoadSession,
-	onResumeSession,
+	onRestoreSession,
 	onForkSession,
 	onDeleteSession,
 	onClose,
 }: {
 	session: SessionInfo;
-	canLoad: boolean;
-	canResume: boolean;
+	canRestore: boolean;
 	canFork: boolean;
-	onLoadSession: (sessionId: string, cwd: string) => Promise<void>;
-	onResumeSession: (sessionId: string, cwd: string) => Promise<void>;
+	onRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
 	onDeleteSession: (sessionId: string) => Promise<void>;
 	onClose: () => void;
 }) {
-	const handleLoad = useCallback(() => {
+	const handleRestore = useCallback(() => {
 		onClose();
-		void onLoadSession(session.sessionId, session.cwd);
-	}, [session, onLoadSession, onClose]);
-
-	const handleResume = useCallback(() => {
-		onClose();
-		void onResumeSession(session.sessionId, session.cwd);
-	}, [session, onResumeSession, onClose]);
+		void onRestoreSession(session.sessionId, session.cwd);
+	}, [session, onRestoreSession, onClose]);
 
 	const handleFork = useCallback(() => {
 		onClose();
@@ -281,20 +253,12 @@ function SessionItem({
 			</div>
 
 			<div className="agent-client-session-history-item-actions">
-				{canLoad && (
-					<IconButton
-						iconName="file-text"
-						label="Load session (with history)"
-						className="agent-client-session-history-action-icon agent-client-session-history-load-icon"
-						onClick={handleLoad}
-					/>
-				)}
-				{canResume && (
+				{canRestore && (
 					<IconButton
 						iconName="play"
-						label="Resume session (without history)"
-						className="agent-client-session-history-action-icon agent-client-session-history-resume-icon"
-						onClick={handleResume}
+						label="Restore session"
+						className="agent-client-session-history-action-icon agent-client-session-history-restore-icon"
+						onClick={handleRestore}
 					/>
 				)}
 				{canFork && (
@@ -333,14 +297,12 @@ export function SessionHistoryContent({
 	hasMore,
 	currentCwd,
 	canList,
-	canLoad,
-	canResume,
+	canRestore,
 	canFork,
 	isUsingLocalSessions,
 	isAgentReady,
 	debugMode,
-	onLoadSession,
-	onResumeSession,
+	onRestoreSession,
 	onForkSession,
 	onDeleteSession,
 	onLoadMore,
@@ -374,7 +336,7 @@ export function SessionHistoryContent({
 	}
 
 	// Check if any session operation is available
-	const canPerformAnyOperation = canLoad || canResume || canFork;
+	const canPerformAnyOperation = canRestore || canFork;
 
 	// Show local sessions list (always show for delete functionality)
 	// - If agent supports list: use agent's session/list
@@ -388,8 +350,7 @@ export function SessionHistoryContent({
 			{debugMode && (
 				<DebugForm
 					currentCwd={currentCwd}
-					onLoadSession={onLoadSession}
-					onResumeSession={onResumeSession}
+					onRestoreSession={onRestoreSession}
 					onForkSession={onForkSession}
 					onClose={onClose}
 				/>
@@ -480,11 +441,9 @@ export function SessionHistoryContent({
 								<SessionItem
 									key={session.sessionId}
 									session={session}
-									canLoad={canLoad}
-									canResume={canResume}
+									canRestore={canRestore}
 									canFork={canFork}
-									onLoadSession={onLoadSession}
-									onResumeSession={onResumeSession}
+									onRestoreSession={onRestoreSession}
 									onForkSession={onForkSession}
 									onDeleteSession={onDeleteSession}
 									onClose={onClose}

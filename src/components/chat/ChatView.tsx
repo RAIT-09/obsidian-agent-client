@@ -340,34 +340,24 @@ function ChatComponent({
 				currentCwd: vaultPath,
 				// Capability flags
 				canList: sessionHistory.canList,
-				canLoad: sessionHistory.canLoad,
-				canResume: sessionHistory.canResume,
+				canRestore: sessionHistory.canRestore,
 				canFork: sessionHistory.canFork,
 				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
 				isAgentReady: isSessionReady,
 				// Debug mode
 				debugMode: settings.debugMode,
 				// Callbacks
-				onLoadSession: async (sessionId: string, cwd: string) => {
+				onRestoreSession: async (sessionId: string, cwd: string) => {
 					try {
-						logger.log(`[ChatView] Loading session: ${sessionId}`);
+						logger.log(
+							`[ChatView] Restoring session: ${sessionId}`,
+						);
 						chat.clearMessages();
-						await sessionHistory.loadSession(sessionId, cwd);
-						new Notice("[Agent Client] Session loaded");
+						await sessionHistory.restoreSession(sessionId, cwd);
+						new Notice("[Agent Client] Session restored");
 					} catch (error) {
-						new Notice("[Agent Client] Failed to load session");
-						logger.error("Session load error:", error);
-					}
-				},
-				onResumeSession: async (sessionId: string, cwd: string) => {
-					try {
-						logger.log(`[ChatView] Resuming session: ${sessionId}`);
-						chat.clearMessages();
-						await sessionHistory.resumeSession(sessionId, cwd);
-						new Notice("[Agent Client] Session resumed");
-					} catch (error) {
-						new Notice("[Agent Client] Failed to resume session");
-						logger.error("Session resume error:", error);
+						new Notice("[Agent Client] Failed to restore session");
+						logger.error("Session restore error:", error);
 					}
 				},
 				onForkSession: async (sessionId: string, cwd: string) => {
@@ -421,34 +411,24 @@ function ChatComponent({
 				currentCwd: vaultPath,
 				// Capability flags
 				canList: sessionHistory.canList,
-				canLoad: sessionHistory.canLoad,
-				canResume: sessionHistory.canResume,
+				canRestore: sessionHistory.canRestore,
 				canFork: sessionHistory.canFork,
 				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
 				isAgentReady: isSessionReady,
 				// Debug mode
 				debugMode: settings.debugMode,
 				// Callbacks
-				onLoadSession: async (sessionId: string, cwd: string) => {
+				onRestoreSession: async (sessionId: string, cwd: string) => {
 					try {
-						logger.log(`[ChatView] Loading session: ${sessionId}`);
+						logger.log(
+							`[ChatView] Restoring session: ${sessionId}`,
+						);
 						chat.clearMessages();
-						await sessionHistory.loadSession(sessionId, cwd);
-						new Notice("[Agent Client] Session loaded");
+						await sessionHistory.restoreSession(sessionId, cwd);
+						new Notice("[Agent Client] Session restored");
 					} catch (error) {
-						new Notice("[Agent Client] Failed to load session");
-						logger.error("Session load error:", error);
-					}
-				},
-				onResumeSession: async (sessionId: string, cwd: string) => {
-					try {
-						logger.log(`[ChatView] Resuming session: ${sessionId}`);
-						chat.clearMessages();
-						await sessionHistory.resumeSession(sessionId, cwd);
-						new Notice("[Agent Client] Session resumed");
-					} catch (error) {
-						new Notice("[Agent Client] Failed to resume session");
-						logger.error("Session resume error:", error);
+						new Notice("[Agent Client] Failed to restore session");
+						logger.error("Session restore error:", error);
 					}
 				},
 				onForkSession: async (sessionId: string, cwd: string) => {
@@ -486,8 +466,7 @@ function ChatComponent({
 		sessionHistory.error,
 		sessionHistory.hasMore,
 		sessionHistory.canList,
-		sessionHistory.canLoad,
-		sessionHistory.canResume,
+		sessionHistory.canRestore,
 		sessionHistory.canFork,
 		sessionHistory.isUsingLocalSessions,
 		isSessionReady,
