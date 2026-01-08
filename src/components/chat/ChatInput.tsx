@@ -50,6 +50,8 @@ export interface ChatInputProps {
 	isSending: boolean;
 	/** Whether the session is ready for user input */
 	isSessionReady: boolean;
+	/** Whether a session is being restored (load/resume/fork) */
+	isRestoringSession: boolean;
 	/** Display name of the active agent */
 	agentLabel: string;
 	/** Available slash commands */
@@ -106,6 +108,7 @@ export interface ChatInputProps {
 export function ChatInput({
 	isSending,
 	isSessionReady,
+	isRestoringSession,
 	agentLabel,
 	availableCommands,
 	autoMentionEnabled,
@@ -578,7 +581,8 @@ export function ChatInput({
 	const isButtonDisabled =
 		!isSending &&
 		((inputValue.trim() === "" && attachedImages.length === 0) ||
-			!isSessionReady);
+			!isSessionReady ||
+			isRestoringSession);
 
 	/**
 	 * Handle keyboard events in the textarea.

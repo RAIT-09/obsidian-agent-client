@@ -781,6 +781,7 @@ function ChatComponent({
 				messages={messages}
 				isSending={isSending}
 				isSessionReady={isSessionReady}
+				isRestoringSession={sessionHistory.loading}
 				agentLabel={activeAgentLabel}
 				errorInfo={errorInfo}
 				plugin={plugin}
@@ -793,6 +794,7 @@ function ChatComponent({
 			<ChatInput
 				isSending={isSending}
 				isSessionReady={isSessionReady}
+				isRestoringSession={sessionHistory.loading}
 				agentLabel={activeAgentLabel}
 				availableCommands={session.availableCommands || []}
 				autoMentionEnabled={settings.autoMentionActiveNote}
