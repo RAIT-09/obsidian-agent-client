@@ -75,8 +75,8 @@ export class NoteMentionService {
 		const fuzzySearch = prepareFuzzySearch(query.trim());
 
 		// Score each file based on multiple fields
-		const scoredFiles: Array<{ item: TFile; score: number }> = this.files.map(
-			(file) => {
+		const scoredFiles: Array<{ item: TFile; score: number }> =
+			this.files.map((file) => {
 				const basename = file.basename;
 				const path = file.path;
 
@@ -105,8 +105,7 @@ export class NoteMentionService {
 				}
 
 				return { item: file, score: bestScore };
-			},
-		);
+			});
 
 		// Sort and return top matches
 		return scoredFiles
