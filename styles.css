@@ -396,33 +396,6 @@ If your plugin does not need CSS, delete this file.
 	margin: 0 !important;
 }
 
-.agent-client-chat-view-header-session {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	margin-top: 2px;
-}
-
-.agent-client-chat-view-header-session-title {
-	font-size: 13px;
-	color: var(--text-muted);
-	font-weight: 400;
-}
-
-.agent-client-chat-view-header-session-input {
-	font-size: 13px;
-	padding: 2px 6px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 3px;
-	background: var(--background-primary);
-	color: var(--text-normal);
-	min-width: 200px;
-}
-
-.agent-client-chat-view-header-session-input:focus {
-	outline: 1px solid var(--text-accent);
-}
-
 .agent-client-chat-view-header-update {
 	margin: 0 10px 0 auto !important;
 	padding: 2px 8px;
@@ -1362,11 +1335,6 @@ If your plugin does not need CSS, delete this file.
 	background: var(--background-secondary);
 	border-radius: 6px;
 	border: 1px solid var(--background-modifier-border);
-	transition: background-color 0.2s;
-}
-
-.agent-client-session-history-item:hover {
-	background: var(--background-modifier-hover);
 }
 
 .agent-client-session-history-item-content {
@@ -1431,14 +1399,6 @@ If your plugin does not need CSS, delete this file.
 
 .agent-client-session-history-fork-icon:hover {
 	color: var(--text-accent);
-}
-
-.agent-client-session-history-rename-icon:hover {
-	color: var(--color-yellow);
-}
-
-.agent-client-session-history-delete-icon:hover {
-	color: var(--text-error);
 }
 
 .agent-client-session-history-loading,
