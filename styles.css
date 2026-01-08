@@ -1543,3 +1543,28 @@ If your plugin does not need CSS, delete this file.
 .agent-client-session-history-delete-icon:hover {
 	color: var(--text-error);
 }
+
+/* Confirm delete modal */
+.agent-client-confirm-delete-message {
+	margin-bottom: 8px;
+}
+
+.agent-client-confirm-delete-warning {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	margin-bottom: 16px;
+}
+
+.agent-client-confirm-delete-buttons {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.agent-client-confirm-delete-cancel {
+	/* Uses default button styles */
+}
+
+.agent-client-confirm-delete-confirm {
+	/* mod-warning class provides warning color */
+}

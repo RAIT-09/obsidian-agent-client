@@ -10,6 +10,7 @@ import { ChatHeader } from "./ChatHeader";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 import { SessionHistoryModal } from "./SessionHistoryModal";
+import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 
 // Service imports
 import { NoteMentionService } from "../../adapters/obsidian/mention-service";
@@ -371,15 +372,33 @@ function ChatComponent({
 						logger.error("Session fork error:", error);
 					}
 				},
-				onDeleteSession: async (sessionId: string) => {
-					try {
-						logger.log(`[ChatView] Deleting session: ${sessionId}`);
-						await sessionHistory.deleteSession(sessionId);
-						new Notice("[Agent Client] Session deleted");
-					} catch (error) {
-						new Notice("[Agent Client] Failed to delete session");
-						logger.error("Session delete error:", error);
-					}
+				onDeleteSession: (sessionId: string) => {
+					// Find session title for confirmation message
+					const session = sessionHistory.sessions.find(
+						(s) => s.sessionId === sessionId,
+					);
+					const sessionTitle = session?.title ?? "Untitled Session";
+
+					// Show confirmation modal
+					const confirmModal = new ConfirmDeleteModal(
+						plugin.app,
+						sessionTitle,
+						async () => {
+							try {
+								logger.log(
+									`[ChatView] Deleting session: ${sessionId}`,
+								);
+								await sessionHistory.deleteSession(sessionId);
+								new Notice("[Agent Client] Session deleted");
+							} catch (error) {
+								new Notice(
+									"[Agent Client] Failed to delete session",
+								);
+								logger.error("Session delete error:", error);
+							}
+						},
+					);
+					confirmModal.open();
 				},
 				onLoadMore: () => {
 					void sessionHistory.loadMoreSessions();
@@ -442,15 +461,33 @@ function ChatComponent({
 						logger.error("Session fork error:", error);
 					}
 				},
-				onDeleteSession: async (sessionId: string) => {
-					try {
-						logger.log(`[ChatView] Deleting session: ${sessionId}`);
-						await sessionHistory.deleteSession(sessionId);
-						new Notice("[Agent Client] Session deleted");
-					} catch (error) {
-						new Notice("[Agent Client] Failed to delete session");
-						logger.error("Session delete error:", error);
-					}
+				onDeleteSession: (sessionId: string) => {
+					// Find session title for confirmation message
+					const session = sessionHistory.sessions.find(
+						(s) => s.sessionId === sessionId,
+					);
+					const sessionTitle = session?.title ?? "Untitled Session";
+
+					// Show confirmation modal
+					const confirmModal = new ConfirmDeleteModal(
+						plugin.app,
+						sessionTitle,
+						async () => {
+							try {
+								logger.log(
+									`[ChatView] Deleting session: ${sessionId}`,
+								);
+								await sessionHistory.deleteSession(sessionId);
+								new Notice("[Agent Client] Session deleted");
+							} catch (error) {
+								new Notice(
+									"[Agent Client] Failed to delete session",
+								);
+								logger.error("Session delete error:", error);
+							}
+						},
+					);
+					confirmModal.open();
 				},
 				onLoadMore: () => {
 					void sessionHistory.loadMoreSessions();

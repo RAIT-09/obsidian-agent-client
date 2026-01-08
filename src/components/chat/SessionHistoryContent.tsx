@@ -39,8 +39,8 @@ export interface SessionHistoryContentProps {
 	onRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	/** Callback when a session is forked (create new branch) */
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
-	/** Callback when a session is deleted */
-	onDeleteSession: (sessionId: string) => Promise<void>;
+	/** Callback when a session is deleted (shows confirmation dialog) */
+	onDeleteSession: (sessionId: string) => void;
 	/** Callback to load more sessions (pagination) */
 	onLoadMore: () => void;
 	/** Callback to fetch sessions with filter */
@@ -218,7 +218,7 @@ function SessionItem({
 	canFork: boolean;
 	onRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
-	onDeleteSession: (sessionId: string) => Promise<void>;
+	onDeleteSession: (sessionId: string) => void;
 	onClose: () => void;
 }) {
 	const handleRestore = useCallback(() => {
@@ -232,7 +232,7 @@ function SessionItem({
 	}, [session, onForkSession, onClose]);
 
 	const handleDelete = useCallback(() => {
-		void onDeleteSession(session.sessionId);
+		onDeleteSession(session.sessionId);
 	}, [session.sessionId, onDeleteSession]);
 
 	return (
