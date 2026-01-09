@@ -57,10 +57,12 @@ export interface MessagesRestoreCallback {
 export interface UseSessionHistoryOptions {
 	/** Agent client for session operations */
 	agentClient: IAgentClient;
-	/** Current session (used to access agentCapabilities) */
+	/** Current session (used to access agentCapabilities and agentId) */
 	session: ChatSession;
 	/** Settings access for local session storage */
 	settingsAccess: ISettingsAccess;
+	/** Working directory (vault path) for session operations */
+	cwd: string;
 	/** Callback invoked when a session is loaded/resumed/forked */
 	onSessionLoad: SessionLoadCallback;
 	/** Callback invoked when messages should be restored from local storage */
@@ -133,6 +135,28 @@ export interface UseSessionHistoryReturn {
 	deleteSession: (sessionId: string) => Promise<void>;
 
 	/**
+	 * Save session metadata locally.
+	 * Called when the first message is sent in a new session.
+	 * @param sessionId - Session ID to save
+	 * @param messageContent - First message content (used to generate title)
+	 */
+	saveSessionLocally: (
+		sessionId: string,
+		messageContent: string,
+	) => Promise<void>;
+
+	/**
+	 * Save session messages locally.
+	 * Called when a turn ends (agent response complete).
+	 * @param sessionId - Session ID
+	 * @param messages - Messages to save
+	 */
+	saveSessionMessages: (
+		sessionId: string,
+		messages: import("../domain/models/chat-message").ChatMessage[],
+	) => void;
+
+	/**
 	 * Invalidate the session cache.
 	 * Call this when creating a new session to refresh the list.
 	 */
@@ -179,6 +203,7 @@ export function useSessionHistory(
 		agentClient,
 		session,
 		settingsAccess,
+		cwd,
 		onSessionLoad,
 		onMessagesRestore,
 		onLoadStart,
@@ -508,6 +533,53 @@ export function useSessionHistory(
 		[settingsAccess, invalidateCache],
 	);
 
+	/**
+	 * Save session metadata locally.
+	 * Called when the first message is sent in a new session.
+	 */
+	const saveSessionLocally = useCallback(
+		async (sessionId: string, messageContent: string) => {
+			if (!session.agentId) return;
+
+			const title =
+				messageContent.length > 50
+					? messageContent.substring(0, 50) + "..."
+					: messageContent;
+
+			await settingsAccess.saveSession({
+				sessionId,
+				agentId: session.agentId,
+				cwd,
+				title,
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+			});
+		},
+		[session.agentId, cwd, settingsAccess],
+	);
+
+	/**
+	 * Save session messages locally.
+	 * Called when a turn ends (agent response complete).
+	 * Fire-and-forget (does not block UI).
+	 */
+	const saveSessionMessages = useCallback(
+		(
+			sessionId: string,
+			messages: import("../domain/models/chat-message").ChatMessage[],
+		) => {
+			if (!session.agentId || messages.length === 0) return;
+
+			// Fire-and-forget
+			void settingsAccess.saveSessionMessages(
+				sessionId,
+				session.agentId,
+				messages,
+			);
+		},
+		[session.agentId, settingsAccess],
+	);
+
 	return {
 		sessions,
 		loading,
@@ -532,6 +604,8 @@ export function useSessionHistory(
 		restoreSession,
 		forkSession,
 		deleteSession,
+		saveSessionLocally,
+		saveSessionMessages,
 		invalidateCache,
 	};
 }

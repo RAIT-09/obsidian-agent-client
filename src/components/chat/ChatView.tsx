@@ -110,30 +110,6 @@ function ChatComponent({
 		isReady: isSessionReady,
 	} = agentSession;
 
-	// Callback to save session locally when first message is sent
-	const handleFirstMessageSent = useCallback(
-		async (sessionId: string, messageContent: string) => {
-			if (!session.agentId) return;
-
-			const title =
-				messageContent.length > 50
-					? messageContent.substring(0, 50) + "..."
-					: messageContent;
-
-			await plugin.settingsStore.saveSession({
-				sessionId,
-				agentId: session.agentId,
-				cwd: vaultPath,
-				title,
-				createdAt: new Date().toISOString(),
-				updatedAt: new Date().toISOString(),
-			});
-
-			logger.log(`[ChatView] Session saved locally: ${sessionId}`);
-		},
-		[session.agentId, vaultPath, plugin.settingsStore, logger],
-	);
-
 	const chat = useChat(
 		acpAdapter,
 		vaultAccessAdapter,
@@ -145,9 +121,6 @@ function ChatComponent({
 		},
 		{
 			windowsWslMode: settings.windowsWslMode,
-		},
-		{
-			onFirstMessageSent: handleFirstMessageSent,
 		},
 	);
 
@@ -216,6 +189,7 @@ function ChatComponent({
 		agentClient: acpAdapter,
 		session,
 		settingsAccess: plugin.settingsStore,
+		cwd: vaultPath,
 		onSessionLoad: handleSessionLoad,
 		onMessagesRestore: chat.setMessagesFromLocal,
 		onLoadStart: handleLoadStart,
@@ -545,6 +519,8 @@ function ChatComponent({
 			content: string,
 			images?: import("../../domain/models/prompt-content").ImagePromptContent[],
 		) => {
+			const isFirstMessage = messages.length === 0;
+
 			await chat.sendMessage(content, {
 				activeNote: autoMention.activeNote,
 				vaultBasePath:
@@ -553,8 +529,27 @@ function ChatComponent({
 				isAutoMentionDisabled: autoMention.isDisabled,
 				images,
 			});
+
+			// Save session metadata locally on first message
+			if (isFirstMessage && session.sessionId) {
+				await sessionHistory.saveSessionLocally(
+					session.sessionId,
+					content,
+				);
+				logger.log(
+					`[ChatView] Session saved locally: ${session.sessionId}`,
+				);
+			}
 		},
-		[chat, autoMention, plugin],
+		[
+			chat,
+			autoMention,
+			plugin,
+			messages.length,
+			session.sessionId,
+			sessionHistory,
+			logger,
+		],
 	);
 
 	const handleStopGeneration = useCallback(async () => {
@@ -703,27 +698,15 @@ function ChatComponent({
 			wasSending &&
 			!isSending &&
 			session.sessionId &&
-			session.agentId &&
 			messages.length > 0
 		) {
-			// Fire-and-forget save (don't block UI)
-			void plugin.settingsStore.saveSessionMessages(
-				session.sessionId,
-				session.agentId,
-				messages,
-			);
+			// Fire-and-forget save via sessionHistory hook
+			sessionHistory.saveSessionMessages(session.sessionId, messages);
 			logger.log(
 				`[ChatView] Session messages saved: ${session.sessionId}`,
 			);
 		}
-	}, [
-		isSending,
-		session.sessionId,
-		session.agentId,
-		messages,
-		plugin.settingsStore,
-		logger,
-	]);
+	}, [isSending, session.sessionId, messages, sessionHistory, logger]);
 
 	// ============================================================
 	// Effects - Auto-mention Active Note Tracking
