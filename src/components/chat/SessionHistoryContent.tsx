@@ -359,18 +359,14 @@ export function SessionHistoryContent({
 			{/* Warning banner for agents that don't support restoration */}
 			{!canPerformAnyOperation && (
 				<div className="agent-client-session-history-warning-banner">
-					<p>
-						This agent does not support session restoration.
-						Messages are saved locally but cannot be restored to the
-						agent.
-					</p>
+					<p>This agent does not support session restoration.</p>
 				</div>
 			)}
 
 			{/* Local sessions banner */}
 			{(isUsingLocalSessions || !canPerformAnyOperation) && (
 				<div className="agent-client-session-history-local-banner">
-					<span>Locally saved sessions</span>
+					<span>These sessions are saved in the plugin.</span>
 				</div>
 			)}
 
