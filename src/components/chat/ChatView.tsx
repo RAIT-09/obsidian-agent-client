@@ -34,6 +34,13 @@ import { usePermission } from "../../hooks/usePermission";
 import { useAutoExport } from "../../hooks/useAutoExport";
 import { useSessionHistory } from "../../hooks/useSessionHistory";
 
+// Domain model imports
+import type {
+	SessionModeState,
+	SessionModelState,
+} from "../../domain/models/chat-session";
+import type { ImagePromptContent } from "../../domain/models/prompt-content";
+
 // Type definitions for Obsidian internal APIs
 interface VaultAdapterWithBasePath {
 	basePath?: string;
@@ -143,8 +150,8 @@ function ChatComponent({
 	const handleSessionLoad = useCallback(
 		(
 			sessionId: string,
-			modes?: import("../../domain/models/chat-session").SessionModeState,
-			models?: import("../../domain/models/chat-session").SessionModelState,
+			modes?: SessionModeState,
+			models?: SessionModelState,
 		) => {
 			// Log that session was loaded
 			logger.log(
@@ -515,10 +522,7 @@ function ChatComponent({
 	]);
 
 	const handleSendMessage = useCallback(
-		async (
-			content: string,
-			images?: import("../../domain/models/prompt-content").ImagePromptContent[],
-		) => {
+		async (content: string, images?: ImagePromptContent[]) => {
 			const isFirstMessage = messages.length === 0;
 
 			await chat.sendMessage(content, {
