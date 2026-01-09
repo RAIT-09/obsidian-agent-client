@@ -20,7 +20,7 @@ export interface EditorPosition {
 /**
  * Metadata for a note in the vault.
  *
- * Contains essential information about a file without
+ * Contains essential information about a note file without
  * exposing Obsidian's internal TFile structure.
  */
 export interface NoteMetadata {
@@ -39,10 +39,10 @@ export interface NoteMetadata {
 	/** Last modified timestamp (milliseconds since epoch) */
 	modified: number;
 
-	/** Optional aliases from frontmatter (files only) */
+	/** Optional aliases from frontmatter */
 	aliases?: string[];
 
-	/** Optional text selection range in the editor (files only) */
+	/** Optional text selection range in the editor */
 	selection?: {
 		from: EditorPosition;
 		to: EditorPosition;
