@@ -244,9 +244,6 @@ function ChatComponent({
 		return custom?.displayName || custom?.id || activeId;
 	}, [session.agentId, plugin.settings]);
 
-	// Session history capability is derived from session.agentCapabilities via useSessionHistory
-	// No need for async capability detection - use sessionHistory.canShowSessionHistory
-
 	// ============================================================
 	// Callbacks
 	// ============================================================
