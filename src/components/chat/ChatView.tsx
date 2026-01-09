@@ -187,16 +187,39 @@ function ChatComponent({
 			agentSession.updateSessionFromLoad(sessionId, modes, models);
 
 			// Conversation history for load is received via session/update notifications
-			// and handled by the useChat hook
+			// but we ignore them and use local history instead (see handleLoadStart/handleLoadEnd)
 		},
 		[logger, agentSession],
 	);
+
+	/**
+	 * Called when session/load starts.
+	 * Sets flag to ignore history replay messages from agent.
+	 */
+	const handleLoadStart = useCallback(() => {
+		logger.log("[ChatView] session/load started, ignoring history replay");
+		setIsLoadingSessionHistory(true);
+		// Clear existing messages before loading local history
+		chat.clearMessages();
+	}, [logger, chat]);
+
+	/**
+	 * Called when session/load ends.
+	 * Clears flag to resume normal message processing.
+	 */
+	const handleLoadEnd = useCallback(() => {
+		logger.log("[ChatView] session/load ended, resuming normal processing");
+		setIsLoadingSessionHistory(false);
+	}, [logger]);
+
 	const sessionHistory = useSessionHistory({
 		agentClient: acpAdapter,
 		session,
 		settingsAccess: plugin.settingsStore,
 		onSessionLoad: handleSessionLoad,
 		onMessagesRestore: chat.setMessagesFromLocal,
+		onLoadStart: handleLoadStart,
+		onLoadEnd: handleLoadEnd,
 	});
 
 	// Combined error info (session errors take precedence)
@@ -210,6 +233,9 @@ function ChatComponent({
 	const [restoredMessage, setRestoredMessage] = useState<string | null>(null);
 	const [historyModal, setHistoryModal] =
 		useState<SessionHistoryModal | null>(null);
+	/** Flag to ignore history replay messages during session/load */
+	const [isLoadingSessionHistory, setIsLoadingSessionHistory] =
+		useState(false);
 
 	// ============================================================
 	// Computed Values
@@ -613,6 +639,18 @@ function ChatComponent({
 				return;
 			}
 
+			// During session/load, ignore history replay messages but process session-level updates
+			if (isLoadingSessionHistory) {
+				// Only process session-level updates during load
+				if (update.type === "available_commands_update") {
+					agentSession.updateAvailableCommands(update.commands);
+				} else if (update.type === "current_mode_update") {
+					agentSession.updateCurrentMode(update.currentModeId);
+				}
+				// Ignore all message-related updates (history replay)
+				return;
+			}
+
 			// Route message-related updates to useChat
 			chat.handleSessionUpdate(update);
 
@@ -627,6 +665,7 @@ function ChatComponent({
 		acpAdapter,
 		session.sessionId,
 		logger,
+		isLoadingSessionHistory,
 		chat.handleSessionUpdate,
 		agentSession.updateAvailableCommands,
 		agentSession.updateCurrentMode,

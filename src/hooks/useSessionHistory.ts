@@ -63,8 +63,12 @@ export interface UseSessionHistoryOptions {
 	settingsAccess: ISettingsAccess;
 	/** Callback invoked when a session is loaded/resumed/forked */
 	onSessionLoad: SessionLoadCallback;
-	/** Callback invoked when messages should be restored from local storage (for resume/fork) */
+	/** Callback invoked when messages should be restored from local storage */
 	onMessagesRestore?: MessagesRestoreCallback;
+	/** Callback invoked when session/load starts (to start ignoring history replay) */
+	onLoadStart?: () => void;
+	/** Callback invoked when session/load ends (to stop ignoring history replay) */
+	onLoadEnd?: () => void;
 }
 
 /**
@@ -177,6 +181,8 @@ export function useSessionHistory(
 		settingsAccess,
 		onSessionLoad,
 		onMessagesRestore,
+		onLoadStart,
+		onLoadEnd,
 	} = options;
 
 	// Derive capability flags from session.agentCapabilities
@@ -361,16 +367,34 @@ export function useSessionHistory(
 				onSessionLoad(sessionId, undefined, undefined);
 
 				if (capabilities.canLoad) {
-					// Use load (with history replay from agent)
-					const result = await agentClient.loadSession(
-						sessionId,
-						cwd,
-					);
-					onSessionLoad(
-						result.sessionId,
-						result.modes,
-						result.models,
-					);
+					// Notify that load is starting (to ignore history replay)
+					onLoadStart?.();
+
+					try {
+						// Start loading local messages in parallel with agent load
+						const localMessagesPromise =
+							settingsAccess.loadSessionMessages(sessionId);
+
+						// Use load (agent will replay history via session/update, but we ignore it)
+						const result = await agentClient.loadSession(
+							sessionId,
+							cwd,
+						);
+						onSessionLoad(
+							result.sessionId,
+							result.modes,
+							result.models,
+						);
+
+						// Restore local messages (may have already resolved)
+						const localMessages = await localMessagesPromise;
+						if (localMessages && onMessagesRestore) {
+							onMessagesRestore(localMessages);
+						}
+					} finally {
+						// Notify that load is complete (stop ignoring)
+						onLoadEnd?.();
+					}
 				} else if (capabilities.canResume) {
 					// Use resume (without history replay, restore from local storage)
 					const result = await agentClient.resumeSession(
@@ -408,6 +432,8 @@ export function useSessionHistory(
 			onSessionLoad,
 			settingsAccess,
 			onMessagesRestore,
+			onLoadStart,
+			onLoadEnd,
 		],
 	);
 
