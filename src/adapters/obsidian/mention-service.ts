@@ -18,15 +18,19 @@ export class NoteMentionService {
 		// Listen for vault changes to keep index up to date
 		this.eventRefs.push(
 			this.plugin.app.vault.on("create", (file) => {
-				this.rebuildIndex();
+				if (file instanceof TFile && file.extension === "md") {
+					this.rebuildIndex();
+				}
 			}),
 		);
 		this.eventRefs.push(
 			this.plugin.app.vault.on("delete", () => this.rebuildIndex()),
 		);
 		this.eventRefs.push(
-			this.plugin.app.vault.on("rename", () => {
-				this.rebuildIndex();
+			this.plugin.app.vault.on("rename", (file) => {
+				if (file instanceof TFile && file.extension === "md") {
+					this.rebuildIndex();
+				}
 			}),
 		);
 	}
@@ -42,7 +46,7 @@ export class NoteMentionService {
 	}
 
 	private rebuildIndex() {
-		this.files = this.plugin.app.vault.getFiles();
+		this.files = this.plugin.app.vault.getMarkdownFiles();
 		this.lastBuild = Date.now();
 		this.logger.log(
 			`[NoteMentionService] Rebuilt index with ${this.files.length} files`,
@@ -54,7 +58,7 @@ export class NoteMentionService {
 			"[DEBUG] NoteMentionService.searchNotes called with:",
 			query,
 		);
-		this.logger.log(`[DEBUG] Total indexed files: ${this.files.length}`);
+		this.logger.log("[DEBUG] Total files indexed:", this.files.length);
 
 		if (!query.trim()) {
 			this.logger.log("[DEBUG] Empty query, returning recent files");
@@ -63,7 +67,6 @@ export class NoteMentionService {
 				.slice()
 				.sort((a, b) => (b.stat?.mtime || 0) - (a.stat?.mtime || 0))
 				.slice(0, 20);
-
 			this.logger.log(
 				"[DEBUG] Recent files:",
 				recentFiles.map((f) => f.name),
@@ -75,8 +78,8 @@ export class NoteMentionService {
 		const fuzzySearch = prepareFuzzySearch(query.trim());
 
 		// Score each file based on multiple fields
-		const scoredFiles: Array<{ item: TFile; score: number }> =
-			this.files.map((file) => {
+		const scored: Array<{ file: TFile; score: number }> = this.files.map(
+			(file) => {
 				const basename = file.basename;
 				const path = file.path;
 
@@ -104,15 +107,15 @@ export class NoteMentionService {
 					}
 				}
 
-				return { item: file, score: bestScore };
-			});
+				return { file, score: bestScore };
+			},
+		);
 
-		// Sort and return top matches
-		return scoredFiles
+		return scored
 			.filter((item) => item.score > -Infinity)
 			.sort((a, b) => b.score - a.score)
 			.slice(0, 20)
-			.map((item) => item.item);
+			.map((item) => item.file);
 	}
 
 	getAllFiles(): TFile[] {
