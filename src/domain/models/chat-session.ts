@@ -223,11 +223,16 @@ export interface ChatSession {
 
 	/**
 	 * Full agent capabilities from initialization.
-	 * Contains loadSession, mcpCapabilities, and promptCapabilities.
+	 * Contains loadSession, sessionCapabilities, mcpCapabilities, and promptCapabilities.
 	 * Set during initialization and persists for the session lifetime.
 	 */
 	agentCapabilities?: {
 		loadSession?: boolean;
+		sessionCapabilities?: {
+			resume?: Record<string, unknown>;
+			fork?: Record<string, unknown>;
+			list?: Record<string, unknown>;
+		};
 		mcpCapabilities?: {
 			http?: boolean;
 			sse?: boolean;

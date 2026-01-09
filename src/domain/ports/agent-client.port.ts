@@ -20,6 +20,12 @@ import type {
 import type { SessionUpdate } from "../models/session-update";
 import type { AgentError } from "../models/agent-error";
 import type { PromptContent } from "../models/prompt-content";
+import type {
+	ListSessionsResult,
+	LoadSessionResult,
+	ResumeSessionResult,
+	ForkSessionResult,
+} from "../models/session-info";
 
 /**
  * Runtime configuration for launching an AI agent process.
@@ -109,14 +115,30 @@ export interface McpCapabilities {
 }
 
 /**
+ * Session-related capabilities (unstable features).
+ * From agentCapabilities.sessionCapabilities in initialize response.
+ */
+export interface SessionCapabilities {
+	/** session/resume support (unstable) */
+	resume?: Record<string, unknown>;
+	/** session/fork support (unstable) */
+	fork?: Record<string, unknown>;
+	/** session/list support (unstable) */
+	list?: Record<string, unknown>;
+}
+
+/**
  * Full agent capabilities from ACP initialization.
  *
  * Contains all capability information returned by the agent,
  * including session features, MCP support, and prompt capabilities.
  */
 export interface AgentCapabilities {
-	/** Whether the agent supports session/load for resuming sessions */
+	/** Whether the agent supports session/load for resuming sessions (stable) */
 	loadSession?: boolean;
+
+	/** Session management capabilities (unstable features) */
+	sessionCapabilities?: SessionCapabilities;
 
 	/** MCP connection capabilities */
 	mcpCapabilities?: McpCapabilities;
@@ -161,7 +183,7 @@ export interface InitializeResult {
 
 	/**
 	 * Full agent capabilities from initialization.
-	 * Contains loadSession, mcpCapabilities, and promptCapabilities.
+	 * Contains loadSession, sessionCapabilities, mcpCapabilities, and promptCapabilities.
 	 */
 	agentCapabilities?: AgentCapabilities;
 
@@ -269,6 +291,7 @@ export interface IAgentClient {
 	 * Called when the agent sends session update events such as:
 	 * - agent_message_chunk: Text chunk from agent's response
 	 * - agent_thought_chunk: Text chunk from agent's reasoning
+	 * - user_message_chunk: Text chunk from user message (for session/load history replay)
 	 * - tool_call: New tool call event
 	 * - tool_call_update: Update to existing tool call
 	 * - plan: Agent's task plan
@@ -344,4 +367,57 @@ export interface IAgentClient {
 	 * @param modelId - The model ID to set
 	 */
 	setSessionModel(sessionId: string, modelId: string): Promise<void>;
+
+	// ========================================================================
+	// Session Management Methods
+	// ========================================================================
+
+	/**
+	 * List available sessions (unstable).
+	 *
+	 * Only available if session.agentCapabilities.sessionCapabilities?.list is defined.
+	 *
+	 * @param cwd - Optional filter by working directory
+	 * @param cursor - Pagination cursor from previous call
+	 * @returns Promise resolving to sessions array and optional next cursor
+	 */
+	listSessions(cwd?: string, cursor?: string): Promise<ListSessionsResult>;
+
+	/**
+	 * Load a previous session with history replay (stable).
+	 *
+	 * Conversation history is received via onSessionUpdate callback
+	 * as user_message_chunk, agent_message_chunk, tool_call, etc.
+	 *
+	 * Only available if session.agentCapabilities.loadSession is true.
+	 *
+	 * @param sessionId - Session to load
+	 * @param cwd - Working directory
+	 * @returns Promise resolving to session result with modes and models
+	 */
+	loadSession(sessionId: string, cwd: string): Promise<LoadSessionResult>;
+
+	/**
+	 * Resume a session without history replay (unstable).
+	 *
+	 * Use when client manages its own history storage.
+	 * Only available if session.agentCapabilities.sessionCapabilities?.resume is defined.
+	 *
+	 * @param sessionId - Session to resume
+	 * @param cwd - Working directory
+	 * @returns Promise resolving to session result with modes and models
+	 */
+	resumeSession(sessionId: string, cwd: string): Promise<ResumeSessionResult>;
+
+	/**
+	 * Fork a session to create a new branch (unstable).
+	 *
+	 * Creates a new session with inherited context from the original.
+	 * Only available if session.agentCapabilities.sessionCapabilities?.fork is defined.
+	 *
+	 * @param sessionId - Session to fork from
+	 * @param cwd - Working directory
+	 * @returns Promise resolving to session result with new sessionId
+	 */
+	forkSession(sessionId: string, cwd: string): Promise<ForkSessionResult>;
 }

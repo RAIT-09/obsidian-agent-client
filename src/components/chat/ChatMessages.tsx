@@ -26,6 +26,8 @@ export interface ChatMessagesProps {
 	isSending: boolean;
 	/** Whether the session is ready for user input */
 	isSessionReady: boolean;
+	/** Whether a session is being restored (load/resume/fork) */
+	isRestoringSession: boolean;
 	/** Display name of the active agent */
 	agentLabel: string;
 	/** Error information (if any) */
@@ -59,6 +61,7 @@ export function ChatMessages({
 	messages,
 	isSending,
 	isSessionReady,
+	isRestoringSession,
 	agentLabel,
 	errorInfo,
 	plugin,
@@ -144,9 +147,11 @@ export function ChatMessages({
 				</div>
 			) : messages.length === 0 ? (
 				<div className="agent-client-chat-empty-state">
-					{!isSessionReady
-						? `Connecting to ${agentLabel}...`
-						: `Start a conversation with ${agentLabel}...`}
+					{isRestoringSession
+						? "Restoring session..."
+						: !isSessionReady
+							? `Connecting to ${agentLabel}...`
+							: `Start a conversation with ${agentLabel}...`}
 				</div>
 			) : (
 				<>

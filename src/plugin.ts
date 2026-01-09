@@ -20,6 +20,7 @@ import {
 	CodexAgentSettings,
 	CustomAgentSettings,
 } from "./domain/models/agent-config";
+import type { SavedSessionInfo } from "./domain/models/session-info";
 
 // Re-export for backward compatibility
 export type { AgentEnvVar, CustomAgentSettings };
@@ -56,6 +57,8 @@ export interface AgentClientPluginSettings {
 	windowsWslDistribution?: string;
 	// Input behavior
 	sendMessageShortcut: SendMessageShortcut;
+	// Locally saved session metadata (for agents without session/list support)
+	savedSessions: SavedSessionInfo[];
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -102,6 +105,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	windowsWslMode: false,
 	windowsWslDistribution: undefined,
 	sendMessageShortcut: "enter",
+	savedSessions: [],
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -514,6 +518,9 @@ export default class AgentClientPlugin extends Plugin {
 				rawSettings.sendMessageShortcut === "cmd-enter"
 					? rawSettings.sendMessageShortcut
 					: DEFAULT_SETTINGS.sendMessageShortcut,
+			savedSessions: Array.isArray(rawSettings.savedSessions)
+				? (rawSettings.savedSessions as SavedSessionInfo[])
+				: DEFAULT_SETTINGS.savedSessions,
 		};
 
 		this.ensureActiveAgentId();

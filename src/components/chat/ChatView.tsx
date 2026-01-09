@@ -9,6 +9,8 @@ import type AgentClientPlugin from "../../plugin";
 import { ChatHeader } from "./ChatHeader";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
+import { SessionHistoryModal } from "./SessionHistoryModal";
+import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 
 // Service imports
 import { NoteMentionService } from "../../adapters/obsidian/mention-service";
@@ -30,6 +32,14 @@ import { useAgentSession } from "../../hooks/useAgentSession";
 import { useChat } from "../../hooks/useChat";
 import { usePermission } from "../../hooks/usePermission";
 import { useAutoExport } from "../../hooks/useAutoExport";
+import { useSessionHistory } from "../../hooks/useSessionHistory";
+
+// Domain model imports
+import type {
+	SessionModeState,
+	SessionModelState,
+} from "../../domain/models/chat-session";
+import type { ImagePromptContent } from "../../domain/models/prompt-content";
 
 // Type definitions for Obsidian internal APIs
 interface VaultAdapterWithBasePath {
@@ -134,6 +144,65 @@ function ChatComponent({
 
 	const autoExport = useAutoExport(plugin);
 
+	// Session history hook with callback for session load
+	// Session load callback - called when a session is loaded/resumed/forked from history
+	// Note: Conversation history is received via session/update notifications for load
+	const handleSessionLoad = useCallback(
+		(
+			sessionId: string,
+			modes?: SessionModeState,
+			models?: SessionModelState,
+		) => {
+			// Log that session was loaded
+			logger.log(
+				`[ChatView] Session loaded/resumed/forked: ${sessionId}`,
+				{
+					modes,
+					models,
+				},
+			);
+
+			// Update session state with new session ID and modes/models
+			// This is critical for session/update notifications to be accepted
+			agentSession.updateSessionFromLoad(sessionId, modes, models);
+
+			// Conversation history for load is received via session/update notifications
+			// but we ignore them and use local history instead (see handleLoadStart/handleLoadEnd)
+		},
+		[logger, agentSession],
+	);
+
+	/**
+	 * Called when session/load starts.
+	 * Sets flag to ignore history replay messages from agent.
+	 */
+	const handleLoadStart = useCallback(() => {
+		logger.log("[ChatView] session/load started, ignoring history replay");
+		setIsLoadingSessionHistory(true);
+		// Clear existing messages before loading local history
+		chat.clearMessages();
+	}, [logger, chat]);
+
+	/**
+	 * Called when session/load ends.
+	 * Clears flag to resume normal message processing.
+	 */
+	const handleLoadEnd = useCallback(() => {
+		logger.log("[ChatView] session/load ended, resuming normal processing");
+		setIsLoadingSessionHistory(false);
+	}, [logger]);
+
+	const sessionHistory = useSessionHistory({
+		agentClient: acpAdapter,
+		session,
+		settingsAccess: plugin.settingsStore,
+		cwd: vaultPath,
+		onSessionLoad: handleSessionLoad,
+		onMessagesRestore: chat.setMessagesFromLocal,
+		onLoadStart: handleLoadStart,
+		onLoadEnd: handleLoadEnd,
+	});
+
 	// Combined error info (session errors take precedence)
 	const errorInfo =
 		sessionErrorInfo || chat.errorInfo || permission.errorInfo;
@@ -143,6 +212,9 @@ function ChatComponent({
 	// ============================================================
 	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
 	const [restoredMessage, setRestoredMessage] = useState<string | null>(null);
+	/** Flag to ignore history replay messages during session/load */
+	const [isLoadingSessionHistory, setIsLoadingSessionHistory] =
+		useState(false);
 
 	// ============================================================
 	// Computed Values
@@ -214,6 +286,9 @@ function ChatComponent({
 			autoMention.toggle(false);
 			chat.clearMessages();
 			await agentSession.restartSession();
+
+			// Invalidate session history cache when creating new session
+			sessionHistory.invalidateCache();
 		},
 		[
 			messages,
@@ -223,6 +298,7 @@ function ChatComponent({
 			autoMention,
 			chat,
 			agentSession,
+			sessionHistory,
 		],
 	);
 
@@ -256,11 +332,90 @@ function ChatComponent({
 		appWithSettings.setting.openTabById(plugin.manifest.id);
 	}, [plugin]);
 
+	const handleOpenHistory = useCallback(() => {
+		const modal = new SessionHistoryModal(plugin.app, {
+			sessions: sessionHistory.sessions,
+			loading: sessionHistory.loading,
+			error: sessionHistory.error,
+			hasMore: sessionHistory.hasMore,
+			currentCwd: vaultPath,
+			canList: sessionHistory.canList,
+			canRestore: sessionHistory.canRestore,
+			canFork: sessionHistory.canFork,
+			isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
+			isAgentReady: isSessionReady,
+			debugMode: settings.debugMode,
+			onRestoreSession: async (sessionId: string, cwd: string) => {
+				try {
+					logger.log(`[ChatView] Restoring session: ${sessionId}`);
+					chat.clearMessages();
+					await sessionHistory.restoreSession(sessionId, cwd);
+					new Notice("[Agent Client] Session restored");
+				} catch (error) {
+					new Notice("[Agent Client] Failed to restore session");
+					logger.error("Session restore error:", error);
+				}
+			},
+			onForkSession: async (sessionId: string, cwd: string) => {
+				try {
+					logger.log(`[ChatView] Forking session: ${sessionId}`);
+					chat.clearMessages();
+					await sessionHistory.forkSession(sessionId, cwd);
+					new Notice("[Agent Client] Session forked");
+				} catch (error) {
+					new Notice("[Agent Client] Failed to fork session");
+					logger.error("Session fork error:", error);
+				}
+			},
+			onDeleteSession: (sessionId: string) => {
+				const targetSession = sessionHistory.sessions.find(
+					(s) => s.sessionId === sessionId,
+				);
+				const sessionTitle = targetSession?.title ?? "Untitled Session";
+
+				const confirmModal = new ConfirmDeleteModal(
+					plugin.app,
+					sessionTitle,
+					async () => {
+						try {
+							logger.log(
+								`[ChatView] Deleting session: ${sessionId}`,
+							);
+							await sessionHistory.deleteSession(sessionId);
+							new Notice("[Agent Client] Session deleted");
+						} catch (error) {
+							new Notice(
+								"[Agent Client] Failed to delete session",
+							);
+							logger.error("Session delete error:", error);
+						}
+					},
+				);
+				confirmModal.open();
+			},
+			onLoadMore: () => {
+				void sessionHistory.loadMoreSessions();
+			},
+			onFetchSessions: (cwd?: string) => {
+				void sessionHistory.fetchSessions(cwd);
+			},
+		});
+		modal.open();
+		void sessionHistory.fetchSessions(vaultPath);
+	}, [
+		plugin.app,
+		sessionHistory,
+		vaultPath,
+		isSessionReady,
+		settings.debugMode,
+		chat,
+		logger,
+	]);
+
 	const handleSendMessage = useCallback(
-		async (
-			content: string,
-			images?: import("../../domain/models/prompt-content").ImagePromptContent[],
-		) => {
+		async (content: string, images?: ImagePromptContent[]) => {
+			const isFirstMessage = messages.length === 0;
+
 			await chat.sendMessage(content, {
 				activeNote: autoMention.activeNote,
 				vaultBasePath:
@@ -269,8 +424,27 @@ function ChatComponent({
 				isAutoMentionDisabled: autoMention.isDisabled,
 				images,
 			});
+
+			// Save session metadata locally on first message
+			if (isFirstMessage && session.sessionId) {
+				await sessionHistory.saveSessionLocally(
+					session.sessionId,
+					content,
+				);
+				logger.log(
+					`[ChatView] Session saved locally: ${session.sessionId}`,
+				);
+			}
 		},
-		[chat, autoMention, plugin],
+		[
+			chat,
+			autoMention,
+			plugin,
+			messages.length,
+			session.sessionId,
+			sessionHistory,
+			logger,
+		],
 	);
 
 	const handleStopGeneration = useCallback(async () => {
@@ -355,6 +529,18 @@ function ChatComponent({
 				return;
 			}
 
+			// During session/load, ignore history replay messages but process session-level updates
+			if (isLoadingSessionHistory) {
+				// Only process session-level updates during load
+				if (update.type === "available_commands_update") {
+					agentSession.updateAvailableCommands(update.commands);
+				} else if (update.type === "current_mode_update") {
+					agentSession.updateCurrentMode(update.currentModeId);
+				}
+				// Ignore all message-related updates (history replay)
+				return;
+			}
+
 			// Route message-related updates to useChat
 			chat.handleSessionUpdate(update);
 
@@ -369,6 +555,7 @@ function ChatComponent({
 		acpAdapter,
 		session.sessionId,
 		logger,
+		isLoadingSessionHistory,
 		chat.handleSessionUpdate,
 		agentSession.updateAvailableCommands,
 		agentSession.updateCurrentMode,
@@ -390,6 +577,31 @@ function ChatComponent({
 				console.error("Failed to check for updates:", error);
 			});
 	}, [plugin]);
+
+	// ============================================================
+	// Effects - Save Session Messages on Turn End
+	// ============================================================
+	// Track previous isSending state to detect turn completion
+	const prevIsSendingRef = useRef<boolean>(false);
+
+	useEffect(() => {
+		const wasSending = prevIsSendingRef.current;
+		prevIsSendingRef.current = isSending;
+
+		// Save when turn ends (isSending: true → false) and has messages
+		if (
+			wasSending &&
+			!isSending &&
+			session.sessionId &&
+			messages.length > 0
+		) {
+			// Fire-and-forget save via sessionHistory hook
+			sessionHistory.saveSessionMessages(session.sessionId, messages);
+			logger.log(
+				`[ChatView] Session messages saved: ${session.sessionId}`,
+			);
+		}
+	}, [isSending, session.sessionId, messages, sessionHistory, logger]);
 
 	// ============================================================
 	// Effects - Auto-mention Active Note Tracking
@@ -511,15 +723,18 @@ function ChatComponent({
 			<ChatHeader
 				agentLabel={activeAgentLabel}
 				isUpdateAvailable={isUpdateAvailable}
+				hasHistoryCapability={sessionHistory.canShowSessionHistory}
 				onNewChat={() => void handleNewChat()}
 				onExportChat={() => void handleExportChat()}
 				onOpenSettings={handleOpenSettings}
+				onOpenHistory={handleOpenHistory}
 			/>
 
 			<ChatMessages
 				messages={messages}
 				isSending={isSending}
 				isSessionReady={isSessionReady}
+				isRestoringSession={sessionHistory.loading}
 				agentLabel={activeAgentLabel}
 				errorInfo={errorInfo}
 				plugin={plugin}
@@ -532,6 +747,7 @@ function ChatComponent({
 			<ChatInput
 				isSending={isSending}
 				isSessionReady={isSessionReady}
+				isRestoringSession={sessionHistory.loading}
 				agentLabel={activeAgentLabel}
 				availableCommands={session.availableCommands || []}
 				autoMentionEnabled={settings.autoMentionActiveNote}

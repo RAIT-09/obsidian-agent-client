@@ -385,6 +385,13 @@ If your plugin does not need CSS, delete this file.
 	justify-content: space-between;
 }
 
+.agent-client-chat-view-header-main {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	flex: 1;
+}
+
 .agent-client-chat-view-header-title {
 	margin: 0 !important;
 }
@@ -1292,4 +1299,272 @@ If your plugin does not need CSS, delete this file.
 .agent-client-message-images-strip .agent-client-message-image {
 	flex-shrink: 0;
 	margin: 0;
+}
+
+/* ===== Session History Modal ===== */
+.agent-client-session-history-filter {
+	margin-bottom: 16px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.agent-client-session-history-filter-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+	font-size: 14px;
+	color: var(--text-normal);
+}
+
+.agent-client-session-history-filter-label input[type="checkbox"] {
+	cursor: pointer;
+}
+
+.agent-client-session-history-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.agent-client-session-history-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px;
+	background: var(--background-secondary);
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.agent-client-session-history-item-content {
+	flex: 1;
+	min-width: 0;
+}
+
+.agent-client-session-history-item-title {
+	font-weight: 500;
+	font-size: 14px;
+	color: var(--text-normal);
+	margin-bottom: 4px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.agent-client-session-history-item-metadata {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.agent-client-session-history-item-timestamp {
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.agent-client-session-history-item-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-shrink: 0;
+	margin-left: 12px;
+}
+
+.agent-client-session-history-action-icon {
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+	cursor: pointer;
+	color: var(--text-muted);
+	transition: all 0.2s;
+}
+
+.agent-client-session-history-action-icon:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.agent-client-session-history-action-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.agent-client-session-history-restore-icon:hover {
+	color: var(--text-accent);
+}
+
+.agent-client-session-history-fork-icon:hover {
+	color: var(--text-accent);
+}
+
+.agent-client-session-history-loading,
+.agent-client-session-history-empty,
+.agent-client-session-history-error {
+	padding: 32px;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+.agent-client-session-history-error-text {
+	color: var(--text-error);
+	margin-bottom: 12px;
+}
+
+.agent-client-session-history-retry-button {
+	padding: 6px 12px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.agent-client-session-history-load-more {
+	margin-top: 16px;
+	text-align: center;
+}
+
+.agent-client-session-history-load-more-button {
+	padding: 8px 16px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 14px;
+	color: var(--text-normal);
+}
+
+.agent-client-session-history-load-more-button:hover {
+	background: var(--background-modifier-hover);
+}
+
+.agent-client-session-history-load-more-button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Debug mode manual input form */
+.agent-client-session-history-debug {
+	margin-bottom: 16px;
+	padding: 12px;
+	background: var(--background-secondary);
+	border-radius: 6px;
+	border: 1px dashed var(--text-muted);
+}
+
+.agent-client-session-history-debug h3 {
+	margin: 0 0 12px 0;
+	font-size: 14px;
+	color: var(--text-muted);
+}
+
+.agent-client-session-history-debug-group {
+	margin-bottom: 10px;
+}
+
+.agent-client-session-history-debug-group label {
+	display: block;
+	margin-bottom: 4px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.agent-client-session-history-debug-input {
+	width: 100%;
+	padding: 6px 8px;
+	font-size: 13px;
+	font-family: var(--font-monospace);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+}
+
+.agent-client-session-history-debug-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.agent-client-session-history-debug-button {
+	padding: 6px 12px;
+	font-size: 13px;
+	border-radius: 4px;
+	cursor: pointer;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border: none;
+}
+
+.agent-client-session-history-debug-button:hover {
+	background: var(--interactive-accent-hover);
+}
+
+.agent-client-session-history-debug-separator {
+	margin: 16px 0;
+	border: none;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Local sessions banner */
+.agent-client-session-history-local-banner {
+	padding: 8px 12px;
+	margin-bottom: 12px;
+	background: var(--background-secondary);
+	border-radius: 4px;
+	font-size: 12px;
+	color: var(--text-muted);
+	border-left: 3px solid var(--interactive-accent);
+}
+
+/* Warning banner for agents that don't support restoration */
+.agent-client-session-history-warning-banner {
+	padding: 8px 12px;
+	margin-bottom: 12px;
+	background: var(--background-secondary);
+	border-radius: 4px;
+	border-left: 3px solid var(--text-warning);
+}
+
+.agent-client-session-history-warning-banner p {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+/* Delete button */
+.agent-client-session-history-delete-icon {
+	color: var(--text-muted);
+}
+
+.agent-client-session-history-delete-icon:hover {
+	color: var(--text-error);
+}
+
+/* Confirm delete modal */
+.agent-client-confirm-delete-message {
+	margin-bottom: 8px;
+}
+
+.agent-client-confirm-delete-warning {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	margin-bottom: 16px;
+}
+
+.agent-client-confirm-delete-buttons {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.agent-client-confirm-delete-cancel {
+	/* Uses default button styles */
+}
+
+.agent-client-confirm-delete-confirm {
+	/* mod-warning class provides warning color */
 }
