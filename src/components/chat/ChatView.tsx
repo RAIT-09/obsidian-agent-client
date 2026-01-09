@@ -212,8 +212,6 @@ function ChatComponent({
 	// ============================================================
 	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
 	const [restoredMessage, setRestoredMessage] = useState<string | null>(null);
-	const [historyModal, setHistoryModal] =
-		useState<SessionHistoryModal | null>(null);
 	/** Flag to ignore history replay messages during session/load */
 	const [isLoadingSessionHistory, setIsLoadingSessionHistory] =
 		useState(false);
@@ -335,185 +333,81 @@ function ChatComponent({
 	}, [plugin]);
 
 	const handleOpenHistory = useCallback(() => {
-		// Create modal if it doesn't exist
-		if (!historyModal) {
-			const modal = new SessionHistoryModal(plugin.app, {
-				sessions: sessionHistory.sessions,
-				loading: sessionHistory.loading,
-				error: sessionHistory.error,
-				hasMore: sessionHistory.hasMore,
-				currentCwd: vaultPath,
-				// Capability flags
-				canList: sessionHistory.canList,
-				canRestore: sessionHistory.canRestore,
-				canFork: sessionHistory.canFork,
-				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
-				isAgentReady: isSessionReady,
-				// Debug mode
-				debugMode: settings.debugMode,
-				// Callbacks
-				onRestoreSession: async (sessionId: string, cwd: string) => {
-					try {
-						logger.log(
-							`[ChatView] Restoring session: ${sessionId}`,
-						);
-						chat.clearMessages();
-						await sessionHistory.restoreSession(sessionId, cwd);
-						new Notice("[Agent Client] Session restored");
-					} catch (error) {
-						new Notice("[Agent Client] Failed to restore session");
-						logger.error("Session restore error:", error);
-					}
-				},
-				onForkSession: async (sessionId: string, cwd: string) => {
-					try {
-						logger.log(`[ChatView] Forking session: ${sessionId}`);
-						chat.clearMessages();
-						await sessionHistory.forkSession(sessionId, cwd);
-						new Notice("[Agent Client] Session forked");
-					} catch (error) {
-						new Notice("[Agent Client] Failed to fork session");
-						logger.error("Session fork error:", error);
-					}
-				},
-				onDeleteSession: (sessionId: string) => {
-					// Find session title for confirmation message
-					const session = sessionHistory.sessions.find(
-						(s) => s.sessionId === sessionId,
-					);
-					const sessionTitle = session?.title ?? "Untitled Session";
+		const modal = new SessionHistoryModal(plugin.app, {
+			sessions: sessionHistory.sessions,
+			loading: sessionHistory.loading,
+			error: sessionHistory.error,
+			hasMore: sessionHistory.hasMore,
+			currentCwd: vaultPath,
+			canList: sessionHistory.canList,
+			canRestore: sessionHistory.canRestore,
+			canFork: sessionHistory.canFork,
+			isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
+			isAgentReady: isSessionReady,
+			debugMode: settings.debugMode,
+			onRestoreSession: async (sessionId: string, cwd: string) => {
+				try {
+					logger.log(`[ChatView] Restoring session: ${sessionId}`);
+					chat.clearMessages();
+					await sessionHistory.restoreSession(sessionId, cwd);
+					new Notice("[Agent Client] Session restored");
+				} catch (error) {
+					new Notice("[Agent Client] Failed to restore session");
+					logger.error("Session restore error:", error);
+				}
+			},
+			onForkSession: async (sessionId: string, cwd: string) => {
+				try {
+					logger.log(`[ChatView] Forking session: ${sessionId}`);
+					chat.clearMessages();
+					await sessionHistory.forkSession(sessionId, cwd);
+					new Notice("[Agent Client] Session forked");
+				} catch (error) {
+					new Notice("[Agent Client] Failed to fork session");
+					logger.error("Session fork error:", error);
+				}
+			},
+			onDeleteSession: (sessionId: string) => {
+				const targetSession = sessionHistory.sessions.find(
+					(s) => s.sessionId === sessionId,
+				);
+				const sessionTitle = targetSession?.title ?? "Untitled Session";
 
-					// Show confirmation modal
-					const confirmModal = new ConfirmDeleteModal(
-						plugin.app,
-						sessionTitle,
-						async () => {
-							try {
-								logger.log(
-									`[ChatView] Deleting session: ${sessionId}`,
-								);
-								await sessionHistory.deleteSession(sessionId);
-								new Notice("[Agent Client] Session deleted");
-							} catch (error) {
-								new Notice(
-									"[Agent Client] Failed to delete session",
-								);
-								logger.error("Session delete error:", error);
-							}
-						},
-					);
-					confirmModal.open();
-				},
-				onLoadMore: () => {
-					void sessionHistory.loadMoreSessions();
-				},
-				onFetchSessions: (cwd?: string) => {
-					void sessionHistory.fetchSessions(cwd);
-				},
-			});
-			setHistoryModal(modal);
-			modal.open();
-
-			// Fetch sessions when modal opens
-			void sessionHistory.fetchSessions(vaultPath);
-		} else {
-			historyModal.open();
-			// Fetch sessions when modal reopens (in case they've changed)
-			void sessionHistory.fetchSessions(vaultPath);
-		}
-	}, [historyModal, plugin.app, sessionHistory, vaultPath, chat, logger]);
-
-	// Update modal props when session history state changes
-	useEffect(() => {
-		if (historyModal) {
-			historyModal.updateProps({
-				sessions: sessionHistory.sessions,
-				loading: sessionHistory.loading,
-				error: sessionHistory.error,
-				hasMore: sessionHistory.hasMore,
-				currentCwd: vaultPath,
-				// Capability flags
-				canList: sessionHistory.canList,
-				canRestore: sessionHistory.canRestore,
-				canFork: sessionHistory.canFork,
-				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
-				isAgentReady: isSessionReady,
-				// Debug mode
-				debugMode: settings.debugMode,
-				// Callbacks
-				onRestoreSession: async (sessionId: string, cwd: string) => {
-					try {
-						logger.log(
-							`[ChatView] Restoring session: ${sessionId}`,
-						);
-						chat.clearMessages();
-						await sessionHistory.restoreSession(sessionId, cwd);
-						new Notice("[Agent Client] Session restored");
-					} catch (error) {
-						new Notice("[Agent Client] Failed to restore session");
-						logger.error("Session restore error:", error);
-					}
-				},
-				onForkSession: async (sessionId: string, cwd: string) => {
-					try {
-						logger.log(`[ChatView] Forking session: ${sessionId}`);
-						chat.clearMessages();
-						await sessionHistory.forkSession(sessionId, cwd);
-						new Notice("[Agent Client] Session forked");
-					} catch (error) {
-						new Notice("[Agent Client] Failed to fork session");
-						logger.error("Session fork error:", error);
-					}
-				},
-				onDeleteSession: (sessionId: string) => {
-					// Find session title for confirmation message
-					const session = sessionHistory.sessions.find(
-						(s) => s.sessionId === sessionId,
-					);
-					const sessionTitle = session?.title ?? "Untitled Session";
-
-					// Show confirmation modal
-					const confirmModal = new ConfirmDeleteModal(
-						plugin.app,
-						sessionTitle,
-						async () => {
-							try {
-								logger.log(
-									`[ChatView] Deleting session: ${sessionId}`,
-								);
-								await sessionHistory.deleteSession(sessionId);
-								new Notice("[Agent Client] Session deleted");
-							} catch (error) {
-								new Notice(
-									"[Agent Client] Failed to delete session",
-								);
-								logger.error("Session delete error:", error);
-							}
-						},
-					);
-					confirmModal.open();
-				},
-				onLoadMore: () => {
-					void sessionHistory.loadMoreSessions();
-				},
-				onFetchSessions: (cwd?: string) => {
-					void sessionHistory.fetchSessions(cwd);
-				},
-			});
-		}
+				const confirmModal = new ConfirmDeleteModal(
+					plugin.app,
+					sessionTitle,
+					async () => {
+						try {
+							logger.log(
+								`[ChatView] Deleting session: ${sessionId}`,
+							);
+							await sessionHistory.deleteSession(sessionId);
+							new Notice("[Agent Client] Session deleted");
+						} catch (error) {
+							new Notice(
+								"[Agent Client] Failed to delete session",
+							);
+							logger.error("Session delete error:", error);
+						}
+					},
+				);
+				confirmModal.open();
+			},
+			onLoadMore: () => {
+				void sessionHistory.loadMoreSessions();
+			},
+			onFetchSessions: (cwd?: string) => {
+				void sessionHistory.fetchSessions(cwd);
+			},
+		});
+		modal.open();
+		void sessionHistory.fetchSessions(vaultPath);
 	}, [
-		sessionHistory.sessions,
-		sessionHistory.loading,
-		sessionHistory.error,
-		sessionHistory.hasMore,
-		sessionHistory.canList,
-		sessionHistory.canRestore,
-		sessionHistory.canFork,
-		sessionHistory.isUsingLocalSessions,
+		plugin.app,
+		sessionHistory,
+		vaultPath,
 		isSessionReady,
 		settings.debugMode,
-		historyModal,
-		vaultPath,
 		chat,
 		logger,
 	]);
