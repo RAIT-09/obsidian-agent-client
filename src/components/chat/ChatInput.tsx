@@ -958,7 +958,6 @@ export function ChatInput({
 					{/* Mode Selector */}
 					{modes && modes.availableModes.length > 1 && (
 						<div
-							ref={modeDropdownRef}
 							className="agent-client-mode-selector"
 							title={
 								modes.availableModes.find(
@@ -966,6 +965,7 @@ export function ChatInput({
 								)?.description ?? "Select mode"
 							}
 						>
+							<div ref={modeDropdownRef} />
 							<span
 								className="agent-client-mode-selector-icon"
 								ref={(el) => {
@@ -978,7 +978,6 @@ export function ChatInput({
 					{/* Model Selector (experimental) */}
 					{models && models.availableModels.length > 1 && (
 						<div
-							ref={modelDropdownRef}
 							className="agent-client-model-selector"
 							title={
 								models.availableModels.find(
@@ -986,6 +985,7 @@ export function ChatInput({
 								)?.description ?? "Select model"
 							}
 						>
+							<div ref={modelDropdownRef} />
 							<span
 								className="agent-client-model-selector-icon"
 								ref={(el) => {
