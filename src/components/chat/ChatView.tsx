@@ -217,6 +217,12 @@ function ChatComponent({
 		useState(false);
 
 	// ============================================================
+	// Refs
+	// ============================================================
+	/** Ref for session history modal (persisted across renders) */
+	const historyModalRef = useRef<SessionHistoryModal | null>(null);
+
+	// ============================================================
 	// Computed Values
 	// ============================================================
 	const activeAgentLabel = useMemo(() => {
@@ -332,75 +338,99 @@ function ChatComponent({
 		appWithSettings.setting.openTabById(plugin.manifest.id);
 	}, [plugin]);
 
-	const handleOpenHistory = useCallback(() => {
-		const modal = new SessionHistoryModal(plugin.app, {
-			sessions: sessionHistory.sessions,
-			loading: sessionHistory.loading,
-			error: sessionHistory.error,
-			hasMore: sessionHistory.hasMore,
-			currentCwd: vaultPath,
-			canList: sessionHistory.canList,
-			canRestore: sessionHistory.canRestore,
-			canFork: sessionHistory.canFork,
-			isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
-			isAgentReady: isSessionReady,
-			debugMode: settings.debugMode,
-			onRestoreSession: async (sessionId: string, cwd: string) => {
-				try {
-					logger.log(`[ChatView] Restoring session: ${sessionId}`);
-					chat.clearMessages();
-					await sessionHistory.restoreSession(sessionId, cwd);
-					new Notice("[Agent Client] Session restored");
-				} catch (error) {
-					new Notice("[Agent Client] Failed to restore session");
-					logger.error("Session restore error:", error);
-				}
-			},
-			onForkSession: async (sessionId: string, cwd: string) => {
-				try {
-					logger.log(`[ChatView] Forking session: ${sessionId}`);
-					chat.clearMessages();
-					await sessionHistory.forkSession(sessionId, cwd);
-					new Notice("[Agent Client] Session forked");
-				} catch (error) {
-					new Notice("[Agent Client] Failed to fork session");
-					logger.error("Session fork error:", error);
-				}
-			},
-			onDeleteSession: (sessionId: string) => {
-				const targetSession = sessionHistory.sessions.find(
-					(s) => s.sessionId === sessionId,
-				);
-				const sessionTitle = targetSession?.title ?? "Untitled Session";
+	// ============================================================
+	// Session History Modal Callbacks
+	// ============================================================
+	const handleHistoryRestoreSession = useCallback(
+		async (sessionId: string, cwd: string) => {
+			try {
+				logger.log(`[ChatView] Restoring session: ${sessionId}`);
+				chat.clearMessages();
+				await sessionHistory.restoreSession(sessionId, cwd);
+				new Notice("[Agent Client] Session restored");
+			} catch (error) {
+				new Notice("[Agent Client] Failed to restore session");
+				logger.error("Session restore error:", error);
+			}
+		},
+		[logger, chat, sessionHistory],
+	);
 
-				const confirmModal = new ConfirmDeleteModal(
-					plugin.app,
-					sessionTitle,
-					async () => {
-						try {
-							logger.log(
-								`[ChatView] Deleting session: ${sessionId}`,
-							);
-							await sessionHistory.deleteSession(sessionId);
-							new Notice("[Agent Client] Session deleted");
-						} catch (error) {
-							new Notice(
-								"[Agent Client] Failed to delete session",
-							);
-							logger.error("Session delete error:", error);
-						}
-					},
-				);
-				confirmModal.open();
-			},
-			onLoadMore: () => {
-				void sessionHistory.loadMoreSessions();
-			},
-			onFetchSessions: (cwd?: string) => {
-				void sessionHistory.fetchSessions(cwd);
-			},
-		});
-		modal.open();
+	const handleHistoryForkSession = useCallback(
+		async (sessionId: string, cwd: string) => {
+			try {
+				logger.log(`[ChatView] Forking session: ${sessionId}`);
+				chat.clearMessages();
+				await sessionHistory.forkSession(sessionId, cwd);
+				new Notice("[Agent Client] Session forked");
+			} catch (error) {
+				new Notice("[Agent Client] Failed to fork session");
+				logger.error("Session fork error:", error);
+			}
+		},
+		[logger, chat, sessionHistory],
+	);
+
+	const handleHistoryDeleteSession = useCallback(
+		(sessionId: string) => {
+			const targetSession = sessionHistory.sessions.find(
+				(s) => s.sessionId === sessionId,
+			);
+			const sessionTitle = targetSession?.title ?? "Untitled Session";
+
+			const confirmModal = new ConfirmDeleteModal(
+				plugin.app,
+				sessionTitle,
+				async () => {
+					try {
+						logger.log(`[ChatView] Deleting session: ${sessionId}`);
+						await sessionHistory.deleteSession(sessionId);
+						new Notice("[Agent Client] Session deleted");
+					} catch (error) {
+						new Notice("[Agent Client] Failed to delete session");
+						logger.error("Session delete error:", error);
+					}
+				},
+			);
+			confirmModal.open();
+		},
+		[plugin.app, sessionHistory, logger],
+	);
+
+	const handleHistoryLoadMore = useCallback(() => {
+		void sessionHistory.loadMoreSessions();
+	}, [sessionHistory]);
+
+	const handleHistoryFetchSessions = useCallback(
+		(cwd?: string) => {
+			void sessionHistory.fetchSessions(cwd);
+		},
+		[sessionHistory],
+	);
+
+	const handleOpenHistory = useCallback(() => {
+		// Create modal if it doesn't exist
+		if (!historyModalRef.current) {
+			historyModalRef.current = new SessionHistoryModal(plugin.app, {
+				sessions: sessionHistory.sessions,
+				loading: sessionHistory.loading,
+				error: sessionHistory.error,
+				hasMore: sessionHistory.hasMore,
+				currentCwd: vaultPath,
+				canList: sessionHistory.canList,
+				canRestore: sessionHistory.canRestore,
+				canFork: sessionHistory.canFork,
+				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
+				isAgentReady: isSessionReady,
+				debugMode: settings.debugMode,
+				onRestoreSession: handleHistoryRestoreSession,
+				onForkSession: handleHistoryForkSession,
+				onDeleteSession: handleHistoryDeleteSession,
+				onLoadMore: handleHistoryLoadMore,
+				onFetchSessions: handleHistoryFetchSessions,
+			});
+		}
+		historyModalRef.current.open();
 		void sessionHistory.fetchSessions(vaultPath);
 	}, [
 		plugin.app,
@@ -408,8 +438,52 @@ function ChatComponent({
 		vaultPath,
 		isSessionReady,
 		settings.debugMode,
-		chat,
-		logger,
+		handleHistoryRestoreSession,
+		handleHistoryForkSession,
+		handleHistoryDeleteSession,
+		handleHistoryLoadMore,
+		handleHistoryFetchSessions,
+	]);
+
+	// Update modal props when session history state changes
+	useEffect(() => {
+		if (historyModalRef.current) {
+			historyModalRef.current.updateProps({
+				sessions: sessionHistory.sessions,
+				loading: sessionHistory.loading,
+				error: sessionHistory.error,
+				hasMore: sessionHistory.hasMore,
+				currentCwd: vaultPath,
+				canList: sessionHistory.canList,
+				canRestore: sessionHistory.canRestore,
+				canFork: sessionHistory.canFork,
+				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
+				isAgentReady: isSessionReady,
+				debugMode: settings.debugMode,
+				onRestoreSession: handleHistoryRestoreSession,
+				onForkSession: handleHistoryForkSession,
+				onDeleteSession: handleHistoryDeleteSession,
+				onLoadMore: handleHistoryLoadMore,
+				onFetchSessions: handleHistoryFetchSessions,
+			});
+		}
+	}, [
+		sessionHistory.sessions,
+		sessionHistory.loading,
+		sessionHistory.error,
+		sessionHistory.hasMore,
+		sessionHistory.canList,
+		sessionHistory.canRestore,
+		sessionHistory.canFork,
+		sessionHistory.isUsingLocalSessions,
+		vaultPath,
+		isSessionReady,
+		settings.debugMode,
+		handleHistoryRestoreSession,
+		handleHistoryForkSession,
+		handleHistoryDeleteSession,
+		handleHistoryLoadMore,
+		handleHistoryFetchSessions,
 	]);
 
 	const handleSendMessage = useCallback(
