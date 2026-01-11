@@ -1150,6 +1150,35 @@ If your plugin does not need CSS, delete this file.
 	text-decoration: line-through;
 }
 
+/* Diff Expand/Collapse Bar */
+.agent-client-diff-expand-bar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 6px 12px;
+	background-color: var(--background-secondary-alt);
+	border-top: 1px solid var(--background-modifier-border);
+	cursor: pointer;
+	user-select: none;
+	transition: background-color 0.1s ease;
+}
+
+.agent-client-diff-expand-bar:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.agent-client-diff-expand-text {
+	font-size: 11px;
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+}
+
+.agent-client-diff-expand-icon {
+	font-size: 0.8em;
+	color: var(--text-muted);
+	margin-left: 8px;
+}
+
 /* Tool Call Details */
 .agent-client-tool-call-read-details,
 .agent-client-tool-call-edit-details,

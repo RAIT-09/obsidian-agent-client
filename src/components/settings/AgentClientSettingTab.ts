@@ -118,6 +118,50 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		new Setting(containerEl)
+			.setName("Auto-collapse long diffs")
+			.setDesc(
+				"Automatically collapse diffs that exceed the line threshold.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(
+						this.plugin.settings.displaySettings.autoCollapseDiffs,
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.displaySettings.autoCollapseDiffs =
+							value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (this.plugin.settings.displaySettings.autoCollapseDiffs) {
+			new Setting(containerEl)
+				.setName("Collapse threshold")
+				.setDesc(
+					"Diffs with more lines than this will be collapsed by default.",
+				)
+				.addText((text) =>
+					text
+						.setPlaceholder("10")
+						.setValue(
+							String(
+								this.plugin.settings.displaySettings
+									.diffCollapseThreshold,
+							),
+						)
+						.onChange(async (value) => {
+							const num = parseInt(value, 10);
+							if (!isNaN(num) && num > 0) {
+								this.plugin.settings.displaySettings.diffCollapseThreshold =
+									num;
+								await this.plugin.saveSettings();
+							}
+						}),
+				);
+		}
+
 		// Windows WSL Settings (Windows only)
 		if (Platform.isWin) {
 			new Setting(containerEl)

@@ -57,6 +57,11 @@ export interface AgentClientPluginSettings {
 	windowsWslDistribution?: string;
 	// Input behavior
 	sendMessageShortcut: SendMessageShortcut;
+	// Display settings
+	displaySettings: {
+		autoCollapseDiffs: boolean;
+		diffCollapseThreshold: number;
+	};
 	// Locally saved session metadata (for agents without session/list support)
 	savedSessions: SavedSessionInfo[];
 }
@@ -105,6 +110,10 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	windowsWslMode: false,
 	windowsWslDistribution: undefined,
 	sendMessageShortcut: "enter",
+	displaySettings: {
+		autoCollapseDiffs: false,
+		diffCollapseThreshold: 10,
+	},
 	savedSessions: [],
 };
 
@@ -518,6 +527,28 @@ export default class AgentClientPlugin extends Plugin {
 				rawSettings.sendMessageShortcut === "cmd-enter"
 					? rawSettings.sendMessageShortcut
 					: DEFAULT_SETTINGS.sendMessageShortcut,
+			displaySettings: (() => {
+				const rawDisplay = rawSettings.displaySettings as
+					| Record<string, unknown>
+					| null
+					| undefined;
+				if (rawDisplay && typeof rawDisplay === "object") {
+					return {
+						autoCollapseDiffs:
+							typeof rawDisplay.autoCollapseDiffs === "boolean"
+								? rawDisplay.autoCollapseDiffs
+								: DEFAULT_SETTINGS.displaySettings
+										.autoCollapseDiffs,
+						diffCollapseThreshold:
+							typeof rawDisplay.diffCollapseThreshold ===
+								"number" && rawDisplay.diffCollapseThreshold > 0
+								? rawDisplay.diffCollapseThreshold
+								: DEFAULT_SETTINGS.displaySettings
+										.diffCollapseThreshold,
+					};
+				}
+				return DEFAULT_SETTINGS.displaySettings;
+			})(),
 			savedSessions: Array.isArray(rawSettings.savedSessions)
 				? (rawSettings.savedSessions as SavedSessionInfo[])
 				: DEFAULT_SETTINGS.savedSessions,
