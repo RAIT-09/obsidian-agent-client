@@ -29,6 +29,7 @@ import {
 	convertWindowsPathToWsl,
 } from "../../shared/wsl-utils";
 import { resolveCommandDirectory } from "../../shared/path-utils";
+import { getEnhancedWindowsEnv } from "../../shared/windows-env";
 
 /**
  * Extended ACP Client interface for UI layer.
@@ -179,10 +180,17 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		);
 
 		// Prepare environment variables
-		const baseEnv: NodeJS.ProcessEnv = {
+		let baseEnv: NodeJS.ProcessEnv = {
 			...process.env,
 			...(config.env || {}),
 		};
+
+		// On Windows, enhance PATH with full system/user PATH from registry.
+		// Electron apps launched from shortcuts don't inherit the full PATH,
+		// which causes executables like python, node, etc. to not be found.
+		if (Platform.isWin && !this.plugin.settings.windowsWslMode) {
+			baseEnv = getEnhancedWindowsEnv(baseEnv);
+		}
 
 		// Add Node.js path to PATH if specified in settings
 		if (
