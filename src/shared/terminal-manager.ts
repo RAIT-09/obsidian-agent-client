@@ -5,6 +5,7 @@ import { Logger } from "./logger";
 import { Platform } from "obsidian";
 import { wrapCommandForWsl } from "./wsl-utils";
 import { resolveCommandDirectory } from "./path-utils";
+import { getEnhancedWindowsEnv } from "./windows-env";
 
 interface TerminalProcess {
 	id: string;
@@ -38,7 +39,14 @@ export class TerminalManager {
 
 		// Set up environment variables
 		// Desktop-only: Node.js process environment for terminal operations
-		const env = { ...process.env };
+		let env: NodeJS.ProcessEnv = { ...process.env };
+
+		// On Windows (non-WSL mode), enhance PATH with full system/user PATH from registry.
+		// Electron apps launched from shortcuts don't inherit the full PATH.
+		if (Platform.isWin && !this.plugin.settings.windowsWslMode) {
+			env = getEnhancedWindowsEnv(env);
+		}
+
 		if (params.env) {
 			for (const envVar of params.env) {
 				env[envVar.name] = envVar.value;
@@ -56,12 +64,13 @@ export class TerminalManager {
 
 			if (hasShellSyntax) {
 				// Use shell to execute the command
-				const shell =
-					Platform.isMacOS || Platform.isLinux
-						? "/bin/sh"
-						: "cmd.exe";
-				const shellFlag =
-					Platform.isMacOS || Platform.isLinux ? "-c" : "/c";
+				// WSL mode uses Linux shell, not cmd.exe
+				const useUnixShell =
+					Platform.isMacOS ||
+					Platform.isLinux ||
+					this.plugin.settings.windowsWslMode;
+				const shell = useUnixShell ? "/bin/sh" : "cmd.exe";
+				const shellFlag = useUnixShell ? "-c" : "/c";
 				command = shell;
 				args = [shellFlag, params.command];
 			} else if (params.command.includes(" ")) {
