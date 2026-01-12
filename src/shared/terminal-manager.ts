@@ -63,16 +63,19 @@ export class TerminalManager {
 			const hasShellSyntax = /[|&;<>()$`\\"]/.test(params.command);
 
 			if (hasShellSyntax) {
-				// Use shell to execute the command
-				// WSL mode uses Linux shell, not cmd.exe
-				const useUnixShell =
-					Platform.isMacOS ||
-					Platform.isLinux ||
-					this.plugin.settings.windowsWslMode;
-				const shell = useUnixShell ? "/bin/sh" : "cmd.exe";
-				const shellFlag = useUnixShell ? "-c" : "/c";
-				command = shell;
-				args = [shellFlag, params.command];
+				// WSL mode: Skip shell wrapping here.
+				// wrapCommandForWsl() already uses "bash -l -c" which handles shell syntax.
+				// Wrapping here causes double-escaping: $variables become literal strings.
+				if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+					// Keep command as-is; wrapCommandForWsl will handle shell execution
+				} else {
+					// Non-WSL: wrap with appropriate shell
+					const useUnixShell = Platform.isMacOS || Platform.isLinux;
+					const shell = useUnixShell ? "/bin/sh" : "cmd.exe";
+					const shellFlag = useUnixShell ? "-c" : "/c";
+					command = shell;
+					args = [shellFlag, params.command];
+				}
 			} else if (params.command.includes(" ")) {
 				// Simple command with arguments, split by space
 				const parts = params.command
