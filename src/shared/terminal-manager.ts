@@ -64,12 +64,13 @@ export class TerminalManager {
 
 			if (hasShellSyntax) {
 				// Use shell to execute the command
-				const shell =
-					Platform.isMacOS || Platform.isLinux
-						? "/bin/sh"
-						: "cmd.exe";
-				const shellFlag =
-					Platform.isMacOS || Platform.isLinux ? "-c" : "/c";
+				// WSL mode uses Linux shell, not cmd.exe
+				const useUnixShell =
+					Platform.isMacOS ||
+					Platform.isLinux ||
+					this.plugin.settings.windowsWslMode;
+				const shell = useUnixShell ? "/bin/sh" : "cmd.exe";
+				const shellFlag = useUnixShell ? "-c" : "/c";
 				command = shell;
 				args = [shellFlag, params.command];
 			} else if (params.command.includes(" ")) {
