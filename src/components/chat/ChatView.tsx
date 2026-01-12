@@ -128,6 +128,8 @@ function ChatComponent({
 		},
 		{
 			windowsWslMode: settings.windowsWslMode,
+			maxNoteLength: settings.displaySettings.maxNoteLength,
+			maxSelectionLength: settings.displaySettings.maxSelectionLength,
 		},
 	);
 

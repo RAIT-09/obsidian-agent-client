@@ -142,6 +142,8 @@ export interface SessionContext {
  */
 export interface SettingsContext {
 	windowsWslMode: boolean;
+	maxNoteLength: number;
+	maxSelectionLength: number;
 }
 
 // ============================================================================
@@ -579,6 +581,8 @@ export function useChat(
 					supportsEmbeddedContext:
 						sessionContext.promptCapabilities?.embeddedContext ??
 						false,
+					maxNoteLength: settingsContext.maxNoteLength,
+					maxSelectionLength: settingsContext.maxSelectionLength,
 				},
 				vaultAccess,
 				mentionService,

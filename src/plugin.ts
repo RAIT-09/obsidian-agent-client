@@ -61,6 +61,8 @@ export interface AgentClientPluginSettings {
 	displaySettings: {
 		autoCollapseDiffs: boolean;
 		diffCollapseThreshold: number;
+		maxNoteLength: number;
+		maxSelectionLength: number;
 	};
 	// Locally saved session metadata (for agents without session/list support)
 	savedSessions: SavedSessionInfo[];
@@ -113,6 +115,8 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	displaySettings: {
 		autoCollapseDiffs: false,
 		diffCollapseThreshold: 10,
+		maxNoteLength: 10000,
+		maxSelectionLength: 10000,
 	},
 	savedSessions: [],
 };
@@ -545,6 +549,18 @@ export default class AgentClientPlugin extends Plugin {
 								? rawDisplay.diffCollapseThreshold
 								: DEFAULT_SETTINGS.displaySettings
 										.diffCollapseThreshold,
+						maxNoteLength:
+							typeof rawDisplay.maxNoteLength === "number" &&
+							rawDisplay.maxNoteLength >= 1
+								? rawDisplay.maxNoteLength
+								: DEFAULT_SETTINGS.displaySettings
+										.maxNoteLength,
+						maxSelectionLength:
+							typeof rawDisplay.maxSelectionLength === "number" &&
+							rawDisplay.maxSelectionLength >= 1
+								? rawDisplay.maxSelectionLength
+								: DEFAULT_SETTINGS.displaySettings
+										.maxSelectionLength,
 					};
 				}
 				return DEFAULT_SETTINGS.displaySettings;

@@ -57,6 +57,12 @@ export interface PreparePromptInput {
 
 	/** Whether agent supports embeddedContext capability */
 	supportsEmbeddedContext?: boolean;
+
+	/** Maximum characters per mentioned note (default: 10000) */
+	maxNoteLength?: number;
+
+	/** Maximum characters for selection (default: 10000) */
+	maxSelectionLength?: number;
 }
 
 /**
@@ -124,8 +130,8 @@ export interface SendPromptResult {
 // Constants
 // ============================================================================
 
-const MAX_NOTE_LENGTH = 10000; // Maximum characters per note
-const MAX_SELECTION_LENGTH = 10000; // Maximum characters for selection
+const DEFAULT_MAX_NOTE_LENGTH = 10000; // Default maximum characters per note
+const DEFAULT_MAX_SELECTION_LENGTH = 10000; // Default maximum characters for selection
 
 // ============================================================================
 // Prompt Preparation Functions
@@ -183,12 +189,13 @@ async function preparePromptWithEmbeddedContext(
 
 		try {
 			const content = await vaultAccess.readNote(file.path);
+			const maxNoteLen = input.maxNoteLength ?? DEFAULT_MAX_NOTE_LENGTH;
 
 			let processedContent = content;
-			if (content.length > MAX_NOTE_LENGTH) {
+			if (content.length > maxNoteLen) {
 				processedContent =
-					content.substring(0, MAX_NOTE_LENGTH) +
-					`\n\n[Note: Truncated from ${content.length} to ${MAX_NOTE_LENGTH} characters]`;
+					content.substring(0, maxNoteLen) +
+					`\n\n[Note: Truncated from ${content.length} to ${maxNoteLen} characters]`;
 			}
 
 			let absolutePath = input.vaultBasePath
@@ -225,6 +232,7 @@ async function preparePromptWithEmbeddedContext(
 			input.vaultBasePath,
 			vaultAccess,
 			input.convertToWsl ?? false,
+			input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
 		);
 		autoMentionBlocks.push(...autoMentionResource);
 	}
@@ -304,13 +312,14 @@ async function preparePromptWithTextContext(
 
 		try {
 			const content = await vaultAccess.readNote(file.path);
+			const maxNoteLen = input.maxNoteLength ?? DEFAULT_MAX_NOTE_LENGTH;
 
 			let processedContent = content;
 			let truncationNote = "";
 
-			if (content.length > MAX_NOTE_LENGTH) {
-				processedContent = content.substring(0, MAX_NOTE_LENGTH);
-				truncationNote = `\n\n[Note: This note was truncated. Original length: ${content.length} characters, showing first ${MAX_NOTE_LENGTH} characters]`;
+			if (content.length > maxNoteLen) {
+				processedContent = content.substring(0, maxNoteLen);
+				truncationNote = `\n\n[Note: This note was truncated. Original length: ${content.length} characters, showing first ${maxNoteLen} characters]`;
 			}
 
 			let absolutePath = input.vaultBasePath
@@ -336,6 +345,7 @@ async function preparePromptWithTextContext(
 			vaultAccess,
 			input.convertToWsl ?? false,
 			input.activeNote.selection,
+			input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
 		);
 		contextBlocks.push(autoMentionContextBlock);
 	}
@@ -404,6 +414,7 @@ async function buildAutoMentionResource(
 	vaultPath: string,
 	vaultAccess: IVaultAccess,
 	convertToWsl: boolean,
+	maxSelectionLength: number,
 ): Promise<PromptContent[]> {
 	let absolutePath = vaultPath
 		? `${vaultPath}/${activeNote.path}`
@@ -429,10 +440,10 @@ async function buildAutoMentionResource(
 			);
 			let selectedText = selectedLines.join("\n");
 
-			if (selectedText.length > MAX_SELECTION_LENGTH) {
+			if (selectedText.length > maxSelectionLength) {
 				selectedText =
-					selectedText.substring(0, MAX_SELECTION_LENGTH) +
-					`\n\n[Note: Truncated from ${selectedLines.join("\n").length} to ${MAX_SELECTION_LENGTH} characters]`;
+					selectedText.substring(0, maxSelectionLength) +
+					`\n\n[Note: Truncated from ${selectedLines.join("\n").length} to ${maxSelectionLength} characters]`;
 			}
 
 			return [
@@ -487,10 +498,8 @@ async function buildAutoMentionTextContext(
 	vaultPath: string,
 	vaultAccess: IVaultAccess,
 	convertToWsl: boolean,
-	selection?: {
-		from: EditorPosition;
-		to: EditorPosition;
-	},
+	selection: { from: EditorPosition; to: EditorPosition } | undefined,
+	maxSelectionLength: number,
 ): Promise<string> {
 	let absolutePath = vaultPath ? `${vaultPath}/${notePath}` : notePath;
 
@@ -512,9 +521,9 @@ async function buildAutoMentionTextContext(
 			let selectedText = selectedLines.join("\n");
 
 			let truncationNote = "";
-			if (selectedText.length > MAX_SELECTION_LENGTH) {
-				selectedText = selectedText.substring(0, MAX_SELECTION_LENGTH);
-				truncationNote = `\n\n[Note: The selection was truncated. Original length: ${selectedLines.join("\n").length} characters, showing first ${MAX_SELECTION_LENGTH} characters]`;
+			if (selectedText.length > maxSelectionLength) {
+				selectedText = selectedText.substring(0, maxSelectionLength);
+				truncationNote = `\n\n[Note: The selection was truncated. Original length: ${selectedLines.join("\n").length} characters, showing first ${maxSelectionLength} characters]`;
 			}
 
 			return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">
