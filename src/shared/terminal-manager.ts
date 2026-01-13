@@ -6,6 +6,7 @@ import { Platform } from "obsidian";
 import { wrapCommandForWsl } from "./wsl-utils";
 import { resolveCommandDirectory } from "./path-utils";
 import { getEnhancedWindowsEnv } from "./windows-env";
+import { escapeShellArgWindows } from "./shell-utils";
 
 interface TerminalProcess {
 	id: string;
@@ -57,36 +58,8 @@ export class TerminalManager {
 		let command = params.command;
 		let args = params.args || [];
 
-		// If no args provided and command contains shell syntax, use shell to execute
-		if (!params.args) {
-			// Check for shell syntax (pipes, redirects, logical operators, etc.)
-			const hasShellSyntax = /[|&;<>()$`\\"]/.test(params.command);
-
-			if (hasShellSyntax) {
-				// WSL mode: Skip shell wrapping here.
-				// wrapCommandForWsl() already uses "bash -l -c" which handles shell syntax.
-				// Wrapping here causes double-escaping: $variables become literal strings.
-				if (Platform.isWin && this.plugin.settings.windowsWslMode) {
-					// Keep command as-is; wrapCommandForWsl will handle shell execution
-				} else {
-					// Non-WSL: wrap with appropriate shell
-					const useUnixShell = Platform.isMacOS || Platform.isLinux;
-					const shell = useUnixShell ? "/bin/sh" : "cmd.exe";
-					const shellFlag = useUnixShell ? "-c" : "/c";
-					command = shell;
-					args = [shellFlag, params.command];
-				}
-			} else if (params.command.includes(" ")) {
-				// Simple command with arguments, split by space
-				const parts = params.command
-					.split(" ")
-					.filter((part) => part.length > 0);
-				command = parts[0];
-				args = parts.slice(1);
-			}
-		}
-
-		// WSL mode for Windows (wrap command to run inside WSL)
+		// Platform-specific shell wrapping
+		// Each platform wraps the command once in its appropriate shell
 		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
 			// Extract node directory from settings for PATH (if available)
 			const nodeDir = this.plugin.settings.nodePath
@@ -112,11 +85,28 @@ export class TerminalManager {
 		// On macOS and Linux, wrap the command in a login shell to inherit the user's environment
 		else if (Platform.isMacOS || Platform.isLinux) {
 			const shell = Platform.isMacOS ? "/bin/zsh" : "/bin/bash";
-			const commandString = [command, ...args]
-				.map((arg) => "'" + arg.replace(/'/g, "'\\''") + "'")
-				.join(" ");
+			let commandString: string;
+			if (args.length > 0) {
+				// args provided: escape each argument individually
+				commandString = [command, ...args]
+					.map((arg) => "'" + arg.replace(/'/g, "'\\''") + "'")
+					.join(" ");
+			} else {
+				// no args: pass command as-is to shell (shell will parse it)
+				commandString = command;
+			}
 			command = shell;
 			args = ["-l", "-c", commandString];
+		}
+		// On Windows (non-WSL), escape command and arguments for shell
+		// spawn() will be called with shell: true below
+		else if (Platform.isWin) {
+			if (args.length > 0) {
+				// args provided: escape each argument individually
+				command = escapeShellArgWindows(command);
+				args = args.map(escapeShellArgWindows);
+			}
+			// no args: pass command as-is to shell (shell will parse it)
 		}
 
 		this.logger.log(`[Terminal ${terminalId}] Creating terminal:`, {
@@ -125,11 +115,16 @@ export class TerminalManager {
 			cwd: params.cwd,
 		});
 
+		// Use shell on Windows (non-WSL) for proper command handling
+		const needsShell =
+			Platform.isWin && !this.plugin.settings.windowsWslMode;
+
 		// Spawn the process
 		const spawnOptions: SpawnOptions = {
 			cwd: params.cwd || undefined,
 			env,
 			stdio: ["pipe", "pipe", "pipe"],
+			shell: needsShell,
 		};
 		const childProcess = spawn(command, args, spawnOptions);
 
