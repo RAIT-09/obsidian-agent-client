@@ -282,9 +282,10 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				fullCommand,
 			);
 		}
-		// On Windows (non-WSL), escape arguments for cmd.exe
+		// On Windows (non-WSL), escape command and arguments for cmd.exe
 		// spawn() will be called with shell: true below
 		else if (Platform.isWin) {
+			spawnCommand = escapeShellArgWindows(command);
 			spawnArgs = args.map(escapeShellArgWindows);
 			this.logger.log(
 				"[AcpAdapter] Using Windows shell with command:",
