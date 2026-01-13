@@ -85,6 +85,12 @@ export default defineConfig({
           { text: "Troubleshooting", link: "/help/troubleshooting" },
         ],
       },
+      {
+        text: "Reference",
+        items: [
+          { text: "ACP Protocol Support", link: "/reference/acp-support" },
+        ],
+      },
     ],
 
     socialLinks: [
