@@ -36,6 +36,7 @@ import {
 } from "../../shared/wsl-utils";
 import { resolveCommandDirectory } from "../../shared/path-utils";
 import { getEnhancedWindowsEnv } from "../../shared/windows-env";
+import { escapeShellArgWindows } from "../../shared/shell-utils";
 
 /**
  * Extended ACP Client interface for UI layer.
@@ -287,8 +288,19 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				fullCommand,
 			);
 		}
+		// On Windows (non-WSL), escape command and arguments for cmd.exe
+		// spawn() will be called with shell: true below
+		else if (Platform.isWin) {
+			spawnCommand = escapeShellArgWindows(command);
+			spawnArgs = args.map(escapeShellArgWindows);
+			this.logger.log(
+				"[AcpAdapter] Using Windows shell with command:",
+				spawnCommand,
+				spawnArgs,
+			);
+		}
 
-		// Use shell on Windows for .cmd/.bat files, but NOT in WSL mode
+		// Use shell on Windows for proper argument handling, but NOT in WSL mode
 		// When using WSL, wsl.exe is the command and doesn't need shell wrapper
 		const needsShell =
 			Platform.isWin && !this.plugin.settings.windowsWslMode;
