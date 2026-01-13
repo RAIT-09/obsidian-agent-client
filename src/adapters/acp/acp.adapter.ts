@@ -282,39 +282,28 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				fullCommand,
 			);
 		}
-		// On Windows (non-WSL), wrap the command in cmd.exe to handle paths with spaces
+		// On Windows (non-WSL), escape arguments for cmd.exe
+		// spawn() will be called with shell: true below
 		else if (Platform.isWin) {
-			const commandString = [command, ...args]
-				.map(escapeShellArgWindows)
-				.join(" ");
-
-			// If nodePath is configured, prepend PATH using Windows syntax
-			let fullCommand = commandString;
-			if (
-				this.plugin.settings.nodePath &&
-				this.plugin.settings.nodePath.trim().length > 0
-			) {
-				const nodeDir = resolveCommandDirectory(
-					this.plugin.settings.nodePath.trim(),
-				);
-				if (nodeDir) {
-					fullCommand = `set "PATH=${nodeDir};%PATH%" && ${commandString}`;
-				}
-			}
-
-			spawnCommand = "cmd.exe";
-			spawnArgs = ["/c", fullCommand];
+			spawnArgs = args.map(escapeShellArgWindows);
 			this.logger.log(
-				"[AcpAdapter] Using Windows cmd.exe with command:",
-				fullCommand,
+				"[AcpAdapter] Using Windows shell with command:",
+				spawnCommand,
+				spawnArgs,
 			);
 		}
+
+		// Use shell on Windows for proper argument handling, but NOT in WSL mode
+		// When using WSL, wsl.exe is the command and doesn't need shell wrapper
+		const needsShell =
+			Platform.isWin && !this.plugin.settings.windowsWslMode;
 
 		// Spawn the agent process
 		const agentProcess = spawn(spawnCommand, spawnArgs, {
 			stdio: ["pipe", "pipe", "pipe"],
 			env: baseEnv,
 			cwd: config.workingDirectory,
+			shell: needsShell,
 		});
 		this.agentProcess = agentProcess;
 
