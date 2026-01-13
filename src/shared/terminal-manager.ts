@@ -98,20 +98,15 @@ export class TerminalManager {
 			command = shell;
 			args = ["-l", "-c", commandString];
 		}
-		// On Windows (non-WSL), wrap the command in cmd.exe to handle paths with spaces
+		// On Windows (non-WSL), escape command and arguments for shell
+		// spawn() will be called with shell: true below
 		else if (Platform.isWin) {
-			let commandString: string;
 			if (args.length > 0) {
 				// args provided: escape each argument individually
-				commandString = [command, ...args]
-					.map(escapeShellArgWindows)
-					.join(" ");
-			} else {
-				// no args: pass command as-is to shell (shell will parse it)
-				commandString = command;
+				command = escapeShellArgWindows(command);
+				args = args.map(escapeShellArgWindows);
 			}
-			command = "cmd.exe";
-			args = ["/c", commandString];
+			// no args: pass command as-is to shell (shell will parse it)
 		}
 
 		this.logger.log(`[Terminal ${terminalId}] Creating terminal:`, {
@@ -120,11 +115,16 @@ export class TerminalManager {
 			cwd: params.cwd,
 		});
 
+		// Use shell on Windows (non-WSL) for proper command handling
+		const needsShell =
+			Platform.isWin && !this.plugin.settings.windowsWslMode;
+
 		// Spawn the process
 		const spawnOptions: SpawnOptions = {
 			cwd: params.cwd || undefined,
 			env,
 			stdio: ["pipe", "pipe", "pipe"],
+			shell: needsShell,
 		};
 		const childProcess = spawn(command, args, spawnOptions);
 
