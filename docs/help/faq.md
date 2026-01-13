@@ -24,13 +24,17 @@ Yes. When you send a message, it's processed by the AI provider behind your sele
 
 ### How do I reference my notes in a conversation?
 
-Type `@` in the input field and a dropdown appears with matching notes. Select a note to insert a mention in `@[[Note Name]]` format. The note's content (up to 10,000 characters) is sent to the agent.
+Type `@` in the input field and a dropdown appears with matching notes. Select a note to insert a mention in `@[[Note Name]]` format. The note's content is sent to the agent.
 
 See [Note Mentions](/usage/mentions) for details.
 
+### Can I change the character limit for mentions?
+
+Yes. Configure **Max note length** and **Max selection length** in **Settings → Agent Client → Mentions**. The default is 10,000 characters each.
+
 ### What is auto-mention?
 
-When enabled (**Settings → Agent Client → Auto-mention active note**), the currently open note is automatically included as context. Unlike manual mentions, auto-mention only sends the note's file path—not its content. The agent can use its Read tool to access the content if needed.
+When enabled (**Settings → Agent Client → Mentions → Auto-mention active note**), the currently open note is automatically included as context. Unlike manual mentions, auto-mention only sends the note's file path—not its content. The agent can use its Read tool to access the content if needed.
 
 ### Can I include just part of a note?
 
@@ -78,7 +82,7 @@ Some agents request permission before performing certain actions (like editing f
 
 ### Can I auto-approve all permissions?
 
-Yes. Enable **Settings → Agent Client → Auto-allow permissions**. Use with caution—this gives agents full access without confirmation prompts.
+Yes. Enable **Settings → Agent Client → Permissions → Auto-allow permissions**. Use with caution—this gives agents full access without confirmation prompts.
 
 ### Some agents don't ask for permission at all?
 
@@ -97,6 +101,30 @@ By default, exports are saved to the `Agent Client` folder in your vault. You ca
 ### Can I auto-export conversations?
 
 Yes. Enable **Auto-export on new chat** or **Auto-export on close chat** in export settings.
+
+## Session History
+
+### How do I resume a previous conversation?
+
+Click the **History** button (clock icon) in the chat header to open the session history modal. Select a session and click the **Restore** button (play icon) to continue where you left off.
+
+See [Session History](/usage/session-history) for details.
+
+### What's the difference between Restore and Fork?
+
+**Restore** continues the existing session—new messages are added to the same conversation. **Fork** creates a new session branching from that point, leaving the original session unchanged.
+
+### The modal says "This agent does not support session restoration"
+
+Not all agents support session restoration. You can still view and delete locally saved sessions, but you won't be able to restore or fork them with that agent.
+
+### Are my sessions saved automatically?
+
+Yes. The plugin automatically saves session metadata and message history when you send messages. Sessions are stored locally in Obsidian's data folder.
+
+### Can I delete old sessions?
+
+Yes. Open the session history modal and click the **Delete** button (trash icon) on any session. Deletion is permanent.
 
 ## Windows
 

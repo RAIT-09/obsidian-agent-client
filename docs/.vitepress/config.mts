@@ -71,6 +71,7 @@ export default defineConfig({
           { text: "Slash Commands", link: "/usage/slash-commands" },
           { text: "Mode Selection", link: "/usage/mode-selection" },
           { text: "Model Selection", link: "/usage/model-selection" },
+          { text: "Session History", link: "/usage/session-history" },
           { text: "Editing", link: "/usage/editing" },
           { text: "Chat Export", link: "/usage/chat-export" },
           { text: "Context Files", link: "/usage/context-files" },
