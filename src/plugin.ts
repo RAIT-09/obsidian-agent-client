@@ -192,7 +192,7 @@ export default class AgentClientPlugin extends Plugin {
 			if (viewContainerEl) {
 				window.setTimeout(() => {
 					const textarea = viewContainerEl.querySelector(
-						"textarea.chat-input-textarea",
+						"textarea.agent-client-chat-input-textarea",
 					);
 					if (textarea instanceof HTMLTextAreaElement) {
 						textarea.focus();
