@@ -129,6 +129,8 @@ export class ChatExporter {
 		sessionId: string,
 		timestamp: Date,
 	): string {
+		const settings = this.plugin.settings.exportSettings;
+
 		// Format timestamp in local timezone: YYYY-MM-DDTHH:mm:ss
 		const year = timestamp.getFullYear();
 		const month = String(timestamp.getMonth() + 1).padStart(2, "0");
@@ -138,12 +140,16 @@ export class ChatExporter {
 		const seconds = String(timestamp.getSeconds()).padStart(2, "0");
 		const localTimestamp = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
 
+		// Build tags line only if tag is specified
+		const tagsLine = settings.frontmatterTag.trim()
+			? `\ntags: [${settings.frontmatterTag.trim()}]`
+			: "";
+
 		return `---
 created: ${localTimestamp}
 agentDisplayName: ${agentLabel}
 agentId: ${agentId}
-session_id: ${sessionId}
-tags: [agent-client]
+session_id: ${sessionId}${tagsLine}
 ---`;
 	}
 

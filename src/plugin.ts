@@ -51,6 +51,7 @@ export interface AgentClientPluginSettings {
 		includeImages: boolean;
 		imageLocation: "obsidian" | "custom" | "base64";
 		imageCustomFolder: string;
+		frontmatterTag: string;
 	};
 	// WSL settings (Windows only)
 	windowsWslMode: boolean;
@@ -109,6 +110,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		includeImages: true,
 		imageLocation: "obsidian",
 		imageCustomFolder: "Agent Client",
+		frontmatterTag: "agent-client",
 	},
 	windowsWslMode: false,
 	windowsWslDistribution: undefined,
@@ -516,6 +518,11 @@ export default class AgentClientPlugin extends Plugin {
 								? rawExport.imageCustomFolder
 								: DEFAULT_SETTINGS.exportSettings
 										.imageCustomFolder,
+						frontmatterTag:
+							typeof rawExport.frontmatterTag === "string"
+								? rawExport.frontmatterTag
+								: DEFAULT_SETTINGS.exportSettings
+										.frontmatterTag,
 					};
 				}
 				return DEFAULT_SETTINGS.exportSettings;

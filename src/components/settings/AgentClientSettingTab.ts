@@ -344,6 +344,24 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Frontmatter tag")
+			.setDesc(
+				"Tag to add to exported notes. Supports nested tags (e.g., projects/agent-client). Leave empty to disable.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("agent-client")
+					.setValue(
+						this.plugin.settings.exportSettings.frontmatterTag,
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.exportSettings.frontmatterTag =
+							value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
 			.setName("Include images")
 			.setDesc("Include images in exported markdown files")
 			.addToggle((toggle) =>
