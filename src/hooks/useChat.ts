@@ -64,6 +64,27 @@ export interface UseChatReturn {
 	clearMessages: () => void;
 
 	/**
+	 * Set initial messages from loaded session history.
+	 * Converts conversation history to ChatMessage format.
+	 * @param history - Conversation history from loadSession
+	 */
+	setInitialMessages: (
+		history: Array<{
+			role: string;
+			content: Array<{ type: string; text: string }>;
+			timestamp?: string;
+		}>,
+	) => void;
+
+	/**
+	 * Set messages directly from local storage.
+	 * Unlike setInitialMessages which converts from ACP history format,
+	 * this accepts ChatMessage[] as-is (for resume/fork operations).
+	 * @param localMessages - Chat messages from local storage
+	 */
+	setMessagesFromLocal: (localMessages: ChatMessage[]) => void;
+
+	/**
 	 * Clear the current error.
 	 */
 	clearError: () => void;
@@ -108,6 +129,12 @@ export interface UseChatReturn {
 export interface SessionContext {
 	sessionId: string | null;
 	authMethods: AuthenticationMethod[];
+	/** Prompt capabilities from agent initialization */
+	promptCapabilities?: {
+		image?: boolean;
+		audio?: boolean;
+		embeddedContext?: boolean;
+	};
 }
 
 /**
@@ -115,6 +142,8 @@ export interface SessionContext {
  */
 export interface SettingsContext {
 	windowsWslMode: boolean;
+	maxNoteLength: number;
+	maxSelectionLength: number;
 }
 
 // ============================================================================
@@ -268,6 +297,62 @@ export function useChat(
 	}, []);
 
 	/**
+	 * Update or create the last user message with new content.
+	 * Used for session/load to reconstruct user messages from chunks.
+	 *
+	 * Similar to updateLastMessage but targets "user" role instead of "assistant".
+	 */
+	const updateUserMessage = useCallback((content: MessageContent): void => {
+		setMessages((prev) => {
+			// If no messages or last message is not user, create new user message
+			if (prev.length === 0 || prev[prev.length - 1].role !== "user") {
+				const newMessage: ChatMessage = {
+					id: crypto.randomUUID(),
+					role: "user",
+					content: [content],
+					timestamp: new Date(),
+				};
+				return [...prev, newMessage];
+			}
+
+			// Update existing last message
+			const lastMessage = prev[prev.length - 1];
+			const updatedMessage = { ...lastMessage };
+
+			if (content.type === "text") {
+				// Append to existing text content or create new
+				const existingContentIndex = updatedMessage.content.findIndex(
+					(c) => c.type === "text",
+				);
+				if (existingContentIndex >= 0) {
+					const existingContent =
+						updatedMessage.content[existingContentIndex];
+					if (existingContent.type === "text") {
+						updatedMessage.content[existingContentIndex] = {
+							type: "text",
+							text: existingContent.text + content.text,
+						};
+					}
+				} else {
+					updatedMessage.content.push(content);
+				}
+			} else {
+				// Replace or add non-text content
+				const existingIndex = updatedMessage.content.findIndex(
+					(c) => c.type === content.type,
+				);
+				if (existingIndex >= 0) {
+					updatedMessage.content[existingIndex] = content;
+				} else {
+					updatedMessage.content.push(content);
+				}
+			}
+
+			return [...prev.slice(0, -1), updatedMessage];
+		});
+	}, []);
+
+	/**
 	 * Update a specific message by tool call ID.
 	 * Only updates if the tool call exists in state.
 	 */
@@ -364,6 +449,13 @@ export function useChat(
 					});
 					break;
 
+				case "user_message_chunk":
+					updateUserMessage({
+						type: "text",
+						text: update.text,
+					});
+					break;
+
 				case "tool_call":
 				case "tool_call_update":
 					upsertToolCall(update.toolCallId, {
@@ -406,6 +498,50 @@ export function useChat(
 	}, []);
 
 	/**
+	 * Set initial messages from loaded session history.
+	 * Converts conversation history to ChatMessage format.
+	 */
+	const setInitialMessages = useCallback(
+		(
+			history: Array<{
+				role: string;
+				content: Array<{ type: string; text: string }>;
+				timestamp?: string;
+			}>,
+		): void => {
+			// Convert conversation history to ChatMessage format
+			const chatMessages: ChatMessage[] = history.map((msg) => ({
+				id: crypto.randomUUID(),
+				role: msg.role as "user" | "assistant",
+				content: msg.content.map((c) => ({
+					type: c.type as "text",
+					text: c.text,
+				})),
+				timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+			}));
+
+			setMessages(chatMessages);
+			setIsSending(false);
+			setErrorInfo(null);
+		},
+		[],
+	);
+
+	/**
+	 * Set messages directly from local storage.
+	 * Unlike setInitialMessages which converts from ACP history format,
+	 * this accepts ChatMessage[] as-is (for resume/fork operations).
+	 */
+	const setMessagesFromLocal = useCallback(
+		(localMessages: ChatMessage[]): void => {
+			setMessages(localMessages);
+			setIsSending(false);
+			setErrorInfo(null);
+		},
+		[],
+	);
+
+	/**
 	 * Clear the current error.
 	 */
 	const clearError = useCallback((): void => {
@@ -442,6 +578,11 @@ export function useChat(
 					vaultBasePath: options.vaultBasePath,
 					isAutoMentionDisabled: options.isAutoMentionDisabled,
 					convertToWsl: shouldConvertToWsl,
+					supportsEmbeddedContext:
+						sessionContext.promptCapabilities?.embeddedContext ??
+						false,
+					maxNoteLength: settingsContext.maxNoteLength,
+					maxSelectionLength: settingsContext.maxSelectionLength,
 				},
 				vaultAccess,
 				mentionService,
@@ -534,6 +675,7 @@ export function useChat(
 			mentionService,
 			sessionContext.sessionId,
 			sessionContext.authMethods,
+			sessionContext.promptCapabilities,
 			shouldConvertToWsl,
 			addMessage,
 		],
@@ -546,6 +688,8 @@ export function useChat(
 		errorInfo,
 		sendMessage,
 		clearMessages,
+		setInitialMessages,
+		setMessagesFromLocal,
 		clearError,
 		addMessage,
 		updateLastMessage,

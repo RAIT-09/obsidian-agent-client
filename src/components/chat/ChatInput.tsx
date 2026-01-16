@@ -50,6 +50,8 @@ export interface ChatInputProps {
 	isSending: boolean;
 	/** Whether the session is ready for user input */
 	isSessionReady: boolean;
+	/** Whether a session is being restored (load/resume/fork) */
+	isRestoringSession: boolean;
 	/** Display name of the active agent */
 	agentLabel: string;
 	/** Available slash commands */
@@ -106,6 +108,7 @@ export interface ChatInputProps {
 export function ChatInput({
 	isSending,
 	isSessionReady,
+	isRestoringSession,
 	agentLabel,
 	availableCommands,
 	autoMentionEnabled,
@@ -574,6 +577,13 @@ export function ChatInput({
 		[slashCommands, mentions, handleSelectSlashCommand, selectMention],
 	);
 
+	// Button disabled state - also allow sending if images are attached
+	const isButtonDisabled =
+		!isSending &&
+		((inputValue.trim() === "" && attachedImages.length === 0) ||
+			!isSessionReady ||
+			isRestoringSession);
+
 	/**
 	 * Handle keyboard events in the textarea.
 	 */
@@ -593,13 +603,7 @@ export function ChatInput({
 
 				if (shouldSend) {
 					e.preventDefault();
-					// Use same logic as isButtonDisabled: allow sending if images are attached
-					const buttonDisabled =
-						!isSending &&
-						((inputValue.trim() === "" &&
-							attachedImages.length === 0) ||
-							!isSessionReady);
-					if (!buttonDisabled && !isSending) {
+					if (!isButtonDisabled && !isSending) {
 						void handleSendOrStop();
 					}
 				}
@@ -609,11 +613,9 @@ export function ChatInput({
 		[
 			handleDropdownKeyPress,
 			isSending,
-			inputValue,
-			isSessionReady,
+			isButtonDisabled,
 			handleSendOrStop,
 			settings.sendMessageShortcut,
-			attachedImages.length,
 		],
 	);
 
@@ -831,12 +833,6 @@ export function ChatInput({
 		}
 	}, [currentModelId]);
 
-	// Button disabled state - also allow sending if images are attached
-	const isButtonDisabled =
-		!isSending &&
-		((inputValue.trim() === "" && attachedImages.length === 0) ||
-			!isSessionReady);
-
 	// Placeholder text
 	const placeholder = `Message ${agentLabel} - @ to mention notes${availableCommands.length > 0 ? ", / for commands" : ""}`;
 
@@ -962,7 +958,6 @@ export function ChatInput({
 					{/* Mode Selector */}
 					{modes && modes.availableModes.length > 1 && (
 						<div
-							ref={modeDropdownRef}
 							className="agent-client-mode-selector"
 							title={
 								modes.availableModes.find(
@@ -970,6 +965,7 @@ export function ChatInput({
 								)?.description ?? "Select mode"
 							}
 						>
+							<div ref={modeDropdownRef} />
 							<span
 								className="agent-client-mode-selector-icon"
 								ref={(el) => {
@@ -982,7 +978,6 @@ export function ChatInput({
 					{/* Model Selector (experimental) */}
 					{models && models.availableModels.length > 1 && (
 						<div
-							ref={modelDropdownRef}
 							className="agent-client-model-selector"
 							title={
 								models.availableModels.find(
@@ -990,6 +985,7 @@ export function ChatInput({
 								)?.description ?? "Select model"
 							}
 						>
+							<div ref={modelDropdownRef} />
 							<span
 								className="agent-client-model-selector-icon"
 								ref={(el) => {

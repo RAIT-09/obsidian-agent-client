@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect } from "react";
 import type {
 	ChatSession,
 	SessionState,
+	SessionModeState,
+	SessionModelState,
 	SlashCommand,
 	AuthenticationMethod,
 } from "../domain/models/chat-session";
@@ -58,6 +60,17 @@ export interface UseAgentSessionReturn {
 	createSession: () => Promise<void>;
 
 	/**
+	 * Load a previous session by ID.
+	 * Restores conversation context via session/load.
+	 *
+	 * Note: Conversation history is received via session/update notifications
+	 * (user_message_chunk, agent_message_chunk, etc.), not returned from this function.
+	 *
+	 * @param sessionId - ID of the session to load
+	 */
+	loadSession: (sessionId: string) => Promise<void>;
+
+	/**
 	 * Restart the current session.
 	 * Alias for createSession (closes current and creates new).
 	 */
@@ -87,6 +100,19 @@ export interface UseAgentSessionReturn {
 	 * @returns Array of agent info with id and displayName
 	 */
 	getAvailableAgents: () => AgentInfo[];
+
+	/**
+	 * Update session state after loading/resuming/forking a session.
+	 * Called by useSessionHistory after a successful session operation.
+	 * @param sessionId - New session ID
+	 * @param modes - Session modes (optional)
+	 * @param models - Session models (optional)
+	 */
+	updateSessionFromLoad: (
+		sessionId: string,
+		modes?: SessionModeState,
+		models?: SessionModelState,
+	) => void;
 
 	/**
 	 * Callback to update available slash commands.
@@ -327,9 +353,11 @@ export function useAgentSession(
 			availableCommands: undefined,
 			modes: undefined,
 			models: undefined,
-			// Keep promptCapabilities from previous session if same agent
-			// It will be updated if re-initialization is needed
+			// Keep capabilities/info from previous session if same agent
+			// They will be updated if re-initialization is needed
 			promptCapabilities: prev.promptCapabilities,
+			agentCapabilities: prev.agentCapabilities,
+			agentInfo: prev.agentInfo,
 			createdAt: new Date(),
 			lastActivityAt: new Date(),
 		}));
@@ -372,12 +400,35 @@ export function useAgentSession(
 						embeddedContext?: boolean;
 				  }
 				| undefined;
+			let agentCapabilities:
+				| {
+						loadSession?: boolean;
+						mcpCapabilities?: {
+							http?: boolean;
+							sse?: boolean;
+						};
+						promptCapabilities?: {
+							image?: boolean;
+							audio?: boolean;
+							embeddedContext?: boolean;
+						};
+				  }
+				| undefined;
+			let agentInfo:
+				| {
+						name: string;
+						title?: string;
+						version?: string;
+				  }
+				| undefined;
 
 			if (needsInitialize) {
 				// Initialize connection to agent (spawn process + protocol handshake)
 				const initResult = await agentClient.initialize(agentConfig);
 				authMethods = initResult.authMethods;
 				promptCapabilities = initResult.promptCapabilities;
+				agentCapabilities = initResult.agentCapabilities;
+				agentInfo = initResult.agentInfo;
 			}
 
 			// Create new session (lightweight operation)
@@ -392,11 +443,15 @@ export function useAgentSession(
 				authMethods: authMethods,
 				modes: sessionResult.modes,
 				models: sessionResult.models,
-				// Only update promptCapabilities if we re-initialized
+				// Only update capabilities/info if we re-initialized
 				// Otherwise, keep the previous value (from the same agent)
 				promptCapabilities: needsInitialize
 					? promptCapabilities
 					: prev.promptCapabilities,
+				agentCapabilities: needsInitialize
+					? agentCapabilities
+					: prev.agentCapabilities,
+				agentInfo: needsInitialize ? agentInfo : prev.agentInfo,
 				lastActivityAt: new Date(),
 			}));
 		} catch (error) {
@@ -410,6 +465,143 @@ export function useAgentSession(
 			});
 		}
 	}, [agentClient, settingsAccess, workingDirectory]);
+
+	/**
+	 * Load a previous session by ID.
+	 * Restores conversation history and creates a new session for future prompts.
+	 *
+	 * Note: Conversation history is received via session/update notifications
+	 * (user_message_chunk, agent_message_chunk, etc.), not returned from this function.
+	 *
+	 * @param sessionId - ID of the session to load
+	 */
+	const loadSession = useCallback(
+		async (sessionId: string) => {
+			// Get current settings and agent info
+			const settings = settingsAccess.getSnapshot();
+			const activeAgentId = getActiveAgentId(settings);
+			const currentAgent = getCurrentAgent(settings);
+
+			// Reset to initializing state immediately
+			setSession((prev) => ({
+				...prev,
+				sessionId: null,
+				state: "initializing",
+				agentId: activeAgentId,
+				agentDisplayName: currentAgent.displayName,
+				authMethods: [],
+				availableCommands: undefined,
+				modes: undefined,
+				models: undefined,
+				promptCapabilities: prev.promptCapabilities,
+				createdAt: new Date(),
+				lastActivityAt: new Date(),
+			}));
+			setErrorInfo(null);
+
+			try {
+				// Find agent settings
+				const agentSettings = findAgentSettings(
+					settings,
+					activeAgentId,
+				);
+
+				if (!agentSettings) {
+					setSession((prev) => ({ ...prev, state: "error" }));
+					setErrorInfo({
+						title: "Agent Not Found",
+						message: `Agent with ID "${activeAgentId}" not found in settings`,
+						suggestion:
+							"Please check your agent configuration in settings.",
+					});
+					return;
+				}
+
+				// Build AgentConfig with API key injection
+				const agentConfig = buildAgentConfigWithApiKey(
+					settings,
+					agentSettings,
+					activeAgentId,
+					workingDirectory,
+				);
+
+				// Check if initialization is needed
+				const needsInitialize =
+					!agentClient.isInitialized() ||
+					agentClient.getCurrentAgentId() !== activeAgentId;
+
+				let authMethods: AuthenticationMethod[] = [];
+				let promptCapabilities:
+					| {
+							image?: boolean;
+							audio?: boolean;
+							embeddedContext?: boolean;
+					  }
+					| undefined;
+				let agentCapabilities:
+					| {
+							loadSession?: boolean;
+							sessionCapabilities?: {
+								resume?: Record<string, unknown>;
+								fork?: Record<string, unknown>;
+								list?: Record<string, unknown>;
+							};
+							mcpCapabilities?: {
+								http?: boolean;
+								sse?: boolean;
+							};
+							promptCapabilities?: {
+								image?: boolean;
+								audio?: boolean;
+								embeddedContext?: boolean;
+							};
+					  }
+					| undefined;
+
+				if (needsInitialize) {
+					// Initialize connection to agent
+					const initResult =
+						await agentClient.initialize(agentConfig);
+					authMethods = initResult.authMethods;
+					promptCapabilities = initResult.promptCapabilities;
+					agentCapabilities = initResult.agentCapabilities;
+				}
+
+				// Load the session
+				// Conversation history is received via session/update notifications
+				const loadResult = await agentClient.loadSession(
+					sessionId,
+					workingDirectory,
+				);
+
+				// Success - update to ready state with session ID
+				setSession((prev) => ({
+					...prev,
+					sessionId: loadResult.sessionId,
+					state: "ready",
+					authMethods: authMethods,
+					modes: loadResult.modes,
+					models: loadResult.models,
+					promptCapabilities: needsInitialize
+						? promptCapabilities
+						: prev.promptCapabilities,
+					agentCapabilities: needsInitialize
+						? agentCapabilities
+						: prev.agentCapabilities,
+					lastActivityAt: new Date(),
+				}));
+			} catch (error) {
+				// Error - update to error state
+				setSession((prev) => ({ ...prev, state: "error" }));
+				setErrorInfo({
+					title: "Session Loading Failed",
+					message: `Failed to load session: ${error instanceof Error ? error.message : String(error)}`,
+					suggestion: "Please try again or create a new session.",
+				});
+			}
+		},
+		[agentClient, settingsAccess, workingDirectory],
+	);
 
 	/**
 	 * Restart the current session.
@@ -487,13 +679,16 @@ export function useAgentSession(
 			await settingsAccess.updateSettings({ activeAgentId: agentId });
 
 			// Update session with new agent ID
-			// Clear availableCommands, modes, and models (new agent will send its own)
+			// Clear agent-specific data (new agent will send its own)
 			setSession((prev) => ({
 				...prev,
 				agentId,
 				availableCommands: undefined,
 				modes: undefined,
 				models: undefined,
+				promptCapabilities: undefined,
+				agentCapabilities: undefined,
+				agentInfo: undefined,
 			}));
 		},
 		[settingsAccess],
@@ -651,16 +846,40 @@ export function useAgentSession(
 		});
 	}, [agentClient]);
 
+	/**
+	 * Update session state after loading/resuming/forking a session.
+	 * Called by useSessionHistory after a successful session operation.
+	 */
+	const updateSessionFromLoad = useCallback(
+		(
+			sessionId: string,
+			modes?: SessionModeState,
+			models?: SessionModelState,
+		) => {
+			setSession((prev) => ({
+				...prev,
+				sessionId,
+				state: "ready",
+				modes: modes ?? prev.modes,
+				models: models ?? prev.models,
+				lastActivityAt: new Date(),
+			}));
+		},
+		[],
+	);
+
 	return {
 		session,
 		isReady,
 		errorInfo,
 		createSession,
+		loadSession,
 		restartSession,
 		closeSession,
 		cancelOperation,
 		switchAgent,
 		getAvailableAgents,
+		updateSessionFromLoad,
 		updateAvailableCommands,
 		updateCurrentMode,
 		setMode,

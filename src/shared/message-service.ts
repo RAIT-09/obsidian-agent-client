@@ -23,9 +23,11 @@ import type { AuthenticationMethod } from "../domain/models/chat-session";
 import type {
 	PromptContent,
 	ImagePromptContent,
+	ResourcePromptContent,
 } from "../domain/models/prompt-content";
 import { extractMentionedNotes, type IMentionService } from "./mention-utils";
 import { convertWindowsPathToWsl } from "./wsl-utils";
+import { buildFileUri } from "./path-utils";
 
 // ============================================================================
 // Types
@@ -52,6 +54,15 @@ export interface PreparePromptInput {
 
 	/** Whether to convert paths to WSL format (Windows + WSL mode) */
 	convertToWsl?: boolean;
+
+	/** Whether agent supports embeddedContext capability */
+	supportsEmbeddedContext?: boolean;
+
+	/** Maximum characters per mentioned note (default: 10000) */
+	maxNoteLength?: number;
+
+	/** Maximum characters for selection (default: 10000) */
+	maxSelectionLength?: number;
 }
 
 /**
@@ -119,8 +130,8 @@ export interface SendPromptResult {
 // Constants
 // ============================================================================
 
-const MAX_NOTE_LENGTH = 10000; // Maximum characters per note
-const MAX_SELECTION_LENGTH = 10000; // Maximum characters for selection
+const DEFAULT_MAX_NOTE_LENGTH = 10000; // Default maximum characters per note
+const DEFAULT_MAX_SELECTION_LENGTH = 10000; // Default maximum characters for selection
 
 // ============================================================================
 // Prompt Preparation Functions
@@ -133,6 +144,9 @@ const MAX_SELECTION_LENGTH = 10000; // Maximum characters for selection
  * - Building context blocks for mentioned notes
  * - Adding auto-mention context for active note
  * - Creating agent content with context + user message + images
+ *
+ * When agent supports embeddedContext capability, mentioned notes are sent
+ * as Resource content blocks. Otherwise, they are embedded as XML text.
  */
 export async function preparePrompt(
 	input: PreparePromptInput,
@@ -142,9 +156,32 @@ export async function preparePrompt(
 	// Step 1: Extract all mentioned notes from the message
 	const mentionedNotes = extractMentionedNotes(input.message, mentionService);
 
-	// Step 2: Build context blocks for each mentioned note
-	const contextBlocks: string[] = [];
+	// Step 2: Build context based on agent capabilities
+	if (input.supportsEmbeddedContext) {
+		return preparePromptWithEmbeddedContext(
+			input,
+			vaultAccess,
+			mentionedNotes,
+		);
+	} else {
+		return preparePromptWithTextContext(input, vaultAccess, mentionedNotes);
+	}
+}
 
+/**
+ * Prepare prompt using embedded Resource format (for embeddedContext-capable agents).
+ */
+async function preparePromptWithEmbeddedContext(
+	input: PreparePromptInput,
+	vaultAccess: IVaultAccess,
+	mentionedNotes: Array<{
+		noteTitle: string;
+		file: { path: string; stat: { mtime: number } } | undefined;
+	}>,
+): Promise<PreparePromptResult> {
+	const resourceBlocks: ResourcePromptContent[] = [];
+
+	// Build Resource blocks for each mentioned note
 	for (const { file } of mentionedNotes) {
 		if (!file) {
 			continue;
@@ -152,13 +189,13 @@ export async function preparePrompt(
 
 		try {
 			const content = await vaultAccess.readNote(file.path);
+			const maxNoteLen = input.maxNoteLength ?? DEFAULT_MAX_NOTE_LENGTH;
 
 			let processedContent = content;
-			let truncationNote = "";
-
-			if (content.length > MAX_NOTE_LENGTH) {
-				processedContent = content.substring(0, MAX_NOTE_LENGTH);
-				truncationNote = `\n\n[Note: This note was truncated. Original length: ${content.length} characters, showing first ${MAX_NOTE_LENGTH} characters]`;
+			if (content.length > maxNoteLen) {
+				processedContent =
+					content.substring(0, maxNoteLen) +
+					`\n\n[Note: Truncated from ${content.length} to ${maxNoteLen} characters]`;
 			}
 
 			let absolutePath = input.vaultBasePath
@@ -169,34 +206,38 @@ export async function preparePrompt(
 				absolutePath = convertWindowsPathToWsl(absolutePath);
 			}
 
-			const contextBlock = `<obsidian_mentioned_note ref="${absolutePath}">\n${processedContent}${truncationNote}\n</obsidian_mentioned_note>`;
-			contextBlocks.push(contextBlock);
+			resourceBlocks.push({
+				type: "resource",
+				resource: {
+					uri: buildFileUri(absolutePath),
+					mimeType: "text/markdown",
+					text: processedContent,
+				},
+				annotations: {
+					audience: ["assistant"],
+					priority: 1.0, // Manual mentions are high priority
+					lastModified: new Date(file.stat.mtime).toISOString(),
+				},
+			});
 		} catch (error) {
 			console.error(`Failed to read note ${file.path}:`, error);
 		}
 	}
 
-	// Step 3: Build context from active note (for agent only)
+	// Build auto-mention Resource block
+	const autoMentionBlocks: PromptContent[] = [];
 	if (input.activeNote && !input.isAutoMentionDisabled) {
-		const autoMentionContextBlock = await buildAutoMentionContext(
-			input.activeNote.path,
+		const autoMentionResource = await buildAutoMentionResource(
+			input.activeNote,
 			input.vaultBasePath,
 			vaultAccess,
 			input.convertToWsl ?? false,
-			input.activeNote.selection,
+			input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
 		);
-		contextBlocks.push(autoMentionContextBlock);
+		autoMentionBlocks.push(...autoMentionResource);
 	}
 
-	// Step 4: Build agent message text (context blocks + original message)
-	const agentMessageText =
-		contextBlocks.length > 0
-			? contextBlocks.join("\n") + "\n\n" + input.message
-			: input.message;
-
-	// Step 5: Build content arrays
-	// Only include text block if there's actual text content
-	// (API rejects empty text blocks)
+	// Build content arrays
 	const displayContent: PromptContent[] = [
 		...(input.message
 			? [{ type: "text" as const, text: input.message }]
@@ -204,14 +245,30 @@ export async function preparePrompt(
 		...(input.images || []),
 	];
 
+	// Build auto-mention prefix for session/load recovery
+	// This allows @[[note]] to be restored when loading a saved session
+	const autoMentionPrefix =
+		input.activeNote && !input.isAutoMentionDisabled
+			? input.activeNote.selection
+				? `@[[${input.activeNote.name}]]:${input.activeNote.selection.from.line + 1}-${input.activeNote.selection.to.line + 1}\n`
+				: `@[[${input.activeNote.name}]]\n`
+			: "";
+
 	const agentContent: PromptContent[] = [
-		...(agentMessageText
-			? [{ type: "text" as const, text: agentMessageText }]
+		...resourceBlocks,
+		...autoMentionBlocks,
+		...(input.message || autoMentionPrefix
+			? [
+					{
+						type: "text" as const,
+						text: autoMentionPrefix + input.message,
+					},
+				]
 			: []),
 		...(input.images || []),
 	];
 
-	// Step 6: Build auto-mention context metadata
+	// Build auto-mention context metadata for UI
 	const autoMentionContext =
 		input.activeNote && !input.isAutoMentionDisabled
 			? {
@@ -235,17 +292,214 @@ export async function preparePrompt(
 }
 
 /**
- * Build context from auto-mentioned note.
+ * Prepare prompt using XML text format (fallback for agents without embeddedContext).
  */
-async function buildAutoMentionContext(
+async function preparePromptWithTextContext(
+	input: PreparePromptInput,
+	vaultAccess: IVaultAccess,
+	mentionedNotes: Array<{
+		noteTitle: string;
+		file: { path: string; stat: { mtime: number } } | undefined;
+	}>,
+): Promise<PreparePromptResult> {
+	const contextBlocks: string[] = [];
+
+	// Build XML context blocks for each mentioned note
+	for (const { file } of mentionedNotes) {
+		if (!file) {
+			continue;
+		}
+
+		try {
+			const content = await vaultAccess.readNote(file.path);
+			const maxNoteLen = input.maxNoteLength ?? DEFAULT_MAX_NOTE_LENGTH;
+
+			let processedContent = content;
+			let truncationNote = "";
+
+			if (content.length > maxNoteLen) {
+				processedContent = content.substring(0, maxNoteLen);
+				truncationNote = `\n\n[Note: This note was truncated. Original length: ${content.length} characters, showing first ${maxNoteLen} characters]`;
+			}
+
+			let absolutePath = input.vaultBasePath
+				? `${input.vaultBasePath}/${file.path}`
+				: file.path;
+
+			if (input.convertToWsl) {
+				absolutePath = convertWindowsPathToWsl(absolutePath);
+			}
+
+			const contextBlock = `<obsidian_mentioned_note ref="${absolutePath}">\n${processedContent}${truncationNote}\n</obsidian_mentioned_note>`;
+			contextBlocks.push(contextBlock);
+		} catch (error) {
+			console.error(`Failed to read note ${file.path}:`, error);
+		}
+	}
+
+	// Build auto-mention XML context
+	if (input.activeNote && !input.isAutoMentionDisabled) {
+		const autoMentionContextBlock = await buildAutoMentionTextContext(
+			input.activeNote.path,
+			input.vaultBasePath,
+			vaultAccess,
+			input.convertToWsl ?? false,
+			input.activeNote.selection,
+			input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
+		);
+		contextBlocks.push(autoMentionContextBlock);
+	}
+
+	// Build auto-mention prefix for session/load recovery
+	// This allows @[[note]] to be restored when loading a saved session
+	const autoMentionPrefix =
+		input.activeNote && !input.isAutoMentionDisabled
+			? input.activeNote.selection
+				? `@[[${input.activeNote.name}]]:${input.activeNote.selection.from.line + 1}-${input.activeNote.selection.to.line + 1}\n`
+				: `@[[${input.activeNote.name}]]\n`
+			: "";
+
+	// Build agent message text (context blocks + auto-mention prefix + original message)
+	const agentMessageText =
+		contextBlocks.length > 0
+			? contextBlocks.join("\n") +
+				"\n\n" +
+				autoMentionPrefix +
+				input.message
+			: autoMentionPrefix + input.message;
+
+	// Build content arrays
+	const displayContent: PromptContent[] = [
+		...(input.message
+			? [{ type: "text" as const, text: input.message }]
+			: []),
+		...(input.images || []),
+	];
+
+	const agentContent: PromptContent[] = [
+		...(agentMessageText
+			? [{ type: "text" as const, text: agentMessageText }]
+			: []),
+		...(input.images || []),
+	];
+
+	// Build auto-mention context metadata for UI
+	const autoMentionContext =
+		input.activeNote && !input.isAutoMentionDisabled
+			? {
+					noteName: input.activeNote.name,
+					notePath: input.activeNote.path,
+					selection: input.activeNote.selection
+						? {
+								fromLine:
+									input.activeNote.selection.from.line + 1,
+								toLine: input.activeNote.selection.to.line + 1,
+							}
+						: undefined,
+				}
+			: undefined;
+
+	return {
+		displayContent,
+		agentContent,
+		autoMentionContext,
+	};
+}
+
+/**
+ * Build Resource content blocks for auto-mentioned note.
+ */
+async function buildAutoMentionResource(
+	activeNote: NoteMetadata,
+	vaultPath: string,
+	vaultAccess: IVaultAccess,
+	convertToWsl: boolean,
+	maxSelectionLength: number,
+): Promise<PromptContent[]> {
+	let absolutePath = vaultPath
+		? `${vaultPath}/${activeNote.path}`
+		: activeNote.path;
+
+	if (convertToWsl) {
+		absolutePath = convertWindowsPathToWsl(absolutePath);
+	}
+
+	const uri = buildFileUri(absolutePath);
+
+	if (activeNote.selection) {
+		// Selection exists - send the selected content as a Resource
+		const fromLine = activeNote.selection.from.line + 1;
+		const toLine = activeNote.selection.to.line + 1;
+
+		try {
+			const content = await vaultAccess.readNote(activeNote.path);
+			const lines = content.split("\n");
+			const selectedLines = lines.slice(
+				activeNote.selection.from.line,
+				activeNote.selection.to.line + 1,
+			);
+			let selectedText = selectedLines.join("\n");
+
+			if (selectedText.length > maxSelectionLength) {
+				selectedText =
+					selectedText.substring(0, maxSelectionLength) +
+					`\n\n[Note: Truncated from ${selectedLines.join("\n").length} to ${maxSelectionLength} characters]`;
+			}
+
+			return [
+				{
+					type: "resource",
+					resource: {
+						uri: uri,
+						mimeType: "text/markdown",
+						text: selectedText,
+					},
+					annotations: {
+						audience: ["assistant"],
+						priority: 0.8, // Selection is high priority
+						lastModified: new Date(
+							activeNote.modified,
+						).toISOString(),
+					},
+				} as ResourcePromptContent,
+				{
+					type: "text",
+					text: `The user has selected lines ${fromLine}-${toLine} in the above note. This is what they are currently focusing on.`,
+				},
+			];
+		} catch (error) {
+			console.error(
+				`Failed to read selection from ${activeNote.path}:`,
+				error,
+			);
+			return [
+				{
+					type: "text",
+					text: `The user has selected lines ${fromLine}-${toLine} in ${uri}. If relevant, use the Read tool to examine the specific lines.`,
+				},
+			];
+		}
+	}
+
+	// No selection - just inform about the opened note
+	return [
+		{
+			type: "text",
+			text: `The user has opened the note ${uri} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine its content.`,
+		},
+	];
+}
+
+/**
+ * Build XML text context from auto-mentioned note (fallback format).
+ */
+async function buildAutoMentionTextContext(
 	notePath: string,
 	vaultPath: string,
 	vaultAccess: IVaultAccess,
 	convertToWsl: boolean,
-	selection?: {
-		from: EditorPosition;
-		to: EditorPosition;
-	},
+	selection: { from: EditorPosition; to: EditorPosition } | undefined,
+	maxSelectionLength: number,
 ): Promise<string> {
 	let absolutePath = vaultPath ? `${vaultPath}/${notePath}` : notePath;
 
@@ -267,9 +521,9 @@ async function buildAutoMentionContext(
 			let selectedText = selectedLines.join("\n");
 
 			let truncationNote = "";
-			if (selectedText.length > MAX_SELECTION_LENGTH) {
-				selectedText = selectedText.substring(0, MAX_SELECTION_LENGTH);
-				truncationNote = `\n\n[Note: The selection was truncated. Original length: ${selectedLines.join("\n").length} characters, showing first ${MAX_SELECTION_LENGTH} characters]`;
+			if (selectedText.length > maxSelectionLength) {
+				selectedText = selectedText.substring(0, maxSelectionLength);
+				truncationNote = `\n\n[Note: The selection was truncated. Original length: ${selectedLines.join("\n").length} characters, showing first ${maxSelectionLength} characters]`;
 			}
 
 			return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">

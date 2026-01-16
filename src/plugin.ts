@@ -20,6 +20,7 @@ import {
 	CodexAgentSettings,
 	CustomAgentSettings,
 } from "./domain/models/agent-config";
+import type { SavedSessionInfo } from "./domain/models/session-info";
 
 // Re-export for backward compatibility
 export type { AgentEnvVar, CustomAgentSettings };
@@ -56,6 +57,15 @@ export interface AgentClientPluginSettings {
 	windowsWslDistribution?: string;
 	// Input behavior
 	sendMessageShortcut: SendMessageShortcut;
+	// Display settings
+	displaySettings: {
+		autoCollapseDiffs: boolean;
+		diffCollapseThreshold: number;
+		maxNoteLength: number;
+		maxSelectionLength: number;
+	};
+	// Locally saved session metadata (for agents without session/list support)
+	savedSessions: SavedSessionInfo[];
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -102,6 +112,13 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	windowsWslMode: false,
 	windowsWslDistribution: undefined,
 	sendMessageShortcut: "enter",
+	displaySettings: {
+		autoCollapseDiffs: false,
+		diffCollapseThreshold: 10,
+		maxNoteLength: 10000,
+		maxSelectionLength: 10000,
+	},
+	savedSessions: [],
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -514,6 +531,43 @@ export default class AgentClientPlugin extends Plugin {
 				rawSettings.sendMessageShortcut === "cmd-enter"
 					? rawSettings.sendMessageShortcut
 					: DEFAULT_SETTINGS.sendMessageShortcut,
+			displaySettings: (() => {
+				const rawDisplay = rawSettings.displaySettings as
+					| Record<string, unknown>
+					| null
+					| undefined;
+				if (rawDisplay && typeof rawDisplay === "object") {
+					return {
+						autoCollapseDiffs:
+							typeof rawDisplay.autoCollapseDiffs === "boolean"
+								? rawDisplay.autoCollapseDiffs
+								: DEFAULT_SETTINGS.displaySettings
+										.autoCollapseDiffs,
+						diffCollapseThreshold:
+							typeof rawDisplay.diffCollapseThreshold ===
+								"number" && rawDisplay.diffCollapseThreshold > 0
+								? rawDisplay.diffCollapseThreshold
+								: DEFAULT_SETTINGS.displaySettings
+										.diffCollapseThreshold,
+						maxNoteLength:
+							typeof rawDisplay.maxNoteLength === "number" &&
+							rawDisplay.maxNoteLength >= 1
+								? rawDisplay.maxNoteLength
+								: DEFAULT_SETTINGS.displaySettings
+										.maxNoteLength,
+						maxSelectionLength:
+							typeof rawDisplay.maxSelectionLength === "number" &&
+							rawDisplay.maxSelectionLength >= 1
+								? rawDisplay.maxSelectionLength
+								: DEFAULT_SETTINGS.displaySettings
+										.maxSelectionLength,
+					};
+				}
+				return DEFAULT_SETTINGS.displaySettings;
+			})(),
+			savedSessions: Array.isArray(rawSettings.savedSessions)
+				? (rawSettings.savedSessions as SavedSessionInfo[])
+				: DEFAULT_SETTINGS.savedSessions,
 		};
 
 		this.ensureActiveAgentId();

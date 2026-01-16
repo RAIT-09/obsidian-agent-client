@@ -15,6 +15,12 @@ import type {
 import type { SessionUpdate } from "../../domain/models/session-update";
 import type { PromptContent } from "../../domain/models/prompt-content";
 import type { AgentError } from "../../domain/models/agent-error";
+import type {
+	ListSessionsResult,
+	LoadSessionResult,
+	ResumeSessionResult,
+	ForkSessionResult,
+} from "../../domain/models/session-info";
 import { AcpTypeConverter } from "./acp-type-converter";
 import { TerminalManager } from "../../shared/terminal-manager";
 import { Logger } from "../../shared/logger";
@@ -426,6 +432,11 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 					},
 					terminal: true,
 				},
+				clientInfo: {
+					name: "obsidian-agent-client",
+					title: "Agent Client for Obsidian",
+					version: this.plugin.manifest.version,
+				},
 			});
 
 			this.logger.log(
@@ -444,17 +455,53 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			this.isInitializedFlag = true;
 			this.currentAgentId = config.id;
 
-			// Extract prompt capabilities from agent capabilities
+			// Extract capabilities from agent capabilities
 			const promptCaps = initResult.agentCapabilities?.promptCapabilities;
+			const mcpCaps = initResult.agentCapabilities?.mcpCapabilities;
+			const sessionCaps =
+				initResult.agentCapabilities?.sessionCapabilities;
 
 			return {
 				protocolVersion: initResult.protocolVersion,
 				authMethods: initResult.authMethods || [],
+				// Convenience accessor for prompt capabilities
 				promptCapabilities: {
 					image: promptCaps?.image ?? false,
 					audio: promptCaps?.audio ?? false,
 					embeddedContext: promptCaps?.embeddedContext ?? false,
 				},
+				// Full agent capabilities
+				agentCapabilities: {
+					loadSession:
+						initResult.agentCapabilities?.loadSession ?? false,
+					// Session capabilities (unstable features)
+					sessionCapabilities: sessionCaps
+						? {
+								resume: sessionCaps.resume ?? undefined,
+								fork: sessionCaps.fork ?? undefined,
+								list: sessionCaps.list ?? undefined,
+							}
+						: undefined,
+					mcpCapabilities: mcpCaps
+						? {
+								http: mcpCaps.http ?? false,
+								sse: mcpCaps.sse ?? false,
+							}
+						: undefined,
+					promptCapabilities: {
+						image: promptCaps?.image ?? false,
+						audio: promptCaps?.audio ?? false,
+						embeddedContext: promptCaps?.embeddedContext ?? false,
+					},
+				},
+				// Agent implementation info
+				agentInfo: initResult.agentInfo
+					? {
+							name: initResult.agentInfo.name,
+							title: initResult.agentInfo.title ?? undefined,
+							version: initResult.agentInfo.version ?? undefined,
+						}
+					: undefined,
 			};
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Initialization Error:", error);
@@ -920,6 +967,18 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				}
 				break;
 
+			case "user_message_chunk":
+				// Used for session/load to reconstruct user messages
+				if (update.content.type === "text") {
+					this.sessionUpdateCallback?.({
+						type: "user_message_chunk",
+						sessionId,
+						text: update.content.text,
+					});
+				}
+				// Note: image, resource etc. ContentBlock types are not yet supported
+				break;
+
 			case "tool_call":
 			case "tool_call_update": {
 				this.sessionUpdateCallback?.({
@@ -1259,5 +1318,267 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			);
 		}
 		return Promise.resolve({});
+	}
+
+	// ========================================================================
+	// Session Management Methods
+	// ========================================================================
+
+	/**
+	 * List available sessions (unstable).
+	 *
+	 * Only available if session.agentCapabilities.sessionCapabilities?.list is defined.
+	 *
+	 * @param cwd - Optional filter by working directory
+	 * @param cursor - Pagination cursor from previous call
+	 * @returns Promise resolving to sessions array and optional next cursor
+	 */
+	async listSessions(
+		cwd?: string,
+		cursor?: string,
+	): Promise<ListSessionsResult> {
+		if (!this.connection) {
+			throw new Error(
+				"ACP connection not initialized. Call initialize() first.",
+			);
+		}
+
+		try {
+			this.logger.log("[AcpAdapter] Listing sessions...");
+
+			const response = await this.connection.unstable_listSessions({
+				cwd: cwd ?? null,
+				cursor: cursor ?? null,
+			});
+
+			this.logger.log(
+				`[AcpAdapter] Found ${response.sessions.length} sessions`,
+			);
+
+			return {
+				sessions: response.sessions.map((s) => ({
+					sessionId: s.sessionId,
+					cwd: s.cwd,
+					title: s.title ?? undefined,
+					updatedAt: s.updatedAt ?? undefined,
+				})),
+				nextCursor: response.nextCursor ?? undefined,
+			};
+		} catch (error) {
+			this.logger.error("[AcpAdapter] List Sessions Error:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Load a previous session with history replay (stable).
+	 *
+	 * Conversation history is received via onSessionUpdate callback
+	 * as user_message_chunk, agent_message_chunk, tool_call, etc.
+	 *
+	 * @param sessionId - Session to load
+	 * @param cwd - Working directory
+	 * @returns Promise resolving to session result with modes and models
+	 */
+	async loadSession(
+		sessionId: string,
+		cwd: string,
+	): Promise<LoadSessionResult> {
+		if (!this.connection) {
+			throw new Error(
+				"ACP connection not initialized. Call initialize() first.",
+			);
+		}
+
+		try {
+			this.logger.log(`[AcpAdapter] Loading session: ${sessionId}...`);
+
+			const response = await this.connection.loadSession({
+				sessionId,
+				cwd,
+				mcpServers: [],
+			});
+
+			// Conversation history is received via session/update notifications
+			// (user_message_chunk, agent_message_chunk, tool_call, etc.)
+			// and handled by the onSessionUpdate callback
+
+			this.logger.log(`[AcpAdapter] Session loaded: ${sessionId}`);
+
+			// Convert modes/models to domain types
+			let modes: SessionModeState | undefined;
+			if (response.modes) {
+				modes = {
+					availableModes: response.modes.availableModes.map((m) => ({
+						id: m.id,
+						name: m.name,
+						description: m.description ?? undefined,
+					})),
+					currentModeId: response.modes.currentModeId,
+				};
+			}
+
+			let models: SessionModelState | undefined;
+			if (response.models) {
+				models = {
+					availableModels: response.models.availableModels.map(
+						(m) => ({
+							modelId: m.modelId,
+							name: m.name,
+							description: m.description ?? undefined,
+						}),
+					),
+					currentModelId: response.models.currentModelId,
+				};
+			}
+
+			return {
+				sessionId,
+				modes,
+				models,
+			};
+		} catch (error) {
+			this.logger.error("[AcpAdapter] Load Session Error:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Resume a session without history replay (unstable).
+	 *
+	 * Use when client manages its own history storage.
+	 *
+	 * @param sessionId - Session to resume
+	 * @param cwd - Working directory
+	 * @returns Promise resolving to session result with modes and models
+	 */
+	async resumeSession(
+		sessionId: string,
+		cwd: string,
+	): Promise<ResumeSessionResult> {
+		if (!this.connection) {
+			throw new Error(
+				"ACP connection not initialized. Call initialize() first.",
+			);
+		}
+
+		try {
+			this.logger.log(`[AcpAdapter] Resuming session: ${sessionId}...`);
+
+			const response = await this.connection.unstable_resumeSession({
+				sessionId,
+				cwd,
+				mcpServers: [],
+			});
+
+			this.logger.log(`[AcpAdapter] Session resumed: ${sessionId}`);
+
+			// Convert modes/models to domain types
+			let modes: SessionModeState | undefined;
+			if (response.modes) {
+				modes = {
+					availableModes: response.modes.availableModes.map((m) => ({
+						id: m.id,
+						name: m.name,
+						description: m.description ?? undefined,
+					})),
+					currentModeId: response.modes.currentModeId,
+				};
+			}
+
+			let models: SessionModelState | undefined;
+			if (response.models) {
+				models = {
+					availableModels: response.models.availableModels.map(
+						(m) => ({
+							modelId: m.modelId,
+							name: m.name,
+							description: m.description ?? undefined,
+						}),
+					),
+					currentModelId: response.models.currentModelId,
+				};
+			}
+
+			return {
+				sessionId,
+				modes,
+				models,
+			};
+		} catch (error) {
+			this.logger.error("[AcpAdapter] Resume Session Error:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Fork a session to create a new branch (unstable).
+	 *
+	 * Creates a new session with inherited context from the original.
+	 *
+	 * @param sessionId - Session to fork from
+	 * @param cwd - Working directory
+	 * @returns Promise resolving to session result with new sessionId
+	 */
+	async forkSession(
+		sessionId: string,
+		cwd: string,
+	): Promise<ForkSessionResult> {
+		if (!this.connection) {
+			throw new Error(
+				"ACP connection not initialized. Call initialize() first.",
+			);
+		}
+
+		try {
+			this.logger.log(`[AcpAdapter] Forking session: ${sessionId}...`);
+
+			const response = await this.connection.unstable_forkSession({
+				sessionId,
+				cwd,
+				mcpServers: [],
+			});
+
+			const newSessionId = response.sessionId;
+			this.logger.log(
+				`[AcpAdapter] Session forked: ${sessionId} -> ${newSessionId}`,
+			);
+
+			// Convert modes/models to domain types
+			let modes: SessionModeState | undefined;
+			if (response.modes) {
+				modes = {
+					availableModes: response.modes.availableModes.map((m) => ({
+						id: m.id,
+						name: m.name,
+						description: m.description ?? undefined,
+					})),
+					currentModeId: response.modes.currentModeId,
+				};
+			}
+
+			let models: SessionModelState | undefined;
+			if (response.models) {
+				models = {
+					availableModels: response.models.availableModels.map(
+						(m) => ({
+							modelId: m.modelId,
+							name: m.name,
+							description: m.description ?? undefined,
+						}),
+					),
+					currentModelId: response.models.currentModelId,
+				};
+			}
+
+			return {
+				sessionId: newSessionId,
+				modes,
+				models,
+			};
+		} catch (error) {
+			this.logger.error("[AcpAdapter] Fork Session Error:", error);
+			throw error;
+		}
 	}
 }

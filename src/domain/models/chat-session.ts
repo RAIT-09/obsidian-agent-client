@@ -213,11 +213,46 @@ export interface ChatSession {
 	 * Prompt capabilities supported by the agent.
 	 * Indicates which content types (image, audio, etc.) can be included in prompts.
 	 * Set during initialization and persists for the session lifetime.
+	 * (Convenience accessor - same as agentCapabilities.promptCapabilities)
 	 */
 	promptCapabilities?: {
 		image?: boolean;
 		audio?: boolean;
 		embeddedContext?: boolean;
+	};
+
+	/**
+	 * Full agent capabilities from initialization.
+	 * Contains loadSession, sessionCapabilities, mcpCapabilities, and promptCapabilities.
+	 * Set during initialization and persists for the session lifetime.
+	 */
+	agentCapabilities?: {
+		loadSession?: boolean;
+		sessionCapabilities?: {
+			resume?: Record<string, unknown>;
+			fork?: Record<string, unknown>;
+			list?: Record<string, unknown>;
+		};
+		mcpCapabilities?: {
+			http?: boolean;
+			sse?: boolean;
+		};
+		promptCapabilities?: {
+			image?: boolean;
+			audio?: boolean;
+			embeddedContext?: boolean;
+		};
+	};
+
+	/**
+	 * Information about the connected agent.
+	 * Contains agent name, title, and version.
+	 * Set during initialization and persists for the session lifetime.
+	 */
+	agentInfo?: {
+		name: string;
+		title?: string;
+		version?: string;
 	};
 
 	/** Timestamp when the session was created */

@@ -37,3 +37,27 @@ export function toRelativePath(absolutePath: string, basePath: string): string {
 	}
 	return absolutePath;
 }
+
+/**
+ * Build a file URI from an absolute path.
+ * Handles both Windows and Unix paths.
+ *
+ * @param absolutePath - Absolute file path
+ * @returns file:// URI
+ *
+ * @example
+ * buildFileUri("/Users/user/note.md") // "file:///Users/user/note.md"
+ * buildFileUri("C:\\Users\\user\\note.md") // "file:///C:/Users/user/note.md"
+ */
+export function buildFileUri(absolutePath: string): string {
+	// Normalize backslashes to forward slashes
+	const normalizedPath = absolutePath.replace(/\\/g, "/");
+
+	// Windows path (e.g., C:/Users/...)
+	if (/^[A-Za-z]:/.test(normalizedPath)) {
+		return `file:///${normalizedPath}`;
+	}
+
+	// Unix path (e.g., /Users/...)
+	return `file://${normalizedPath}`;
+}

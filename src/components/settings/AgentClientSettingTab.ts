@@ -42,6 +42,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		});
 		docContainer.createSpan({ text: "." });
 
+		// ─────────────────────────────────────────────────────────────────────
+		// Top-level settings (no header)
+		// ─────────────────────────────────────────────────────────────────────
+
 		this.renderAgentSelector(containerEl);
 
 		// Subscribe to settings changes to update agent dropdown
@@ -67,34 +71,6 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(containerEl)
-			.setName("Auto-allow permissions")
-			.setDesc(
-				"Automatically allow all permission requests from agents. ⚠️ Use with caution - this gives agents full access to your system.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.autoAllowPermissions)
-					.onChange(async (value) => {
-						this.plugin.settings.autoAllowPermissions = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Auto-mention active note")
-			.setDesc(
-				"Include the current note in your messages automatically. The agent will have access to its content without typing @notename.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.autoMentionActiveNote)
-					.onChange(async (value) => {
-						this.plugin.settings.autoMentionActiveNote = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
 			.setName("Send message shortcut")
 			.setDesc(
 				"Choose the keyboard shortcut to send messages. Note: If using Cmd/Ctrl+Enter, you may need to remove any hotkeys assigned to Cmd/Ctrl+Enter (Settings → Hotkeys).",
@@ -118,7 +94,147 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		// ─────────────────────────────────────────────────────────────────────
+		// Mentions
+		// ─────────────────────────────────────────────────────────────────────
+
+		new Setting(containerEl).setName("Mentions").setHeading();
+
+		new Setting(containerEl)
+			.setName("Auto-mention active note")
+			.setDesc(
+				"Include the current note in your messages automatically. The agent will have access to its content without typing @notename.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoMentionActiveNote)
+					.onChange(async (value) => {
+						this.plugin.settings.autoMentionActiveNote = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Max note length")
+			.setDesc(
+				"Maximum characters per mentioned note. Notes longer than this will be truncated.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("10000")
+					.setValue(
+						String(
+							this.plugin.settings.displaySettings.maxNoteLength,
+						),
+					)
+					.onChange(async (value) => {
+						const num = parseInt(value, 10);
+						if (!isNaN(num) && num >= 1) {
+							this.plugin.settings.displaySettings.maxNoteLength =
+								num;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Max selection length")
+			.setDesc(
+				"Maximum characters for text selection in auto-mention. Selections longer than this will be truncated.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("10000")
+					.setValue(
+						String(
+							this.plugin.settings.displaySettings
+								.maxSelectionLength,
+						),
+					)
+					.onChange(async (value) => {
+						const num = parseInt(value, 10);
+						if (!isNaN(num) && num >= 1) {
+							this.plugin.settings.displaySettings.maxSelectionLength =
+								num;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
+		// ─────────────────────────────────────────────────────────────────────
+		// Display
+		// ─────────────────────────────────────────────────────────────────────
+
+		new Setting(containerEl).setName("Display").setHeading();
+
+		new Setting(containerEl)
+			.setName("Auto-collapse long diffs")
+			.setDesc(
+				"Automatically collapse diffs that exceed the line threshold.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(
+						this.plugin.settings.displaySettings.autoCollapseDiffs,
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.displaySettings.autoCollapseDiffs =
+							value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (this.plugin.settings.displaySettings.autoCollapseDiffs) {
+			new Setting(containerEl)
+				.setName("Collapse threshold")
+				.setDesc(
+					"Diffs with more lines than this will be collapsed by default.",
+				)
+				.addText((text) =>
+					text
+						.setPlaceholder("10")
+						.setValue(
+							String(
+								this.plugin.settings.displaySettings
+									.diffCollapseThreshold,
+							),
+						)
+						.onChange(async (value) => {
+							const num = parseInt(value, 10);
+							if (!isNaN(num) && num > 0) {
+								this.plugin.settings.displaySettings.diffCollapseThreshold =
+									num;
+								await this.plugin.saveSettings();
+							}
+						}),
+				);
+		}
+
+		// ─────────────────────────────────────────────────────────────────────
+		// Permissions
+		// ─────────────────────────────────────────────────────────────────────
+
+		new Setting(containerEl).setName("Permissions").setHeading();
+
+		new Setting(containerEl)
+			.setName("Auto-allow permissions")
+			.setDesc(
+				"Automatically allow all permission requests from agents. ⚠️ Use with caution - this gives agents full access to your system.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoAllowPermissions)
+					.onChange(async (value) => {
+						this.plugin.settings.autoAllowPermissions = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		// ─────────────────────────────────────────────────────────────────────
 		// Windows WSL Settings (Windows only)
+		// ─────────────────────────────────────────────────────────────────────
+
 		if (Platform.isWin) {
 			new Setting(containerEl)
 				.setName("Windows Subsystem for Linux")
@@ -161,6 +277,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			}
 		}
 
+		// ─────────────────────────────────────────────────────────────────────
+		// Agents
+		// ─────────────────────────────────────────────────────────────────────
+
 		new Setting(containerEl).setName("Built-in agents").setHeading();
 
 		this.renderClaudeSettings(containerEl);
@@ -170,6 +290,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName("Custom agents").setHeading();
 
 		this.renderCustomAgents(containerEl);
+
+		// ─────────────────────────────────────────────────────────────────────
+		// Export
+		// ─────────────────────────────────────────────────────────────────────
 
 		new Setting(containerEl).setName("Export").setHeading();
 
@@ -318,6 +442,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}),
 			);
+
+		// ─────────────────────────────────────────────────────────────────────
+		// Developer
+		// ─────────────────────────────────────────────────────────────────────
 
 		new Setting(containerEl).setName("Developer").setHeading();
 

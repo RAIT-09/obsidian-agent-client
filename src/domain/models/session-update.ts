@@ -55,6 +55,15 @@ export interface AgentThoughtChunk extends SessionUpdateBase {
 }
 
 /**
+ * Text chunk from user's message during session/load.
+ * Used for reconstructing user messages when loading a saved session.
+ */
+export interface UserMessageChunk extends SessionUpdateBase {
+	type: "user_message_chunk";
+	text: string;
+}
+
+/**
  * New tool call event.
  * Creates a new tool call in the message history.
  */
@@ -134,14 +143,12 @@ export interface CurrentModeUpdate extends SessionUpdateBase {
  * These types correspond to ACP's SessionNotification.update.sessionUpdate values:
  * - agent_message_chunk: Text chunk from agent's response
  * - agent_thought_chunk: Text chunk from agent's reasoning
+ * - user_message_chunk: Text chunk from user's message (session/load)
  * - tool_call: New tool call event
  * - tool_call_update: Update to existing tool call
  * - plan: Agent's task plan
  * - available_commands_update: Slash commands changed
  * - current_mode_update: Mode changed
- *
- * Note: user_message_chunk is not included as it's not typically processed
- * by the client in the same way (user messages are handled directly).
  *
  * All session update types include a sessionId field to identify which
  * session the update belongs to. This enables filtering/routing of updates
@@ -150,6 +157,7 @@ export interface CurrentModeUpdate extends SessionUpdateBase {
 export type SessionUpdate =
 	| AgentMessageChunk
 	| AgentThoughtChunk
+	| UserMessageChunk
 	| ToolCall
 	| ToolCallUpdate
 	| Plan

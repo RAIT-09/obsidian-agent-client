@@ -28,7 +28,7 @@ Permission options vary by agent. Some agents may not request permission at all 
 
 ### Auto-Allow Permissions
 
-In **Settings → Agent Client → Auto-allow permissions**, you can automatically allow all permission requests from agents.
+In **Settings → Agent Client → Permissions → Auto-allow permissions**, you can automatically allow all permission requests from agents.
 
 ::: warning
 Use with caution—this gives agents full access to your system without confirmation prompts.
@@ -41,6 +41,19 @@ The chat displays file changes with:
 - **File path**: Which file was modified
 - **Diff view**: What was added/removed (when available)
 - **Status**: Success or failure of the operation
+
+### Auto-Collapse Long Diffs
+
+Large diffs can be automatically collapsed to keep the chat readable. This feature is **disabled by default**.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| **Auto-collapse long diffs** | Off | Enable automatic collapsing of large diffs |
+| **Collapse threshold** | 10 lines | Diffs exceeding this line count are collapsed |
+
+Configure these in **Settings → Agent Client → Display**.
+
+Collapsed diffs can be expanded by clicking on them.
 
 ## Best Practices
 

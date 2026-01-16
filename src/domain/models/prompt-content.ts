@@ -29,6 +29,44 @@ export interface ImagePromptContent {
 }
 
 /**
+ * Annotations for resource content (ACP spec compliant)
+ *
+ * Provides hints to the agent about how to use or prioritize the resource.
+ */
+export interface ResourceAnnotations {
+	/** Intended audience(s) for this resource */
+	audience?: ("user" | "assistant")[];
+	/** Importance (0.0 = least important, 1.0 = most important) */
+	priority?: number;
+	/** Last modified timestamp (ISO 8601) */
+	lastModified?: string;
+}
+
+/**
+ * Embedded resource content in a prompt
+ *
+ * Used when agent supports embeddedContext capability.
+ * Contains file content with URI and metadata.
+ * This allows the agent to receive structured context about referenced files.
+ */
+export interface ResourcePromptContent {
+	type: "resource";
+	resource: {
+		/** Resource URI (e.g., "file:///path/to/note.md") */
+		uri: string;
+		/** MIME type of the resource */
+		mimeType: string;
+		/** Text content of the resource */
+		text: string;
+	};
+	/** Optional annotations for the resource */
+	annotations?: ResourceAnnotations;
+}
+
+/**
  * Union type for all prompt content types
  */
-export type PromptContent = TextPromptContent | ImagePromptContent;
+export type PromptContent =
+	| TextPromptContent
+	| ImagePromptContent
+	| ResourcePromptContent;
