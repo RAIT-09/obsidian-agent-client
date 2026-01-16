@@ -486,6 +486,44 @@ export function useSessionHistory(
 					onMessagesRestore(localMessages);
 				}
 
+				// Save forked session to history
+				if (session.agentId) {
+					const originalSession = sessions.find(
+						(s) => s.sessionId === sessionId,
+					);
+					const originalTitle = originalSession?.title ?? "Session";
+
+					// Truncate title to 50 characters
+					const maxTitleLength = 50;
+					const prefix = "Fork: ";
+					const maxBaseLength = maxTitleLength - prefix.length;
+					const truncatedTitle =
+						originalTitle.length > maxBaseLength
+							? originalTitle.substring(0, maxBaseLength) + "..."
+							: originalTitle;
+					const newTitle = `${prefix}${truncatedTitle}`;
+
+					const now = new Date().toISOString();
+
+					await settingsAccess.saveSession({
+						sessionId: result.sessionId,
+						agentId: session.agentId,
+						cwd,
+						title: newTitle,
+						createdAt: now,
+						updatedAt: now,
+					});
+
+					// Save messages under new session ID for restore after restart
+					if (localMessages) {
+						void settingsAccess.saveSessionMessages(
+							result.sessionId,
+							session.agentId,
+							localMessages,
+						);
+					}
+				}
+
 				// Invalidate cache since a new session was created
 				invalidateCache();
 			} catch (err) {
@@ -503,6 +541,8 @@ export function useSessionHistory(
 			settingsAccess,
 			onMessagesRestore,
 			invalidateCache,
+			session.agentId,
+			sessions,
 		],
 	);
 
