@@ -131,6 +131,13 @@ export function ChatInput({
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 	const settings = useSettings(plugin);
 
+	// Unofficial Obsidian API: app.vault.getConfig() is not in the public type definitions
+	// but is widely used by the plugin community for accessing editor settings.
+	/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
+	const obsidianSpellcheck: boolean =
+		(plugin.app.vault as any).getConfig("spellcheck") ?? true;
+	/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
+
 	// Local state
 	const [inputValue, setInputValue] = useState("");
 	const [hintText, setHintText] = useState<string | null>(null);
@@ -929,6 +936,7 @@ export function ChatInput({
 						placeholder={placeholder}
 						className={`agent-client-chat-input-textarea ${autoMentionEnabled && autoMention.activeNote ? "has-auto-mention" : ""}`}
 						rows={1}
+						spellCheck={obsidianSpellcheck}
 					/>
 					{hintText && (
 						<div
