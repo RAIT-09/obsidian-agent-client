@@ -168,6 +168,20 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName("Display").setHeading();
 
 		new Setting(containerEl)
+			.setName("Show emojis")
+			.setDesc(
+				"Display emoji icons in tool calls, thoughts, plans, and terminal blocks.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.displaySettings.showEmojis)
+					.onChange(async (value) => {
+						this.plugin.settings.displaySettings.showEmojis = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
 			.setName("Auto-collapse long diffs")
 			.setDesc(
 				"Automatically collapse diffs that exceed the line threshold.",

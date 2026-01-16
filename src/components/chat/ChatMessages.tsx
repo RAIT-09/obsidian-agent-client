@@ -123,6 +123,8 @@ export function ChatMessages({
 		checkIfAtBottom();
 	}, [view, checkIfAtBottom]);
 
+	const showEmojis = plugin.settings.displaySettings.showEmojis;
+
 	return (
 		<div ref={containerRef} className="agent-client-chat-view-messages">
 			{errorInfo ? (
@@ -135,7 +137,8 @@ export function ChatMessages({
 					</p>
 					{errorInfo.suggestion && (
 						<p className="agent-client-chat-error-suggestion">
-							💡 {errorInfo.suggestion}
+							{showEmojis && "💡 "}
+							{errorInfo.suggestion}
 						</p>
 					)}
 					<button

@@ -55,8 +55,13 @@ export function ToolCallRenderer({
 		return adapter.basePath || "";
 	}, [plugin]);
 
+	// Get showEmojis setting
+	const showEmojis = plugin.settings.displaySettings.showEmojis;
+
 	// Get icon based on kind
 	const getKindIcon = (kind?: string) => {
+		if (!showEmojis) return null;
+
 		switch (kind) {
 			case "read":
 				return "📖";
@@ -86,9 +91,11 @@ export function ToolCallRenderer({
 			{/* Header */}
 			<div className="agent-client-message-tool-call-header">
 				<div className="agent-client-message-tool-call-title">
-					<span className="agent-client-message-tool-call-icon">
-						{getKindIcon(kind)}
-					</span>
+					{showEmojis && (
+						<span className="agent-client-message-tool-call-icon">
+							{getKindIcon(kind)}
+						</span>
+					)}
 					{title}
 				</div>
 				{locations && locations.length > 0 && (

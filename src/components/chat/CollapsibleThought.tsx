@@ -10,6 +10,7 @@ interface CollapsibleThoughtProps {
 
 export function CollapsibleThought({ text, plugin }: CollapsibleThoughtProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
+	const showEmojis = plugin.settings.displaySettings.showEmojis;
 
 	return (
 		<div
@@ -17,7 +18,7 @@ export function CollapsibleThought({ text, plugin }: CollapsibleThoughtProps) {
 			onClick={() => setIsExpanded(!isExpanded)}
 		>
 			<div className="agent-client-collapsible-thought-header">
-				💡Thinking
+				{showEmojis && "💡"}Thinking
 				<span className="agent-client-collapsible-thought-icon">
 					{isExpanded ? "▼" : "▶"}
 				</span>
