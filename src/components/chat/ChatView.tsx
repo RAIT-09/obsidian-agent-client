@@ -11,6 +11,7 @@ import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 import { SessionHistoryModal } from "./SessionHistoryModal";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
+import { SettingsMenu } from "./SettingsMenu";
 
 // Service imports
 import { NoteMentionService } from "../../adapters/obsidian/mention-service";
@@ -58,9 +59,11 @@ export const VIEW_TYPE_CHAT = "agent-client-chat-view";
 function ChatComponent({
 	plugin,
 	view,
+	viewId,
 }: {
 	plugin: AgentClientPlugin;
 	view: ChatView;
+	viewId: string;
 }) {
 	// ============================================================
 	// Platform Check
@@ -93,7 +96,29 @@ function ChatComponent({
 		};
 	}, [noteMentionService]);
 
-	const acpAdapter = useMemo(() => plugin.getOrCreateAdapter(), [plugin]);
+	// Track this view as the last active when it receives focus or interaction
+	useEffect(() => {
+		const handleFocus = () => {
+			plugin.setLastActiveChatViewId(viewId);
+		};
+
+		const container = view.containerEl;
+		container.addEventListener("focus", handleFocus, true);
+		container.addEventListener("click", handleFocus);
+
+		// Set as active on mount (first opened view becomes active)
+		plugin.setLastActiveChatViewId(viewId);
+
+		return () => {
+			container.removeEventListener("focus", handleFocus, true);
+			container.removeEventListener("click", handleFocus);
+		};
+	}, [plugin, viewId, view.containerEl]);
+
+	const acpAdapter = useMemo(
+		() => plugin.getOrCreateAdapter(viewId),
+		[plugin, viewId],
+	);
 	const acpClientRef = useRef<IAcpClient>(acpAdapter);
 
 	const vaultAccessAdapter = useMemo(() => {
@@ -217,12 +242,16 @@ function ChatComponent({
 	/** Flag to ignore history replay messages during session/load */
 	const [isLoadingSessionHistory, setIsLoadingSessionHistory] =
 		useState(false);
+	/** Whether the settings menu is open */
+	const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
 
 	// ============================================================
 	// Refs
 	// ============================================================
 	/** Ref for session history modal (persisted across renders) */
 	const historyModalRef = useRef<SessionHistoryModal | null>(null);
+	/** Ref for settings button (for menu positioning) */
+	const settingsButtonRef = useRef<HTMLButtonElement>(null);
 
 	// ============================================================
 	// Computed Values
@@ -338,6 +367,40 @@ function ChatComponent({
 		const appWithSettings = plugin.app as unknown as AppWithSettings;
 		appWithSettings.setting.open();
 		appWithSettings.setting.openTabById(plugin.manifest.id);
+	}, [plugin]);
+
+	// ============================================================
+	// Settings Menu Callbacks
+	// ============================================================
+	const handleToggleSettingsMenu = useCallback(() => {
+		setIsSettingsMenuOpen((prev) => !prev);
+	}, []);
+
+	const handleCloseSettingsMenu = useCallback(() => {
+		setIsSettingsMenuOpen(false);
+	}, []);
+
+	const handleSwitchAgent = useCallback(
+		async (agentId: string) => {
+			setIsSettingsMenuOpen(false);
+			if (agentId !== session.agentId) {
+				await handleNewChat(agentId);
+			}
+		},
+		[session.agentId, handleNewChat],
+	);
+
+	const handleOpenNewView = useCallback(
+		(agentId: string) => {
+			setIsSettingsMenuOpen(false);
+			void plugin.openNewChatViewWithAgent(agentId);
+		},
+		[plugin],
+	);
+
+	/** Get available agents for settings menu */
+	const availableAgents = useMemo(() => {
+		return plugin.getAvailableAgents();
 	}, [plugin]);
 
 	// ============================================================
@@ -578,18 +641,9 @@ function ChatComponent({
 		// Empty dependency array - only run on unmount
 	}, []);
 
-	// Monitor agent changes from settings when messages are empty
-	useEffect(() => {
-		const newActiveAgentId = settings.activeAgentId || settings.claude.id;
-		if (messages.length === 0 && newActiveAgentId !== session.agentId) {
-			void agentSession.switchAgent(newActiveAgentId);
-		}
-	}, [
-		settings.activeAgentId,
-		messages.length,
-		session.agentId,
-		agentSession.switchAgent,
-	]);
+	// Note: Previously monitored settings.activeAgentId to auto-switch agents.
+	// Removed for multi-session support - each view manages its own agentId locally.
+	// Agent switching is now done explicitly via Settings Menu.
 
 	// ============================================================
 	// Effects - ACP Adapter Callbacks
@@ -705,20 +759,31 @@ function ChatComponent({
 	// ============================================================
 	// Effects - Workspace Events (Hotkeys)
 	// ============================================================
+	// Custom event type with targetViewId parameter
+	type CustomEventCallback = (targetViewId?: string) => void;
+
 	useEffect(() => {
 		const workspace = plugin.app.workspace;
 
-		const eventRef = workspace.on(
-			"agent-client:toggle-auto-mention" as "quit",
-			() => {
-				autoMention.toggle();
-			},
-		);
+		const eventRef = (
+			workspace as unknown as {
+				on: (
+					name: string,
+					callback: CustomEventCallback,
+				) => ReturnType<typeof workspace.on>;
+			}
+		).on("agent-client:toggle-auto-mention", (targetViewId?: string) => {
+			// Only respond if this view is the target (or no target specified)
+			if (targetViewId && targetViewId !== viewId) {
+				return;
+			}
+			autoMention.toggle();
+		});
 
 		return () => {
 			workspace.offref(eventRef);
 		};
-	}, [plugin.app.workspace, autoMention.toggle]);
+	}, [plugin.app.workspace, autoMention.toggle, viewId]);
 
 	// Handle new chat request from plugin commands (e.g., "New chat with [Agent]")
 	useEffect(() => {
@@ -733,20 +798,44 @@ function ChatComponent({
 				) => ReturnType<typeof workspace.on>;
 			}
 		).on("agent-client:new-chat-requested", (agentId?: string) => {
+			// Note: new-chat-requested targets the last active view, which is handled
+			// by plugin.lastActiveChatViewId - only respond if we are that view
+			if (
+				plugin.lastActiveChatViewId &&
+				plugin.lastActiveChatViewId !== viewId
+			) {
+				return;
+			}
 			void handleNewChat(agentId);
 		});
 
 		return () => {
 			workspace.offref(eventRef);
 		};
-	}, [plugin.app.workspace, handleNewChat]);
+	}, [
+		plugin.app.workspace,
+		plugin.lastActiveChatViewId,
+		handleNewChat,
+		viewId,
+	]);
 
 	useEffect(() => {
 		const workspace = plugin.app.workspace;
 
-		const approveRef = workspace.on(
-			"agent-client:approve-active-permission" as "quit",
-			() => {
+		const approveRef = (
+			workspace as unknown as {
+				on: (
+					name: string,
+					callback: CustomEventCallback,
+				) => ReturnType<typeof workspace.on>;
+			}
+		).on(
+			"agent-client:approve-active-permission",
+			(targetViewId?: string) => {
+				// Only respond if this view is the target (or no target specified)
+				if (targetViewId && targetViewId !== viewId) {
+					return;
+				}
 				void (async () => {
 					const success = await permission.approveActivePermission();
 					if (!success) {
@@ -758,9 +847,20 @@ function ChatComponent({
 			},
 		);
 
-		const rejectRef = workspace.on(
-			"agent-client:reject-active-permission" as "quit",
-			() => {
+		const rejectRef = (
+			workspace as unknown as {
+				on: (
+					name: string,
+					callback: CustomEventCallback,
+				) => ReturnType<typeof workspace.on>;
+			}
+		).on(
+			"agent-client:reject-active-permission",
+			(targetViewId?: string) => {
+				// Only respond if this view is the target (or no target specified)
+				if (targetViewId && targetViewId !== viewId) {
+					return;
+				}
 				void (async () => {
 					const success = await permission.rejectActivePermission();
 					if (!success) {
@@ -772,12 +872,20 @@ function ChatComponent({
 			},
 		);
 
-		const cancelRef = workspace.on(
-			"agent-client:cancel-message" as "quit",
-			() => {
-				void handleStopGeneration();
-			},
-		);
+		const cancelRef = (
+			workspace as unknown as {
+				on: (
+					name: string,
+					callback: CustomEventCallback,
+				) => ReturnType<typeof workspace.on>;
+			}
+		).on("agent-client:cancel-message", (targetViewId?: string) => {
+			// Only respond if this view is the target (or no target specified)
+			if (targetViewId && targetViewId !== viewId) {
+				return;
+			}
+			void handleStopGeneration();
+		});
 
 		return () => {
 			workspace.offref(approveRef);
@@ -789,6 +897,7 @@ function ChatComponent({
 		permission.approveActivePermission,
 		permission.rejectActivePermission,
 		handleStopGeneration,
+		viewId,
 	]);
 
 	// ============================================================
@@ -802,9 +911,24 @@ function ChatComponent({
 				hasHistoryCapability={sessionHistory.canShowSessionHistory}
 				onNewChat={() => void handleNewChat()}
 				onExportChat={() => void handleExportChat()}
-				onOpenSettings={handleOpenSettings}
+				onToggleSettingsMenu={handleToggleSettingsMenu}
 				onOpenHistory={handleOpenHistory}
+				settingsButtonRef={settingsButtonRef}
 			/>
+
+			{isSettingsMenuOpen && (
+				<SettingsMenu
+					anchorRef={settingsButtonRef}
+					currentAgentId={session.agentId || ""}
+					availableAgents={availableAgents}
+					onSwitchAgent={handleSwitchAgent}
+					onOpenNewView={handleOpenNewView}
+					onOpenPluginSettings={handleOpenSettings}
+					onClose={handleCloseSettingsMenu}
+					plugin={plugin}
+					view={view}
+				/>
+			)}
 
 			<ChatMessages
 				messages={messages}
@@ -847,15 +971,26 @@ function ChatComponent({
 	);
 }
 
+/** State stored for view persistence */
+interface ChatViewState extends Record<string, unknown> {
+	initialAgentId?: string;
+}
+
 export class ChatView extends ItemView {
 	private root: Root | null = null;
 	private plugin: AgentClientPlugin;
 	private logger: Logger;
+	/** Unique identifier for this view instance (for multi-session support) */
+	readonly viewId: string;
+	/** Initial agent ID passed via state (for openNewChatViewWithAgent) */
+	private initialAgentId: string | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: AgentClientPlugin) {
 		super(leaf);
 		this.plugin = plugin;
 		this.logger = new Logger(plugin);
+		// Use leaf.id if available, otherwise generate UUID
+		this.viewId = (leaf as { id?: string }).id ?? crypto.randomUUID();
 	}
 
 	getViewType() {
@@ -870,16 +1005,50 @@ export class ChatView extends ItemView {
 		return "bot-message-square";
 	}
 
+	/**
+	 * Get the view state for persistence.
+	 */
+	getState(): ChatViewState {
+		return {
+			initialAgentId: this.initialAgentId ?? undefined,
+		};
+	}
+
+	/**
+	 * Restore the view state from persistence.
+	 */
+	async setState(
+		state: ChatViewState,
+		result: { history: boolean },
+	): Promise<void> {
+		this.initialAgentId = state.initialAgentId ?? null;
+		await super.setState(state, result);
+	}
+
+	/**
+	 * Get the initial agent ID for this view.
+	 * Used by ChatComponent to determine which agent to initialize.
+	 */
+	getInitialAgentId(): string | null {
+		return this.initialAgentId;
+	}
+
 	onOpen() {
 		const container = this.containerEl.children[1];
 		container.empty();
 
 		this.root = createRoot(container);
-		this.root.render(<ChatComponent plugin={this.plugin} view={this} />);
+		this.root.render(
+			<ChatComponent
+				plugin={this.plugin}
+				view={this}
+				viewId={this.viewId}
+			/>,
+		);
 		return Promise.resolve();
 	}
 
-	onClose(): Promise<void> {
+	async onClose(): Promise<void> {
 		this.logger.log("[ChatView] onClose() called");
 		// Cleanup is handled by React useEffect cleanup in ChatComponent
 		// which performs auto-export and closeSession
@@ -887,6 +1056,7 @@ export class ChatView extends ItemView {
 			this.root.unmount();
 			this.root = null;
 		}
-		return Promise.resolve();
+		// Remove adapter for this view (disconnect process)
+		await this.plugin.removeAdapter(this.viewId);
 	}
 }

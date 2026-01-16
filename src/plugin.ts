@@ -37,7 +37,8 @@ export interface AgentClientPluginSettings {
 	claude: ClaudeAgentSettings;
 	codex: CodexAgentSettings;
 	customAgents: CustomAgentSettings[];
-	activeAgentId: string;
+	/** Default agent ID for new views (renamed from activeAgentId for multi-session) */
+	defaultAgentId: string;
 	autoAllowPermissions: boolean;
 	autoMentionActiveNote: boolean;
 	debugMode: boolean;
@@ -96,7 +97,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		env: [],
 	},
 	customAgents: [],
-	activeAgentId: "claude-code-acp",
+	defaultAgentId: "claude-code-acp",
 	autoAllowPermissions: false,
 	autoMentionActiveNote: true,
 	debugMode: false,
@@ -129,7 +130,10 @@ export default class AgentClientPlugin extends Plugin {
 	settings: AgentClientPluginSettings;
 	settingsStore!: SettingsStore;
 
-	private _acpAdapter: AcpAdapter | null = null;
+	/** Map of viewId to AcpAdapter for multi-session support */
+	private _adapters: Map<string, AcpAdapter> = new Map();
+	/** Track the last active ChatView for keybind targeting */
+	private _lastActiveChatViewId: string | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -162,30 +166,75 @@ export default class AgentClientPlugin extends Plugin {
 
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
 
-		// Clean up ACP session when Obsidian quits
+		// Clean up all ACP sessions when Obsidian quits
 		// Note: We don't wait for disconnect to complete to avoid blocking quit
 		this.registerEvent(
 			this.app.workspace.on("quit", () => {
-				if (this._acpAdapter) {
-					// Fire and forget - don't block Obsidian from quitting
-					this._acpAdapter.disconnect().catch((error) => {
+				// Fire and forget - don't block Obsidian from quitting
+				for (const [viewId, adapter] of this._adapters) {
+					adapter.disconnect().catch((error) => {
 						console.warn(
-							"[AgentClient] Quit cleanup error:",
+							`[AgentClient] Quit cleanup error for view ${viewId}:`,
 							error,
 						);
 					});
 				}
+				this._adapters.clear();
 			}),
 		);
 	}
 
 	onunload() {}
 
-	getOrCreateAdapter(): AcpAdapter {
-		if (!this._acpAdapter) {
-			this._acpAdapter = new AcpAdapter(this);
+	/**
+	 * Get or create an AcpAdapter for a specific view.
+	 * Each ChatView has its own adapter for independent sessions.
+	 */
+	getOrCreateAdapter(viewId: string): AcpAdapter {
+		let adapter = this._adapters.get(viewId);
+		if (!adapter) {
+			adapter = new AcpAdapter(this);
+			this._adapters.set(viewId, adapter);
 		}
-		return this._acpAdapter;
+		return adapter;
+	}
+
+	/**
+	 * Remove and disconnect the adapter for a specific view.
+	 * Called when a ChatView is closed.
+	 */
+	async removeAdapter(viewId: string): Promise<void> {
+		const adapter = this._adapters.get(viewId);
+		if (adapter) {
+			try {
+				await adapter.disconnect();
+			} catch (error) {
+				console.warn(
+					`[AgentClient] Failed to disconnect adapter for view ${viewId}:`,
+					error,
+				);
+			}
+			this._adapters.delete(viewId);
+		}
+		// Clear lastActiveChatViewId if it was this view
+		if (this._lastActiveChatViewId === viewId) {
+			this._lastActiveChatViewId = null;
+		}
+	}
+
+	/**
+	 * Get the last active ChatView ID for keybind targeting.
+	 */
+	get lastActiveChatViewId(): string | null {
+		return this._lastActiveChatViewId;
+	}
+
+	/**
+	 * Set the last active ChatView ID.
+	 * Called when a ChatView receives focus or interaction.
+	 */
+	setLastActiveChatViewId(viewId: string | null): void {
+		this._lastActiveChatViewId = viewId;
 	}
 
 	async activateView() {
@@ -224,9 +273,45 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	/**
+	 * Open a new chat view with a specific agent.
+	 * Always creates a new view (doesn't reuse existing).
+	 */
+	async openNewChatViewWithAgent(agentId: string): Promise<void> {
+		const { workspace } = this.app;
+
+		// Always create new leaf (split right)
+		const leaf = workspace.getRightLeaf(true);
+		if (!leaf) {
+			console.warn("[AgentClient] Failed to create new leaf");
+			return;
+		}
+
+		await leaf.setViewState({
+			type: VIEW_TYPE_CHAT,
+			active: true,
+			state: { initialAgentId: agentId },
+		});
+
+		await workspace.revealLeaf(leaf);
+
+		// Focus textarea after revealing the leaf
+		const viewContainerEl = leaf.view?.containerEl;
+		if (viewContainerEl) {
+			window.setTimeout(() => {
+				const textarea = viewContainerEl.querySelector(
+					"textarea.agent-client-chat-input-textarea",
+				);
+				if (textarea instanceof HTMLTextAreaElement) {
+					textarea.focus();
+				}
+			}, 0);
+		}
+	}
+
+	/**
 	 * Get all available agents (claude, codex, gemini, custom)
 	 */
-	private getAvailableAgents(): Array<{ id: string; displayName: string }> {
+	getAvailableAgents(): Array<{ id: string; displayName: string }> {
 		return [
 			{
 				id: this.settings.claude.id,
@@ -254,9 +339,11 @@ export default class AgentClientPlugin extends Plugin {
 	 * Open chat view and switch to specified agent
 	 */
 	private async openChatWithAgent(agentId: string): Promise<void> {
-		// 1. Switch agent in settings (if different from current)
-		if (this.settings.activeAgentId !== agentId) {
-			await this.settingsStore.updateSettings({ activeAgentId: agentId });
+		// 1. Update default agent in settings (if different from current)
+		if (this.settings.defaultAgentId !== agentId) {
+			await this.settingsStore.updateSettings({
+				defaultAgentId: agentId,
+			});
 		}
 
 		// 2. Activate view (create new or focus existing)
@@ -294,7 +381,8 @@ export default class AgentClientPlugin extends Plugin {
 			callback: async () => {
 				await this.activateView();
 				this.app.workspace.trigger(
-					"agent-client:approve-active-permission",
+					"agent-client:approve-active-permission" as "quit",
+					this._lastActiveChatViewId,
 				);
 			},
 		});
@@ -305,7 +393,8 @@ export default class AgentClientPlugin extends Plugin {
 			callback: async () => {
 				await this.activateView();
 				this.app.workspace.trigger(
-					"agent-client:reject-active-permission",
+					"agent-client:reject-active-permission" as "quit",
+					this._lastActiveChatViewId,
 				);
 			},
 		});
@@ -315,7 +404,10 @@ export default class AgentClientPlugin extends Plugin {
 			name: "Toggle auto-mention",
 			callback: async () => {
 				await this.activateView();
-				this.app.workspace.trigger("agent-client:toggle-auto-mention");
+				this.app.workspace.trigger(
+					"agent-client:toggle-auto-mention" as "quit",
+					this._lastActiveChatViewId,
+				);
 			},
 		});
 
@@ -323,7 +415,10 @@ export default class AgentClientPlugin extends Plugin {
 			id: "cancel-current-message",
 			name: "Cancel current message",
 			callback: () => {
-				this.app.workspace.trigger("agent-client:cancel-message");
+				this.app.workspace.trigger(
+					"agent-client:cancel-message" as "quit",
+					this._lastActiveChatViewId,
+				);
 			},
 		});
 	}
@@ -373,17 +468,20 @@ export default class AgentClientPlugin extends Plugin {
 			DEFAULT_SETTINGS.gemini.id,
 			...customAgents.map((agent) => agent.id),
 		];
-		const rawActiveId =
-			typeof rawSettings.activeAgentId === "string"
-				? rawSettings.activeAgentId.trim()
-				: "";
-		const fallbackActiveId =
+		// Migration: support both old activeAgentId and new defaultAgentId
+		const rawDefaultId =
+			typeof rawSettings.defaultAgentId === "string"
+				? rawSettings.defaultAgentId.trim()
+				: typeof rawSettings.activeAgentId === "string"
+					? rawSettings.activeAgentId.trim()
+					: "";
+		const fallbackDefaultId =
 			availableAgentIds.find((id) => id.length > 0) ||
 			DEFAULT_SETTINGS.claude.id;
-		const activeAgentId =
-			availableAgentIds.includes(rawActiveId) && rawActiveId.length > 0
-				? rawActiveId
-				: fallbackActiveId;
+		const defaultAgentId =
+			availableAgentIds.includes(rawDefaultId) && rawDefaultId.length > 0
+				? rawDefaultId
+				: fallbackDefaultId;
 
 		this.settings = {
 			claude: {
@@ -455,7 +553,7 @@ export default class AgentClientPlugin extends Plugin {
 				env: resolvedGeminiEnv.length > 0 ? resolvedGeminiEnv : [],
 			},
 			customAgents: customAgents,
-			activeAgentId,
+			defaultAgentId,
 			autoAllowPermissions:
 				typeof rawSettings.autoAllowPermissions === "boolean"
 					? rawSettings.autoAllowPermissions
@@ -583,7 +681,7 @@ export default class AgentClientPlugin extends Plugin {
 				: DEFAULT_SETTINGS.savedSessions,
 		};
 
-		this.ensureActiveAgentId();
+		this.ensureDefaultAgentId();
 	}
 
 	async saveSettings() {
@@ -670,14 +768,14 @@ export default class AgentClientPlugin extends Plugin {
 		return false;
 	}
 
-	ensureActiveAgentId(): void {
+	ensureDefaultAgentId(): void {
 		const availableIds = this.collectAvailableAgentIds();
 		if (availableIds.length === 0) {
-			this.settings.activeAgentId = DEFAULT_SETTINGS.claude.id;
+			this.settings.defaultAgentId = DEFAULT_SETTINGS.claude.id;
 			return;
 		}
-		if (!availableIds.includes(this.settings.activeAgentId)) {
-			this.settings.activeAgentId = availableIds[0];
+		if (!availableIds.includes(this.settings.defaultAgentId)) {
+			this.settings.defaultAgentId = availableIds[0];
 		}
 	}
 

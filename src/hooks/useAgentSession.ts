@@ -146,10 +146,10 @@ export interface UseAgentSessionReturn {
 // ============================================================================
 
 /**
- * Get the currently active agent ID from settings.
+ * Get the default agent ID from settings (for new views).
  */
-function getActiveAgentId(settings: AgentClientPluginSettings): string {
-	return settings.activeAgentId || settings.claude.id;
+function getDefaultAgentId(settings: AgentClientPluginSettings): string {
+	return settings.defaultAgentId || settings.claude.id;
 }
 
 /**
@@ -182,7 +182,7 @@ function getAvailableAgentsFromSettings(
  * Get the currently active agent information from settings.
  */
 function getCurrentAgent(settings: AgentClientPluginSettings): AgentInfo {
-	const activeId = getActiveAgentId(settings);
+	const activeId = getDefaultAgentId(settings);
 	const agents = getAvailableAgentsFromSettings(settings);
 	return (
 		agents.find((agent) => agent.id === activeId) || {
@@ -314,7 +314,7 @@ export function useAgentSession(
 ): UseAgentSessionReturn {
 	// Get initial agent info from settings
 	const initialSettings = settingsAccess.getSnapshot();
-	const initialAgentId = getActiveAgentId(initialSettings);
+	const initialAgentId = getDefaultAgentId(initialSettings);
 	const initialAgent = getCurrentAgent(initialSettings);
 
 	// Session state
@@ -339,7 +339,7 @@ export function useAgentSession(
 	const createSession = useCallback(async () => {
 		// Get current settings and agent info
 		const settings = settingsAccess.getSnapshot();
-		const activeAgentId = getActiveAgentId(settings);
+		const defaultAgentId = getDefaultAgentId(settings);
 		const currentAgent = getCurrentAgent(settings);
 
 		// Reset to initializing state immediately
@@ -347,7 +347,7 @@ export function useAgentSession(
 			...prev,
 			sessionId: null,
 			state: "initializing",
-			agentId: activeAgentId,
+			agentId: defaultAgentId,
 			agentDisplayName: currentAgent.displayName,
 			authMethods: [],
 			availableCommands: undefined,
@@ -365,13 +365,13 @@ export function useAgentSession(
 
 		try {
 			// Find agent settings
-			const agentSettings = findAgentSettings(settings, activeAgentId);
+			const agentSettings = findAgentSettings(settings, defaultAgentId);
 
 			if (!agentSettings) {
 				setSession((prev) => ({ ...prev, state: "error" }));
 				setErrorInfo({
 					title: "Agent Not Found",
-					message: `Agent with ID "${activeAgentId}" not found in settings`,
+					message: `Agent with ID "${defaultAgentId}" not found in settings`,
 					suggestion:
 						"Please check your agent configuration in settings.",
 				});
@@ -382,7 +382,7 @@ export function useAgentSession(
 			const agentConfig = buildAgentConfigWithApiKey(
 				settings,
 				agentSettings,
-				activeAgentId,
+				defaultAgentId,
 				workingDirectory,
 			);
 
@@ -390,7 +390,7 @@ export function useAgentSession(
 			// Only initialize if agent is not initialized OR agent ID has changed
 			const needsInitialize =
 				!agentClient.isInitialized() ||
-				agentClient.getCurrentAgentId() !== activeAgentId;
+				agentClient.getCurrentAgentId() !== defaultAgentId;
 
 			let authMethods: AuthenticationMethod[] = [];
 			let promptCapabilities:
@@ -479,7 +479,7 @@ export function useAgentSession(
 		async (sessionId: string) => {
 			// Get current settings and agent info
 			const settings = settingsAccess.getSnapshot();
-			const activeAgentId = getActiveAgentId(settings);
+			const defaultAgentId = getDefaultAgentId(settings);
 			const currentAgent = getCurrentAgent(settings);
 
 			// Reset to initializing state immediately
@@ -487,7 +487,7 @@ export function useAgentSession(
 				...prev,
 				sessionId: null,
 				state: "initializing",
-				agentId: activeAgentId,
+				agentId: defaultAgentId,
 				agentDisplayName: currentAgent.displayName,
 				authMethods: [],
 				availableCommands: undefined,
@@ -503,14 +503,14 @@ export function useAgentSession(
 				// Find agent settings
 				const agentSettings = findAgentSettings(
 					settings,
-					activeAgentId,
+					defaultAgentId,
 				);
 
 				if (!agentSettings) {
 					setSession((prev) => ({ ...prev, state: "error" }));
 					setErrorInfo({
 						title: "Agent Not Found",
-						message: `Agent with ID "${activeAgentId}" not found in settings`,
+						message: `Agent with ID "${defaultAgentId}" not found in settings`,
 						suggestion:
 							"Please check your agent configuration in settings.",
 					});
@@ -521,14 +521,14 @@ export function useAgentSession(
 				const agentConfig = buildAgentConfigWithApiKey(
 					settings,
 					agentSettings,
-					activeAgentId,
+					defaultAgentId,
 					workingDirectory,
 				);
 
 				// Check if initialization is needed
 				const needsInitialize =
 					!agentClient.isInitialized() ||
-					agentClient.getCurrentAgentId() !== activeAgentId;
+					agentClient.getCurrentAgentId() !== defaultAgentId;
 
 				let authMethods: AuthenticationMethod[] = [];
 				let promptCapabilities:
@@ -676,7 +676,7 @@ export function useAgentSession(
 	const switchAgent = useCallback(
 		async (agentId: string) => {
 			// Update settings (persists the change)
-			await settingsAccess.updateSettings({ activeAgentId: agentId });
+			await settingsAccess.updateSettings({ defaultAgentId: agentId });
 
 			// Update session with new agent ID
 			// Clear agent-specific data (new agent will send its own)

@@ -1607,3 +1607,85 @@ If your plugin does not need CSS, delete this file.
 .agent-client-confirm-delete-confirm {
 	/* mod-warning class provides warning color */
 }
+
+/* ===== Settings Menu ===== */
+.agent-client-settings-menu {
+	position: fixed;
+	z-index: 1000;
+	min-width: 180px;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	padding: 4px 0;
+}
+
+.agent-client-settings-menu-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	cursor: pointer;
+	color: var(--text-normal);
+	transition: background-color 0.1s ease;
+}
+
+.agent-client-settings-menu-item:hover,
+.agent-client-settings-menu-item.agent-client-selected {
+	background-color: var(--background-modifier-hover);
+}
+
+.agent-client-settings-menu-item.agent-client-current {
+	color: var(--text-accent);
+}
+
+.agent-client-settings-menu-item-submenu {
+	/* Additional styles for submenu items if needed */
+}
+
+.agent-client-settings-menu-icon {
+	width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.agent-client-settings-menu-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.agent-client-settings-menu-arrow {
+	margin-left: auto;
+	color: var(--text-muted);
+	font-size: 14px;
+}
+
+.agent-client-settings-menu-check {
+	margin-left: auto;
+	color: var(--text-accent);
+	font-size: 12px;
+}
+
+.agent-client-settings-menu-separator {
+	height: 1px;
+	background-color: var(--background-modifier-border);
+	margin: 4px 0;
+}
+
+.agent-client-settings-menu-back {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	cursor: pointer;
+	color: var(--text-muted);
+	font-size: 12px;
+	transition: background-color 0.1s ease;
+}
+
+.agent-client-settings-menu-back:hover {
+	background-color: var(--background-modifier-hover);
+}
