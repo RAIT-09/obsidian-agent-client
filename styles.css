@@ -1609,7 +1609,7 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* ===== Settings Menu ===== */
-.agent-client-settings-menu {
+.agent-client-header-menu {
 	position: fixed;
 	z-index: 1000;
 	min-width: 180px;
@@ -1620,7 +1620,7 @@ If your plugin does not need CSS, delete this file.
 	padding: 4px 0;
 }
 
-.agent-client-settings-menu-item {
+.agent-client-header-menu-item {
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -1630,20 +1630,20 @@ If your plugin does not need CSS, delete this file.
 	transition: background-color 0.1s ease;
 }
 
-.agent-client-settings-menu-item:hover,
-.agent-client-settings-menu-item.agent-client-selected {
+.agent-client-header-menu-item:hover,
+.agent-client-header-menu-item.agent-client-selected {
 	background-color: var(--background-modifier-hover);
 }
 
-.agent-client-settings-menu-item.agent-client-current {
+.agent-client-header-menu-item.agent-client-current {
 	color: var(--interactive-accent-hover);
 }
 
-.agent-client-settings-menu-item-submenu {
+.agent-client-header-menu-item-submenu {
 	/* Additional styles for submenu items if needed */
 }
 
-.agent-client-settings-menu-icon {
+.agent-client-header-menu-icon {
 	width: 16px;
 	height: 16px;
 	display: flex;
@@ -1652,30 +1652,30 @@ If your plugin does not need CSS, delete this file.
 	flex-shrink: 0;
 }
 
-.agent-client-settings-menu-icon svg {
+.agent-client-header-menu-icon svg {
 	width: 14px;
 	height: 14px;
 }
 
-.agent-client-settings-menu-arrow {
+.agent-client-header-menu-arrow {
 	margin-left: auto;
 	color: var(--text-muted);
 	font-size: 14px;
 }
 
-.agent-client-settings-menu-check {
+.agent-client-header-menu-check {
 	margin-left: auto;
 	color: var(--interactive-accent-hover);
 	font-size: 12px;
 }
 
-.agent-client-settings-menu-separator {
+.agent-client-header-menu-separator {
 	height: 1px;
 	background-color: var(--background-modifier-border);
 	margin: 4px 0;
 }
 
-.agent-client-settings-menu-header {
+.agent-client-header-menu-header {
 	padding: 8px 12px 4px;
 	font-size: 11px;
 	font-weight: 600;
@@ -1684,7 +1684,7 @@ If your plugin does not need CSS, delete this file.
 	letter-spacing: 0.05em;
 }
 
-.agent-client-settings-menu-back {
+.agent-client-header-menu-back {
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -1695,6 +1695,6 @@ If your plugin does not need CSS, delete this file.
 	transition: background-color 0.1s ease;
 }
 
-.agent-client-settings-menu-back:hover {
+.agent-client-header-menu-back:hover {
 	background-color: var(--background-modifier-hover);
 }

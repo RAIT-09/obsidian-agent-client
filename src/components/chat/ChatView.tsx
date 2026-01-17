@@ -11,7 +11,7 @@ import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 import { SessionHistoryModal } from "./SessionHistoryModal";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
-import { SettingsMenu } from "./SettingsMenu";
+import { HeaderMenu } from "./HeaderMenu";
 
 // Service imports
 import { NoteMentionService } from "../../adapters/obsidian/mention-service";
@@ -243,7 +243,7 @@ function ChatComponent({
 	const [isLoadingSessionHistory, setIsLoadingSessionHistory] =
 		useState(false);
 	/** Whether the settings menu is open */
-	const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+	const [isMenuOpen, setIsMenuOpen] = useState(false);
 
 	// ============================================================
 	// Refs
@@ -251,7 +251,7 @@ function ChatComponent({
 	/** Ref for session history modal (persisted across renders) */
 	const historyModalRef = useRef<SessionHistoryModal | null>(null);
 	/** Ref for settings button (for menu positioning) */
-	const settingsButtonRef = useRef<HTMLButtonElement>(null);
+	const menuButtonRef = useRef<HTMLButtonElement>(null);
 
 	// ============================================================
 	// Computed Values
@@ -367,19 +367,19 @@ function ChatComponent({
 	}, [plugin]);
 
 	// ============================================================
-	// Settings Menu Callbacks
+	// Header Menu Callbacks
 	// ============================================================
-	const handleToggleSettingsMenu = useCallback(() => {
-		setIsSettingsMenuOpen((prev) => !prev);
+	const handleToggleMenu = useCallback(() => {
+		setIsMenuOpen((prev) => !prev);
 	}, []);
 
-	const handleCloseSettingsMenu = useCallback(() => {
-		setIsSettingsMenuOpen(false);
+	const handleCloseMenu = useCallback(() => {
+		setIsMenuOpen(false);
 	}, []);
 
 	const handleSwitchAgent = useCallback(
 		async (agentId: string) => {
-			setIsSettingsMenuOpen(false);
+			setIsMenuOpen(false);
 			if (agentId !== session.agentId) {
 				await handleNewChat(agentId);
 			}
@@ -388,7 +388,7 @@ function ChatComponent({
 	);
 
 	const handleOpenNewView = useCallback(() => {
-		setIsSettingsMenuOpen(false);
+		setIsMenuOpen(false);
 		void plugin.openNewChatViewWithAgent(plugin.settings.defaultAgentId);
 	}, [plugin]);
 
@@ -905,20 +905,20 @@ function ChatComponent({
 				hasHistoryCapability={sessionHistory.canShowSessionHistory}
 				onNewChat={() => void handleNewChat()}
 				onExportChat={() => void handleExportChat()}
-				onToggleSettingsMenu={handleToggleSettingsMenu}
+				onToggleMenu={handleToggleMenu}
 				onOpenHistory={handleOpenHistory}
-				settingsButtonRef={settingsButtonRef}
+				menuButtonRef={menuButtonRef}
 			/>
 
-			{isSettingsMenuOpen && (
-				<SettingsMenu
-					anchorRef={settingsButtonRef}
+			{isMenuOpen && (
+				<HeaderMenu
+					anchorRef={menuButtonRef}
 					currentAgentId={session.agentId || ""}
 					availableAgents={availableAgents}
 					onSwitchAgent={handleSwitchAgent}
 					onOpenNewView={handleOpenNewView}
 					onOpenPluginSettings={handleOpenSettings}
-					onClose={handleCloseSettingsMenu}
+					onClose={handleCloseMenu}
 					plugin={plugin}
 					view={view}
 				/>

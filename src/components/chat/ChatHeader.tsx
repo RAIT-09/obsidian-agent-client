@@ -15,12 +15,12 @@ export interface ChatHeaderProps {
 	onNewChat: () => void;
 	/** Callback to export the chat */
 	onExportChat: () => void;
-	/** Callback to toggle settings menu */
-	onToggleSettingsMenu: () => void;
+	/** Callback to toggle header menu */
+	onToggleMenu: () => void;
 	/** Callback to open session history */
 	onOpenHistory?: () => void;
-	/** Reference to the settings button for menu positioning */
-	settingsButtonRef: React.RefObject<HTMLButtonElement | null>;
+	/** Reference to the menu button for menu positioning */
+	menuButtonRef: React.RefObject<HTMLButtonElement | null>;
 }
 
 /**
@@ -37,9 +37,9 @@ export function ChatHeader({
 	hasHistoryCapability = false,
 	onNewChat,
 	onExportChat,
-	onToggleSettingsMenu,
+	onToggleMenu,
 	onOpenHistory,
-	settingsButtonRef,
+	menuButtonRef,
 }: ChatHeaderProps) {
 	return (
 		<div className="agent-client-chat-view-header">
@@ -72,10 +72,10 @@ export function ChatHeader({
 					onClick={onExportChat}
 				/>
 				<HeaderButton
-					ref={settingsButtonRef}
-					iconName="settings"
-					tooltip="Settings"
-					onClick={onToggleSettingsMenu}
+					ref={menuButtonRef}
+					iconName="more-vertical"
+					tooltip="More"
+					onClick={onToggleMenu}
 				/>
 			</div>
 		</div>

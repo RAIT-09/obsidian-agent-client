@@ -10,7 +10,7 @@ interface AgentInfo {
 	displayName: string;
 }
 
-export interface SettingsMenuProps {
+export interface HeaderMenuProps {
 	/** Reference element for positioning */
 	anchorRef: React.RefObject<HTMLButtonElement | null>;
 	/** Current agent ID for this view */
@@ -31,7 +31,7 @@ export interface SettingsMenuProps {
 	view: ChatView;
 }
 
-export function SettingsMenu({
+export function HeaderMenu({
 	anchorRef,
 	currentAgentId,
 	availableAgents,
@@ -39,7 +39,7 @@ export function SettingsMenu({
 	onOpenNewView,
 	onOpenPluginSettings,
 	onClose,
-}: SettingsMenuProps) {
+}: HeaderMenuProps) {
 	const menuRef = useRef<HTMLDivElement>(null);
 
 	// Icons refs
@@ -109,19 +109,17 @@ export function SettingsMenu({
 	return ReactDOM.createPortal(
 		<div
 			ref={menuRef}
-			className="agent-client-settings-menu"
+			className="agent-client-header-menu"
 			style={menuStyle}
 		>
 			{/* Switch Agent Header */}
-			<div className="agent-client-settings-menu-header">
-				Switch Agent
-			</div>
+			<div className="agent-client-header-menu-header">Switch Agent</div>
 
 			{/* Agent List */}
 			{availableAgents.map((agent) => (
 				<div
 					key={agent.id}
-					className={`agent-client-settings-menu-item ${
+					className={`agent-client-header-menu-item ${
 						agent.id === currentAgentId
 							? "agent-client-current"
 							: ""
@@ -131,21 +129,21 @@ export function SettingsMenu({
 						onClose();
 					}}
 				>
-					<span className="agent-client-settings-menu-icon" />
+					<span className="agent-client-header-menu-icon" />
 					<span>{agent.displayName}</span>
 					{agent.id === currentAgentId && (
-						<span className="agent-client-settings-menu-check">
+						<span className="agent-client-header-menu-check">
 							✓
 						</span>
 					)}
 				</div>
 			))}
 
-			<div className="agent-client-settings-menu-separator" />
+			<div className="agent-client-header-menu-separator" />
 
 			{/* Open New View */}
 			<div
-				className="agent-client-settings-menu-item"
+				className="agent-client-header-menu-item"
 				onClick={() => {
 					onOpenNewView();
 					onClose();
@@ -153,16 +151,16 @@ export function SettingsMenu({
 			>
 				<span
 					ref={newViewIconRef}
-					className="agent-client-settings-menu-icon"
+					className="agent-client-header-menu-icon"
 				/>
 				<span>Open New View</span>
 			</div>
 
-			<div className="agent-client-settings-menu-separator" />
+			<div className="agent-client-header-menu-separator" />
 
 			{/* Plugin Settings */}
 			<div
-				className="agent-client-settings-menu-item"
+				className="agent-client-header-menu-item"
 				onClick={() => {
 					onOpenPluginSettings();
 					onClose();
@@ -170,7 +168,7 @@ export function SettingsMenu({
 			>
 				<span
 					ref={settingsIconRef}
-					className="agent-client-settings-menu-icon"
+					className="agent-client-header-menu-icon"
 				/>
 				<span>Plugin Settings</span>
 			</div>
