@@ -142,11 +142,7 @@ function ChatComponent({
 
 	// Subscribe to agentId restoration from Obsidian's setState
 	useEffect(() => {
-		console.log(
-			`[DEBUG] Initial restoredAgentId: ${restoredAgentId}, view.getInitialAgentId(): ${view.getInitialAgentId()}`,
-		);
 		const unsubscribe = view.onAgentIdRestored((agentId) => {
-			console.log(`[DEBUG] onAgentIdRestored called with: ${agentId}`);
 			logger.log(
 				`[ChatView] Agent ID restored from workspace: ${agentId}`,
 			);
@@ -420,10 +416,10 @@ function ChatComponent({
 	}, []);
 
 	const handleSwitchAgent = useCallback(
-		async (agentId: string) => {
+		(agentId: string) => {
 			setIsMenuOpen(false);
 			if (agentId !== session.agentId) {
-				await handleNewChat(agentId);
+				void handleNewChat(agentId);
 			}
 		},
 		[session.agentId, handleNewChat],
@@ -759,25 +755,18 @@ function ChatComponent({
 	// This handles the case where setState() is called after onOpen()
 	// Only runs ONCE for initial restoration (prevents re-triggering on agent switch)
 	useEffect(() => {
-		console.log(
-			`[DEBUG] Restore useEffect: hasRestoredAgentRef=${hasRestoredAgentRef.current}, restoredAgentId=${restoredAgentId}, session.state=${session.state}, session.agentId=${session.agentId}`,
-		);
-
 		// Only run once for initial restoration
 		if (hasRestoredAgentRef.current) {
-			console.log(`[DEBUG] Skipping: already restored`);
 			return;
 		}
 
 		// Skip if no restored agentId (initial mount with null)
 		if (!restoredAgentId) {
-			console.log(`[DEBUG] Skipping: no restoredAgentId`);
 			return;
 		}
 
 		// Skip if session is still initializing (wait for it to be ready)
 		if (session.state === "initializing") {
-			console.log(`[DEBUG] Skipping: session still initializing`);
 			return;
 		}
 
@@ -786,13 +775,9 @@ function ChatComponent({
 
 		// Skip if already using the correct agent
 		if (session.agentId === restoredAgentId) {
-			console.log(`[DEBUG] Skipping: already using correct agent`);
 			return;
 		}
 
-		console.log(
-			`[DEBUG] Triggering restartSession with: ${restoredAgentId}`,
-		);
 		logger.log(
 			`[ChatView] Switching to restored agent: ${restoredAgentId} (current: ${session.agentId})`,
 		);
