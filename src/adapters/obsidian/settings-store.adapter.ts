@@ -55,6 +55,9 @@ export class SettingsStore implements ISettingsAccess {
 	/** Plugin instance for persistence */
 	private plugin: AgentClientPlugin;
 
+	/** Lock for session operations to prevent race conditions */
+	private sessionLock: Promise<void> = Promise.resolve();
+
 	/**
 	 * Create a new settings store.
 	 *
@@ -147,27 +150,30 @@ export class SettingsStore implements ISettingsAccess {
 	 * @returns Promise that resolves when session is saved
 	 */
 	async saveSession(info: SavedSessionInfo): Promise<void> {
-		const sessions = [...(this.state.savedSessions || [])];
+		this.sessionLock = this.sessionLock.then(async () => {
+			const sessions = [...(this.state.savedSessions || [])];
 
-		// Find existing session by sessionId
-		const existingIndex = sessions.findIndex(
-			(s) => s.sessionId === info.sessionId,
-		);
+			// Find existing session by sessionId
+			const existingIndex = sessions.findIndex(
+				(s) => s.sessionId === info.sessionId,
+			);
 
-		if (existingIndex >= 0) {
-			// Update existing session
-			sessions[existingIndex] = info;
-		} else {
-			// Add new session at the beginning
-			sessions.unshift(info);
+			if (existingIndex >= 0) {
+				// Update existing session
+				sessions[existingIndex] = info;
+			} else {
+				// Add new session at the beginning
+				sessions.unshift(info);
 
-			// Remove oldest sessions if exceeding limit
-			if (sessions.length > SettingsStore.MAX_SAVED_SESSIONS) {
-				sessions.pop();
+				// Remove oldest sessions if exceeding limit
+				if (sessions.length > SettingsStore.MAX_SAVED_SESSIONS) {
+					sessions.pop();
+				}
 			}
-		}
 
-		await this.updateSettings({ savedSessions: sessions });
+			await this.updateSettings({ savedSessions: sessions });
+		});
+		await this.sessionLock;
 	}
 
 	/**
@@ -206,14 +212,17 @@ export class SettingsStore implements ISettingsAccess {
 	 * @returns Promise that resolves when session is deleted
 	 */
 	async deleteSession(sessionId: string): Promise<void> {
-		// Delete metadata from savedSessions
-		const sessions = (this.state.savedSessions || []).filter(
-			(s) => s.sessionId !== sessionId,
-		);
-		await this.updateSettings({ savedSessions: sessions });
+		this.sessionLock = this.sessionLock.then(async () => {
+			// Delete metadata from savedSessions
+			const sessions = (this.state.savedSessions || []).filter(
+				(s) => s.sessionId !== sessionId,
+			);
+			await this.updateSettings({ savedSessions: sessions });
 
-		// Also delete message history file
-		await this.deleteSessionMessages(sessionId);
+			// Also delete message history file
+			await this.deleteSessionMessages(sessionId);
+		});
+		await this.sessionLock;
 	}
 
 	// ============================================================

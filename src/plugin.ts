@@ -440,14 +440,6 @@ export default class AgentClientPlugin extends Plugin {
 	 * Open chat view and switch to specified agent
 	 */
 	private async openChatWithAgent(agentId: string): Promise<void> {
-		// 1. Update default agent in settings (if different from current)
-		if (this.settings.defaultAgentId !== agentId) {
-			await this.settingsStore.updateSettings({
-				defaultAgentId: agentId,
-			});
-		}
-
-		// 2. Activate view (create new or focus existing)
 		await this.activateView();
 
 		// Trigger new chat with specific agent
