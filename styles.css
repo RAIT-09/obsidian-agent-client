@@ -1600,14 +1600,6 @@ If your plugin does not need CSS, delete this file.
 	gap: 8px;
 }
 
-.agent-client-confirm-delete-cancel {
-	/* Uses default button styles */
-}
-
-.agent-client-confirm-delete-confirm {
-	/* mod-warning class provides warning color */
-}
-
 /* ===== Settings Menu ===== */
 .agent-client-header-menu {
 	position: fixed;
@@ -1637,10 +1629,6 @@ If your plugin does not need CSS, delete this file.
 
 .agent-client-header-menu-item.agent-client-current {
 	color: var(--interactive-accent-hover);
-}
-
-.agent-client-header-menu-item-submenu {
-	/* Additional styles for submenu items if needed */
 }
 
 .agent-client-header-menu-icon {
