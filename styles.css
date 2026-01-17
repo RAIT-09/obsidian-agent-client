@@ -1636,7 +1636,7 @@ If your plugin does not need CSS, delete this file.
 }
 
 .agent-client-settings-menu-item.agent-client-current {
-	color: var(--text-accent);
+	color: var(--interactive-accent-hover);
 }
 
 .agent-client-settings-menu-item-submenu {
@@ -1665,7 +1665,7 @@ If your plugin does not need CSS, delete this file.
 
 .agent-client-settings-menu-check {
 	margin-left: auto;
-	color: var(--text-accent);
+	color: var(--interactive-accent-hover);
 	font-size: 12px;
 }
 
