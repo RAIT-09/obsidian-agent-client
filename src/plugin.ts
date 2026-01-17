@@ -160,6 +160,22 @@ export default class AgentClientPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "focus-next-chat-view",
+			name: "Focus next chat view",
+			callback: () => {
+				this.focusChatView("next");
+			},
+		});
+
+		this.addCommand({
+			id: "focus-previous-chat-view",
+			name: "Focus previous chat view",
+			callback: () => {
+				this.focusChatView("previous");
+			},
+		});
+
 		// Register agent-specific commands
 		this.registerAgentCommands();
 		this.registerPermissionCommands();
@@ -267,19 +283,66 @@ export default class AgentClientPlugin extends Plugin {
 
 		if (leaf) {
 			await workspace.revealLeaf(leaf);
-			// Focus textarea after revealing the leaf
-			const viewContainerEl = leaf.view?.containerEl;
-			if (viewContainerEl) {
-				window.setTimeout(() => {
-					const textarea = viewContainerEl.querySelector(
-						"textarea.agent-client-chat-input-textarea",
-					);
-					if (textarea instanceof HTMLTextAreaElement) {
-						textarea.focus();
-					}
-				}, 0);
+			this.focusTextarea(leaf);
+		}
+	}
+
+	/**
+	 * Focus the textarea in a ChatView leaf.
+	 */
+	private focusTextarea(leaf: WorkspaceLeaf): void {
+		const viewContainerEl = leaf.view?.containerEl;
+		if (viewContainerEl) {
+			window.setTimeout(() => {
+				const textarea = viewContainerEl.querySelector(
+					"textarea.agent-client-chat-input-textarea",
+				);
+				if (textarea instanceof HTMLTextAreaElement) {
+					textarea.focus();
+				}
+			}, 50);
+		}
+	}
+
+	/**
+	 * Focus the next or previous ChatView in the list.
+	 * Cycles through all ChatView leaves.
+	 */
+	private focusChatView(direction: "next" | "previous"): void {
+		const { workspace } = this.app;
+		const leaves = workspace.getLeavesOfType(VIEW_TYPE_CHAT);
+
+		if (leaves.length === 0) {
+			return;
+		}
+
+		if (leaves.length === 1) {
+			void workspace.revealLeaf(leaves[0]);
+			this.focusTextarea(leaves[0]);
+			return;
+		}
+
+		// Find current index
+		let currentIndex = 0;
+		if (this._lastActiveChatViewId) {
+			const foundIndex = leaves.findIndex(
+				(l) =>
+					(l.view as ChatView)?.viewId === this._lastActiveChatViewId,
+			);
+			if (foundIndex !== -1) {
+				currentIndex = foundIndex;
 			}
 		}
+
+		// Get target index (cycle)
+		const targetIndex =
+			direction === "next"
+				? (currentIndex + 1) % leaves.length
+				: (currentIndex - 1 + leaves.length) % leaves.length;
+		const targetLeaf = leaves[targetIndex];
+
+		void workspace.revealLeaf(targetLeaf);
+		this.focusTextarea(targetLeaf);
 	}
 
 	/**
