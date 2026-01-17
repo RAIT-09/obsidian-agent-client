@@ -6,7 +6,11 @@ import {
 	Platform,
 } from "obsidian";
 import type AgentClientPlugin from "../../plugin";
-import type { CustomAgentSettings, AgentEnvVar } from "../../plugin";
+import type {
+	CustomAgentSettings,
+	AgentEnvVar,
+	ChatViewLocation,
+} from "../../plugin";
 import { normalizeEnvVars } from "../../shared/settings-utils";
 
 export class AgentClientSettingTab extends PluginSettingTab {
@@ -166,6 +170,22 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// ─────────────────────────────────────────────────────────────────────
 
 		new Setting(containerEl).setName("Display").setHeading();
+
+		new Setting(containerEl)
+			.setName("Chat view location")
+			.setDesc("Where to open new chat views")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("right-tab", "Right pane (tabs)")
+					.addOption("editor-tab", "Editor area (tabs)")
+					.addOption("editor-split", "Editor area (split)")
+					.setValue(this.plugin.settings.chatViewLocation)
+					.onChange(async (value) => {
+						this.plugin.settings.chatViewLocation =
+							value as ChatViewLocation;
+						await this.plugin.saveSettings();
+					}),
+			);
 
 		new Setting(containerEl)
 			.setName("Show emojis")
@@ -510,8 +530,8 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		const currentValue = this.agentSelector.getValue();
 
 		// Only update if different to avoid triggering onChange
-		if (settings.activeAgentId !== currentValue) {
-			this.agentSelector.setValue(settings.activeAgentId);
+		if (settings.defaultAgentId !== currentValue) {
+			this.agentSelector.setValue(settings.defaultAgentId);
 		}
 	}
 
@@ -527,21 +547,21 @@ export class AgentClientSettingTab extends PluginSettingTab {
 	}
 
 	private renderAgentSelector(containerEl: HTMLElement) {
-		this.plugin.ensureActiveAgentId();
+		this.plugin.ensureDefaultAgentId();
 
 		new Setting(containerEl)
-			.setName("Active agent")
-			.setDesc("Choose which agent handles new chat sessions.")
+			.setName("Default agent")
+			.setDesc("Choose which agent is used when opening a new chat view.")
 			.addDropdown((dropdown) => {
 				this.agentSelector = dropdown;
 				this.populateAgentDropdown(dropdown);
-				dropdown.setValue(this.plugin.settings.activeAgentId);
+				dropdown.setValue(this.plugin.settings.defaultAgentId);
 				dropdown.onChange(async (value) => {
 					const nextSettings = {
 						...this.plugin.settings,
-						activeAgentId: value,
+						defaultAgentId: value,
 					};
-					this.plugin.ensureActiveAgentId();
+					this.plugin.ensureDefaultAgentId();
 					await this.plugin.saveSettingsAndNotify(nextSettings);
 				});
 			});
@@ -559,7 +579,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			return;
 		}
 		this.populateAgentDropdown(this.agentSelector);
-		this.agentSelector.setValue(this.plugin.settings.activeAgentId);
+		this.agentSelector.setValue(this.plugin.settings.defaultAgentId);
 	}
 
 	private getAgentOptions(): { id: string; label: string }[] {
@@ -832,7 +852,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						args: [],
 						env: [],
 					});
-					this.plugin.ensureActiveAgentId();
+					this.plugin.ensureDefaultAgentId();
 					await this.plugin.saveSettings();
 					this.display();
 				});
@@ -864,10 +884,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 							text.setValue(nextId);
 						}
 						this.plugin.settings.customAgents[index].id = nextId;
-						if (this.plugin.settings.activeAgentId === previousId) {
-							this.plugin.settings.activeAgentId = nextId;
+						if (
+							this.plugin.settings.defaultAgentId === previousId
+						) {
+							this.plugin.settings.defaultAgentId = nextId;
 						}
-						this.plugin.ensureActiveAgentId();
+						this.plugin.ensureDefaultAgentId();
 						await this.plugin.saveSettings();
 						this.refreshAgentDropdown();
 					});
@@ -879,7 +901,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				.setTooltip("Delete this agent")
 				.onClick(async () => {
 					this.plugin.settings.customAgents.splice(index, 1);
-					this.plugin.ensureActiveAgentId();
+					this.plugin.ensureDefaultAgentId();
 					await this.plugin.saveSettings();
 					this.display();
 				});
