@@ -6,7 +6,11 @@ import {
 	Platform,
 } from "obsidian";
 import type AgentClientPlugin from "../../plugin";
-import type { CustomAgentSettings, AgentEnvVar } from "../../plugin";
+import type {
+	CustomAgentSettings,
+	AgentEnvVar,
+	ChatViewLocation,
+} from "../../plugin";
 import { normalizeEnvVars } from "../../shared/settings-utils";
 
 export class AgentClientSettingTab extends PluginSettingTab {
@@ -166,6 +170,22 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// ─────────────────────────────────────────────────────────────────────
 
 		new Setting(containerEl).setName("Display").setHeading();
+
+		new Setting(containerEl)
+			.setName("Chat view location")
+			.setDesc("Where to open new chat views")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("right-tab", "Right pane (tabs)")
+					.addOption("editor-tab", "Editor area (tabs)")
+					.addOption("editor-split", "Editor area (split)")
+					.setValue(this.plugin.settings.chatViewLocation)
+					.onChange(async (value) => {
+						this.plugin.settings.chatViewLocation =
+							value as ChatViewLocation;
+						await this.plugin.saveSettings();
+					}),
+			);
 
 		new Setting(containerEl)
 			.setName("Show emojis")

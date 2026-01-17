@@ -32,6 +32,14 @@ export type { AgentEnvVar, CustomAgentSettings };
  */
 export type SendMessageShortcut = "enter" | "cmd-enter";
 
+/**
+ * Chat view location configuration.
+ * - 'right-tab': Open in right pane as tabs (default)
+ * - 'editor-tab': Open in editor area as tabs
+ * - 'editor-split': Open in editor area with right split
+ */
+export type ChatViewLocation = "right-tab" | "editor-tab" | "editor-split";
+
 export interface AgentClientPluginSettings {
 	gemini: GeminiAgentSettings;
 	claude: ClaudeAgentSettings;
@@ -59,6 +67,8 @@ export interface AgentClientPluginSettings {
 	windowsWslDistribution?: string;
 	// Input behavior
 	sendMessageShortcut: SendMessageShortcut;
+	// View settings
+	chatViewLocation: ChatViewLocation;
 	// Display settings
 	displaySettings: {
 		autoCollapseDiffs: boolean;
@@ -116,6 +126,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	windowsWslMode: false,
 	windowsWslDistribution: undefined,
 	sendMessageShortcut: "enter",
+	chatViewLocation: "right-tab",
 	displaySettings: {
 		autoCollapseDiffs: false,
 		diffCollapseThreshold: 10,
@@ -272,7 +283,7 @@ export default class AgentClientPlugin extends Plugin {
 				leaf = leaves[0];
 			}
 		} else {
-			leaf = workspace.getRightLeaf(false);
+			leaf = this.createNewChatLeaf(false);
 			if (leaf) {
 				await leaf.setViewState({
 					type: VIEW_TYPE_CHAT,
@@ -346,14 +357,31 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	/**
+	 * Create a new leaf for ChatView based on the configured location setting.
+	 * @param isAdditional - true when opening additional views (e.g., Open New View)
+	 */
+	private createNewChatLeaf(isAdditional: boolean): WorkspaceLeaf | null {
+		const { workspace } = this.app;
+		const location = this.settings.chatViewLocation;
+
+		switch (location) {
+			case "right-tab":
+				return workspace.getRightLeaf(isAdditional);
+			case "editor-tab":
+				return workspace.getLeaf("tab");
+			case "editor-split":
+				return workspace.getLeaf("split");
+			default:
+				return workspace.getRightLeaf(isAdditional);
+		}
+	}
+
+	/**
 	 * Open a new chat view with a specific agent.
 	 * Always creates a new view (doesn't reuse existing).
 	 */
 	async openNewChatViewWithAgent(agentId: string): Promise<void> {
-		const { workspace } = this.app;
-
-		// Always create new leaf (split right)
-		const leaf = workspace.getRightLeaf(true);
+		const leaf = this.createNewChatLeaf(true);
 		if (!leaf) {
 			console.warn("[AgentClient] Failed to create new leaf");
 			return;
@@ -365,7 +393,7 @@ export default class AgentClientPlugin extends Plugin {
 			state: { initialAgentId: agentId },
 		});
 
-		await workspace.revealLeaf(leaf);
+		await this.app.workspace.revealLeaf(leaf);
 
 		// Focus textarea after revealing the leaf
 		const viewContainerEl = leaf.view?.containerEl;
@@ -711,6 +739,12 @@ export default class AgentClientPlugin extends Plugin {
 				rawSettings.sendMessageShortcut === "cmd-enter"
 					? rawSettings.sendMessageShortcut
 					: DEFAULT_SETTINGS.sendMessageShortcut,
+			chatViewLocation:
+				rawSettings.chatViewLocation === "right-tab" ||
+				rawSettings.chatViewLocation === "editor-tab" ||
+				rawSettings.chatViewLocation === "editor-split"
+					? rawSettings.chatViewLocation
+					: DEFAULT_SETTINGS.chatViewLocation,
 			displaySettings: (() => {
 				const rawDisplay = rawSettings.displaySettings as
 					| Record<string, unknown>
