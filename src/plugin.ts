@@ -200,6 +200,7 @@ export default class AgentClientPlugin extends Plugin {
 		// Register agent-specific commands
 		this.registerAgentCommands();
 		this.registerPermissionCommands();
+		this.registerBroadcastCommands();
 
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
 
@@ -524,6 +525,142 @@ export default class AgentClientPlugin extends Plugin {
 				);
 			},
 		});
+	}
+
+	/**
+	 * Register broadcast commands for multi-view operations
+	 */
+	private registerBroadcastCommands(): void {
+		// Broadcast prompt: Copy prompt from active view to all other views
+		this.addCommand({
+			id: "broadcast-prompt",
+			name: "Broadcast prompt",
+			callback: () => {
+				this.broadcastPrompt();
+			},
+		});
+
+		// Broadcast send: Send message in all views that can send
+		this.addCommand({
+			id: "broadcast-send",
+			name: "Broadcast send",
+			callback: () => {
+				void this.broadcastSend();
+			},
+		});
+
+		// Broadcast cancel: Cancel operation in all views
+		this.addCommand({
+			id: "broadcast-cancel",
+			name: "Broadcast cancel",
+			callback: () => {
+				void this.broadcastCancel();
+			},
+		});
+	}
+
+	/**
+	 * Copy prompt from active view to all other views
+	 */
+	private broadcastPrompt(): void {
+		const allChatViews = this.getAllChatViews();
+		if (allChatViews.length === 0) {
+			new Notice("[Agent Client] No chat views open");
+			return;
+		}
+
+		// Find the active (source) view
+		const activeViewId = this._lastActiveChatViewId;
+		const sourceView = allChatViews.find((v) => v.viewId === activeViewId);
+
+		if (!sourceView) {
+			new Notice("[Agent Client] No active chat view found");
+			return;
+		}
+
+		// Get input state from source view
+		const inputState = sourceView.getInputState();
+		if (
+			!inputState ||
+			(inputState.text.trim() === "" && inputState.images.length === 0)
+		) {
+			new Notice("[Agent Client] No prompt to broadcast");
+			return;
+		}
+
+		// Broadcast to all other views
+		const targetViews = allChatViews.filter(
+			(v) => v.viewId !== activeViewId,
+		);
+		if (targetViews.length === 0) {
+			new Notice("[Agent Client] No other chat views to broadcast to");
+			return;
+		}
+
+		let successCount = 0;
+		for (const view of targetViews) {
+			view.setInputState(inputState);
+			successCount++;
+		}
+
+		new Notice(
+			`[Agent Client] Prompt broadcast to ${successCount} view(s)`,
+		);
+	}
+
+	/**
+	 * Send message in all views that can send
+	 */
+	private async broadcastSend(): Promise<void> {
+		const allChatViews = this.getAllChatViews();
+		if (allChatViews.length === 0) {
+			new Notice("[Agent Client] No chat views open");
+			return;
+		}
+
+		// Filter to views that can send
+		const sendableViews = allChatViews.filter((v) => v.canSend());
+		if (sendableViews.length === 0) {
+			new Notice("[Agent Client] No views ready to send");
+			return;
+		}
+
+		// Send in all views concurrently
+		const results = await Promise.allSettled(
+			sendableViews.map((v) => v.sendMessage()),
+		);
+
+		const successCount = results.filter(
+			(r) => r.status === "fulfilled" && r.value === true,
+		).length;
+
+		new Notice(`[Agent Client] Message sent in ${successCount} view(s)`);
+	}
+
+	/**
+	 * Cancel operation in all views
+	 */
+	private async broadcastCancel(): Promise<void> {
+		const allChatViews = this.getAllChatViews();
+		if (allChatViews.length === 0) {
+			new Notice("[Agent Client] No chat views open");
+			return;
+		}
+
+		// Cancel in all views concurrently
+		await Promise.allSettled(allChatViews.map((v) => v.cancelOperation()));
+
+		new Notice("[Agent Client] Cancel broadcast to all views");
+	}
+
+	/**
+	 * Get all open ChatView instances
+	 */
+	private getAllChatViews(): ChatView[] {
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
+		return leaves
+			.map((leaf) => leaf.view)
+			.filter((view): view is ChatView => view instanceof ChatView);
 	}
 
 	async loadSettings() {

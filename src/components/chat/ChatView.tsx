@@ -4,11 +4,13 @@ const { useState, useRef, useEffect, useMemo, useCallback } = React;
 import { createRoot, Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../../plugin";
+import type { ChatInputState } from "../../domain/models/chat-input-state";
 
 // Component imports
 import { ChatHeader } from "./ChatHeader";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
+import type { AttachedImage } from "./ImagePreviewStrip";
 import { SessionHistoryModal } from "./SessionHistoryModal";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { HeaderMenu } from "./HeaderMenu";
@@ -140,7 +142,11 @@ function ChatComponent({
 
 	// Subscribe to agentId restoration from Obsidian's setState
 	useEffect(() => {
+		console.log(
+			`[DEBUG] Initial restoredAgentId: ${restoredAgentId}, view.getInitialAgentId(): ${view.getInitialAgentId()}`,
+		);
 		const unsubscribe = view.onAgentIdRestored((agentId) => {
+			console.log(`[DEBUG] onAgentIdRestored called with: ${agentId}`);
 			logger.log(
 				`[ChatView] Agent ID restored from workspace: ${agentId}`,
 			);
@@ -266,12 +272,20 @@ function ChatComponent({
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 
 	// ============================================================
+	// Input State (lifted from ChatInput for broadcast commands)
+	// ============================================================
+	const [inputValue, setInputValue] = useState("");
+	const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+
+	// ============================================================
 	// Refs
 	// ============================================================
 	/** Ref for session history modal (persisted across renders) */
 	const historyModalRef = useRef<SessionHistoryModal | null>(null);
 	/** Ref for settings button (for menu positioning) */
 	const menuButtonRef = useRef<HTMLButtonElement>(null);
+	/** Track if initial agent restoration has been performed (prevent re-triggering) */
+	const hasRestoredAgentRef = useRef(false);
 
 	// ============================================================
 	// Computed Values
@@ -628,29 +642,157 @@ function ChatComponent({
 	}, []);
 
 	// ============================================================
+	// Broadcast Command Callbacks
+	// ============================================================
+	/** Get current input state for broadcast commands */
+	const getInputState = useCallback((): ChatInputState | null => {
+		return {
+			text: inputValue,
+			images: attachedImages,
+		};
+	}, [inputValue, attachedImages]);
+
+	/** Set input state from broadcast commands */
+	const setInputState = useCallback((state: ChatInputState) => {
+		setInputValue(state.text);
+		setAttachedImages(state.images);
+	}, []);
+
+	/** Send message for broadcast commands (returns true if sent) */
+	const sendMessageForBroadcast = useCallback(async (): Promise<boolean> => {
+		// Allow sending if there's text OR images
+		if (!inputValue.trim() && attachedImages.length === 0) {
+			return false;
+		}
+		if (!isSessionReady || sessionHistory.loading) {
+			return false;
+		}
+		if (isSending) {
+			return false;
+		}
+
+		// Convert attached images to ImagePromptContent format
+		const imagesToSend: ImagePromptContent[] = attachedImages.map(
+			(img) => ({
+				type: "image",
+				data: img.data,
+				mimeType: img.mimeType,
+			}),
+		);
+
+		// Clear input before sending
+		const messageToSend = inputValue.trim();
+		setInputValue("");
+		setAttachedImages([]);
+
+		await handleSendMessage(
+			messageToSend,
+			imagesToSend.length > 0 ? imagesToSend : undefined,
+		);
+		return true;
+	}, [
+		inputValue,
+		attachedImages,
+		isSessionReady,
+		sessionHistory.loading,
+		isSending,
+		handleSendMessage,
+	]);
+
+	/** Check if this view can send a message */
+	const canSendForBroadcast = useCallback((): boolean => {
+		const hasContent =
+			inputValue.trim() !== "" || attachedImages.length > 0;
+		return (
+			hasContent &&
+			isSessionReady &&
+			!sessionHistory.loading &&
+			!isSending
+		);
+	}, [
+		inputValue,
+		attachedImages,
+		isSessionReady,
+		sessionHistory.loading,
+		isSending,
+	]);
+
+	/** Cancel current operation for broadcast commands */
+	const cancelForBroadcast = useCallback(async (): Promise<void> => {
+		if (isSending) {
+			await handleStopGeneration();
+		}
+	}, [isSending, handleStopGeneration]);
+
+	// Register callbacks with ChatView class for broadcast commands
+	useEffect(() => {
+		view.registerInputCallbacks({
+			getInputState,
+			setInputState,
+			sendMessage: sendMessageForBroadcast,
+			canSend: canSendForBroadcast,
+			cancel: cancelForBroadcast,
+		});
+
+		return () => {
+			view.unregisterInputCallbacks();
+		};
+	}, [
+		view,
+		getInputState,
+		setInputState,
+		sendMessageForBroadcast,
+		canSendForBroadcast,
+		cancelForBroadcast,
+	]);
+
+	// ============================================================
 	// Effects - Session Lifecycle
 	// ============================================================
 	// Initialize session on mount
 	useEffect(() => {
 		logger.log("[Debug] Starting connection setup via useAgentSession...");
-		void agentSession.createSession();
-	}, [agentSession.createSession]);
+		void agentSession.createSession(restoredAgentId);
+	}, [agentSession.createSession, restoredAgentId]);
 
 	// Re-create session when agentId is restored from workspace state
 	// This handles the case where setState() is called after onOpen()
+	// Only runs ONCE for initial restoration (prevents re-triggering on agent switch)
 	useEffect(() => {
-		// Skip if:
-		// - No restored agentId (initial mount with null)
-		// - Session is still initializing (avoid interrupting initial createSession)
-		// - Already using the correct agent
-		if (
-			!restoredAgentId ||
-			session.state === "initializing" ||
-			session.agentId === restoredAgentId
-		) {
+		console.log(
+			`[DEBUG] Restore useEffect: hasRestoredAgentRef=${hasRestoredAgentRef.current}, restoredAgentId=${restoredAgentId}, session.state=${session.state}, session.agentId=${session.agentId}`,
+		);
+
+		// Only run once for initial restoration
+		if (hasRestoredAgentRef.current) {
+			console.log(`[DEBUG] Skipping: already restored`);
 			return;
 		}
 
+		// Skip if no restored agentId (initial mount with null)
+		if (!restoredAgentId) {
+			console.log(`[DEBUG] Skipping: no restoredAgentId`);
+			return;
+		}
+
+		// Skip if session is still initializing (wait for it to be ready)
+		if (session.state === "initializing") {
+			console.log(`[DEBUG] Skipping: session still initializing`);
+			return;
+		}
+
+		// Mark as handled once we can make a decision
+		hasRestoredAgentRef.current = true;
+
+		// Skip if already using the correct agent
+		if (session.agentId === restoredAgentId) {
+			console.log(`[DEBUG] Skipping: already using correct agent`);
+			return;
+		}
+
+		console.log(
+			`[DEBUG] Triggering restartSession with: ${restoredAgentId}`,
+		);
 		logger.log(
 			`[ChatView] Switching to restored agent: ${restoredAgentId} (current: ${session.agentId})`,
 		);
@@ -1009,6 +1151,11 @@ function ChatComponent({
 				onModelChange={(modelId) => void agentSession.setModel(modelId)}
 				supportsImages={session.promptCapabilities?.image ?? false}
 				agentId={session.agentId}
+				// Controlled component props (for broadcast commands)
+				inputValue={inputValue}
+				onInputChange={setInputValue}
+				attachedImages={attachedImages}
+				onAttachedImagesChange={setAttachedImages}
 			/>
 		</div>
 	);
@@ -1018,6 +1165,13 @@ function ChatComponent({
 interface ChatViewState extends Record<string, unknown> {
 	initialAgentId?: string;
 }
+
+// Callback types for input state access (broadcast commands)
+type GetInputStateCallback = () => ChatInputState | null;
+type SetInputStateCallback = (state: ChatInputState) => void;
+type SendMessageCallback = () => Promise<boolean>;
+type CanSendCallback = () => boolean;
+type CancelCallback = () => Promise<void>;
 
 export class ChatView extends ItemView {
 	private root: Root | null = null;
@@ -1030,6 +1184,13 @@ export class ChatView extends ItemView {
 	/** Callbacks to notify React when agentId is restored from workspace state */
 	private agentIdRestoredCallbacks: Set<(agentId: string) => void> =
 		new Set();
+
+	// Callbacks for input state access (broadcast commands)
+	private getInputStateCallback: GetInputStateCallback | null = null;
+	private setInputStateCallback: SetInputStateCallback | null = null;
+	private sendMessageCallback: SendMessageCallback | null = null;
+	private canSendCallback: CanSendCallback | null = null;
+	private cancelCallback: CancelCallback | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: AgentClientPlugin) {
 		super(leaf);
@@ -1108,6 +1269,75 @@ export class ChatView extends ItemView {
 		return () => {
 			this.agentIdRestoredCallbacks.delete(callback);
 		};
+	}
+
+	// ============================================================
+	// Input State Callbacks (for broadcast commands)
+	// ============================================================
+
+	/**
+	 * Register callbacks for input state access.
+	 * Called by ChatComponent on mount.
+	 */
+	registerInputCallbacks(callbacks: {
+		getInputState: GetInputStateCallback;
+		setInputState: SetInputStateCallback;
+		sendMessage: SendMessageCallback;
+		canSend: CanSendCallback;
+		cancel: CancelCallback;
+	}): void {
+		this.getInputStateCallback = callbacks.getInputState;
+		this.setInputStateCallback = callbacks.setInputState;
+		this.sendMessageCallback = callbacks.sendMessage;
+		this.canSendCallback = callbacks.canSend;
+		this.cancelCallback = callbacks.cancel;
+	}
+
+	/**
+	 * Unregister callbacks when component unmounts.
+	 */
+	unregisterInputCallbacks(): void {
+		this.getInputStateCallback = null;
+		this.setInputStateCallback = null;
+		this.sendMessageCallback = null;
+		this.canSendCallback = null;
+		this.cancelCallback = null;
+	}
+
+	/**
+	 * Get current input state (text + images).
+	 * Returns null if React component not mounted.
+	 */
+	getInputState(): ChatInputState | null {
+		return this.getInputStateCallback?.() ?? null;
+	}
+
+	/**
+	 * Set input state (text + images).
+	 */
+	setInputState(state: ChatInputState): void {
+		this.setInputStateCallback?.(state);
+	}
+
+	/**
+	 * Trigger send message. Returns true if message was sent.
+	 */
+	async sendMessage(): Promise<boolean> {
+		return (await this.sendMessageCallback?.()) ?? false;
+	}
+
+	/**
+	 * Check if this view can send a message.
+	 */
+	canSend(): boolean {
+		return this.canSendCallback?.() ?? false;
+	}
+
+	/**
+	 * Cancel current operation.
+	 */
+	async cancelOperation(): Promise<void> {
+		await this.cancelCallback?.();
 	}
 
 	onOpen() {

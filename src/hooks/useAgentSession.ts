@@ -54,10 +54,11 @@ export interface UseAgentSessionReturn {
 	errorInfo: SessionErrorInfo | null;
 
 	/**
-	 * Create a new session with the current active agent.
+	 * Create a new session with the specified or default agent.
 	 * Resets session state and initializes connection.
+	 * @param overrideAgentId - Optional agent ID to use instead of default
 	 */
-	createSession: () => Promise<void>;
+	createSession: (overrideAgentId?: string) => Promise<void>;
 
 	/**
 	 * Load a previous session by ID.

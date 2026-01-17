@@ -91,6 +91,15 @@ export interface ChatInputProps {
 	supportsImages?: boolean;
 	/** Current agent ID (used to clear images on agent switch) */
 	agentId: string;
+	// Controlled component props (for broadcast commands)
+	/** Current input text value */
+	inputValue: string;
+	/** Callback when input text changes */
+	onInputChange: (value: string) => void;
+	/** Currently attached images */
+	attachedImages: AttachedImage[];
+	/** Callback when attached images change */
+	onAttachedImagesChange: (images: AttachedImage[]) => void;
 }
 
 /**
@@ -127,6 +136,11 @@ export function ChatInput({
 	onModelChange,
 	supportsImages = false,
 	agentId,
+	// Controlled component props
+	inputValue,
+	onInputChange,
+	attachedImages,
+	onAttachedImagesChange,
 }: ChatInputProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 	const settings = useSettings(plugin);
@@ -138,11 +152,9 @@ export function ChatInput({
 		(plugin.app.vault as any).getConfig("spellcheck") ?? true;
 	/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
 
-	// Local state
-	const [inputValue, setInputValue] = useState("");
+	// Local state (hint and command are still local - not needed for broadcast)
 	const [hintText, setHintText] = useState<string | null>(null);
 	const [commandText, setCommandText] = useState<string>("");
-	const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
 	const [isDraggingOver, setIsDraggingOver] = useState(false);
 
 	// Refs
@@ -156,29 +168,35 @@ export function ChatInput({
 
 	// Clear attached images when agent changes
 	useEffect(() => {
-		setAttachedImages([]);
-	}, [agentId]);
+		onAttachedImagesChange([]);
+	}, [agentId, onAttachedImagesChange]);
 
 	/**
 	 * Add an image to the attached images list.
 	 * Simple addition - validation is done in handlePaste.
 	 */
-	const addImage = useCallback((image: AttachedImage) => {
-		setAttachedImages((prev) => {
-			// Safety check for race conditions
-			if (prev.length >= MAX_IMAGE_COUNT) {
-				return prev;
+	const addImage = useCallback(
+		(image: AttachedImage) => {
+			// Safety check for max count
+			if (attachedImages.length >= MAX_IMAGE_COUNT) {
+				return;
 			}
-			return [...prev, image];
-		});
-	}, []);
+			onAttachedImagesChange([...attachedImages, image]);
+		},
+		[attachedImages, onAttachedImagesChange],
+	);
 
 	/**
 	 * Remove an image from the attached images list.
 	 */
-	const removeImage = useCallback((id: string) => {
-		setAttachedImages((prev) => prev.filter((img) => img.id !== id));
-	}, []);
+	const removeImage = useCallback(
+		(id: string) => {
+			onAttachedImagesChange(
+				attachedImages.filter((img) => img.id !== id),
+			);
+		},
+		[attachedImages, onAttachedImagesChange],
+	);
 
 	/**
 	 * Convert a File to Base64 string.
@@ -346,20 +364,23 @@ export function ChatInput({
 	/**
 	 * Common logic for setting cursor position after text replacement.
 	 */
-	const setTextAndFocus = useCallback((newText: string) => {
-		setInputValue(newText);
+	const setTextAndFocus = useCallback(
+		(newText: string) => {
+			onInputChange(newText);
 
-		// Set cursor position to end of text
-		window.setTimeout(() => {
-			const textarea = textareaRef.current;
-			if (textarea) {
-				const cursorPos = newText.length;
-				textarea.selectionStart = cursorPos;
-				textarea.selectionEnd = cursorPos;
-				textarea.focus();
-			}
-		}, 0);
-	}, []);
+			// Set cursor position to end of text
+			window.setTimeout(() => {
+				const textarea = textareaRef.current;
+				if (textarea) {
+					const cursorPos = newText.length;
+					textarea.selectionStart = cursorPos;
+					textarea.selectionEnd = cursorPos;
+					textarea.focus();
+				}
+			}, 0);
+		},
+		[onInputChange],
+	);
 
 	/**
 	 * Handle mention selection from dropdown.
@@ -378,7 +399,7 @@ export function ChatInput({
 	const handleSelectSlashCommand = useCallback(
 		(command: SlashCommand) => {
 			const newText = slashCommands.selectSuggestion(inputValue, command);
-			setInputValue(newText);
+			onInputChange(newText);
 
 			// Setup hint overlay if command has hint
 			if (command.hint) {
@@ -404,7 +425,7 @@ export function ChatInput({
 				}
 			}, 0);
 		},
-		[slashCommands, inputValue],
+		[slashCommands, inputValue, onInputChange],
 	);
 
 	/**
@@ -499,8 +520,8 @@ export function ChatInput({
 		);
 
 		// Clear input, images, and hint state immediately
-		setInputValue("");
-		setAttachedImages([]);
+		onInputChange("");
+		onAttachedImagesChange([]);
 		setHintText(null);
 		setCommandText("");
 
@@ -514,6 +535,8 @@ export function ChatInput({
 		attachedImages,
 		onSendMessage,
 		onStopGeneration,
+		onInputChange,
+		onAttachedImagesChange,
 	]);
 
 	/**
@@ -641,7 +664,7 @@ export function ChatInput({
 				cursorPosition,
 			);
 
-			setInputValue(newValue);
+			onInputChange(newValue);
 
 			// Hide hint overlay when user modifies the input
 			if (hintText) {
@@ -658,7 +681,7 @@ export function ChatInput({
 			// Update slash command suggestions
 			slashCommands.updateSuggestions(newValue, cursorPosition);
 		},
-		[logger, hintText, commandText, mentions, slashCommands],
+		[logger, hintText, commandText, mentions, slashCommands, onInputChange],
 	);
 
 	// Adjust textarea height when input changes
@@ -702,7 +725,7 @@ export function ChatInput({
 	useEffect(() => {
 		if (restoredMessage) {
 			if (!inputValue.trim()) {
-				setInputValue(restoredMessage);
+				onInputChange(restoredMessage);
 				// Focus and place cursor at end
 				window.setTimeout(() => {
 					if (textareaRef.current) {
@@ -716,7 +739,7 @@ export function ChatInput({
 			}
 			onRestoredMessageConsumed();
 		}
-	}, [restoredMessage, onRestoredMessageConsumed, inputValue]);
+	}, [restoredMessage, onRestoredMessageConsumed, inputValue, onInputChange]);
 
 	// Stable references for callbacks
 	const onModeChangeRef = useRef(onModeChange);
