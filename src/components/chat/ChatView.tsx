@@ -390,13 +390,10 @@ function ChatComponent({
 		[session.agentId, handleNewChat],
 	);
 
-	const handleOpenNewView = useCallback(
-		(agentId: string) => {
-			setIsSettingsMenuOpen(false);
-			void plugin.openNewChatViewWithAgent(agentId);
-		},
-		[plugin],
-	);
+	const handleOpenNewView = useCallback(() => {
+		setIsSettingsMenuOpen(false);
+		void plugin.openNewChatViewWithAgent(plugin.settings.defaultAgentId);
+	}, [plugin]);;
 
 	/** Get available agents for settings menu */
 	const availableAgents = useMemo(() => {

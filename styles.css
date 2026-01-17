@@ -1675,6 +1675,15 @@ If your plugin does not need CSS, delete this file.
 	margin: 4px 0;
 }
 
+.agent-client-settings-menu-header {
+	padding: 8px 12px 4px;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
 .agent-client-settings-menu-back {
 	display: flex;
 	align-items: center;
