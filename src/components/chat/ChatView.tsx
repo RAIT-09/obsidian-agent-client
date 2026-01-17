@@ -130,10 +130,30 @@ function ChatComponent({
 	// ============================================================
 	const settings = useSettings(plugin);
 
+	// ============================================================
+	// Agent ID State (synced with Obsidian view state)
+	// ============================================================
+	// Start with view's current value (may be null on initial mount before setState)
+	const [restoredAgentId, setRestoredAgentId] = useState<string | undefined>(
+		view.getInitialAgentId() ?? undefined,
+	);
+
+	// Subscribe to agentId restoration from Obsidian's setState
+	useEffect(() => {
+		const unsubscribe = view.onAgentIdRestored((agentId) => {
+			logger.log(
+				`[ChatView] Agent ID restored from workspace: ${agentId}`,
+			);
+			setRestoredAgentId(agentId);
+		});
+		return unsubscribe;
+	}, [view, logger]);
+
 	const agentSession = useAgentSession(
 		acpAdapter,
 		plugin.settingsStore,
 		vaultPath,
+		restoredAgentId,
 	);
 
 	const {
@@ -317,9 +337,16 @@ function ChatComponent({
 
 			autoMention.toggle(false);
 			chat.clearMessages();
-			await agentSession.restartSession(
-				isAgentSwitch ? requestedAgentId : session.agentId,
-			);
+
+			const newAgentId = isAgentSwitch
+				? requestedAgentId
+				: session.agentId;
+			await agentSession.restartSession(newAgentId);
+
+			// Persist agent ID for this view (survives Obsidian restart)
+			if (newAgentId) {
+				view.setAgentId(newAgentId);
+			}
 
 			// Invalidate session history cache when creating new session
 			sessionHistory.invalidateCache();
@@ -333,6 +360,7 @@ function ChatComponent({
 			chat,
 			agentSession,
 			sessionHistory,
+			view,
 		],
 	);
 
@@ -607,6 +635,27 @@ function ChatComponent({
 		logger.log("[Debug] Starting connection setup via useAgentSession...");
 		void agentSession.createSession();
 	}, [agentSession.createSession]);
+
+	// Re-create session when agentId is restored from workspace state
+	// This handles the case where setState() is called after onOpen()
+	useEffect(() => {
+		// Skip if:
+		// - No restored agentId (initial mount with null)
+		// - Session is still initializing (avoid interrupting initial createSession)
+		// - Already using the correct agent
+		if (
+			!restoredAgentId ||
+			session.state === "initializing" ||
+			session.agentId === restoredAgentId
+		) {
+			return;
+		}
+
+		logger.log(
+			`[ChatView] Switching to restored agent: ${restoredAgentId} (current: ${session.agentId})`,
+		);
+		void agentSession.restartSession(restoredAgentId);
+	}, [restoredAgentId, session.state, session.agentId, agentSession, logger]);
 
 	// Refs for cleanup (to access latest values in cleanup function)
 	const messagesRef = useRef(messages);
@@ -978,6 +1027,9 @@ export class ChatView extends ItemView {
 	readonly viewId: string;
 	/** Initial agent ID passed via state (for openNewChatViewWithAgent) */
 	private initialAgentId: string | null = null;
+	/** Callbacks to notify React when agentId is restored from workspace state */
+	private agentIdRestoredCallbacks: Set<(agentId: string) => void> =
+		new Set();
 
 	constructor(leaf: WorkspaceLeaf, plugin: AgentClientPlugin) {
 		super(leaf);
@@ -1010,13 +1062,22 @@ export class ChatView extends ItemView {
 
 	/**
 	 * Restore the view state from persistence.
+	 * Notifies React when agentId is restored so it can re-create the session.
 	 */
 	async setState(
 		state: ChatViewState,
 		result: { history: boolean },
 	): Promise<void> {
+		const previousAgentId = this.initialAgentId;
 		this.initialAgentId = state.initialAgentId ?? null;
 		await super.setState(state, result);
+
+		// Notify React when agentId is restored and differs from previous value
+		if (this.initialAgentId && this.initialAgentId !== previousAgentId) {
+			this.agentIdRestoredCallbacks.forEach((cb) =>
+				cb(this.initialAgentId!),
+			);
+		}
 	}
 
 	/**
@@ -1025,6 +1086,28 @@ export class ChatView extends ItemView {
 	 */
 	getInitialAgentId(): string | null {
 		return this.initialAgentId;
+	}
+
+	/**
+	 * Set the agent ID for this view.
+	 * Called when agent is switched to persist the change.
+	 */
+	setAgentId(agentId: string): void {
+		this.initialAgentId = agentId;
+		// Request workspace to save the updated state
+		this.app.workspace.requestSaveLayout();
+	}
+
+	/**
+	 * Register a callback to be notified when agentId is restored from workspace state.
+	 * Used by React components to sync with Obsidian's setState lifecycle.
+	 * @returns Unsubscribe function
+	 */
+	onAgentIdRestored(callback: (agentId: string) => void): () => void {
+		this.agentIdRestoredCallbacks.add(callback);
+		return () => {
+			this.agentIdRestoredCallbacks.delete(callback);
+		};
 	}
 
 	onOpen() {

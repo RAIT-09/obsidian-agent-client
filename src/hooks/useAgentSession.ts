@@ -303,21 +303,27 @@ function createInitialSession(
  * @param agentClient - Agent client for communication
  * @param settingsAccess - Settings access for agent configuration
  * @param workingDirectory - Working directory for the session
+ * @param initialAgentId - Optional initial agent ID (from view persistence)
  */
 export function useAgentSession(
 	agentClient: IAgentClient,
 	settingsAccess: ISettingsAccess,
 	workingDirectory: string,
+	initialAgentId?: string,
 ): UseAgentSessionReturn {
 	// Get initial agent info from settings
 	const initialSettings = settingsAccess.getSnapshot();
-	const initialAgentId = getDefaultAgentId(initialSettings);
-	const initialAgent = getCurrentAgent(initialSettings);
+	const effectiveInitialAgentId =
+		initialAgentId || getDefaultAgentId(initialSettings);
+	const initialAgent = getCurrentAgent(
+		initialSettings,
+		effectiveInitialAgentId,
+	);
 
 	// Session state
 	const [session, setSession] = useState<ChatSession>(() =>
 		createInitialSession(
-			initialAgentId,
+			effectiveInitialAgentId,
 			initialAgent.displayName,
 			workingDirectory,
 		),
