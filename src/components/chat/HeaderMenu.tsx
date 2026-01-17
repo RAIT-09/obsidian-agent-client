@@ -113,7 +113,7 @@ export function HeaderMenu({
 			style={menuStyle}
 		>
 			{/* Switch Agent Header */}
-			<div className="agent-client-header-menu-header">Switch Agent</div>
+			<div className="agent-client-header-menu-header">Switch agent</div>
 
 			{/* Agent List */}
 			{availableAgents.map((agent) => (
@@ -153,7 +153,7 @@ export function HeaderMenu({
 					ref={newViewIconRef}
 					className="agent-client-header-menu-icon"
 				/>
-				<span>Open New View</span>
+				<span>Open new view</span>
 			</div>
 
 			<div className="agent-client-header-menu-separator" />
@@ -170,7 +170,7 @@ export function HeaderMenu({
 					ref={settingsIconRef}
 					className="agent-client-header-menu-icon"
 				/>
-				<span>Plugin Settings</span>
+				<span>Plugin settings</span>
 			</div>
 		</div>,
 		document.body,

@@ -187,6 +187,16 @@ export default class AgentClientPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "open-new-chat-view",
+			name: "Open new chat view",
+			callback: () => {
+				void this.openNewChatViewWithAgent(
+					this.settings.defaultAgentId,
+				);
+			},
+		});
+
 		// Register agent-specific commands
 		this.registerAgentCommands();
 		this.registerPermissionCommands();
