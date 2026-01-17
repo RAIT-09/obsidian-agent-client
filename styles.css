@@ -149,7 +149,7 @@ If your plugin does not need CSS, delete this file.
 /* Tool Call */
 .agent-client-message-tool-call {
 	padding: 8px;
-	margin-top: 4px;
+	margin-bottom: 12px;
 	background-color: transparent;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 4px;
@@ -854,6 +854,7 @@ If your plugin does not need CSS, delete this file.
 	word-break: break-word;
 	max-width: 100%;
 	margin-top: 8px;
+	margin-bottom: 12px;
 }
 
 .agent-client-collapsible-thought-header {
