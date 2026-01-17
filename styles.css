@@ -426,9 +426,17 @@ If your plugin does not need CSS, delete this file.
 	flex: 1;
 	padding: 16px;
 	overflow-y: auto;
+	overflow-x: hidden;
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
+}
+
+/* Allow horizontal scroll for wide tables within messages */
+.agent-client-chat-view-messages table {
+	display: block;
+	overflow-x: auto;
+	max-width: 100%;
 }
 
 /* Error display */
