@@ -244,7 +244,17 @@ export default class AgentClientPlugin extends Plugin {
 		const leaves = workspace.getLeavesOfType(VIEW_TYPE_CHAT);
 
 		if (leaves.length > 0) {
-			leaf = leaves[0];
+			// Find the leaf matching lastActiveChatViewId, or fall back to first leaf
+			if (this._lastActiveChatViewId) {
+				leaf =
+					leaves.find(
+						(l) =>
+							(l.view as ChatView)?.viewId ===
+							this._lastActiveChatViewId,
+					) || leaves[0];
+			} else {
+				leaf = leaves[0];
+			}
 		} else {
 			leaf = workspace.getRightLeaf(false);
 			if (leaf) {
