@@ -73,8 +73,9 @@ export interface UseAgentSessionReturn {
 	/**
 	 * Restart the current session.
 	 * Alias for createSession (closes current and creates new).
+	 * @param newAgentId - Optional agent ID to switch to
 	 */
-	restartSession: () => Promise<void>;
+	restartSession: (newAgentId?: string) => Promise<void>;
 
 	/**
 	 * Close the current session and disconnect from agent.
@@ -87,13 +88,6 @@ export interface UseAgentSessionReturn {
 	 * Stops ongoing message generation without disconnecting.
 	 */
 	cancelOperation: () => Promise<void>;
-
-	/**
-	 * Switch to a different agent.
-	 * Updates the active agent ID in session state.
-	 * @param agentId - ID of the agent to switch to
-	 */
-	switchAgent: (agentId: string) => Promise<void>;
 
 	/**
 	 * Get list of available agents.
@@ -181,8 +175,11 @@ function getAvailableAgentsFromSettings(
 /**
  * Get the currently active agent information from settings.
  */
-function getCurrentAgent(settings: AgentClientPluginSettings): AgentInfo {
-	const activeId = getDefaultAgentId(settings);
+function getCurrentAgent(
+	settings: AgentClientPluginSettings,
+	agentId?: string,
+): AgentInfo {
+	const activeId = agentId || getDefaultAgentId(settings);
 	const agents = getAvailableAgentsFromSettings(settings);
 	return (
 		agents.find((agent) => agent.id === activeId) || {
@@ -336,135 +333,139 @@ export function useAgentSession(
 	 * Create a new session with the active agent.
 	 * (Inlined from ManageSessionUseCase.createSession)
 	 */
-	const createSession = useCallback(async () => {
-		// Get current settings and agent info
-		const settings = settingsAccess.getSnapshot();
-		const defaultAgentId = getDefaultAgentId(settings);
-		const currentAgent = getCurrentAgent(settings);
+	const createSession = useCallback(
+		async (overrideAgentId?: string) => {
+			// Get current settings and agent info
+			const settings = settingsAccess.getSnapshot();
+			const agentId = overrideAgentId || getDefaultAgentId(settings);
+			const currentAgent = getCurrentAgent(settings, agentId);
 
-		// Reset to initializing state immediately
-		setSession((prev) => ({
-			...prev,
-			sessionId: null,
-			state: "initializing",
-			agentId: defaultAgentId,
-			agentDisplayName: currentAgent.displayName,
-			authMethods: [],
-			availableCommands: undefined,
-			modes: undefined,
-			models: undefined,
-			// Keep capabilities/info from previous session if same agent
-			// They will be updated if re-initialization is needed
-			promptCapabilities: prev.promptCapabilities,
-			agentCapabilities: prev.agentCapabilities,
-			agentInfo: prev.agentInfo,
-			createdAt: new Date(),
-			lastActivityAt: new Date(),
-		}));
-		setErrorInfo(null);
+			// Reset to initializing state immediately
+			setSession((prev) => ({
+				...prev,
+				sessionId: null,
+				state: "initializing",
+				agentId: agentId,
+				agentDisplayName: currentAgent.displayName,
+				authMethods: [],
+				availableCommands: undefined,
+				modes: undefined,
+				models: undefined,
+				// Keep capabilities/info from previous session if same agent
+				// They will be updated if re-initialization is needed
+				promptCapabilities: prev.promptCapabilities,
+				agentCapabilities: prev.agentCapabilities,
+				agentInfo: prev.agentInfo,
+				createdAt: new Date(),
+				lastActivityAt: new Date(),
+			}));
+			setErrorInfo(null);
 
-		try {
-			// Find agent settings
-			const agentSettings = findAgentSettings(settings, defaultAgentId);
+			try {
+				// Find agent settings
+				const agentSettings = findAgentSettings(settings, agentId);
 
-			if (!agentSettings) {
-				setSession((prev) => ({ ...prev, state: "error" }));
-				setErrorInfo({
-					title: "Agent Not Found",
-					message: `Agent with ID "${defaultAgentId}" not found in settings`,
-					suggestion:
-						"Please check your agent configuration in settings.",
-				});
-				return;
-			}
+				if (!agentSettings) {
+					setSession((prev) => ({ ...prev, state: "error" }));
+					setErrorInfo({
+						title: "Agent Not Found",
+						message: `Agent with ID "${agentId}" not found in settings`,
+						suggestion:
+							"Please check your agent configuration in settings.",
+					});
+					return;
+				}
 
-			// Build AgentConfig with API key injection
-			const agentConfig = buildAgentConfigWithApiKey(
-				settings,
-				agentSettings,
-				defaultAgentId,
-				workingDirectory,
-			);
+				// Build AgentConfig with API key injection
+				const agentConfig = buildAgentConfigWithApiKey(
+					settings,
+					agentSettings,
+					agentId,
+					workingDirectory,
+				);
 
-			// Check if initialization is needed
-			// Only initialize if agent is not initialized OR agent ID has changed
-			const needsInitialize =
-				!agentClient.isInitialized() ||
-				agentClient.getCurrentAgentId() !== defaultAgentId;
+				// Check if initialization is needed
+				// Only initialize if agent is not initialized OR agent ID has changed
+				const needsInitialize =
+					!agentClient.isInitialized() ||
+					agentClient.getCurrentAgentId() !== agentId;
 
-			let authMethods: AuthenticationMethod[] = [];
-			let promptCapabilities:
-				| {
-						image?: boolean;
-						audio?: boolean;
-						embeddedContext?: boolean;
-				  }
-				| undefined;
-			let agentCapabilities:
-				| {
-						loadSession?: boolean;
-						mcpCapabilities?: {
-							http?: boolean;
-							sse?: boolean;
-						};
-						promptCapabilities?: {
+				let authMethods: AuthenticationMethod[] = [];
+				let promptCapabilities:
+					| {
 							image?: boolean;
 							audio?: boolean;
 							embeddedContext?: boolean;
-						};
-				  }
-				| undefined;
-			let agentInfo:
-				| {
-						name: string;
-						title?: string;
-						version?: string;
-				  }
-				| undefined;
+					  }
+					| undefined;
+				let agentCapabilities:
+					| {
+							loadSession?: boolean;
+							mcpCapabilities?: {
+								http?: boolean;
+								sse?: boolean;
+							};
+							promptCapabilities?: {
+								image?: boolean;
+								audio?: boolean;
+								embeddedContext?: boolean;
+							};
+					  }
+					| undefined;
+				let agentInfo:
+					| {
+							name: string;
+							title?: string;
+							version?: string;
+					  }
+					| undefined;
 
-			if (needsInitialize) {
-				// Initialize connection to agent (spawn process + protocol handshake)
-				const initResult = await agentClient.initialize(agentConfig);
-				authMethods = initResult.authMethods;
-				promptCapabilities = initResult.promptCapabilities;
-				agentCapabilities = initResult.agentCapabilities;
-				agentInfo = initResult.agentInfo;
+				if (needsInitialize) {
+					// Initialize connection to agent (spawn process + protocol handshake)
+					const initResult =
+						await agentClient.initialize(agentConfig);
+					authMethods = initResult.authMethods;
+					promptCapabilities = initResult.promptCapabilities;
+					agentCapabilities = initResult.agentCapabilities;
+					agentInfo = initResult.agentInfo;
+				}
+
+				// Create new session (lightweight operation)
+				const sessionResult =
+					await agentClient.newSession(workingDirectory);
+
+				// Success - update to ready state
+				setSession((prev) => ({
+					...prev,
+					sessionId: sessionResult.sessionId,
+					state: "ready",
+					authMethods: authMethods,
+					modes: sessionResult.modes,
+					models: sessionResult.models,
+					// Only update capabilities/info if we re-initialized
+					// Otherwise, keep the previous value (from the same agent)
+					promptCapabilities: needsInitialize
+						? promptCapabilities
+						: prev.promptCapabilities,
+					agentCapabilities: needsInitialize
+						? agentCapabilities
+						: prev.agentCapabilities,
+					agentInfo: needsInitialize ? agentInfo : prev.agentInfo,
+					lastActivityAt: new Date(),
+				}));
+			} catch (error) {
+				// Error - update to error state
+				setSession((prev) => ({ ...prev, state: "error" }));
+				setErrorInfo({
+					title: "Session Creation Failed",
+					message: `Failed to create new session: ${error instanceof Error ? error.message : String(error)}`,
+					suggestion:
+						"Please check the agent configuration and try again.",
+				});
 			}
-
-			// Create new session (lightweight operation)
-			const sessionResult =
-				await agentClient.newSession(workingDirectory);
-
-			// Success - update to ready state
-			setSession((prev) => ({
-				...prev,
-				sessionId: sessionResult.sessionId,
-				state: "ready",
-				authMethods: authMethods,
-				modes: sessionResult.modes,
-				models: sessionResult.models,
-				// Only update capabilities/info if we re-initialized
-				// Otherwise, keep the previous value (from the same agent)
-				promptCapabilities: needsInitialize
-					? promptCapabilities
-					: prev.promptCapabilities,
-				agentCapabilities: needsInitialize
-					? agentCapabilities
-					: prev.agentCapabilities,
-				agentInfo: needsInitialize ? agentInfo : prev.agentInfo,
-				lastActivityAt: new Date(),
-			}));
-		} catch (error) {
-			// Error - update to error state
-			setSession((prev) => ({ ...prev, state: "error" }));
-			setErrorInfo({
-				title: "Session Creation Failed",
-				message: `Failed to create new session: ${error instanceof Error ? error.message : String(error)}`,
-				suggestion:
-					"Please check the agent configuration and try again.",
-			});
-		}
-	}, [agentClient, settingsAccess, workingDirectory]);
+		},
+		[agentClient, settingsAccess, workingDirectory],
+	);
 
 	/**
 	 * Load a previous session by ID.
@@ -605,10 +606,14 @@ export function useAgentSession(
 
 	/**
 	 * Restart the current session.
+	 * @param newAgentId - Optional agent ID to switch to
 	 */
-	const restartSession = useCallback(async () => {
-		await createSession();
-	}, [createSession]);
+	const restartSession = useCallback(
+		async (newAgentId?: string) => {
+			await createSession(newAgentId);
+		},
+		[createSession],
+	);
 
 	/**
 	 * Close the current session and disconnect from agent.
@@ -668,31 +673,6 @@ export function useAgentSession(
 			}));
 		}
 	}, [agentClient, session.sessionId]);
-
-	/**
-	 * Switch to a different agent.
-	 * Updates settings and local session state.
-	 */
-	const switchAgent = useCallback(
-		async (agentId: string) => {
-			// Update settings (persists the change)
-			await settingsAccess.updateSettings({ defaultAgentId: agentId });
-
-			// Update session with new agent ID
-			// Clear agent-specific data (new agent will send its own)
-			setSession((prev) => ({
-				...prev,
-				agentId,
-				availableCommands: undefined,
-				modes: undefined,
-				models: undefined,
-				promptCapabilities: undefined,
-				agentCapabilities: undefined,
-				agentInfo: undefined,
-			}));
-		},
-		[settingsAccess],
-	);
 
 	/**
 	 * Get list of available agents.
@@ -877,7 +857,6 @@ export function useAgentSession(
 		restartSession,
 		closeSession,
 		cancelOperation,
-		switchAgent,
 		getAvailableAgents,
 		updateSessionFromLoad,
 		updateAvailableCommands,

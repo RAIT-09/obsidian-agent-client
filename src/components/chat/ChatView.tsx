@@ -315,14 +315,11 @@ function ChatComponent({
 				);
 			}
 
-			// Switch agent if requested
-			if (isAgentSwitch) {
-				await agentSession.switchAgent(requestedAgentId);
-			}
-
 			autoMention.toggle(false);
 			chat.clearMessages();
-			await agentSession.restartSession();
+			await agentSession.restartSession(
+				isAgentSwitch ? requestedAgentId : session.agentId,
+			);
 
 			// Invalidate session history cache when creating new session
 			sessionHistory.invalidateCache();
@@ -393,7 +390,7 @@ function ChatComponent({
 	const handleOpenNewView = useCallback(() => {
 		setIsSettingsMenuOpen(false);
 		void plugin.openNewChatViewWithAgent(plugin.settings.defaultAgentId);
-	}, [plugin]);;
+	}, [plugin]);
 
 	/** Get available agents for settings menu */
 	const availableAgents = useMemo(() => {
@@ -605,11 +602,11 @@ function ChatComponent({
 	// ============================================================
 	// Effects - Session Lifecycle
 	// ============================================================
-	// Initialize session on mount or when agent changes
+	// Initialize session on mount
 	useEffect(() => {
 		logger.log("[Debug] Starting connection setup via useAgentSession...");
 		void agentSession.createSession();
-	}, [session.agentId, agentSession.createSession]);
+	}, [agentSession.createSession]);
 
 	// Refs for cleanup (to access latest values in cleanup function)
 	const messagesRef = useRef(messages);
