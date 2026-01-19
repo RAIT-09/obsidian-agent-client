@@ -4,6 +4,8 @@ Claude Code is Anthropic's AI coding assistant. You can use it with either an **
 
 ## Install and Configure
 
+Open a terminal (Terminal on macOS/Linux, PowerShell on Windows) and run the following commands.
+
 1. Install claude-code-acp:
 
 ```bash
@@ -45,7 +47,7 @@ If you have a Claude subscription and prefer not to use an API key, you can log 
 This requires installing **Claude Code CLI** separately. The CLI creates the login session that the plugin uses.
 :::
 
-1. Install Claude Code CLI:
+1. Install Claude Code CLI by running the following command in your terminal:
 
 ::: code-group
 
@@ -59,7 +61,7 @@ irm https://claude.ai/install.ps1 | iex
 
 :::
 
-2. Login via CLI:
+2. Login via CLI by running:
 
 ```bash
 claude

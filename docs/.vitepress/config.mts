@@ -75,6 +75,7 @@ export default defineConfig({
           { text: "Multi-Session Chat", link: "/usage/multi-session" },
           { text: "Editing", link: "/usage/editing" },
           { text: "Chat Export", link: "/usage/chat-export" },
+          { text: "Commands & Hotkeys", link: "/usage/commands" },
           { text: "Context Files", link: "/usage/context-files" },
           { text: "MCP Tools", link: "/usage/mcp-tools" },
         ],
