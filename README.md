@@ -52,12 +52,19 @@ https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 
 Open a terminal (Terminal on macOS/Linux, PowerShell on Windows) and run the following commands.
 
-1. **Install an agent** (e.g., Claude Code):
+1. **Install an agent and its ACP adapter** (e.g., Claude Code):
    ```bash
-   npm install -g @zed-industries/claude-code-acp
+   curl -fsSL https://claude.ai/install.sh | bash   # Install Claude Code
+   npm install -g @zed-industries/claude-code-acp   # Install ACP adapter
    ```
 
-2. **Find the paths**:
+2. **Login** (skip if using API key):
+   ```bash
+   claude
+   ```
+   Follow the prompts to authenticate with your Anthropic account.
+
+3. **Find the paths**:
    ```bash
    which node   # macOS/Linux
    which claude-code-acp
@@ -66,12 +73,12 @@ Open a terminal (Terminal on macOS/Linux, PowerShell on Windows) and run the fol
    where.exe claude-code-acp
    ```
 
-3. **Configure** in **Settings → Agent Client**:
-   - Set Node.js path
-   - Set agent path
-   - Add API key (or login via CLI)
+4. **Configure** in **Settings → Agent Client**:
+   - **Node.js path**: e.g., `/usr/local/bin/node`
+   - **Built-in agents → Claude Code → Path**: e.g., `/usr/local/bin/claude-code-acp` (not `claude`)
+   - **API key**: Add your key, or leave empty if logged in via CLI
 
-4. **Start chatting**: Click the robot icon in the ribbon
+5. **Start chatting**: Click the robot icon in the ribbon
 
 ### Setup Guides
 
