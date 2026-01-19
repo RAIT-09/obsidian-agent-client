@@ -66,6 +66,7 @@ export default defineConfig({
         text: "Usage",
         items: [
           { text: "Basic Usage", link: "/usage/" },
+          { text: "Multi-Session Chat", link: "/usage/multi-session" },
           { text: "Note Mentions", link: "/usage/mentions" },
           { text: "Sending Images", link: "/usage/sending-images" },
           { text: "Slash Commands", link: "/usage/slash-commands" },
