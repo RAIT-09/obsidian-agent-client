@@ -48,13 +48,26 @@ Click the **×** button next to the auto-mention badge above the input field. Cl
 
 ### How do I switch between agents?
 
-Open plugin settings via the gear icon in the chat header, then select a different agent from the **Active agent** dropdown. If no conversation has started, the agent switches immediately. Otherwise, click **New Chat** to apply the change.
+Click the **⋮** (ellipsis) menu in the chat header and select **"Switch agent"**. The agent switches immediately. This is a one-time change for that view only.
 
-You can also use the command palette (`Cmd/Ctrl + P`) and search for **"New chat with [Agent Name]"**.
+To change the default agent for new chat views, go to **Settings → Agent Client → Default agent**.
 
-### Can I use multiple agents?
+### Can I run multiple agents at the same time?
 
-Yes. Configure multiple agents in settings and switch between them as needed. Each agent has its own configuration (API key, arguments, etc.).
+Yes. Open multiple chat views using **"Open new chat view"** from the command palette or the **⋮** menu in the chat header. Each view runs an independent agent process.
+
+See [Multi-Session Chat](/usage/multi-session) for details.
+
+### How do I send the same prompt to multiple agents?
+
+Use the **Broadcast** commands:
+1. Type your prompt in one chat view
+2. Open command palette and run **"Broadcast prompt"** to copy it to all views
+3. Run **"Broadcast send"** to send simultaneously
+
+### Where do new chat views open?
+
+By default, new views open in the right pane. You can change this in **Settings → Agent Client → Display → Chat view location** to open in editor tabs or splits instead.
 
 ### What is a custom agent?
 
@@ -101,6 +114,10 @@ By default, exports are saved to the `Agent Client` folder in your vault. You ca
 ### Can I auto-export conversations?
 
 Yes. Enable **Auto-export on new chat** or **Auto-export on close chat** in export settings.
+
+### Can I customize the frontmatter tag?
+
+Yes. In **Settings → Agent Client → Export → Frontmatter tag**, you can set a custom tag. Nested tags like `projects/agent-client` are supported.
 
 ## Session History
 
