@@ -36,9 +36,9 @@ Configure where new chat views open in **Settings → Agent Client → Display �
 
 | Location | Description |
 |----------|-------------|
-| **Right pane** (default) | Opens in the right sidebar |
-| **Editor tabs** | Opens as a tab in the editor area |
-| **Editor split** | Opens in a new split pane |
+| **Right pane (tabs)** (default) | Opens in the right sidebar |
+| **Editor area (tabs)** | Opens as a tab in the editor area |
+| **Editor area (split)** | Opens in a new split pane |
 
 ## Broadcast Commands
 
