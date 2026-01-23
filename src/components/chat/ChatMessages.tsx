@@ -2,19 +2,11 @@ import * as React from "react";
 const { useRef, useState, useEffect, useCallback } = React;
 
 import type { ChatMessage } from "../../domain/models/chat-message";
+import type { ErrorInfo } from "../../domain/models/agent-error";
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../plugin";
 import type { ChatView } from "./ChatView";
 import { MessageRenderer } from "./MessageRenderer";
-
-/**
- * Error information to display
- */
-export interface ErrorInfo {
-	title: string;
-	message: string;
-	suggestion?: string;
-}
 
 /**
  * Props for ChatMessages component

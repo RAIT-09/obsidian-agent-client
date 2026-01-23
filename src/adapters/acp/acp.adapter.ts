@@ -14,7 +14,7 @@ import type {
 } from "../../domain/models/chat-message";
 import type { SessionUpdate } from "../../domain/models/session-update";
 import type { PromptContent } from "../../domain/models/prompt-content";
-import type { AgentError } from "../../domain/models/agent-error";
+import type { ProcessError } from "../../domain/models/agent-error";
 import type {
 	ListSessionsResult,
 	LoadSessionResult,
@@ -80,7 +80,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		null;
 
 	// Error callback for process-level errors
-	private errorCallback: ((error: AgentError) => void) | null = null;
+	private errorCallback: ((error: ProcessError) => void) | null = null;
 
 	// Message update callback for permission UI updates
 	private updateMessage: (
@@ -330,17 +330,15 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				error,
 			);
 
-			const agentError: AgentError = {
-				id: crypto.randomUUID(),
-				category: "connection",
-				severity: "error",
-				occurredAt: new Date(),
+			const processError: ProcessError = {
+				type: "spawn_failed",
 				agentId: config.id,
+				errorCode: (error as NodeJS.ErrnoException).code,
 				originalError: error,
 				...this.getErrorInfo(error, command, agentLabel),
 			};
 
-			this.errorCallback?.(agentError);
+			this.errorCallback?.(processError);
 		});
 
 		agentProcess.on("exit", (code, signal) => {
@@ -354,19 +352,16 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			if (code === 127) {
 				this.logger.error(`[AcpAdapter] Command not found: ${command}`);
 
-				const agentError: AgentError = {
-					id: crypto.randomUUID(),
-					category: "configuration",
-					severity: "error",
+				const processError: ProcessError = {
+					type: "command_not_found",
+					agentId: config.id,
+					exitCode: code,
 					title: "Command Not Found",
 					message: `The command "${command}" could not be found. Please check the path configuration for ${agentLabel}.`,
 					suggestion: this.getCommandNotFoundSuggestion(command),
-					occurredAt: new Date(),
-					agentId: config.id,
-					code: code,
 				};
 
-				this.errorCallback?.(agentError);
+				this.errorCallback?.(processError);
 			}
 		});
 
@@ -870,7 +865,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	 * Called when errors occur during agent operations that cannot be
 	 * propagated via exceptions (e.g., process spawn errors, exit code 127).
 	 */
-	onError(callback: (error: AgentError) => void): void {
+	onError(callback: (error: ProcessError) => void): void {
 		this.errorCallback = callback;
 	}
 

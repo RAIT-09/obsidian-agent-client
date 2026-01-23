@@ -18,7 +18,7 @@ import type {
 	SessionModelState,
 } from "../models/chat-session";
 import type { SessionUpdate } from "../models/session-update";
-import type { AgentError } from "../models/agent-error";
+import type { ProcessError } from "../models/agent-error";
 import type { PromptContent } from "../models/prompt-content";
 import type {
 	ListSessionsResult,
@@ -312,7 +312,7 @@ export interface IAgentClient {
 	 *
 	 * @param callback - Function to call when an error occurs
 	 */
-	onError(callback: (error: AgentError) => void): void;
+	onError(callback: (error: ProcessError) => void): void;
 
 	/**
 	 * Respond to a permission request.

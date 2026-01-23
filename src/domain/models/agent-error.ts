@@ -1,58 +1,50 @@
 /**
  * Domain Models for Agent Errors
  *
- * These types represent errors that occur during agent operations,
- * independent of the ACP protocol implementation. They provide structured
- * error information with categorization, severity levels, and contextual
- * details for proper error handling and user feedback.
+ * This module defines error types for the Agent Client plugin:
+ * - AcpError: ACP protocol errors (JSON-RPC based)
+ * - ProcessError: Node.js process-level errors
+ *
+ * These types are based on the ACP (Agent Client Protocol) specification
+ * and JSON-RPC 2.0 error object specification.
  */
 
 // ============================================================================
-// Error Classification
+// ACP Error Codes
 // ============================================================================
 
 /**
- * Categories of errors that can occur during agent operations.
+ * ACP Error Codes based on JSON-RPC 2.0 and ACP protocol extensions.
+ * https://agentclientprotocol.com/
  *
- * - connection: Network or process connection failures
- * - authentication: Auth failures (invalid API key, expired token, etc.)
- * - configuration: Invalid settings or missing required config
- * - communication: Protocol-level communication errors
- * - permission: Permission denied or access control issues
- * - timeout: Operation exceeded time limit
- * - rate_limit: API rate limit exceeded
- * - unknown: Uncategorized or unexpected errors
+ * Standard JSON-RPC 2.0 errors: -32700 to -32600
+ * ACP protocol-specific errors: -32000 to -32099 (reserved range)
  */
-export type AgentErrorCategory =
-	| "connection"
-	| "authentication"
-	| "configuration"
-	| "communication"
-	| "permission"
-	| "timeout"
-	| "rate_limit"
-	| "unknown";
+export const AcpErrorCode = {
+	// JSON-RPC 2.0 standard errors
+	PARSE_ERROR: -32700,
+	INVALID_REQUEST: -32600,
+	METHOD_NOT_FOUND: -32601,
+	INVALID_PARAMS: -32602,
+	INTERNAL_ERROR: -32603,
 
-/**
- * Severity level of an error.
- *
- * - error: Critical error requiring user attention
- * - warning: Non-critical issue that may affect functionality
- * - info: Informational message (e.g., connection restored)
- */
-export type AgentErrorSeverity = "error" | "warning" | "info";
+	// ACP protocol-specific errors (reserved range -32000 to -32099)
+	AUTHENTICATION_REQUIRED: -32000,
+	RESOURCE_NOT_FOUND: -32002,
+} as const;
+
+export type AcpErrorCodeValue =
+	(typeof AcpErrorCode)[keyof typeof AcpErrorCode];
 
 // ============================================================================
-// Error Information
+// User-Facing Error Information
 // ============================================================================
 
 /**
- * User-facing error information.
+ * User-facing error information for UI display.
  *
- * Provides a structured way to present errors to users with:
- * - A concise title
- * - Detailed explanation message
- * - Optional suggestion for resolution
+ * This is the common interface used by all error types to provide
+ * consistent error information to the user.
  */
 export interface ErrorInfo {
 	/** Short, user-friendly error title */
@@ -65,35 +57,66 @@ export interface ErrorInfo {
 	suggestion?: string;
 }
 
+// ============================================================================
+// ACP Error (Protocol-level)
+// ============================================================================
+
 /**
- * Complete error information with metadata.
+ * ACP protocol error from agent communication.
  *
- * Extends ErrorInfo with additional context for logging, tracking,
- * and debugging purposes. Used internally to track error history
- * and provide detailed diagnostics.
+ * Based on JSON-RPC 2.0 error object specification with ACP extensions.
+ * The `message` field contains the agent's error message and should be
+ * displayed directly to the user for detailed error information.
  */
-export interface AgentError extends ErrorInfo {
-	/** Unique identifier for this error occurrence */
-	id: string;
+export interface AcpError extends ErrorInfo {
+	/** ACP/JSON-RPC error code */
+	code: number;
 
-	/** Error category for classification */
-	category: AgentErrorCategory;
+	/** Additional error data from agent (for debugging) */
+	data?: unknown;
 
-	/** Severity level */
-	severity: AgentErrorSeverity;
-
-	/** Timestamp when the error occurred */
-	occurredAt: Date;
-
-	/** ID of the agent where the error occurred (if applicable) */
-	agentId?: string;
-
-	/** Session ID where the error occurred (null if no session) */
+	/** Session ID where the error occurred */
 	sessionId?: string | null;
 
-	/** Error code from the underlying system/protocol (if available) */
-	code?: string | number;
+	/** Original error object for debugging */
+	originalError?: unknown;
+}
 
-	/** Original error object for debugging (not shown to users) */
+// ============================================================================
+// Process Error (System-level)
+// ============================================================================
+
+/**
+ * Process-level error types.
+ *
+ * These represent Node.js/system errors that occur during
+ * agent process management, not ACP protocol errors.
+ */
+export type ProcessErrorType =
+	| "spawn_failed" // Process spawn failed (ENOENT, etc.)
+	| "command_not_found" // Exit code 127
+	| "process_crashed" // Abnormal termination
+	| "process_timeout"; // Timeout
+
+/**
+ * Process-level error from agent process management.
+ *
+ * These are Node.js/system errors, not ACP protocol errors.
+ * Used for errors that occur before or outside of ACP communication.
+ */
+export interface ProcessError extends ErrorInfo {
+	/** Error type classification */
+	type: ProcessErrorType;
+
+	/** Agent ID where the error occurred */
+	agentId: string;
+
+	/** Exit code (if applicable) */
+	exitCode?: number;
+
+	/** Node.js error code (e.g., "ENOENT") */
+	errorCode?: string;
+
+	/** Original error object for debugging */
 	originalError?: unknown;
 }
