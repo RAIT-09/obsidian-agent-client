@@ -2,7 +2,6 @@ import * as React from "react";
 const { useRef, useState, useEffect, useCallback } = React;
 
 import type { ChatMessage } from "../../domain/models/chat-message";
-import type { ErrorInfo } from "../../domain/models/agent-error";
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../plugin";
 import type { ChatView } from "./ChatView";
@@ -22,8 +21,6 @@ export interface ChatMessagesProps {
 	isRestoringSession: boolean;
 	/** Display name of the active agent */
 	agentLabel: string;
-	/** Error information (if any) */
-	errorInfo: ErrorInfo | null;
 	/** Plugin instance */
 	plugin: AgentClientPlugin;
 	/** View instance for event registration */
@@ -35,8 +32,6 @@ export interface ChatMessagesProps {
 		requestId: string,
 		optionId: string,
 	) => Promise<void>;
-	/** Callback to clear the error */
-	onClearError: () => void;
 }
 
 /**
@@ -45,7 +40,6 @@ export interface ChatMessagesProps {
  * Handles:
  * - Message list rendering
  * - Auto-scroll behavior
- * - Error display
  * - Empty state display
  * - Loading indicator
  */
@@ -55,12 +49,10 @@ export function ChatMessages({
 	isSessionReady,
 	isRestoringSession,
 	agentLabel,
-	errorInfo,
 	plugin,
 	view,
 	acpClient,
 	onApprovePermission,
-	onClearError,
 }: ChatMessagesProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
@@ -115,32 +107,9 @@ export function ChatMessages({
 		checkIfAtBottom();
 	}, [view, checkIfAtBottom]);
 
-	const showEmojis = plugin.settings.displaySettings.showEmojis;
-
 	return (
 		<div ref={containerRef} className="agent-client-chat-view-messages">
-			{errorInfo ? (
-				<div className="agent-client-chat-error-container">
-					<h4 className="agent-client-chat-error-title">
-						{errorInfo.title}
-					</h4>
-					<p className="agent-client-chat-error-message">
-						{errorInfo.message}
-					</p>
-					{errorInfo.suggestion && (
-						<p className="agent-client-chat-error-suggestion">
-							{showEmojis && "💡 "}
-							{errorInfo.suggestion}
-						</p>
-					)}
-					<button
-						onClick={onClearError}
-						className="agent-client-chat-error-button"
-					>
-						OK
-					</button>
-				</div>
-			) : messages.length === 0 ? (
+			{messages.length === 0 ? (
 				<div className="agent-client-chat-empty-state">
 					{isRestoringSession
 						? "Restoring session..."

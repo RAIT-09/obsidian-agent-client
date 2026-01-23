@@ -1106,12 +1106,10 @@ function ChatComponent({
 				isSessionReady={isSessionReady}
 				isRestoringSession={sessionHistory.loading}
 				agentLabel={activeAgentLabel}
-				errorInfo={errorInfo}
 				plugin={plugin}
 				view={view}
 				acpClient={acpClientRef.current}
 				onApprovePermission={permission.approvePermission}
-				onClearError={handleClearError}
 			/>
 
 			<ChatInput
@@ -1141,6 +1139,9 @@ function ChatComponent({
 				onInputChange={setInputValue}
 				attachedImages={attachedImages}
 				onAttachedImagesChange={setAttachedImages}
+				// Error overlay props
+				errorInfo={errorInfo}
+				onClearError={handleClearError}
 			/>
 		</div>
 	);

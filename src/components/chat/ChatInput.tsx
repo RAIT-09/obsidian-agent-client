@@ -15,8 +15,10 @@ import type { UseMentionsReturn } from "../../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../../hooks/useSlashCommands";
 import type { UseAutoMentionReturn } from "../../hooks/useAutoMention";
 import { SuggestionDropdown } from "./SuggestionDropdown";
+import { ErrorOverlay } from "./ErrorOverlay";
 import { ImagePreviewStrip, type AttachedImage } from "./ImagePreviewStrip";
 import { Logger } from "../../shared/logger";
+import type { ErrorInfo } from "../../domain/models/agent-error";
 import { useSettings } from "../../hooks/useSettings";
 
 // ============================================================================
@@ -100,6 +102,10 @@ export interface ChatInputProps {
 	attachedImages: AttachedImage[];
 	/** Callback when attached images change */
 	onAttachedImagesChange: (images: AttachedImage[]) => void;
+	/** Error information to display as overlay */
+	errorInfo: ErrorInfo | null;
+	/** Callback to clear the error */
+	onClearError: () => void;
 }
 
 /**
@@ -141,9 +147,13 @@ export function ChatInput({
 	onInputChange,
 	attachedImages,
 	onAttachedImagesChange,
+	// Error overlay props
+	errorInfo,
+	onClearError,
 }: ChatInputProps) {
 	const logger = useMemo(() => new Logger(plugin), [plugin]);
 	const settings = useSettings(plugin);
+	const showEmojis = plugin.settings.displaySettings.showEmojis;
 
 	// Unofficial Obsidian API: app.vault.getConfig() is not in the public type definitions
 	// but is widely used by the plugin community for accessing editor settings.
@@ -872,6 +882,16 @@ export function ChatInput({
 
 	return (
 		<div className="agent-client-chat-input-container">
+			{/* Error Overlay - displayed above input */}
+			{errorInfo && (
+				<ErrorOverlay
+					errorInfo={errorInfo}
+					onClose={onClearError}
+					showEmojis={showEmojis}
+					view={view}
+				/>
+			)}
+
 			{/* Mention Dropdown */}
 			{mentions.isOpen && (
 				<SuggestionDropdown
