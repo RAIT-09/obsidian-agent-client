@@ -574,6 +574,10 @@ export function ChatInput({
 
 			// Select item (Enter or Tab)
 			if (e.key === "Enter" || e.key === "Tab") {
+				// Skip Enter during IME composition (allow Tab to still work)
+				if (e.key === "Enter" && e.nativeEvent.isComposing) {
+					return false;
+				}
 				e.preventDefault();
 				if (isSlashCommandActive) {
 					const selectedCommand =
