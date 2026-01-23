@@ -425,6 +425,33 @@ function ChatComponent({
 		[session.agentId, handleNewChat],
 	);
 
+	const handleRestartAgent = useCallback(() => {
+		setIsMenuOpen(false);
+		void (async () => {
+			logger.log("[ChatView] Restarting agent process...");
+
+			// Auto-export current chat before restart (if has messages)
+			if (messages.length > 0) {
+				await autoExport.autoExportIfEnabled(
+					"newChat",
+					messages,
+					session,
+				);
+			}
+
+			// Clear messages for fresh start
+			chat.clearMessages();
+
+			try {
+				await agentSession.forceRestartAgent();
+				new Notice("[Agent Client] Agent restarted");
+			} catch (error) {
+				new Notice("[Agent Client] Failed to restart agent");
+				logger.error("Restart error:", error);
+			}
+		})();
+	}, [logger, messages, session, autoExport, chat, agentSession]);
+
 	const handleOpenNewView = useCallback(() => {
 		setIsMenuOpen(false);
 		void plugin.openNewChatViewWithAgent(plugin.settings.defaultAgentId);
@@ -1093,6 +1120,7 @@ function ChatComponent({
 					availableAgents={availableAgents}
 					onSwitchAgent={handleSwitchAgent}
 					onOpenNewView={handleOpenNewView}
+					onRestartAgent={handleRestartAgent}
 					onOpenPluginSettings={handleOpenSettings}
 					onClose={handleCloseMenu}
 					plugin={plugin}

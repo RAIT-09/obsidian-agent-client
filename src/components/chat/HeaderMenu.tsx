@@ -21,6 +21,8 @@ export interface HeaderMenuProps {
 	onSwitchAgent: (agentId: string) => void;
 	/** Callback to open a new view with default agent */
 	onOpenNewView: () => void;
+	/** Callback to restart the agent process */
+	onRestartAgent: () => void;
 	/** Callback to open plugin settings */
 	onOpenPluginSettings: () => void;
 	/** Callback to close the menu */
@@ -37,6 +39,7 @@ export function HeaderMenu({
 	availableAgents,
 	onSwitchAgent,
 	onOpenNewView,
+	onRestartAgent,
 	onOpenPluginSettings,
 	onClose,
 }: HeaderMenuProps) {
@@ -44,12 +47,16 @@ export function HeaderMenu({
 
 	// Icons refs
 	const newViewIconRef = useRef<HTMLSpanElement>(null);
+	const restartIconRef = useRef<HTMLSpanElement>(null);
 	const settingsIconRef = useRef<HTMLSpanElement>(null);
 
 	// Set icons
 	useEffect(() => {
 		if (newViewIconRef.current) {
 			setIcon(newViewIconRef.current, "plus");
+		}
+		if (restartIconRef.current) {
+			setIcon(restartIconRef.current, "refresh-cw");
 		}
 		if (settingsIconRef.current) {
 			setIcon(settingsIconRef.current, "settings");
@@ -154,6 +161,21 @@ export function HeaderMenu({
 					className="agent-client-header-menu-icon"
 				/>
 				<span>Open new view</span>
+			</div>
+
+			{/* Restart Agent */}
+			<div
+				className="agent-client-header-menu-item"
+				onClick={() => {
+					onRestartAgent();
+					onClose();
+				}}
+			>
+				<span
+					ref={restartIconRef}
+					className="agent-client-header-menu-icon"
+				/>
+				<span>Restart agent</span>
 			</div>
 
 			<div className="agent-client-header-menu-separator" />

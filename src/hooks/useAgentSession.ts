@@ -85,6 +85,13 @@ export interface UseAgentSessionReturn {
 	closeSession: () => Promise<void>;
 
 	/**
+	 * Force restart the agent process.
+	 * Unlike restartSession, this ALWAYS kills and respawns the process.
+	 * Use when: environment variables changed, agent became unresponsive, etc.
+	 */
+	forceRestartAgent: () => Promise<void>;
+
+	/**
 	 * Cancel the current agent operation.
 	 * Stops ongoing message generation without disconnecting.
 	 */
@@ -653,6 +660,28 @@ export function useAgentSession(
 	}, [agentClient, session.sessionId]);
 
 	/**
+	 * Force restart the agent process.
+	 * Disconnects (kills process) then creates a new session (spawns new process).
+	 *
+	 * Note: All state reset (modes, models, availableCommands, etc.) is handled
+	 * by createSession() internally, so this function is intentionally simple.
+	 */
+	const forceRestartAgent = useCallback(async () => {
+		const currentAgentId = session.agentId;
+
+		// 1. Disconnect - kills process, sets isInitialized to false
+		await agentClient.disconnect();
+
+		// 2. Create new session - handles ALL state reset internally:
+		//    - sessionId, state, authMethods
+		//    - modes, models (reset to undefined, then set from newSession result)
+		//    - availableCommands (reset to undefined)
+		//    - createdAt, lastActivityAt
+		//    - promptCapabilities, agentCapabilities, agentInfo (updated if re-initialized)
+		await createSession(currentAgentId);
+	}, [agentClient, session.agentId, createSession]);
+
+	/**
 	 * Cancel the current operation.
 	 */
 	const cancelOperation = useCallback(async () => {
@@ -863,6 +892,7 @@ export function useAgentSession(
 		loadSession,
 		restartSession,
 		closeSession,
+		forceRestartAgent,
 		cancelOperation,
 		getAvailableAgents,
 		updateSessionFromLoad,
