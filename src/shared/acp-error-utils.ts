@@ -111,7 +111,7 @@ export function getErrorSuggestion(
 			lowerMsg.includes("max_tokens") ||
 			lowerMsg.includes("too long")
 		) {
-			return "Try using /compact to compress the conversation, or start a new chat.";
+			return "The conversation is too long. Try using a compact command if available, or start a new chat.";
 		}
 		if (lowerMsg.includes("overloaded") || lowerMsg.includes("capacity")) {
 			return "The service is busy. Please wait a moment and try again.";
