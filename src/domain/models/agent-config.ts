@@ -59,7 +59,7 @@ export interface BaseAgentSettings {
  * Extends base settings with Gemini-specific requirements.
  */
 export interface GeminiAgentSettings extends BaseAgentSettings {
-	/** Google API key for Gemini (GOOGLE_API_KEY) */
+	/** Gemini API key (GEMINI_API_KEY) */
 	apiKey: string;
 }
 
