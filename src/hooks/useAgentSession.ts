@@ -98,6 +98,13 @@ export interface UseAgentSessionReturn {
 	cancelOperation: () => Promise<void>;
 
 	/**
+	 * Switch to a different agent without creating a new session.
+	 * Call createSession() after to start the new agent.
+	 * @param agentId - ID of the agent to switch to
+	 */
+	switchAgent: (agentId: string) => void;
+
+	/**
 	 * Get list of available agents.
 	 * @returns Array of agent info with id and displayName
 	 */
@@ -884,6 +891,17 @@ export function useAgentSession(
 		[],
 	);
 
+	/**
+	 * Switch to a different agent without creating a new session.
+	 * Call createSession() after to start the new agent.
+	 */
+	const switchAgent = useCallback((agentId: string) => {
+		setSession((prev) => ({
+			...prev,
+			agentId,
+		}));
+	}, []);
+
 	return {
 		session,
 		isReady,
@@ -894,6 +912,7 @@ export function useAgentSession(
 		closeSession,
 		forceRestartAgent,
 		cancelOperation,
+		switchAgent,
 		getAvailableAgents,
 		updateSessionFromLoad,
 		updateAvailableCommands,

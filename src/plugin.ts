@@ -1,6 +1,9 @@
-import { Plugin, WorkspaceLeaf, Notice, requestUrl } from "obsidian";
+import { Plugin, WorkspaceLeaf, Notice, requestUrl, MarkdownRenderChild } from "obsidian";
+import type { Root } from "react-dom/client";
 import * as semver from "semver";
 import { ChatView, VIEW_TYPE_CHAT } from "./components/chat/ChatView";
+import { mountFloatingChat } from "./components/chat/FloatingChatView";
+import { mountCodeBlockChat } from "./components/chat/CodeBlockChatView";
 import {
 	createSettingsStore,
 	type SettingsStore,
@@ -79,6 +82,11 @@ export interface AgentClientPluginSettings {
 	};
 	// Locally saved session metadata (for agents without session/list support)
 	savedSessions: SavedSessionInfo[];
+	// Floating chat button settings
+	showFloatingButton: boolean;
+	floatingButtonImage: string;
+	floatingWindowSize: { width: number; height: number };
+	floatingWindowPosition: { x: number; y: number } | null;
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -135,6 +143,10 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		showEmojis: true,
 	},
 	savedSessions: [],
+	showFloatingButton: false,
+	floatingButtonImage: "",
+	floatingWindowSize: { width: 400, height: 500 },
+	floatingWindowPosition: null,
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -145,6 +157,8 @@ export default class AgentClientPlugin extends Plugin {
 	private _adapters: Map<string, AcpAdapter> = new Map();
 	/** Track the last active ChatView for keybind targeting */
 	private _lastActiveChatViewId: string | null = null;
+	/** React root for floating chat component */
+	private floatingChatRoot: Root | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -204,6 +218,18 @@ export default class AgentClientPlugin extends Plugin {
 
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
 
+		// Mount floating chat component
+		this.floatingChatRoot = mountFloatingChat(this);
+
+		// Register agent-client code block processor
+		this.registerMarkdownCodeBlockProcessor("agent-client", (source, el, ctx) => {
+			const root = mountCodeBlockChat(this, el, source);
+			// Create a proper MarkdownRenderChild for cleanup
+			const child = new MarkdownRenderChild(el);
+			child.onunload = () => root.unmount();
+			ctx.addChild(child);
+		});
+
 		// Clean up all ACP sessions when Obsidian quits
 		// Note: We don't wait for disconnect to complete to avoid blocking quit
 		this.registerEvent(
@@ -222,7 +248,18 @@ export default class AgentClientPlugin extends Plugin {
 		);
 	}
 
-	onunload() {}
+	onunload() {
+		// Unmount floating chat
+		if (this.floatingChatRoot) {
+			this.floatingChatRoot.unmount();
+			this.floatingChatRoot = null;
+		}
+		// Remove floating chat container from DOM
+		const floatingContainer = document.querySelector(".agent-client-floating-root");
+		if (floatingContainer) {
+			floatingContainer.remove();
+		}
+	}
 
 	/**
 	 * Get or create an AcpAdapter for a specific view.
@@ -911,6 +948,44 @@ export default class AgentClientPlugin extends Plugin {
 			savedSessions: Array.isArray(rawSettings.savedSessions)
 				? (rawSettings.savedSessions as SavedSessionInfo[])
 				: DEFAULT_SETTINGS.savedSessions,
+			showFloatingButton:
+				typeof rawSettings.showFloatingButton === "boolean"
+					? rawSettings.showFloatingButton
+					: DEFAULT_SETTINGS.showFloatingButton,
+			floatingButtonImage:
+				typeof rawSettings.floatingButtonImage === "string"
+					? rawSettings.floatingButtonImage
+					: DEFAULT_SETTINGS.floatingButtonImage,
+			floatingWindowSize: (() => {
+				const raw = rawSettings.floatingWindowSize as
+					| { width?: number; height?: number }
+					| null
+					| undefined;
+				if (
+					raw &&
+					typeof raw === "object" &&
+					typeof raw.width === "number" &&
+					typeof raw.height === "number"
+				) {
+					return { width: raw.width, height: raw.height };
+				}
+				return DEFAULT_SETTINGS.floatingWindowSize;
+			})(),
+			floatingWindowPosition: (() => {
+				const raw = rawSettings.floatingWindowPosition as
+					| { x?: number; y?: number }
+					| null
+					| undefined;
+				if (
+					raw &&
+					typeof raw === "object" &&
+					typeof raw.x === "number" &&
+					typeof raw.y === "number"
+				) {
+					return { x: raw.x, y: raw.y };
+				}
+				return null;
+			})(),
 		};
 
 		this.ensureDefaultAgentId();

@@ -496,6 +496,41 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		// ─────────────────────────────────────────────────────────────────────
+		// Floating Chat Button
+		// ─────────────────────────────────────────────────────────────────────
+
+		new Setting(containerEl).setName("Floating Chat Button").setHeading();
+
+		new Setting(containerEl)
+			.setName("Show floating button")
+			.setDesc(
+				"Display a floating chat button that opens a draggable chat window.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showFloatingButton)
+					.onChange(async (value) => {
+						this.plugin.settings.showFloatingButton = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Floating button image")
+			.setDesc(
+				"URL or path to an image for the floating button. Leave empty for default 'AI' text.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("https://example.com/avatar.png")
+					.setValue(this.plugin.settings.floatingButtonImage)
+					.onChange(async (value) => {
+						this.plugin.settings.floatingButtonImage = value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		// ─────────────────────────────────────────────────────────────────────
 		// Developer
 		// ─────────────────────────────────────────────────────────────────────
 

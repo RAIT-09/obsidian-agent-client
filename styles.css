@@ -611,7 +611,7 @@ If your plugin does not need CSS, delete this file.
 	align-items: center;
 	justify-content: space-between;
 	gap: 4px;
-	padding: 6px 12px;
+	padding: 4px 12px;
 	border-bottom: 1px solid var(--background-modifier-border);
 	background-color: transparent;
 }
@@ -678,12 +678,12 @@ If your plugin does not need CSS, delete this file.
 
 .agent-client-chat-input-textarea {
 	width: 100%;
-	padding: 12px;
+	padding: 8px 12px;
 	border: none;
 	background-color: transparent;
 	color: var(--text-normal);
 	resize: none;
-	min-height: 80px;
+	min-height: 40px;
 	max-height: 300px;
 	font-family: inherit;
 	font-size: var(--font-text-size);
@@ -723,7 +723,7 @@ If your plugin does not need CSS, delete this file.
 .agent-client-textarea-wrapper {
 	position: relative;
 	flex: 1;
-	min-height: 80px;
+	min-height: 40px;
 }
 
 /* Hint overlay for slash commands */
@@ -736,7 +736,7 @@ If your plugin does not need CSS, delete this file.
 	bottom: 0;
 	pointer-events: none;
 	/* Match textarea properties exactly */
-	padding: 12px;
+	padding: 8px 12px;
 	box-sizing: border-box;
 	font-family: inherit;
 	font-size: var(--font-text-size);
@@ -761,7 +761,7 @@ If your plugin does not need CSS, delete this file.
 	align-items: center;
 	justify-content: flex-end;
 	gap: 8px;
-	padding: 4px 12px 8px 12px;
+	padding: 4px 12px 6px 12px;
 }
 
 /* Mode Selector */
@@ -1778,4 +1778,305 @@ If your plugin does not need CSS, delete this file.
 
 .agent-client-header-menu-back:hover {
 	background-color: var(--background-modifier-hover);
+}
+
+/* ===== Floating Chat Button ===== */
+.agent-client-floating-root {
+	position: fixed;
+	z-index: 9999;
+	pointer-events: none;
+}
+
+.agent-client-floating-root > * {
+	pointer-events: auto;
+}
+
+.agent-client-floating-button {
+	position: fixed;
+	bottom: 20px;
+	right: 20px;
+	width: 48px;
+	height: 48px;
+	min-width: 48px;
+	min-height: 48px;
+	border-radius: 50%;
+	background: var(--interactive-accent);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+	transition: transform 0.2s, box-shadow 0.2s;
+	overflow: hidden;
+	padding: 0;
+}
+
+.agent-client-floating-button:hover {
+	transform: scale(1.05);
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.agent-client-floating-button img {
+	width: 48px;
+	height: 48px;
+	min-width: 48px;
+	min-height: 48px;
+	object-fit: cover;
+	object-position: center;
+	border-radius: 50%;
+	display: block;
+}
+
+.agent-client-floating-button-fallback {
+	color: var(--text-on-accent);
+	font-weight: bold;
+	font-size: 16px;
+}
+
+/* ===== Floating Chat Window ===== */
+.agent-client-floating-window {
+	position: fixed;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	resize: both;
+	min-width: 300px;
+	min-height: 400px;
+}
+
+.agent-client-floating-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 12px;
+	background: var(--background-secondary);
+	border-bottom: 1px solid var(--background-modifier-border);
+	cursor: grab;
+	user-select: none;
+}
+
+.agent-client-floating-header:active {
+	cursor: grabbing;
+}
+
+.agent-client-floating-header-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 500;
+}
+
+.agent-client-floating-header-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.agent-client-floating-close {
+	background: none;
+	border: none;
+	font-size: 18px;
+	cursor: pointer;
+	color: var(--text-muted);
+	padding: 2px 6px;
+	border-radius: 4px;
+}
+
+.agent-client-floating-close:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.agent-client-floating-content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	padding: 4px;
+}
+
+.agent-client-floating-messages-container {
+	flex: 1;
+	overflow-y: auto;
+	margin-bottom: 8px;
+}
+
+/* ===== Code Block Chat View ===== */
+.agent-client-code-block-container {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-primary);
+	overflow: hidden;
+}
+
+.agent-client-code-block-image-container {
+	display: flex;
+	justify-content: center;
+	padding: 12px;
+	background: var(--background-secondary);
+}
+
+.agent-client-code-block-image {
+	width: 48px;
+	height: 48px;
+	border-radius: 50%;
+	object-fit: cover;
+}
+
+.agent-client-code-block-content {
+	display: flex;
+	flex-direction: column;
+	padding: 8px;
+}
+
+.agent-client-code-block-status {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 4px 8px;
+	background: var(--background-secondary);
+	border-radius: 4px;
+	margin-bottom: 4px;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.agent-client-code-block-status-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.agent-client-code-block-messages {
+	max-height: 400px;
+	overflow-y: auto;
+	margin-bottom: 8px;
+}
+
+/* ===== Shared Status Indicator ===== */
+.agent-client-status-indicator {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.agent-client-status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--text-muted);
+}
+
+.agent-client-status-dot.ready {
+	background: var(--color-green);
+}
+
+.agent-client-status-dot.connecting {
+	background: var(--color-yellow);
+	animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.5; }
+}
+
+.agent-client-status-text {
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+/* ===== Agent & Session Selectors ===== */
+.agent-client-agent-selector,
+.agent-client-session-selector {
+	background: var(--background-modifier-form-field);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	padding: 2px 6px;
+	font-size: 12px;
+	color: var(--text-normal);
+	cursor: pointer;
+}
+
+.agent-client-agent-selector:hover,
+.agent-client-session-selector:hover {
+	border-color: var(--interactive-accent);
+}
+
+/* ===== Header Action Buttons ===== */
+.agent-client-header-action-button {
+	background: none;
+	border: none;
+	padding: 4px 6px;
+	cursor: pointer;
+	font-size: 14px;
+	border-radius: 4px;
+	opacity: 0.7;
+	transition: opacity 0.2s, background 0.2s;
+}
+
+.agent-client-header-action-button:hover {
+	opacity: 1;
+	background: var(--background-modifier-hover);
+}
+
+.agent-client-header-action-button:disabled {
+	opacity: 0.3;
+	cursor: not-allowed;
+}
+
+.agent-client-new-session-button {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border: none;
+	border-radius: 4px;
+	padding: 2px 8px;
+	font-size: 14px;
+	font-weight: bold;
+	cursor: pointer;
+}
+
+.agent-client-new-session-button:hover {
+	filter: brightness(1.1);
+}
+
+/* ===== Active Note Indicator ===== */
+.agent-client-active-note-indicator {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 11px;
+	color: var(--text-muted);
+	background: var(--background-primary);
+	padding: 2px 6px;
+	border-radius: 4px;
+}
+
+.agent-client-note-icon {
+	font-size: 12px;
+}
+
+.agent-client-note-name {
+	max-width: 120px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ===== History Loading Spinner ===== */
+.agent-client-history-loading {
+	animation: spin 1s linear infinite;
+	display: inline-block;
+	font-size: 14px;
+}
+
+@keyframes spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
 }
