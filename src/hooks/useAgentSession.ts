@@ -262,7 +262,7 @@ function buildAgentConfigWithApiKey(
 			...baseConfig,
 			env: {
 				...baseConfig.env,
-				GOOGLE_API_KEY: geminiSettings.apiKey,
+				GEMINI_API_KEY: geminiSettings.apiKey,
 			},
 		};
 	}
