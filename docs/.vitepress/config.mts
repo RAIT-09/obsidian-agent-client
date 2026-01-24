@@ -73,6 +73,7 @@ export default defineConfig({
           { text: "Model Selection", link: "/usage/model-selection" },
           { text: "Session History", link: "/usage/session-history" },
           { text: "Multi-Session Chat", link: "/usage/multi-session" },
+          { text: "Notion-Style Views", link: "/usage/notion-style-views" },
           { text: "Editing", link: "/usage/editing" },
           { text: "Chat Export", link: "/usage/chat-export" },
           { text: "Commands & Hotkeys", link: "/usage/commands" },

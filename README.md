@@ -28,6 +28,8 @@ https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 - **Slash Commands**: Use `/` commands provided by your agent
 - **Multi-Agent Support**: Switch between Claude Code, Codex, Gemini CLI, and custom agents
 - **Multi-Session**: Run multiple agents simultaneously in separate views
+- **Floating Chat**: A persistent, collapsible chat window for quick access
+- **Code Block Chat**: Embed AI chat interfaces directly into your notes
 - **Mode & Model Switching**: Change AI models and agent modes from the chat
 - **Session History**: Resume or fork previous conversations
 - **Chat Export**: Save conversations as Markdown notes
