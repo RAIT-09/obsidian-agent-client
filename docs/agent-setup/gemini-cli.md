@@ -4,6 +4,8 @@ Gemini CLI is Google's AI assistant. You can authenticate using your **Google ac
 
 ## Install and Configure
 
+Open a terminal (Terminal on macOS/Linux, PowerShell on Windows) and run the following commands.
+
 1. Install Gemini CLI:
 
 ```bash
@@ -38,7 +40,7 @@ Choose one of the following methods:
 
 If you have a Google account and prefer not to use an API key, you can log in directly.
 
-1. Run Gemini CLI and choose "Login with Google":
+1. Run Gemini CLI in your terminal and choose "Login with Google":
 
 ```bash
 gemini

@@ -6,7 +6,7 @@ You can use any agent that implements the [Agent Client Protocol (ACP)](https://
 
 1. Install your ACP-compatible agent (e.g., [OpenCode](https://github.com/sst/opencode), [Qwen Code](https://github.com/QwenLM/qwen-code)).
 
-2. Find the installation path:
+2. Find the installation path by running the following command in your terminal (Terminal on macOS/Linux, PowerShell on Windows):
 
 ::: code-group
 

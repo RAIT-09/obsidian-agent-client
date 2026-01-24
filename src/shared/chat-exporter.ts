@@ -43,13 +43,18 @@ export class ChatExporter {
 		const effectiveTimestamp =
 			messages.length > 0 ? messages[0].timestamp : sessionCreatedAt;
 
-		const fileName = this.generateFileName(effectiveTimestamp);
+		const baseFileName = this.generateFileName(effectiveTimestamp);
 		const folderPath = settings.defaultFolder || "Agent Client";
 
 		// Create folder if it doesn't exist
 		await this.ensureFolderExists(folderPath);
 
-		const filePath = `${folderPath}/${fileName}.md`;
+		// Resolve file path considering session ID conflicts
+		const filePath = this.resolveExportFilePath(
+			folderPath,
+			baseFileName,
+			sessionId,
+		);
 
 		try {
 			const frontmatter = this.generateFrontmatter(
@@ -65,13 +70,13 @@ export class ChatExporter {
 			);
 			const fullContent = `${frontmatter}\n\n${chatContent}`;
 
-			// Check if file already exists
+			// Check if file already exists (path is already resolved for our session)
 			const existingFile =
 				this.plugin.app.vault.getAbstractFileByPath(filePath);
 			let file: TFile;
 
 			if (existingFile instanceof TFile) {
-				// File exists, update it
+				// File exists (same session), update it
 				await this.plugin.app.vault.modify(existingFile, fullContent);
 				file = existingFile;
 			} else {
@@ -103,6 +108,91 @@ export class ChatExporter {
 		}
 	}
 
+	/**
+	 * Extract session_id from file's frontmatter cache.
+	 *
+	 * Uses Obsidian's metadataCache for efficient access (no disk I/O).
+	 * This is the same pattern used in vault.adapter.ts and mention-service.ts.
+	 *
+	 * @param file - TFile to extract session_id from
+	 * @returns session_id string if found, null otherwise
+	 */
+	private getSessionIdFromFile(file: TFile): string | null {
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+		const sessionId = cache?.frontmatter?.session_id as string | undefined;
+		return sessionId ?? null;
+	}
+
+	/**
+	 * Resolve export file path, handling session ID conflicts.
+	 *
+	 * Resolution logic:
+	 * 1. If no file exists at base path → use base path
+	 * 2. If file exists with same sessionId → use base path (overwrite)
+	 * 3. If file exists with different sessionId → try suffixed paths (_2, _3, ...)
+	 *    - If suffixed file has same sessionId → use that path (overwrite)
+	 *    - If suffixed file has different sessionId → continue searching
+	 *    - If no suffixed file exists → use that path (create new)
+	 *
+	 * @param folderPath - Export folder path
+	 * @param baseFileName - Base file name without extension
+	 * @param sessionId - Current session's ID
+	 * @returns Resolved file path
+	 */
+	private resolveExportFilePath(
+		folderPath: string,
+		baseFileName: string,
+		sessionId: string,
+	): string {
+		const basePath = `${folderPath}/${baseFileName}.md`;
+
+		// Check if base file exists
+		const existingFile =
+			this.plugin.app.vault.getAbstractFileByPath(basePath);
+
+		if (!(existingFile instanceof TFile)) {
+			// No existing file, use base path
+			return basePath;
+		}
+
+		// File exists - check sessionId in frontmatter
+		const existingSessionId = this.getSessionIdFromFile(existingFile);
+
+		if (existingSessionId === sessionId) {
+			// Same session, overwrite
+			return basePath;
+		}
+
+		// Different session (or no sessionId in frontmatter) - find available suffix
+		// Start from 2 to follow common convention (file, file_2, file_3, ...)
+		for (let suffix = 2; suffix <= 100; suffix++) {
+			const suffixedPath = `${folderPath}/${baseFileName}_${suffix}.md`;
+			const suffixedFile =
+				this.plugin.app.vault.getAbstractFileByPath(suffixedPath);
+
+			if (!(suffixedFile instanceof TFile)) {
+				// No file at this path, use it
+				return suffixedPath;
+			}
+
+			// Check if this file belongs to our session
+			const suffixedSessionId = this.getSessionIdFromFile(suffixedFile);
+			if (suffixedSessionId === sessionId) {
+				// Found our session's file
+				return suffixedPath;
+			}
+
+			// Different session, continue searching
+		}
+
+		// Safety fallback: exceeded limit, use the last checked path
+		// This should rarely happen (100+ exports with same timestamp)
+		this.logger.warn(
+			`Too many export files with same base name: ${baseFileName}`,
+		);
+		return `${folderPath}/${baseFileName}_101.md`;
+	}
+
 	private generateFileName(timestamp: Date): string {
 		const settings = this.plugin.settings.exportSettings;
 		const template =
@@ -129,6 +219,8 @@ export class ChatExporter {
 		sessionId: string,
 		timestamp: Date,
 	): string {
+		const settings = this.plugin.settings.exportSettings;
+
 		// Format timestamp in local timezone: YYYY-MM-DDTHH:mm:ss
 		const year = timestamp.getFullYear();
 		const month = String(timestamp.getMonth() + 1).padStart(2, "0");
@@ -138,12 +230,16 @@ export class ChatExporter {
 		const seconds = String(timestamp.getSeconds()).padStart(2, "0");
 		const localTimestamp = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
 
+		// Build tags line only if tag is specified
+		const tagsLine = settings.frontmatterTag.trim()
+			? `\ntags: [${settings.frontmatterTag.trim()}]`
+			: "";
+
 		return `---
 created: ${localTimestamp}
 agentDisplayName: ${agentLabel}
 agentId: ${agentId}
-session_id: ${sessionId}
-tags: [agent-client]
+session_id: ${sessionId}${tagsLine}
 ---`;
 	}
 

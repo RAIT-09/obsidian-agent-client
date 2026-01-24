@@ -8,15 +8,6 @@ import type { ChatView } from "./ChatView";
 import { MessageRenderer } from "./MessageRenderer";
 
 /**
- * Error information to display
- */
-export interface ErrorInfo {
-	title: string;
-	message: string;
-	suggestion?: string;
-}
-
-/**
  * Props for ChatMessages component
  */
 export interface ChatMessagesProps {
@@ -30,8 +21,6 @@ export interface ChatMessagesProps {
 	isRestoringSession: boolean;
 	/** Display name of the active agent */
 	agentLabel: string;
-	/** Error information (if any) */
-	errorInfo: ErrorInfo | null;
 	/** Plugin instance */
 	plugin: AgentClientPlugin;
 	/** View instance for event registration */
@@ -43,8 +32,6 @@ export interface ChatMessagesProps {
 		requestId: string,
 		optionId: string,
 	) => Promise<void>;
-	/** Callback to clear the error */
-	onClearError: () => void;
 }
 
 /**
@@ -53,7 +40,6 @@ export interface ChatMessagesProps {
  * Handles:
  * - Message list rendering
  * - Auto-scroll behavior
- * - Error display
  * - Empty state display
  * - Loading indicator
  */
@@ -63,12 +49,10 @@ export function ChatMessages({
 	isSessionReady,
 	isRestoringSession,
 	agentLabel,
-	errorInfo,
 	plugin,
 	view,
 	acpClient,
 	onApprovePermission,
-	onClearError,
 }: ChatMessagesProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
@@ -125,27 +109,7 @@ export function ChatMessages({
 
 	return (
 		<div ref={containerRef} className="agent-client-chat-view-messages">
-			{errorInfo ? (
-				<div className="agent-client-chat-error-container">
-					<h4 className="agent-client-chat-error-title">
-						{errorInfo.title}
-					</h4>
-					<p className="agent-client-chat-error-message">
-						{errorInfo.message}
-					</p>
-					{errorInfo.suggestion && (
-						<p className="agent-client-chat-error-suggestion">
-							💡 {errorInfo.suggestion}
-						</p>
-					)}
-					<button
-						onClick={onClearError}
-						className="agent-client-chat-error-button"
-					>
-						OK
-					</button>
-				</div>
-			) : messages.length === 0 ? (
+			{messages.length === 0 ? (
 				<div className="agent-client-chat-empty-state">
 					{isRestoringSession
 						? "Restoring session..."

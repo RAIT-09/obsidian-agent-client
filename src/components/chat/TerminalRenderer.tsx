@@ -102,10 +102,12 @@ export function TerminalRenderer({
 		}
 	}, [isRunning]);
 
+	const showEmojis = plugin.settings.displaySettings.showEmojis;
+
 	return (
 		<div className="agent-client-terminal-renderer">
 			<div className="agent-client-terminal-renderer-header">
-				🖥️ Terminal {terminalId.slice(0, 8)}
+				{showEmojis && "🖥️ "}Terminal {terminalId.slice(0, 8)}
 				{isRunning ? (
 					<span className="agent-client-terminal-status agent-client-running">
 						● RUNNING

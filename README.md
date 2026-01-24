@@ -1,4 +1,4 @@
-<h1 align="center">🤖 Agent Client Plugin for Obsidian</h1>
+<h1 align="center">Agent Client Plugin for Obsidian</h1>
 
 <p align="center">
   <img src="https://img.shields.io/github/downloads/RAIT-09/obsidian-agent-client/total" alt="GitHub Downloads">
@@ -15,177 +15,81 @@
   <a href="https://www.buymeacoffee.com/rait09" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="180" height="50" ></a>
 </p>
 
-Bring your AI agents directly into Obsidian! This plugin lets you chat with Claude Code, Codex, Gemini CLI, and other AI agents right from your vault. Your AI assistant is now just a side panel away. ✨
+Bring AI agents (Claude Code, Codex, Gemini CLI) directly into Obsidian. Chat with your AI assistant right from your vault.
 
 Built on [Agent Client Protocol (ACP)](https://github.com/zed-industries/agent-client-protocol) by Zed.
 
 https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 
-## ✨ Features
+## Features
 
-- 🔗 **Direct Agent Integration**: Chat with AI coding agents in a dedicated right-side panel
-- 🖼️ **Image Attachments**: Paste or drag-and-drop images into the chat to send them with your message
-- 📝 **Note Mention Support**: Automatically include the active note in conversations, or manually use `@notename` to reference specific notes
-- ⚡ **Slash Command Support**: Use `/` commands to browse and trigger actions provided by your current agent
-- 🔄 **Multi-Agent Support**: Switch between Claude Code, Codex, Gemini CLI, and custom agents
-- 🎛️ **Mode & Model Switching**: Change AI models (e.g., Sonnet, Haiku) and agent modes (e.g., Plan Mode) directly from the chat
-- 💻 **Terminal Integration**: Let your agent execute terminal commands and return the results in chat
-- 🔐 **Permission Management**: Fine-grained control over agent actions
+- **Note Mentions**: Reference your notes with `@notename` syntax
+- **Image Attachments**: Paste or drag-and-drop images into the chat
+- **Slash Commands**: Use `/` commands provided by your agent
+- **Multi-Agent Support**: Switch between Claude Code, Codex, Gemini CLI, and custom agents
+- **Multi-Session**: Run multiple agents simultaneously in separate views
+- **Mode & Model Switching**: Change AI models and agent modes from the chat
+- **Session History**: Resume or fork previous conversations
+- **Chat Export**: Save conversations as Markdown notes
+- **Terminal Integration**: Let agents execute commands and return results
 
-## 📦 Installation
-### 🧪 Install via BRAT
-1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin from the Community Plugins browser.
-2. In Obsidian settings, go to Community Plugins → BRAT → Add Beta Plugin.
-3. Paste this repo URL:
+## Installation
+
+### Via BRAT (Recommended)
+
+1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin
+2. Go to **Settings → BRAT → Add Beta Plugin**
+3. Paste: `https://github.com/RAIT-09/obsidian-agent-client`
+4. Enable **Agent Client** from the plugin list
+
+### Manual Installation
+
+1. Download `main.js`, `manifest.json`, `styles.css` from [Releases](https://github.com/RAIT-09/obsidian-agent-client/releases)
+2. Place them in `VaultFolder/.obsidian/plugins/agent-client/`
+3. Enable the plugin in **Settings → Community Plugins**
+
+## Quick Start
+
+Open a terminal (Terminal on macOS/Linux, PowerShell on Windows) and run the following commands.
+
+1. **Install an agent and its ACP adapter** (e.g., Claude Code):
+   ```bash
+   curl -fsSL https://claude.ai/install.sh | bash   # Install Claude Code
+   npm install -g @zed-industries/claude-code-acp   # Install ACP adapter
    ```
-   https://github.com/RAIT-09/obsidian-agent-client
+
+2. **Login** (skip if using API key):
+   ```bash
+   claude
    ```
-4. BRAT will download the latest release and keep it auto-updated.
-5. Enable Agent Client from the plugin list.
+   Follow the prompts to authenticate with your Anthropic account.
 
-### 💻 Manual Installation
-1. Download the latest release files from [GitHub Releases](https://github.com/RAIT-09/obsidian-agent-client/releases):
-   - `main.js`
-   - `manifest.json`
-   - `styles.css`
-2. Create plugin folder and place the files in: `VaultFolder/.obsidian/plugins/agent-client/`
-3. Enable the plugin in Obsidian Settings → Community Plugins
+3. **Find the paths**:
+   ```bash
+   which node   # macOS/Linux
+   which claude-code-acp
 
-## ⚙️ Configuration
+   where.exe node   # Windows
+   where.exe claude-code-acp
+   ```
 
-### Step 1: 📦 Install Required Dependencies
+4. **Configure** in **Settings → Agent Client**:
+   - **Node.js path**: e.g., `/usr/local/bin/node`
+   - **Built-in agents → Claude Code → Path**: e.g., `/usr/local/bin/claude-code-acp` (not `claude`)
+   - **API key**: Add your key, or leave empty if logged in via CLI
 
-- For **Claude Code**:
-  ```bash
-  npm install -g @zed-industries/claude-code-acp
-  ```
+5. **Start chatting**: Click the robot icon in the ribbon
 
-- For **Codex**:
-  ```bash
-  npm install -g @zed-industries/codex-acp
-  ```
+### Setup Guides
 
-- For **Gemini CLI**:
-  ```bash
-  npm install -g @google/gemini-cli
-  ```
+- [Claude Code](https://rait-09.github.io/obsidian-agent-client/agent-setup/claude-code.html)
+- [Codex](https://rait-09.github.io/obsidian-agent-client/agent-setup/codex.html)
+- [Gemini CLI](https://rait-09.github.io/obsidian-agent-client/agent-setup/gemini-cli.html)
+- [Custom Agents](https://rait-09.github.io/obsidian-agent-client/agent-setup/custom-agents.html) (OpenCode, Qwen Code, Mistral Vibe, etc.)
 
-### Step 2: 🔍 Find Installation Paths
+**[Full Documentation](https://rait-09.github.io/obsidian-agent-client/)**
 
-After installing the agents, you need to find their absolute paths:
-
-**On macOS/Linux:**
-```bash
-# Find Node.js path
-which node
-# Example output: /usr/local/bin/node
-
-# Find Claude Code path
-which claude-code-acp
-# Example output: /usr/local/bin/claude-code-acp
-
-# Find Codex path
-which codex-acp
-# Example output: /usr/local/bin/codex-acp
-
-# Find Gemini CLI path
-which gemini
-# Example output: /usr/local/bin/gemini
-```
-
-**On Windows:**
-```cmd
-# Find Node.js path
-where.exe node
-# Example output: C:\Program Files\nodejs\node.exe
-
-# Find Claude Code path
-where.exe claude-code-acp
-# Example output: C:\Users\Username\AppData\Roaming\npm\claude-code-acp.cmd
-
-# Find Codex path
-where.exe codex-acp
-# Example output: C:\Users\Username\AppData\Roaming\npm\codex-acp.cmd
-
-# Find Gemini CLI path
-where.exe gemini
-# Example output: C:\Users\Username\AppData\Roaming\npm\gemini.cmd
-```
-
-### Step 3: 🛠️ Configure Plugin Settings
-
-1. Open **Settings → Agent Client**
-2. Configure your node path:
-   - **Node.js path**: Enter the absolute path found above (e.g., `/usr/local/bin/node` or `C:\Program Files\nodejs\node.exe`)
-3. Configure your preferred agents:
-   - **Claude Code**:
-     - **Path**: Enter absolute path (e.g., `/usr/local/bin/claude-code-acp`)
-     - **API key**: Optional if logged in to Anthropic account
-   - **Codex**
-	   - **Path**: Enter absolute path (e.g., `/usr/local/bin/codex-acp`)
-	   - **API key**: Optional if logged in to OpenAI account
-   - **Gemini CLI**:
-     - **Path**: Enter absolute path (e.g., `/usr/local/bin/gemini`)
-     - **API key**: Optional if logged in to Google account
-   - **Custom Agents**: Add any ACP-compatible agents
-
-### 📋 Example Configuration
-
-**macOS/Linux Example:**
-```
-Settings:
-├── Node.js path: /usr/local/bin/node
-
-Built-in agents:
-├── Claude Code
-│   ├── Path: /usr/local/bin/claude-code-acp
-│   └── API key: (optional)
-├── Codex
-│   ├── Path: /usr/local/bin/codex-acp
-│   └── API key: (optional)
-└── Gemini CLI
-    ├── Path: /usr/local/bin/gemini
-    └── API key: (optional)
-```
-
-**Windows Example (Native):**
-
-> 💡 If using WSL Mode, refer to the macOS/Linux example instead.
-
-```
-Settings:
-├── Node.js path: C:\Program Files\nodejs\node.exe
-
-Built-in agents:
-├── Claude Code
-│   ├── Path: C:\Users\Username\AppData\Roaming\npm\claude-code-acp.cmd
-│   └── API key: (optional)
-├── Codex
-│   ├── Path: C:\Users\Username\AppData\Roaming\npm\codex-acp.cmd
-│   └── API key: (optional)
-└── Gemini CLI
-    ├── Path: C:\Users\Username\AppData\Roaming\npm\gemini.cmd
-    └── API key: (optional)
-```
-
-### 🪟 WSL Mode (Recommended for Windows)
-
-WSL Mode runs agents inside Windows Subsystem for Linux, providing better compatibility and a more Unix-like environment.
-
-1. Enable **WSL Mode** in **Settings → Agent Client**
-2. Use Linux-style paths (e.g., `/usr/local/bin/node`, `/usr/local/bin/claude-code-acp`)
-3. Refer to the **macOS/Linux** examples above for path configuration
-
-## 🚀 Usage
-
-- 🎯 Use the command palette: "Open agent chat"
-- 🤖 Click the robot icon in the ribbon
-- 💬 Chat with your configured agent in the right panel
-- 📝 Reference notes using `@notename` syntax
-- 🔄 Switch agents using the dropdown in plugin settings
-- 🎛️ Change AI models and modes from the dropdowns below the input field
-
-## 👨‍💻 Development
+## Development
 
 ```bash
 npm install
@@ -197,26 +101,10 @@ For production builds:
 npm run build
 ```
 
-Code formatting with Prettier:
-```bash
-# Check code formatting
-npm run format:check
+## License
 
-# Auto-fix formatting issues
-npm run format
-```
+Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
-## 🗺️ Roadmap
-- **Edit Tracking**: Automatically follow the agent's edits — open affected notes and move the cursor as they edit
-- **Chat History Access**: Browse, search, and restore previous chat sessions with agents
-- **Multi-Instance Support**: Run multiple agents simultaneously in separate panels
-
-Have ideas or feature requests? Feel free to [open an issue](https://github.com/RAIT-09/obsidian-agent-client/issues) on GitHub!
-
-## 📄 License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## ⭐️ Star History
+## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=RAIT-09/obsidian-agent-client&type=Date)](https://www.star-history.com/#RAIT-09/obsidian-agent-client&Date)

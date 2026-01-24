@@ -149,7 +149,7 @@ If your plugin does not need CSS, delete this file.
 /* Tool Call */
 .agent-client-message-tool-call {
 	padding: 8px;
-	margin-top: 4px;
+	margin-bottom: 12px;
 	background-color: transparent;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 4px;
@@ -238,6 +238,16 @@ If your plugin does not need CSS, delete this file.
 .agent-client-message-plan-entry-icon.agent-client-status-pending {
 	color: var(--text-muted);
 	user-select: text;
+}
+
+/* Plan entry status text styles (for emoji-off mode) */
+.agent-client-message-plan-entry.agent-client-plan-status-completed {
+	text-decoration: line-through;
+	color: var(--text-muted);
+}
+
+.agent-client-message-plan-entry.agent-client-plan-status-in_progress {
+	font-weight: bold;
 }
 
 /* Permission Request */
@@ -416,9 +426,17 @@ If your plugin does not need CSS, delete this file.
 	flex: 1;
 	padding: 16px;
 	overflow-y: auto;
+	overflow-x: hidden;
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
+}
+
+/* Allow horizontal scroll for wide tables within messages */
+.agent-client-chat-view-messages table {
+	display: block;
+	overflow-x: auto;
+	max-width: 100%;
 }
 
 /* Error display */
@@ -468,6 +486,91 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-muted) !important;
 	cursor: pointer;
 	font-size: 14px;
+}
+
+/* ============================================================
+   Error Overlay (displayed above input field)
+   ============================================================ */
+
+.agent-client-error-overlay {
+	position: absolute;
+	bottom: 100%;
+	left: 0;
+	right: 0;
+	margin-bottom: 8px;
+	padding: 12px 16px;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--color-red);
+	border-radius: 8px;
+	z-index: 10;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.agent-client-error-overlay-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.agent-client-error-overlay-title {
+	margin: 0 !important;
+	color: var(--color-red) !important;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.agent-client-error-overlay-close {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 14px;
+	height: 14px;
+	background: none !important;
+	background-color: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+	color: var(--text-muted);
+	cursor: pointer;
+	padding: 0 !important;
+	margin: 0;
+	outline: none !important;
+}
+
+.agent-client-error-overlay-close svg {
+	width: 14px;
+	height: 14px;
+	color: inherit;
+}
+
+.agent-client-error-overlay-close:hover {
+	background: none !important;
+	box-shadow: none !important;
+	color: var(--interactive-accent);
+}
+
+.agent-client-error-overlay-close:active,
+.agent-client-error-overlay-close:focus {
+	background: none !important;
+	box-shadow: none !important;
+	outline: none !important;
+}
+
+.agent-client-error-overlay-message {
+	margin: 0 !important;
+	color: var(--text-normal);
+	font-size: 13px;
+	line-height: 1.4;
+	word-wrap: break-word;
+	word-break: break-word;
+}
+
+.agent-client-error-overlay-suggestion {
+	margin: 8px 0 0 0 !important;
+	color: var(--text-muted);
+	font-size: 12px;
+	font-style: italic;
+	line-height: 1.4;
 }
 
 /* Empty state */
@@ -836,6 +939,7 @@ If your plugin does not need CSS, delete this file.
 	word-break: break-word;
 	max-width: 100%;
 	margin-top: 8px;
+	margin-bottom: 12px;
 }
 
 .agent-client-collapsible-thought-header {
@@ -1590,10 +1694,88 @@ If your plugin does not need CSS, delete this file.
 	gap: 8px;
 }
 
-.agent-client-confirm-delete-cancel {
-	/* Uses default button styles */
+/* ===== Settings Menu ===== */
+.agent-client-header-menu {
+	position: fixed;
+	z-index: 1000;
+	min-width: 180px;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	padding: 4px 0;
 }
 
-.agent-client-confirm-delete-confirm {
-	/* mod-warning class provides warning color */
+.agent-client-header-menu-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	cursor: pointer;
+	color: var(--text-normal);
+	transition: background-color 0.1s ease;
+}
+
+.agent-client-header-menu-item:hover,
+.agent-client-header-menu-item.agent-client-selected {
+	background-color: var(--background-modifier-hover);
+}
+
+.agent-client-header-menu-item.agent-client-current {
+	color: var(--interactive-accent-hover);
+}
+
+.agent-client-header-menu-icon {
+	width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.agent-client-header-menu-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.agent-client-header-menu-arrow {
+	margin-left: auto;
+	color: var(--text-muted);
+	font-size: 14px;
+}
+
+.agent-client-header-menu-check {
+	margin-left: auto;
+	color: var(--interactive-accent-hover);
+	font-size: 12px;
+}
+
+.agent-client-header-menu-separator {
+	height: 1px;
+	background-color: var(--background-modifier-border);
+	margin: 4px 0;
+}
+
+.agent-client-header-menu-header {
+	padding: 8px 12px 4px;
+	font-size: 11px;
+	font-weight: 400;
+	color: var(--text-muted);
+	letter-spacing: 0.05em;
+}
+
+.agent-client-header-menu-back {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	cursor: pointer;
+	color: var(--text-muted);
+	font-size: 12px;
+	transition: background-color 0.1s ease;
+}
+
+.agent-client-header-menu-back:hover {
+	background-color: var(--background-modifier-hover);
 }

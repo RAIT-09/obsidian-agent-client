@@ -45,20 +45,32 @@ See [Sending Images](/usage/sending-images) for more details.
 
 ## Switching Agents
 
-To switch between agents:
+To switch agents for the current view:
 
-1. Open plugin settings via **Obsidian Settings → Agent Client**, or click the **gear icon** in the chat header
-2. Select an agent from the **Active agent** dropdown
+1. Click the **⋮** (ellipsis) menu in the chat header
+2. Select **"Switch agent"**
+3. The agent switches immediately
+
+This is a one-time change for that view only.
 
 <p align="center">
-  <img src="/images/switching-agents.webp" alt="Switching Agents" />
+  <img src="/images/switch-agent.webp" alt="Switch agent menu" width="400" />
 </p>
 
 ::: tip
-- If no conversation has started, the agent switches immediately.
-- If a conversation is in progress, click **New Chat** to apply the change.
-- You can also use the command palette (`Cmd/Ctrl + P`) and search for **"New chat with [Agent Name]"** to switch agents directly.
+To change the default agent for new chat views, go to **Settings → Agent Client → Default agent**.
+
+<img src="/images/switch-default-agent.webp" alt="Default agent setting" />
 :::
+
+## Multiple Chat Views
+
+You can open multiple chat views to run independent conversations simultaneously. Each view has its own agent process and session.
+
+See [Multi-Session Chat](/usage/multi-session) for details on:
+- Opening multiple views
+- Broadcast commands
+- Focus navigation
 
 ## Changing Models and Modes
 

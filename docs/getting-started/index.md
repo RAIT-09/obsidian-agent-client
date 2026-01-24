@@ -42,6 +42,8 @@ If you need Node.js:
 
 ### Find Your Node.js Path
 
+Open a terminal (Terminal on macOS/Linux, PowerShell on Windows) and run:
+
 ::: code-group
 
 ```bash [macOS/Linux]

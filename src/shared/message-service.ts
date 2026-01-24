@@ -18,7 +18,12 @@ import type {
 	NoteMetadata,
 	EditorPosition,
 } from "../domain/ports/vault-access.port";
-import type { AgentError } from "../domain/models/agent-error";
+import { AcpErrorCode, type AcpError } from "../domain/models/agent-error";
+import {
+	extractErrorCode,
+	toAcpError,
+	isEmptyResponseError,
+} from "./acp-error-utils";
 import type { AuthenticationMethod } from "../domain/models/chat-session";
 import type {
 	PromptContent,
@@ -117,7 +122,7 @@ export interface SendPromptResult {
 	agentContent: PromptContent[];
 
 	/** Error information if sending failed */
-	error?: AgentError;
+	error?: AcpError;
 
 	/** Whether authentication is required */
 	requiresAuth?: boolean;
@@ -579,6 +584,11 @@ export async function sendPreparedPrompt(
 
 /**
  * Handle errors that occur during prompt sending.
+ *
+ * Error handling strategy:
+ * 1. "empty response text" errors are ignored (not real errors)
+ * 2. -32000 (Authentication Required) triggers authentication retry
+ * 3. All other errors are converted to AcpError and displayed directly
  */
 async function handleSendError(
 	error: unknown,
@@ -597,128 +607,49 @@ async function handleSendError(
 		};
 	}
 
-	// Check if this is a rate limit error
-	const isRateLimitError =
-		error &&
-		typeof error === "object" &&
-		"code" in error &&
-		(error as { code: unknown }).code === 429;
+	const errorCode = extractErrorCode(error);
 
-	if (isRateLimitError) {
-		const errorMessage =
-			"message" in error &&
-			typeof (error as { message: unknown }).message === "string"
-				? (error as { message: string }).message
-				: "Too many requests. Please try again later.";
+	// Only attempt authentication retry for -32000 (Authentication Required)
+	if (errorCode === AcpErrorCode.AUTHENTICATION_REQUIRED) {
+		// Check if authentication methods are available
+		if (authMethods && authMethods.length > 0) {
+			// Try automatic authentication retry if only one method available
+			if (authMethods.length === 1) {
+				const retryResult = await retryWithAuthentication(
+					sessionId,
+					agentContent,
+					displayContent,
+					authMethods[0].id,
+					agentClient,
+				);
 
-		return {
-			success: false,
-			displayContent,
-			agentContent,
-			error: {
-				id: crypto.randomUUID(),
-				category: "rate_limit",
-				severity: "error",
-				title: "Rate Limit Exceeded",
-				message: `Rate limit exceeded: ${errorMessage}`,
-				suggestion:
-					"You have exceeded the API rate limit. Please wait a few moments before trying again.",
-				occurredAt: new Date(),
-				sessionId,
-				originalError: error,
-			},
-		};
-	}
+				if (retryResult) {
+					return retryResult;
+				}
+			}
 
-	// Check if authentication is required
-	if (!authMethods || authMethods.length === 0) {
-		return {
-			success: false,
-			displayContent,
-			agentContent,
-			error: {
-				id: crypto.randomUUID(),
-				category: "authentication",
-				severity: "error",
-				title: "No Authentication Methods",
-				message: "No authentication methods available for this agent.",
-				suggestion:
-					"Please check your agent configuration in settings.",
-				occurredAt: new Date(),
-				sessionId,
-				originalError: error,
-			},
-		};
-	}
-
-	// Try automatic authentication retry if only one method available
-	if (authMethods.length === 1) {
-		const retryResult = await retryWithAuthentication(
-			sessionId,
-			agentContent,
-			displayContent,
-			authMethods[0].id,
-			agentClient,
-		);
-
-		if (retryResult) {
-			return retryResult;
+			// Multiple auth methods or retry failed - let user choose
+			return {
+				success: false,
+				displayContent,
+				agentContent,
+				requiresAuth: true,
+				error: toAcpError(error, sessionId),
+			};
 		}
+
+		// No auth methods available - still show the error
+		// This is not an error condition, agent just doesn't support auth
 	}
 
-	// Multiple auth methods or retry failed
+	// For all other errors, convert to AcpError and display directly
+	// The agent's error message is preserved and shown to the user
 	return {
 		success: false,
 		displayContent,
 		agentContent,
-		requiresAuth: true,
-		error: {
-			id: crypto.randomUUID(),
-			category: "authentication",
-			severity: "error",
-			title: "Authentication Required",
-			message:
-				"Authentication failed. Please check if you are logged into the agent or if your API key is correctly set.",
-			suggestion:
-				"Check your agent configuration in settings and ensure API keys are valid.",
-			occurredAt: new Date(),
-			sessionId,
-			originalError: error,
-		},
+		error: toAcpError(error, sessionId),
 	};
-}
-
-/**
- * Check if error is the "empty response text" error that should be ignored.
- */
-function isEmptyResponseError(error: unknown): boolean {
-	if (!error || typeof error !== "object") {
-		return false;
-	}
-
-	if (!("code" in error) || (error as { code: unknown }).code !== -32603) {
-		return false;
-	}
-
-	if (!("data" in error)) {
-		return false;
-	}
-
-	const errorData = (error as { data: unknown }).data;
-
-	if (
-		errorData &&
-		typeof errorData === "object" &&
-		"details" in errorData &&
-		typeof (errorData as { details: unknown }).details === "string" &&
-		(errorData as { details: string }).details.includes(
-			"empty response text",
-		)
-	) {
-		return true;
-	}
-
-	return false;
 }
 
 /**
@@ -747,21 +678,12 @@ async function retryWithAuthentication(
 			retriedSuccessfully: true,
 		};
 	} catch (retryError) {
+		// Convert retry error to AcpError
 		return {
 			success: false,
 			displayContent,
 			agentContent,
-			error: {
-				id: crypto.randomUUID(),
-				category: "communication",
-				severity: "error",
-				title: "Message Send Failed",
-				message: `Failed to send message after authentication: ${retryError instanceof Error ? retryError.message : String(retryError)}`,
-				suggestion: "Please try again or check your connection.",
-				occurredAt: new Date(),
-				sessionId,
-				originalError: retryError,
-			},
+			error: toAcpError(retryError, sessionId),
 		};
 	}
 }

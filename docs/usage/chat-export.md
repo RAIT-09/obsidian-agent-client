@@ -18,12 +18,13 @@ Configure export options in **Settings → Agent Client → Export**:
 |---------|-------------|
 | **Export folder** | Folder where chat exports will be saved (default: `Agent Client`) |
 | **Filename** | Template for filenames. Use `{date}` and `{time}` as placeholders |
+| **Frontmatter tag** | Tag added to exported notes (default: `agent-client`). Supports nested tags like `projects/agent-client` |
 | **Auto-export on new chat** | Automatically export when starting a new chat |
 | **Auto-export on close chat** | Automatically export when closing the chat view |
 | **Open note after export** | Automatically open the exported note |
 | **Include images** | Save images attached in messages (default: enabled) |
 | **Image location** | Where to save images: Obsidian's attachment folder, custom folder, or embed as Base64 |
-| **Custom image folder** | Folder path for images when using custom location (only shown when "Custom folder" is selected) |
+| **Custom image folder** | Folder path for images when using custom location |
 
 ## Export Format
 
@@ -35,7 +36,7 @@ created: 2025-12-13T00:31:12
 agentDisplayName: Claude Code
 agentId: claude-code-acp
 session_id: f95b4847-cb9c-441a-9f0b-08eb243ff5dd
-tags: [agent-client]
+tags: [agent-client]  # Customizable in settings
 ---
 
 # Claude Code
