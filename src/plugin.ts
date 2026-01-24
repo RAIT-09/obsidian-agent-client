@@ -597,15 +597,9 @@ export default class AgentClientPlugin extends Plugin {
 			return;
 		}
 
-		let successCount = 0;
 		for (const view of targetViews) {
 			view.setInputState(inputState);
-			successCount++;
 		}
-
-		new Notice(
-			`[Agent Client] Prompt broadcast to ${successCount} view(s)`,
-		);
 	}
 
 	/**
@@ -626,15 +620,7 @@ export default class AgentClientPlugin extends Plugin {
 		}
 
 		// Send in all views concurrently
-		const results = await Promise.allSettled(
-			sendableViews.map((v) => v.sendMessage()),
-		);
-
-		const successCount = results.filter(
-			(r) => r.status === "fulfilled" && r.value === true,
-		).length;
-
-		new Notice(`[Agent Client] Message sent in ${successCount} view(s)`);
+		await Promise.allSettled(sendableViews.map((v) => v.sendMessage()));
 	}
 
 	/**
