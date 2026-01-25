@@ -1341,8 +1341,14 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		try {
 			this.logger.log("[AcpAdapter] Listing sessions...");
 
+			// Convert Windows path to WSL path if in WSL mode
+			let filterCwd = cwd;
+			if (cwd && Platform.isWin && this.plugin.settings.windowsWslMode) {
+				filterCwd = convertWindowsPathToWsl(cwd);
+			}
+
 			const response = await this.connection.unstable_listSessions({
-				cwd: cwd ?? null,
+				cwd: filterCwd ?? null,
 				cursor: cursor ?? null,
 			});
 
