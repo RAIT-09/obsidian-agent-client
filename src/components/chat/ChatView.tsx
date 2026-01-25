@@ -615,7 +615,12 @@ function ChatComponent({
 			const isFirstMessage = messages.length === 0;
 
 			await chat.sendMessage(content, {
-				activeNote: autoMention.activeNote,
+				// TODO: Refactor to handle settings inside useAutoMention hook
+				// Current: Pass null when setting is OFF to disable auto-mention
+				// Ideal: useAutoMention should accept settings and return effective values
+				activeNote: settings.autoMentionActiveNote
+					? autoMention.activeNote
+					: null,
 				vaultBasePath:
 					(plugin.app.vault.adapter as VaultAdapterWithBasePath)
 						.basePath || "",
@@ -642,6 +647,7 @@ function ChatComponent({
 			session.sessionId,
 			sessionHistory,
 			logger,
+			settings.autoMentionActiveNote,
 		],
 	);
 
