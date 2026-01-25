@@ -29,6 +29,9 @@ export interface SessionHistoryContentProps {
 	/** Whether using locally saved sessions (instead of agent session/list) */
 	isUsingLocalSessions: boolean;
 
+	/** Set of session IDs that have local data (for filtering) */
+	localSessionIds: Set<string>;
+
 	/** Whether the agent is ready (initialized) */
 	isAgentReady: boolean;
 
@@ -300,6 +303,7 @@ export function SessionHistoryContent({
 	canRestore,
 	canFork,
 	isUsingLocalSessions,
+	localSessionIds,
 	isAgentReady,
 	debugMode,
 	onRestoreSession,
@@ -310,6 +314,7 @@ export function SessionHistoryContent({
 	onClose,
 }: SessionHistoryContentProps) {
 	const [filterByCurrentVault, setFilterByCurrentVault] = useState(true);
+	const [hideNonLocalSessions, setHideNonLocalSessions] = useState(true);
 
 	const handleFilterChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -325,6 +330,15 @@ export function SessionHistoryContent({
 		const cwd = filterByCurrentVault ? currentCwd : undefined;
 		onFetchSessions(cwd);
 	}, [filterByCurrentVault, currentCwd, onFetchSessions]);
+
+	// Filter sessions based on hideNonLocalSessions setting
+	// Only applies to agent session/list (not local sessions which are already filtered)
+	const filteredSessions = React.useMemo(() => {
+		if (isUsingLocalSessions || !hideNonLocalSessions) {
+			return sessions;
+		}
+		return sessions.filter((s) => localSessionIds.has(s.sessionId));
+	}, [sessions, isUsingLocalSessions, hideNonLocalSessions, localSessionIds]);
 
 	// Show preparing message if agent is not ready
 	if (!isAgentReady) {
@@ -385,7 +399,7 @@ export function SessionHistoryContent({
 
 			{canShowList && (
 				<>
-					{/* Filter toggle - only for agent session/list */}
+					{/* Filter toggles - only for agent session/list */}
 					{canList && !isUsingLocalSessions && (
 						<div className="agent-client-session-history-filter">
 							<label className="agent-client-session-history-filter-label">
@@ -395,6 +409,18 @@ export function SessionHistoryContent({
 									onChange={handleFilterChange}
 								/>
 								<span>Show current vault only</span>
+							</label>
+							<label className="agent-client-session-history-filter-label">
+								<input
+									type="checkbox"
+									checked={hideNonLocalSessions}
+									onChange={(e) =>
+										setHideNonLocalSessions(
+											e.target.checked,
+										)
+									}
+								/>
+								<span>Hide sessions without local data</span>
 							</label>
 						</div>
 					)}
@@ -415,14 +441,14 @@ export function SessionHistoryContent({
 					)}
 
 					{/* Loading state */}
-					{!error && loading && sessions.length === 0 && (
+					{!error && loading && filteredSessions.length === 0 && (
 						<div className="agent-client-session-history-loading">
 							<p>Loading sessions...</p>
 						</div>
 					)}
 
 					{/* Empty state */}
-					{!error && !loading && sessions.length === 0 && (
+					{!error && !loading && filteredSessions.length === 0 && (
 						<div className="agent-client-session-history-empty">
 							<p className="agent-client-session-history-empty-text">
 								No previous sessions
@@ -431,9 +457,9 @@ export function SessionHistoryContent({
 					)}
 
 					{/* Session list */}
-					{!error && sessions.length > 0 && (
+					{!error && filteredSessions.length > 0 && (
 						<div className="agent-client-session-history-list">
-							{sessions.map((session) => (
+							{filteredSessions.map((session) => (
 								<SessionItem
 									key={session.sessionId}
 									session={session}
