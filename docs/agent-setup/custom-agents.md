@@ -33,6 +33,28 @@ where.exe your-agent
    - **Arguments**: Command-line arguments, one per line (if required)
    - **Environment variables**: `KEY=VALUE` pairs, one per line (if required)
 
+## Configuration Examples
+
+### OpenCode
+
+| Field | Value |
+|-------|-------|
+| **Agent ID** | `opencode` |
+| **Display name** | `OpenCode` |
+| **Path** | `/usr/local/bin/opencode` |
+| **Arguments** | `acp` |
+| **Environment variables** | (optional) |
+
+### Qwen Code
+
+| Field | Value |
+|-------|-------|
+| **Agent ID** | `qwen-code` |
+| **Display name** | `Qwen Code` |
+| **Path** | `/usr/local/bin/qwen` |
+| **Arguments** | `--experimental-acp` |
+| **Environment variables** | (optional) |
+
 ## Authentication
 
 Authentication depends on the specific agent. Common patterns:
