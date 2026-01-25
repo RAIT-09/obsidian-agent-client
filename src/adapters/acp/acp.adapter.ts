@@ -1394,9 +1394,15 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		try {
 			this.logger.log(`[AcpAdapter] Loading session: ${sessionId}...`);
 
+			// Convert Windows path to WSL path if in WSL mode
+			let sessionCwd = cwd;
+			if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+				sessionCwd = convertWindowsPathToWsl(cwd);
+			}
+
 			const response = await this.connection.loadSession({
 				sessionId,
-				cwd,
+				cwd: sessionCwd,
 				mcpServers: [],
 			});
 
@@ -1466,9 +1472,15 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		try {
 			this.logger.log(`[AcpAdapter] Resuming session: ${sessionId}...`);
 
+			// Convert Windows path to WSL path if in WSL mode
+			let sessionCwd = cwd;
+			if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+				sessionCwd = convertWindowsPathToWsl(cwd);
+			}
+
 			const response = await this.connection.unstable_resumeSession({
 				sessionId,
-				cwd,
+				cwd: sessionCwd,
 				mcpServers: [],
 			});
 
@@ -1534,9 +1546,15 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		try {
 			this.logger.log(`[AcpAdapter] Forking session: ${sessionId}...`);
 
+			// Convert Windows path to WSL path if in WSL mode
+			let sessionCwd = cwd;
+			if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+				sessionCwd = convertWindowsPathToWsl(cwd);
+			}
+
 			const response = await this.connection.unstable_forkSession({
 				sessionId,
-				cwd,
+				cwd: sessionCwd,
 				mcpServers: [],
 			});
 
