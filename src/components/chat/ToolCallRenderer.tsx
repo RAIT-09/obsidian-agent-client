@@ -1,5 +1,6 @@
 import * as React from "react";
 const { useState, useMemo } = React;
+import { FileSystemAdapter } from "obsidian";
 import type { MessageContent } from "../../domain/models/chat-message";
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../plugin";
@@ -51,8 +52,11 @@ export function ToolCallRenderer({
 
 	// Get vault path for relative path display
 	const vaultPath = useMemo(() => {
-		const adapter = plugin.app.vault.adapter as { basePath?: string };
-		return adapter.basePath || "";
+		const adapter = plugin.app.vault.adapter;
+		if (adapter instanceof FileSystemAdapter) {
+			return adapter.getBasePath();
+		}
+		return "";
 	}, [plugin]);
 
 	// Get showEmojis setting
