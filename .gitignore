@@ -30,6 +30,9 @@ sessions/
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
 
+# AI coding agent settings
+.claude/
+
 # MCP client configuration
 .mcp.json
 
