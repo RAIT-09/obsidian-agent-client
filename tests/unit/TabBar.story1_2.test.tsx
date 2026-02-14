@@ -29,6 +29,8 @@ describe("TabBar - User Story 1.2", () => {
 		};
 	}
 
+	const noop = vi.fn();
+
 	// ========================================================================
 	// AC: New tab label shows agent name + current timestamp
 	// (Test that TabBar renders multiple tabs with correct labels)
@@ -44,7 +46,7 @@ describe("TabBar - User Story 1.2", () => {
 			];
 
 			const { container } = render(
-				<TabBar tabs={tabs} activeTabIndex={1} />,
+				<TabBar tabs={tabs} activeTabIndex={1} onTabClick={noop} />,
 			);
 
 			const tabElements =
@@ -65,7 +67,7 @@ describe("TabBar - User Story 1.2", () => {
 				}),
 			];
 
-			render(<TabBar tabs={tabs} activeTabIndex={0} />);
+			render(<TabBar tabs={tabs} activeTabIndex={0} onTabClick={noop} />);
 
 			const expectedLabel1 = `Claude Code ${formatTabTimestamp(tab1Time)}`;
 			const expectedLabel2 = `Gemini CLI ${formatTabTimestamp(tab2Time)}`;
@@ -88,7 +90,7 @@ describe("TabBar - User Story 1.2", () => {
 			];
 
 			const { container } = render(
-				<TabBar tabs={tabs} activeTabIndex={1} />,
+				<TabBar tabs={tabs} activeTabIndex={1} onTabClick={noop} />,
 			);
 
 			const tabElements =
@@ -105,7 +107,7 @@ describe("TabBar - User Story 1.2", () => {
 			];
 
 			const { container, rerender } = render(
-				<TabBar tabs={tabs} activeTabIndex={0} />,
+				<TabBar tabs={tabs} activeTabIndex={0} onTabClick={noop} />,
 			);
 
 			// First tab is active
@@ -115,7 +117,7 @@ describe("TabBar - User Story 1.2", () => {
 			expect(tabElements[1].classList.contains("agent-client-tab-active")).toBe(false);
 
 			// Re-render with new activeTabIndex
-			rerender(<TabBar tabs={tabs} activeTabIndex={1} />);
+			rerender(<TabBar tabs={tabs} activeTabIndex={1} onTabClick={noop} />);
 
 			tabElements = container.querySelectorAll(".agent-client-tab");
 			expect(tabElements[0].classList.contains("agent-client-tab-active")).toBe(false);
@@ -152,7 +154,7 @@ describe("TabBar - User Story 1.2", () => {
 			];
 
 			const { container } = render(
-				<TabBar tabs={tabs} activeTabIndex={4} />,
+				<TabBar tabs={tabs} activeTabIndex={4} onTabClick={noop} />,
 			);
 
 			const tabElements =
@@ -185,7 +187,7 @@ describe("TabBar - User Story 1.2", () => {
 			);
 
 			const { container } = render(
-				<TabBar tabs={tabs} activeTabIndex={9} />,
+				<TabBar tabs={tabs} activeTabIndex={9} onTabClick={noop} />,
 			);
 
 			const tabElements =
@@ -209,7 +211,7 @@ describe("TabBar - User Story 1.2", () => {
 				createTab({ tabId: "view-1-tab-2" }),
 			];
 
-			render(<TabBar tabs={tabs} activeTabIndex={0} />);
+			render(<TabBar tabs={tabs} activeTabIndex={0} onTabClick={noop} />);
 
 			// React would log a console.error for duplicate keys
 			const keyWarnings = consoleError.mock.calls.filter(
