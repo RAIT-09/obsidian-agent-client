@@ -11,6 +11,7 @@ import type AgentClientPlugin from "../../plugin";
 import type { ChatInputState } from "../../domain/models/chat-input-state";
 
 // Component imports
+import { TabBar } from "./TabBar";
 import { ChatHeader } from "./ChatHeader";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
@@ -500,7 +501,12 @@ function ChatComponent({
 	return (
 		<div className="agent-client-chat-view-container">
 			<ChatHeader
-				agentLabel={activeAgentLabel}
+				tabBar={
+					<TabBar
+						agentLabel={activeAgentLabel}
+						createdAt={session.createdAt}
+					/>
+				}
 				isUpdateAvailable={isUpdateAvailable}
 				hasHistoryCapability={sessionHistory.canShowSessionHistory}
 				onNewChat={() => void handleNewChatWithPersist()}

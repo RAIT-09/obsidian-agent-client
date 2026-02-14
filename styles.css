@@ -394,6 +394,39 @@ If your plugin does not need CSS, delete this file.
 	padding: 0;
 }
 
+/* ===== Tab Bar ===== */
+.agent-client-tab-bar {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.agent-client-tab {
+	display: flex;
+	align-items: center;
+	padding: 4px 12px;
+	border-radius: 4px 4px 0 0;
+	background-color: transparent;
+	border: 1px solid transparent;
+	cursor: default; /* No pointer cursor - tab is not interactive in Story 1.1 */
+	transition: background-color 0.15s ease;
+}
+
+.agent-client-tab-active {
+	background-color: var(--background-primary-alt);
+	border-color: var(--background-modifier-border);
+	border-bottom-color: transparent; /* Connects to content below */
+}
+
+.agent-client-tab-label {
+	font-size: 12px;
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 200px;
+}
+
 /* Header */
 .agent-client-chat-view-header {
 	padding: 16px;

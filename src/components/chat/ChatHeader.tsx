@@ -5,8 +5,8 @@ import { HeaderButton } from "./HeaderButton";
  * Props for ChatHeader component
  */
 export interface ChatHeaderProps {
-	/** Display name of the active agent */
-	agentLabel: string;
+	/** Tab bar to display in the header */
+	tabBar: React.ReactNode;
 	/** Whether a plugin update is available */
 	isUpdateAvailable: boolean;
 	/** Whether session history is supported (show History button) */
@@ -27,12 +27,12 @@ export interface ChatHeaderProps {
  * Header component for the chat view.
  *
  * Displays:
- * - Agent name
+ * - Tab bar
  * - Update notification (if available)
  * - Action buttons (new chat, history, export, settings)
  */
 export function ChatHeader({
-	agentLabel,
+	tabBar,
 	isUpdateAvailable,
 	hasHistoryCapability = false,
 	onNewChat,
@@ -43,11 +43,7 @@ export function ChatHeader({
 }: ChatHeaderProps) {
 	return (
 		<div className="agent-client-chat-view-header">
-			<div className="agent-client-chat-view-header-main">
-				<h3 className="agent-client-chat-view-header-title">
-					{agentLabel}
-				</h3>
-			</div>
+			<div className="agent-client-chat-view-header-main">{tabBar}</div>
 			{isUpdateAvailable && (
 				<p className="agent-client-chat-view-header-update">
 					Plugin update available!
