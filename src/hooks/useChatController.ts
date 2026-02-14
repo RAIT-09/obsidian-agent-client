@@ -101,6 +101,9 @@ export interface UseChatControllerReturn {
 	handleSetMode: (modeId: string) => Promise<void>;
 	handleSetModel: (modelId: string) => Promise<void>;
 
+	// Message management
+	clearMessages: () => void;
+
 	// Input state (for broadcast commands - sidebar only)
 	inputValue: string;
 	setInputValue: (value: string) => void;
@@ -843,6 +846,9 @@ export function useChatController(
 		handleOpenHistory,
 		handleSetMode,
 		handleSetModel,
+
+		// Message management
+		clearMessages: chat.clearMessages,
 
 		// Input state
 		inputValue,

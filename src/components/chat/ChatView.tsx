@@ -25,6 +25,7 @@ import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 
 // Hooks imports
 import { useChatController } from "../../hooks/useChatController";
+import { useTabManager } from "../../hooks/useTabManager";
 
 // Domain model imports
 import type { ImagePromptContent } from "../../domain/models/prompt-content";
@@ -64,12 +65,18 @@ function ChatComponent({
 	);
 
 	// ============================================================
+	// Tab Manager (Multi-tab support)
+	// ============================================================
+	const tabManager = useTabManager(viewId, plugin, restoredAgentId);
+
+	// ============================================================
 	// Chat Controller Hook (Centralized Logic)
+	// Uses activeTabId as adapter key for per-tab session isolation
 	// ============================================================
 	const controller = useChatController({
 		plugin,
-		viewId,
-		initialAgentId: restoredAgentId,
+		viewId: tabManager.activeTabId,
+		initialAgentId: tabManager.activeTab.agentId,
 	});
 
 	const {
@@ -98,6 +105,7 @@ function ChatComponent({
 		handleOpenHistory,
 		handleSetMode,
 		handleSetModel,
+		clearMessages,
 		inputValue,
 		setInputValue,
 		attachedImages,
@@ -141,6 +149,23 @@ function ChatComponent({
 			container.removeEventListener("click", handleFocus);
 		};
 	}, [plugin, viewId, view.containerEl]);
+
+	// ============================================================
+	// Tab Lifecycle Effects
+	// ============================================================
+	// Clear messages when active tab changes (new tab gets fresh state)
+	const prevActiveTabIdRef = useRef(tabManager.activeTabId);
+	useEffect(() => {
+		if (prevActiveTabIdRef.current !== tabManager.activeTabId) {
+			prevActiveTabIdRef.current = tabManager.activeTabId;
+			clearMessages();
+		}
+	}, [tabManager.activeTabId, clearMessages]);
+
+	// Sync tab IDs with view class for cleanup on view close
+	useEffect(() => {
+		view.tabIds = tabManager.tabs.map((t) => t.tabId);
+	}, [view, tabManager.tabs]);
 
 	// ============================================================
 	// Refs
@@ -503,13 +528,14 @@ function ChatComponent({
 			<ChatHeader
 				tabBar={
 					<TabBar
-						agentLabel={activeAgentLabel}
-						createdAt={session.createdAt}
+						tabs={tabManager.tabs}
+						activeTabIndex={tabManager.activeTabIndex}
+						onCreateTab={() => tabManager.createTab()}
 					/>
 				}
 				isUpdateAvailable={isUpdateAvailable}
 				hasHistoryCapability={sessionHistory.canShowSessionHistory}
-				onNewChat={() => void handleNewChatWithPersist()}
+				onNewChat={() => tabManager.createTab()}
 				onExportChat={() => void handleExportChat()}
 				onToggleMenu={handleToggleMenu}
 				onOpenHistory={handleOpenHistory}
@@ -605,6 +631,8 @@ export class ChatView extends ItemView implements IChatViewContainer {
 	/** Callbacks to notify React when agentId is restored from workspace state */
 	private agentIdRestoredCallbacks: Set<(agentId: string) => void> =
 		new Set();
+	/** Tab IDs for cleanup (set by React component via useEffect) */
+	tabIds: string[] = [];
 
 	// Callbacks for input state access (broadcast commands)
 	private getDisplayNameCallback: GetDisplayNameCallback | null = null;
@@ -856,7 +884,9 @@ export class ChatView extends ItemView implements IChatViewContainer {
 			this.root.unmount();
 			this.root = null;
 		}
-		// Remove adapter for this view (disconnect process)
-		await this.plugin.removeAdapter(this.viewId);
+		// Remove adapters for all tabs (disconnect processes)
+		for (const tabId of this.tabIds) {
+			await this.plugin.removeAdapter(tabId);
+		}
 	}
 }
