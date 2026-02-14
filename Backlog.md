@@ -63,113 +63,6 @@ This document captures requirements, design decisions, and implementation backlo
 
 ## Epic 1: Basic Tab Infrastructure 🔴 MVP
 
-### User Story 1.1: Display Single Tab by Default 🔴 P0
-**As a** plugin user
-**I want** to see one tab when I open the Agent Client view
-**So that** I have a clear starting point for my conversation
-
-**Acceptance Criteria:**
-- [ ] When plugin loads, ChatView displays exactly one tab
-- [ ] Tab shows agent name + timestamp (e.g., "Claude Code 2:34 PM")
-- [ ] Tab uses default agent from settings
-- [ ] Tab creates new empty session automatically
-- [ ] Existing chat functionality (messages, input) works as before
-- [ ] No visual regressions in header or message area
-
-
-**Definition of Done:**
-- Existing functionality unaffected
-
----
-
-### User Story 1.2: Create New Tab with + Button 🔴 P0
-**As a** plugin user
-**I want** to click a + button to create a new tab
-**So that** I can start multiple independent conversations
-
-**Acceptance Criteria:**
-- [ ] + button visible in tab bar (right side of tabs)
-- [ ] Clicking + creates new tab with default agent
-- [ ] New tab becomes active automatically
-- [ ] New tab label shows agent name + current timestamp
-- [ ] New tab creates new session with unique sessionId
-- [ ] New tab spawns new agent process (separate from other tabs)
-- [ ] Previous tab's session/process remains running
-- [ ] Can create unlimited tabs (no limit for MVP)
-
-**Test Cases:**
-1. Click + → New tab appears with label "Claude Code [time]"
-2. Send message in tab 1, click +, verify tab 2 is independent
-3. Create 5 tabs, verify all have unique labels and sessions
-4. Verify each tab has separate agent process (check adapters map)
-
-
-**Definition of Done:**
-- Can create multiple tabs via + button
-- Each tab is independent (separate process, messages, input)
-- Agent processes remain alive when switching tabs
-
----
-
-### User Story 1.3: Switch Between Tabs 🔴 P0
-**As a** plugin user
-**I want** to click on a tab to switch to it
-**So that** I can view and interact with different conversations
-
-**Acceptance Criteria:**
-- [ ] Clicking a tab makes it active (switches focus)
-- [ ] Active tab shows visual distinction (e.g., different background)
-- [ ] Switching tabs shows correct messages for that tab
-- [ ] Switching tabs shows correct input field state for that tab
-- [ ] Background tab's agent continues generating (doesn't stop)
-- [ ] Input text typed in tab A is not visible when switching to tab B
-- [ ] Attached images in tab A are not visible when switching to tab B
-- [ ] Session state (modes, models) preserved per tab
-
-**Test Cases:**
-1. Tab A: Type "hello" in input → Switch to tab B → Verify input is empty
-2. Tab A: Send message "test" → Switch to tab B → Tab A still shows "test" message
-3. Tab A: Agent generating response → Switch to tab B → Switch back to tab A → Verify generation completed
-4. Tab A: Attach image → Switch to tab B → Verify no image attached in tab B
-
-**Definition of Done:**
-- Clicking tabs switches between them smoothly
-- Each tab maintains independent state
-- No data leakage between tabs
-- Background processes continue running
-
----
-
-### User Story 1.4: Close Tab with × Button 🔴 P0
-**As a** plugin user
-**I want** to close a tab by clicking the × button
-**So that** I can remove conversations I no longer need
-
-**Acceptance Criteria:**
-- [ ] Each tab displays × button on the right side
-- [ ] Clicking × closes that tab (removes from tab bar)
-- [ ] Closing a tab cancels any active operation in that tab
-- [ ] Closing a tab disconnects the agent process for that tab
-- [ ] No confirmation dialog shown (as per Q12)
-- [ ] If closing active tab, switch to adjacent tab (prefer left)
-- [ ] If closing non-active tab, active tab stays active
-- [ ] Tab indices adjust correctly after closing
-
-**Test Cases:**
-1. 3 tabs open, close middle tab → Verify 2 tabs remain, correct tab is active
-2. Close tab with active generation → Verify process is cancelled
-3. Close tab with unsent input → Verify input is lost (no warning)
-4. Close active tab → Verify switches to previous tab
-5. Close non-active tab → Verify active tab stays active
-
-
-**Definition of Done:**
-- Can close any tab via × button
-- Agent process terminates when tab closes
-- Correct tab becomes active after closing
-- No memory leaks (adapters cleaned up)
-
----
 
 ### User Story 1.5: Auto-Create Tab When Last Tab Closed 🔴 P0
 **As a** plugin user
@@ -183,17 +76,15 @@ This document captures requirements, design decisions, and implementation backlo
 - [ ] New tab label shows agent name + current timestamp
 - [ ] User doesn't see empty state (always at least 1 tab)
 - [ ] Transition is smooth (no flicker)
+- Impossible to have zero tabs
+- Closing last tab creates new empty tab automatically
+- No error states or empty views
 
 **Test Cases:**
 1. Open plugin (1 tab) → Close tab → Verify new empty tab created
 2. Create 3 tabs → Close all 3 → Verify ends with 1 empty tab
 3. Last tab has messages → Close → Verify new tab is empty (fresh session)
 
-
-**Definition of Done:**
-- Impossible to have zero tabs
-- Closing last tab creates new empty tab automatically
-- No error states or empty views
 
 ---
 
