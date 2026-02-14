@@ -326,7 +326,12 @@ export function useChatController(
 		(state: TabCachedState | null) => {
 			if (state) {
 				chat.setMessagesFromLocal(state.messages);
-				chat.restoreIsSending(state.isSending);
+				// Don't blindly restore cached isSending — the prompt may have
+				// completed while this tab was in the background. Check the
+				// adapter to see if a prompt is still actually in flight.
+				const actualIsSending =
+					state.isSending && acpAdapter.isPromptInFlight;
+				chat.restoreIsSending(actualIsSending);
 				setInputValue(state.inputValue);
 				setAttachedImages(state.attachedImages);
 				agentSession.restoreSessionSnapshot(state.session);
@@ -336,7 +341,7 @@ export function useChatController(
 				setAttachedImages([]);
 			}
 		},
-		[chat, agentSession],
+		[chat, agentSession, acpAdapter],
 	);
 
 	// ============================================================

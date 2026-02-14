@@ -59,6 +59,8 @@ export interface IAcpClient extends acp.Client {
 	terminalOutput(
 		params: acp.TerminalOutputRequest,
 	): Promise<acp.TerminalOutputResponse>;
+	/** Whether a prompt is currently awaiting a response from the agent. */
+	readonly isPromptInFlight: boolean;
 }
 
 /**
@@ -115,6 +117,9 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	// Used to detect silent failures (e.g., missing API keys) where the agent
 	// returns end_turn with no content.
 	private promptSessionUpdateCount = 0;
+	// Whether a prompt is currently awaiting a response from the agent.
+	// Used by tab switching to detect stale isSending state.
+	private _promptInFlight = false;
 	// Captures recent stderr output for error diagnostics
 	private recentStderr = "";
 
@@ -645,6 +650,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		this.resetCurrentMessage();
 		this.promptSessionUpdateCount = 0;
 		this.recentStderr = "";
+		this._promptInFlight = true;
 
 		try {
 			// Convert domain PromptContent to ACP ContentBlock
@@ -730,6 +736,8 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			}
 
 			throw error;
+		} finally {
+			this._promptInFlight = false;
 		}
 	}
 
@@ -818,6 +826,14 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	 */
 	getCurrentAgentId(): string | null {
 		return this.currentAgentId;
+	}
+
+	/**
+	 * Whether a prompt is currently awaiting a response from the agent.
+	 * Used by tab switching to detect stale isSending state.
+	 */
+	get isPromptInFlight(): boolean {
+		return this._promptInFlight;
 	}
 
 	/**
