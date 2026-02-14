@@ -61,36 +61,9 @@ This document captures requirements, design decisions, and implementation backlo
 
 ---
 
-## Epic 1: Basic Tab Infrastructure 🔴 MVP
-
-
-### User Story 1.5: Auto-Create Tab When Last Tab Closed 🔴 P0
-**As a** plugin user
-**I want** a new empty tab to be created automatically when I close the last tab
-**So that** I always have at least one tab to work with
-
-**Acceptance Criteria:**
-- [ ] When closing the last remaining tab, a new empty tab is created
-- [ ] New tab uses default agent from settings
-- [ ] New tab has fresh session (no messages)
-- [ ] New tab label shows agent name + current timestamp
-- [ ] User doesn't see empty state (always at least 1 tab)
-- [ ] Transition is smooth (no flicker)
-- Impossible to have zero tabs
-- Closing last tab creates new empty tab automatically
-- No error states or empty views
-
-**Test Cases:**
-1. Open plugin (1 tab) → Close tab → Verify new empty tab created
-2. Create 3 tabs → Close all 3 → Verify ends with 1 empty tab
-3. Last tab has messages → Close → Verify new tab is empty (fresh session)
-
-
----
-
 ## Epic 2: Tab Integration with Existing Features 🟡 Enhanced
 
-### User Story 2.1: Load Session from History into New Tab 🟡 P1
+### User Story: Load Session from History into New Tab 🟡 P1
 **As a** plugin user
 **I want** to load a previous session from history into a new tab
 **So that** I can resume past conversations without losing my current work
@@ -117,7 +90,7 @@ This document captures requirements, design decisions, and implementation backlo
 
 ---
 
-### User Story 2.2: Switch Agent for Current Tab Only 🟡 P1
+### User Story: Switch Agent for Current Tab Only 🟡 P1
 **As a** plugin user
 **I want** to switch agents and have it only affect the current tab
 **So that** I can use different agents in different tabs
@@ -144,7 +117,7 @@ This document captures requirements, design decisions, and implementation backlo
 
 ---
 
-### User Story 2.3: Export Current Tab Only 🟡 P1
+### User Story: Export Current Tab Only 🟡 P1
 **As a** plugin user
 **I want** the export button to export only the current tab's conversation
 **So that** I can save individual conversations to markdown
@@ -170,7 +143,7 @@ This document captures requirements, design decisions, and implementation backlo
 
 ---
 
-### User Story 2.4: Remove "New Chat" from Header Menu 🟡 P1
+### User Story: Remove "New Chat" from Header Menu 🟡 P1
 **As a** plugin user
 **I want** the header menu to remove the "New chat" option
 **So that** the UI is cleaner and uses the + button for new tabs
@@ -195,30 +168,9 @@ This document captures requirements, design decisions, and implementation backlo
 
 ## Epic 3: Tab UI Polish 🟢 Polish
 
-### User Story 3.1: Tab Overflow with Horizontal Scroll 🟢 P2
-**As a** plugin user
-**I want** tabs to shrink and scroll horizontally when there are many tabs
-**So that** I can manage many conversations without UI breaking
-
-**Acceptance Criteria:**
-- [ ] Tabs shrink in width as more tabs are added (min width: 80px)
-- [ ] When tabs reach minimum width, tab bar becomes scrollable
-- [ ] Horizontal scroll arrows appear (or scrollbar)
-- [ ] Scrolling is smooth and intuitive
-- [ ] Active tab is auto-scrolled into view when switching
-- [ ] Behavior matches Obsidian's file tab overflow
-- [ ] Tab labels truncate with ellipsis (...) when too long
-
-
-**Definition of Done:**
-- Many tabs (10+) handled gracefully
-- UI doesn't break with overflow
-- Scrolling works smoothly
-- Matches Obsidian's UX patterns
-
 ---
 
-### User Story 3.2: Tab Styling Matches Obsidian Editor Tabs 🟢 P2
+### User Story: Tab Styling Matches Obsidian Editor Tabs 🟢 P2
 **As a** plugin user
 **I want** the tab bar to look like Obsidian's native file tabs
 **So that** the UI feels consistent and familiar
@@ -238,7 +190,7 @@ This document captures requirements, design decisions, and implementation backlo
 
 ---
 
-### User Story 3.3: Update ChatHeader Layout 🟢 P2
+### User Story: Update ChatHeader Layout 🟢 P2
 **As a** plugin user
 **I want** the header to show only action buttons (no agent name)
 **So that** the tab bar can show agent names per tab
@@ -261,7 +213,7 @@ This document captures requirements, design decisions, and implementation backlo
 
 ## Epic 4: Future Enhancements (Phase 2+) 🔵 Future
 
-### User Story 4.1: Background Tab Activity Indicator 🔵 P3
+### User Story: Background Tab Activity Indicator 🔵 P3
 **As a** plugin user
 **I want** to see a loading spinner on tabs where the agent is generating
 **So that** I know which background tabs are active
@@ -281,7 +233,7 @@ This document captures requirements, design decisions, and implementation backlo
 
 ---
 
-### User Story 4.2: Tab Persistence Across Restarts 🔵 P3
+### User Story: Tab Persistence Across Restarts 🔵 P3
 **As a** plugin user
 **I want** my tabs to be restored when I restart Obsidian
 **So that** I can continue where I left off
@@ -301,7 +253,7 @@ This document captures requirements, design decisions, and implementation backlo
 
 ---
 
-### User Story 4.3: Keyboard Shortcuts for Tabs 🔵 P3
+### User Story: Keyboard Shortcuts for Tabs 🔵 P3
 **As a** plugin user
 **I want** to use keyboard shortcuts to manage tabs
 **So that** I can work more efficiently
@@ -321,7 +273,7 @@ This document captures requirements, design decisions, and implementation backlo
 
 ---
 
-### User Story 4.4: Tab Context Menu (Right-Click) 🔵 P3
+### User Story: Tab Context Menu (Right-Click) 🔵 P3
 **As a** plugin user
 **I want** to right-click a tab to see options
 **So that** I can perform tab actions quickly
@@ -341,7 +293,7 @@ This document captures requirements, design decisions, and implementation backlo
 
 ---
 
-### User Story 4.5: Dynamic Tab Labels from First Message 🔵 P3
+### User Story: Dynamic Tab Labels from First Message 🔵 P3
 **As a** plugin user
 **I want** tab labels to update with a summary of my first message
 **So that** I can identify tabs by their content
@@ -366,11 +318,11 @@ This document captures requirements, design decisions, and implementation backlo
 ### 🔴 MVP (Phase 1) - Required for Initial Release
 **Timeline: ~2-3 weeks**
 
-| Week | User Stories | Focus |
-|------|--------------|-------|
-| Week 1 | 1.1, 1.2, 1.3 | Core tab infrastructure |
-| Week 2 | 1.4, 1.5, 2.1 | Tab operations & history integration |
-| Week 3 | 2.2, 2.3, 2.4, 3.1, 3.2, 3.3 | Feature integration & UI polish |
+| Week | Focus | Details |
+|------|-------|---------|
+| Week 1 | Core tab infrastructure | Tab bar, switching, state management |
+| Week 2 | Tab operations & history integration | Close, auto-create, history loading |
+| Week 3 | Feature integration & UI polish | Agent switching, export, styling |
 
 **MVP Deliverables:**
 - ✅ Multiple independent tabs in sidebar view
@@ -385,20 +337,20 @@ This document captures requirements, design decisions, and implementation backlo
 **Timeline: +1-2 weeks**
 
 Already included in MVP:
-- Tab overflow handling (3.1)
-- Tab styling (3.2)
-- Header layout update (3.3)
+- Tab overflow handling
+- Tab styling
+- Header layout update
 
 ---
 
 ### 🔵 Future Enhancements (Phase 3+) - Based on User Feedback
 **Timeline: Post-launch iterations**
 
-- Background activity indicators (4.1)
-- Tab persistence (4.2)
-- Keyboard shortcuts (4.3)
-- Tab context menu (4.4)
-- Dynamic tab labels (4.5)
+- Background activity indicators
+- Tab persistence
+- Keyboard shortcuts
+- Tab context menu
+- Dynamic tab labels
 - Tab reordering (drag & drop)
 - Export all tabs
 - Tab limits & management
