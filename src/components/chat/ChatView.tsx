@@ -530,7 +530,6 @@ function ChatComponent({
 					<TabBar
 						tabs={tabManager.tabs}
 						activeTabIndex={tabManager.activeTabIndex}
-						onCreateTab={() => tabManager.createTab()}
 					/>
 				}
 				isUpdateAvailable={isUpdateAvailable}

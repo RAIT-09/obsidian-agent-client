@@ -431,34 +431,6 @@ If your plugin does not need CSS, delete this file.
 	max-width: 200px;
 }
 
-.agent-client-tab-add-button {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 24px;
-	height: 24px;
-	padding: 0;
-	border: none;
-	border-radius: 4px;
-	background-color: transparent;
-	color: var(--text-muted);
-	cursor: pointer;
-	flex-shrink: 0;
-	transition:
-		background-color 0.15s ease,
-		color 0.15s ease;
-}
-
-.agent-client-tab-add-button:hover {
-	background-color: var(--background-modifier-hover);
-	color: var(--text-normal);
-}
-
-.agent-client-tab-add-button svg {
-	width: 14px;
-	height: 14px;
-}
-
 /* Header */
 .agent-client-chat-view-header {
 	padding: 16px;

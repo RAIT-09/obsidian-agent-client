@@ -1,6 +1,4 @@
 import * as React from "react";
-const { useRef, useEffect } = React;
-import { setIcon } from "obsidian";
 import type { TabInfo } from "../../hooks/useTabManager";
 import { formatTabTimestamp } from "../../shared/time-utils";
 
@@ -9,19 +7,9 @@ export interface TabBarProps {
 	tabs: TabInfo[];
 	/** Index of the currently active tab */
 	activeTabIndex: number;
-	/** Callback to create a new tab */
-	onCreateTab: () => void;
 }
 
-export function TabBar({ tabs, activeTabIndex, onCreateTab }: TabBarProps) {
-	const addButtonRef = useRef<HTMLButtonElement>(null);
-
-	useEffect(() => {
-		if (addButtonRef.current) {
-			setIcon(addButtonRef.current, "plus");
-		}
-	}, []);
-
+export function TabBar({ tabs, activeTabIndex }: TabBarProps) {
 	return (
 		<div className="agent-client-tab-bar">
 			{tabs.map((tab, index) => {
@@ -38,12 +26,6 @@ export function TabBar({ tabs, activeTabIndex, onCreateTab }: TabBarProps) {
 					</div>
 				);
 			})}
-			<button
-				ref={addButtonRef}
-				className="agent-client-tab-add-button"
-				onClick={onCreateTab}
-				title="New tab"
-			/>
 		</div>
 	);
 }

@@ -103,12 +103,6 @@ This document captures requirements, design decisions, and implementation backlo
 3. Create 5 tabs, verify all have unique labels and sessions
 4. Verify each tab has separate agent process (check adapters map)
 
-**Technical Notes:**
-- Add `createTab(agentId?: string)` method to `useTabManager`
-- Generate tab ID: `${viewId}-tab-${tabs.length}`
-- Create adapter with key: tabId
-- Initialize session via `useAgentSession.createSession()`
-- Switch to new tab index after creation
 
 **Definition of Done:**
 - Can create multiple tabs via + button
@@ -137,18 +131,6 @@ This document captures requirements, design decisions, and implementation backlo
 2. Tab A: Send message "test" → Switch to tab B → Tab A still shows "test" message
 3. Tab A: Agent generating response → Switch to tab B → Switch back to tab A → Verify generation completed
 4. Tab A: Attach image → Switch to tab B → Verify no image attached in tab B
-
-**Technical Notes:**
-- Implement `switchTab(index: number)` in `useTabManager`
-- Save current tab state before switching: `setTabState(activeTabIndex, currentState)`
-- Load new tab state after switching: `restoreTabState(getTabState(newIndex))`
-- Update `activeTabIndex` state
-- Ensure each tab maintains separate:
-  - `messages: ChatMessage[]`
-  - `inputValue: string`
-  - `attachedImages: AttachedImage[]`
-  - `isSending: boolean`
-  - `session: ChatSession`
 
 **Definition of Done:**
 - Clicking tabs switches between them smoothly
@@ -180,16 +162,6 @@ This document captures requirements, design decisions, and implementation backlo
 4. Close active tab → Verify switches to previous tab
 5. Close non-active tab → Verify active tab stays active
 
-**Technical Notes:**
-- Add × button to Tab component, `onClick` calls `onClose` prop
-- Implement `closeTab(index: number)` in `useTabManager`
-- Cancel operation: `await acpAdapter.cancel(sessionId)`
-- Disconnect adapter: `await plugin.removeAdapter(tabId)`
-- Remove from tabs array: `tabs.filter((_, i) => i !== index)`
-- Adjust activeTabIndex if needed:
-  - If closing active tab: `Math.max(0, index - 1)`
-  - If closing before active tab: `activeTabIndex - 1`
-- Prevent × button click from triggering tab switch (stopPropagation)
 
 **Definition of Done:**
 - Can close any tab via × button
@@ -217,10 +189,6 @@ This document captures requirements, design decisions, and implementation backlo
 2. Create 3 tabs → Close all 3 → Verify ends with 1 empty tab
 3. Last tab has messages → Close → Verify new tab is empty (fresh session)
 
-**Technical Notes:**
-- In `closeTab()` function, check if `newTabs.length === 0`
-- If true, call `await createTab()` before completing close operation
-- Ensure smooth transition (may need to defer UI update)
 
 **Definition of Done:**
 - Impossible to have zero tabs
@@ -250,12 +218,6 @@ This document captures requirements, design decisions, and implementation backlo
 3. 3 tabs open, load session → Verify 4th tab created with loaded session
 4. Load session → Verify all messages appear in correct order
 
-**Technical Notes:**
-- Modify `handleRestoreSession` in `useSessionHistory`
-- Check if `messages.length === 0` before loading
-- If empty: Load into current tab (existing behavior)
-- If not empty: Call `createTab()` then load session into new tab
-- Update tab label with session metadata
 
 **Definition of Done:**
 - History loading respects empty/non-empty tab state
@@ -283,12 +245,6 @@ This document captures requirements, design decisions, and implementation backlo
 3. Switch agent → Verify tab label updates
 4. Switch agent → Verify messages cleared in current tab only
 
-**Technical Notes:**
-- Modify `handleSwitchAgent` to work with current tab index
-- Disconnect current tab's adapter
-- Create new adapter with same tabId
-- Update tab state: `agentId`, `label`
-- Call `createSession()` for current tab only
 
 **Definition of Done:**
 - Agent switching is per-tab, not global
@@ -315,13 +271,6 @@ This document captures requirements, design decisions, and implementation backlo
 2. Tab 1: 5 messages, Tab 2: 3 messages → Export from tab 1 → Verify file has 5 messages
 3. Close tab with auto-export enabled → Verify that tab's messages exported
 
-**Technical Notes:**
-- Modify `handleExportChat` to use current tab's:
-  - `messages` array
-  - `session.sessionId`
-  - `session.agentDisplayName`
-- No changes needed to ChatExporter class (already uses passed params)
-- Auto-export already works per session, should work per tab
 
 **Definition of Done:**
 - Export button exports current tab only
@@ -369,12 +318,6 @@ This document captures requirements, design decisions, and implementation backlo
 - [ ] Behavior matches Obsidian's file tab overflow
 - [ ] Tab labels truncate with ellipsis (...) when too long
 
-**Technical Notes:**
-- Use CSS: `overflow-x: auto` on tab list container
-- Calculate tab width: `max(80px, available-width / tab-count)`
-- Use existing Obsidian CSS classes if possible
-- Auto-scroll to active tab: `scrollIntoView({ behavior: 'smooth' })`
-- Tab label: `text-overflow: ellipsis; white-space: nowrap`
 
 **Definition of Done:**
 - Many tabs (10+) handled gracefully
@@ -397,19 +340,6 @@ This document captures requirements, design decisions, and implementation backlo
 - [ ] Font, spacing, padding match Obsidian tabs
 - [ ] Animations/transitions match Obsidian (if any)
 
-**Technical Notes:**
-- Use Obsidian CSS variables:
-  - `--background-primary`
-  - `--background-secondary`
-  - `--background-modifier-border`
-  - `--background-modifier-hover`
-  - `--text-normal`
-  - `--text-muted`
-  - `--interactive-accent`
-- Reference Obsidian's `.workspace-tab-header` classes
-- Test in both light and dark themes
-- Test with community themes
-
 **Definition of Done:**
 - Tabs look native to Obsidian
 - Works in light and dark themes
@@ -430,12 +360,6 @@ This document captures requirements, design decisions, and implementation backlo
 - [ ] Layout is clean and balanced
 - [ ] No empty space where agent name was
 
-**Technical Notes:**
-- Remove `agentLabel` from ChatHeader component props
-- Remove `h3.agent-client-chat-view-header-title` element
-- Remove `onNewChat` from ChatHeader props (handled by TabBar)
-- Adjust CSS for header layout
-- Update ChatHeader styling
 
 **Definition of Done:**
 - Header shows only action buttons
@@ -458,11 +382,6 @@ This document captures requirements, design decisions, and implementation backlo
 - [ ] Spinner doesn't interfere with tab label readability
 - [ ] Active tab doesn't need spinner (user can see messages streaming)
 
-**Technical Notes:**
-- Track `isSending` state per tab
-- If `isSending && !isActive`, show spinner icon
-- Use Obsidian's lucide icons or CSS animation
-- Position spinner before or after tab label
 
 **Definition of Done:**
 - Background activity is visible
@@ -484,13 +403,6 @@ This document captures requirements, design decisions, and implementation backlo
 - [ ] Active tab index restored
 - [ ] Empty tabs (no messages) not persisted
 
-**Technical Notes:**
-- Save `tabs: TabState[]` to `ChatViewState` in `getState()`
-- Restore tabs in `setState()` or `onOpen()`
-- For each tab: Call `loadSession()` only when switched to (lazy)
-- Use `agentCapabilities.loadSession` for history replay
-- Handle tabs whose sessions no longer exist
-
 **Definition of Done:**
 - Tabs survive Obsidian restart
 - Session history loads on demand
@@ -510,12 +422,6 @@ This document captures requirements, design decisions, and implementation backlo
 - [ ] Cmd/Ctrl + Shift + Tab: Previous tab
 - [ ] Shortcuts registered in Obsidian settings
 - [ ] No conflicts with Obsidian's default shortcuts
-
-**Technical Notes:**
-- Register commands in `plugin.ts`
-- Add to `addCommand()` with keyboard hotkeys
-- Call appropriate tab manager methods
-- Test for conflicts with Obsidian hotkeys
 
 **Definition of Done:**
 - Keyboard shortcuts work as expected
@@ -537,12 +443,6 @@ This document captures requirements, design decisions, and implementation backlo
 - [ ] Menu actions work correctly
 - [ ] Menu dismisses on click away
 
-**Technical Notes:**
-- Use Obsidian's `Menu` class
-- Handle `oncontextmenu` event on Tab component
-- Position menu near mouse cursor
-- Implement menu actions via tab manager
-
 **Definition of Done:**
 - Context menu works on right-click
 - Menu actions functional
@@ -562,12 +462,6 @@ This document captures requirements, design decisions, and implementation backlo
 - [ ] User can manually rename tab (override auto-label)
 - [ ] Empty tabs still show timestamp
 
-**Technical Notes:**
-- Listen for first message in tab
-- Extract first 30 chars of user message
-- Update tab label: `updateTabLabel(index, newLabel)`
-- Store original timestamp in tab state
-- Add tooltip showing full info
 
 **Definition of Done:**
 - Tab labels more descriptive
@@ -620,36 +514,5 @@ Already included in MVP:
 
 ---
 
-## Technical Dependencies
-
-### Prerequisites
-- [ ] Review and understand current session management (`useAgentSession`)
-- [ ] Review current adapter management in `plugin.ts`
-- [ ] Review ChatView lifecycle and state management
-- [ ] Design `TabState` and `TabComponentState` interfaces
-
-### Core Components to Create
-- [ ] `useTabManager` hook
-- [ ] `TabBar` component
-- [ ] `Tab` component
-- [ ] Tab styling CSS
-
-### Components to Modify
-- [ ] `ChatView.tsx` - Add tab management
-- [ ] `ChatHeader.tsx` - Remove agent label, + button
-- [ ] `HeaderMenu.tsx` - Remove "New chat" option
-- [ ] `plugin.ts` - Update adapter key format
-- [ ] `useChatController.ts` - Work with tab context
-
-### Testing Strategy
-- [ ] Unit tests for `useTabManager` hook
-- [ ] Integration tests for tab operations
-- [ ] Manual testing checklist for each user story
-- [ ] Cross-browser testing (Obsidian desktop)
-- [ ] Theme compatibility testing (light/dark)
-
----
-
-## Notes
 
 

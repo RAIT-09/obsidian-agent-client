@@ -16,7 +16,6 @@ describe("TabBar", () => {
 	const defaultProps = {
 		tabs: [defaultTab],
 		activeTabIndex: 0,
-		onCreateTab: vi.fn(),
 	};
 
 	describe("AC: When plugin loads, ChatView displays exactly one tab", () => {
@@ -76,8 +75,7 @@ describe("TabBar", () => {
 				<TabBar
 					tabs={[geminiTab]}
 					activeTabIndex={0}
-					onCreateTab={vi.fn()}
-				/>,
+					/>,
 			);
 			const label = screen.getByText(/Gemini CLI/);
 			expect(label).toBeDefined();
@@ -95,8 +93,7 @@ describe("TabBar", () => {
 				<TabBar
 					tabs={[morningTab]}
 					activeTabIndex={0}
-					onCreateTab={vi.fn()}
-				/>,
+					/>,
 			);
 			const labelSpan = container.querySelector(
 				".agent-client-tab-label",
