@@ -915,6 +915,9 @@ export function useAgentSession(
 				suggestion: error.suggestion,
 			});
 		});
+		return () => {
+			agentClient.onError(() => {});
+		};
 	}, [agentClient]);
 
 	/**

@@ -804,6 +804,9 @@ export function useChatController(
 				agentSession.updateCurrentMode(update.currentModeId);
 			}
 		});
+		return () => {
+			acpAdapter.onSessionUpdate(() => {});
+		};
 	}, [
 		acpAdapter,
 		session.sessionId,
@@ -817,6 +820,9 @@ export function useChatController(
 	// Register updateMessage callback for permission UI updates
 	useEffect(() => {
 		acpAdapter.setUpdateMessageCallback(chat.updateMessage);
+		return () => {
+			acpAdapter.setUpdateMessageCallback(() => {});
+		};
 	}, [acpAdapter, chat.updateMessage]);
 
 	// ============================================================
