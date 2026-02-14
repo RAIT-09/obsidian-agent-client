@@ -431,6 +431,39 @@ If your plugin does not need CSS, delete this file.
 	max-width: 200px;
 }
 
+.agent-client-tab-close {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	margin-left: 4px;
+	padding: 0;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: 14px;
+	line-height: 1;
+	cursor: pointer;
+	opacity: 0;
+	transition:
+		opacity 0.15s ease,
+		background-color 0.15s ease,
+		color 0.15s ease;
+	flex-shrink: 0;
+}
+
+.agent-client-tab:hover .agent-client-tab-close,
+.agent-client-tab-active .agent-client-tab-close {
+	opacity: 1;
+}
+
+.agent-client-tab-close:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
 /* Header */
 .agent-client-chat-view-header {
 	padding: 16px;

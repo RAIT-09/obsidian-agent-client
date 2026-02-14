@@ -173,6 +173,25 @@ function ChatComponent({
 		[tabManager, getTabState],
 	);
 
+	// Handle tab close: cancel operations, remove tab, cleanup adapter
+	const handleTabClose = useCallback(
+		(index: number) => {
+			const closingTabId = tabManager.tabs[index]?.tabId;
+			if (!closingTabId) return;
+
+			// Close the tab (returns tabId if successful, null if blocked)
+			const closedTabId = tabManager.closeTab(index);
+			if (!closedTabId) return;
+
+			// Clean up cached state for the closed tab
+			tabStateCacheRef.current.delete(closedTabId);
+
+			// Disconnect the agent process and remove the adapter
+			void plugin.removeAdapter(closedTabId);
+		},
+		[tabManager, plugin],
+	);
+
 	// Restore state when active tab changes (after switchTab or createTab)
 	const prevActiveTabIdRef = useRef(tabManager.activeTabId);
 	useEffect(() => {
@@ -553,6 +572,7 @@ function ChatComponent({
 						tabs={tabManager.tabs}
 						activeTabIndex={tabManager.activeTabIndex}
 						onTabClick={handleTabClick}
+						onTabClose={handleTabClose}
 					/>
 				}
 				isUpdateAvailable={isUpdateAvailable}

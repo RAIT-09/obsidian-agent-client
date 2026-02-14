@@ -35,6 +35,8 @@ export interface UseTabManagerReturn {
 	createTab: (agentId?: string) => void;
 	/** Switch to a tab by index */
 	switchTab: (index: number) => void;
+	/** Close a tab by index. Returns the closed tab's tabId, or null if close was blocked. */
+	closeTab: (index: number) => string | null;
 }
 
 // ============================================================================
@@ -127,6 +129,42 @@ export function useTabManager(
 		[tabs.length],
 	);
 
+	/**
+	 * Close a tab by index.
+	 * Returns the closed tab's tabId for cleanup, or null if close was blocked.
+	 *
+	 * Active tab switching logic (when closing the active tab):
+	 * - Prefer the left adjacent tab (index - 1)
+	 * - If closing the first tab, switch to the new first tab (index 0)
+	 *
+	 * If closing a non-active tab, the active tab stays active (index adjusted if needed).
+	 * Cannot close the last remaining tab (returns null).
+	 */
+	const closeTab = useCallback(
+		(index: number): string | null => {
+			if (index < 0 || index >= tabs.length) return null;
+			if (tabs.length <= 1) return null; // Cannot close last tab
+
+			const closedTab = tabs[index];
+			const isClosingActive = index === activeTabIndex;
+
+			setTabs((prev) => prev.filter((_, i) => i !== index));
+
+			if (isClosingActive) {
+				// Prefer left adjacent, fall back to 0
+				const newIndex = index > 0 ? index - 1 : 0;
+				setActiveTabIndex(newIndex);
+			} else if (index < activeTabIndex) {
+				// Closing a tab before the active one shifts the index down
+				setActiveTabIndex((prev) => prev - 1);
+			}
+			// If closing after active tab, activeTabIndex stays the same
+
+			return closedTab.tabId;
+		},
+		[tabs, activeTabIndex],
+	);
+
 	const activeTab = tabs[activeTabIndex];
 	const activeTabId = activeTab.tabId;
 
@@ -137,5 +175,6 @@ export function useTabManager(
 		activeTab,
 		createTab,
 		switchTab,
+		closeTab,
 	};
 }

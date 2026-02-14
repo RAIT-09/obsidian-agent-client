@@ -9,9 +9,16 @@ export interface TabBarProps {
 	activeTabIndex: number;
 	/** Called when a tab is clicked */
 	onTabClick: (index: number) => void;
+	/** Called when a tab's close button is clicked */
+	onTabClose?: (index: number) => void;
 }
 
-export function TabBar({ tabs, activeTabIndex, onTabClick }: TabBarProps) {
+export function TabBar({
+	tabs,
+	activeTabIndex,
+	onTabClick,
+	onTabClose,
+}: TabBarProps) {
 	return (
 		<div className="agent-client-tab-bar">
 			{tabs.map((tab, index) => {
@@ -26,6 +33,18 @@ export function TabBar({ tabs, activeTabIndex, onTabClick }: TabBarProps) {
 						onClick={() => onTabClick(index)}
 					>
 						<span className="agent-client-tab-label">{label}</span>
+						{onTabClose && (
+							<button
+								className="agent-client-tab-close"
+								onClick={(e) => {
+									e.stopPropagation();
+									onTabClose(index);
+								}}
+								aria-label="Close tab"
+							>
+								×
+							</button>
+						)}
 					</div>
 				);
 			})}
