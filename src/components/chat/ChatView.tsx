@@ -24,7 +24,10 @@ import { getLogger, Logger } from "../../shared/logger";
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 
 // Hooks imports
-import { useChatController } from "../../hooks/useChatController";
+import {
+	useChatController,
+	type TabCachedState,
+} from "../../hooks/useChatController";
 import { useTabManager } from "../../hooks/useTabManager";
 
 // Domain model imports
@@ -112,6 +115,8 @@ function ChatComponent({
 		setAttachedImages,
 		restoredMessage,
 		handleRestoredMessageConsumed,
+		getTabState,
+		restoreTabState,
 	} = controller;
 
 	// ============================================================
@@ -153,14 +158,31 @@ function ChatComponent({
 	// ============================================================
 	// Tab Lifecycle Effects
 	// ============================================================
-	// Clear messages when active tab changes (new tab gets fresh state)
+	// Per-tab state cache: saves messages, input, session when switching away
+	const tabStateCacheRef = useRef<Map<string, TabCachedState>>(new Map());
+
+	// Handle tab click: save current state, then switch
+	const handleTabClick = useCallback(
+		(index: number) => {
+			if (index === tabManager.activeTabIndex) return; // Already active
+			// Save current tab's state to cache
+			tabStateCacheRef.current.set(tabManager.activeTabId, getTabState());
+			// Switch to the clicked tab
+			tabManager.switchTab(index);
+		},
+		[tabManager, getTabState],
+	);
+
+	// Restore state when active tab changes (after switchTab or createTab)
 	const prevActiveTabIdRef = useRef(tabManager.activeTabId);
 	useEffect(() => {
 		if (prevActiveTabIdRef.current !== tabManager.activeTabId) {
 			prevActiveTabIdRef.current = tabManager.activeTabId;
-			clearMessages();
+			// Restore from cache if available (switching back to existing tab)
+			const cached = tabStateCacheRef.current.get(tabManager.activeTabId);
+			restoreTabState(cached ?? null);
 		}
-	}, [tabManager.activeTabId, clearMessages]);
+	}, [tabManager.activeTabId, restoreTabState]);
 
 	// Sync tab IDs with view class for cleanup on view close
 	useEffect(() => {
@@ -530,11 +552,19 @@ function ChatComponent({
 					<TabBar
 						tabs={tabManager.tabs}
 						activeTabIndex={tabManager.activeTabIndex}
+						onTabClick={handleTabClick}
 					/>
 				}
 				isUpdateAvailable={isUpdateAvailable}
 				hasHistoryCapability={sessionHistory.canShowSessionHistory}
-				onNewChat={() => tabManager.createTab()}
+				onNewChat={() => {
+					// Save current tab state before creating new tab
+					tabStateCacheRef.current.set(
+						tabManager.activeTabId,
+						getTabState(),
+					);
+					tabManager.createTab();
+				}}
 				onExportChat={() => void handleExportChat()}
 				onToggleMenu={handleToggleMenu}
 				onOpenHistory={handleOpenHistory}

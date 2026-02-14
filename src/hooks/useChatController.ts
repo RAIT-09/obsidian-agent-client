@@ -28,15 +28,28 @@ import { useSessionHistory } from "./useSessionHistory";
 
 // Domain model imports
 import type {
+	ChatSession,
 	SessionModeState,
 	SessionModelState,
 } from "../domain/models/chat-session";
+import type { ChatMessage } from "../domain/models/chat-message";
 import type { ImagePromptContent } from "../domain/models/prompt-content";
 
 // Agent info for display (from plugin.getAvailableAgents())
 interface AgentInfo {
 	id: string;
 	displayName: string;
+}
+
+/**
+ * Cached state for a tab, saved when switching away and restored when switching back.
+ */
+export interface TabCachedState {
+	messages: ChatMessage[];
+	inputValue: string;
+	attachedImages: AttachedImage[];
+	session: ChatSession;
+	isSending: boolean;
 }
 
 export interface UseChatControllerOptions {
@@ -114,6 +127,10 @@ export interface UseChatControllerReturn {
 
 	// History modal management
 	historyModalRef: React.RefObject<SessionHistoryModal | null>;
+
+	// Tab state management (for tab switching)
+	getTabState: () => TabCachedState;
+	restoreTabState: (state: TabCachedState | null) => void;
 }
 
 export function useChatController(
@@ -272,6 +289,55 @@ export function useChatController(
 	// Refs
 	// ============================================================
 	const historyModalRef = useRef<SessionHistoryModal | null>(null);
+
+	// Refs for latest state access (used by getTabState and cleanup)
+	const messagesRef = useRef(messages);
+	const sessionRef = useRef(session);
+	const inputValueRef = useRef(inputValue);
+	const attachedImagesRef = useRef(attachedImages);
+	messagesRef.current = messages;
+	sessionRef.current = session;
+	inputValueRef.current = inputValue;
+	attachedImagesRef.current = attachedImages;
+
+	// ============================================================
+	// Tab State Management (for tab switching)
+	// ============================================================
+
+	/**
+	 * Capture current tab state for caching when switching away.
+	 * Uses refs to always capture the latest values.
+	 */
+	const getTabState = useCallback((): TabCachedState => {
+		return {
+			messages: messagesRef.current,
+			inputValue: inputValueRef.current,
+			attachedImages: attachedImagesRef.current,
+			session: sessionRef.current,
+			isSending: chat.isSending,
+		};
+	}, [chat.isSending]);
+
+	/**
+	 * Restore tab state from cache, or clear for a fresh tab.
+	 * Called when switching to a previously active tab.
+	 */
+	const restoreTabState = useCallback(
+		(state: TabCachedState | null) => {
+			if (state) {
+				chat.setMessagesFromLocal(state.messages);
+				chat.restoreIsSending(state.isSending);
+				setInputValue(state.inputValue);
+				setAttachedImages(state.attachedImages);
+				agentSession.restoreSessionSnapshot(state.session);
+			} else {
+				chat.clearMessages();
+				setInputValue("");
+				setAttachedImages([]);
+			}
+		},
+		[chat, agentSession],
+	);
 
 	// ============================================================
 	// Computed Values
@@ -635,11 +701,27 @@ export function useChatController(
 	// ============================================================
 	// Effects - Session Lifecycle
 	// ============================================================
-	// Initialize session on mount
+	// Track which tabs have been initialized to avoid re-creating sessions on tab switch
+	const initializedTabsRef = useRef<Set<string>>(new Set());
+
+	// Initialize session on mount (skip for tabs restored via tab switch)
 	useEffect(() => {
+		if (initializedTabsRef.current.has(viewId)) {
+			logger.log(
+				`[useChatController] Tab ${viewId} already initialized, skipping session creation`,
+			);
+			return;
+		}
+		initializedTabsRef.current.add(viewId);
 		logger.log("[Debug] Starting connection setup via useAgentSession...");
 		void agentSession.createSession(config?.agent || initialAgentId);
-	}, [agentSession.createSession, config?.agent, initialAgentId]);
+	}, [
+		agentSession.createSession,
+		config?.agent,
+		initialAgentId,
+		viewId,
+		logger,
+	]);
 
 	// TODO(code-block): Apply configured model when session is ready
 	useEffect(() => {
@@ -664,12 +746,8 @@ export function useChatController(
 	]);
 
 	// Refs for cleanup (to access latest values in cleanup function)
-	const messagesRef = useRef(messages);
-	const sessionRef = useRef(session);
 	const autoExportRef = useRef(autoExport);
 	const closeSessionRef = useRef(agentSession.closeSession);
-	messagesRef.current = messages;
-	sessionRef.current = session;
 	autoExportRef.current = autoExport;
 	closeSessionRef.current = agentSession.closeSession;
 
@@ -860,5 +938,9 @@ export function useChatController(
 
 		// History modal management
 		historyModalRef,
+
+		// Tab state management
+		getTabState,
+		restoreTabState,
 	};
 }

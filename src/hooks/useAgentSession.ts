@@ -141,6 +141,13 @@ export interface UseAgentSessionReturn {
 	 * @param modelId - ID of the model to set
 	 */
 	setModel: (modelId: string) => Promise<void>;
+
+	/**
+	 * Restore session state from a cached snapshot.
+	 * Used when switching back to a previously active tab.
+	 * Sets session state directly without touching the adapter.
+	 */
+	restoreSessionSnapshot: (snapshot: ChatSession) => void;
 }
 
 // ============================================================================
@@ -932,6 +939,16 @@ export function useAgentSession(
 		[],
 	);
 
+	/**
+	 * Restore session state from a cached snapshot.
+	 * Used when switching back to a previously active tab.
+	 * Sets session state directly without touching the adapter.
+	 */
+	const restoreSessionSnapshot = useCallback((snapshot: ChatSession) => {
+		setSession(snapshot);
+		setErrorInfo(null);
+	}, []);
+
 	return {
 		session,
 		isReady,
@@ -948,5 +965,6 @@ export function useAgentSession(
 		updateCurrentMode,
 		setMode,
 		setModel,
+		restoreSessionSnapshot,
 	};
 }

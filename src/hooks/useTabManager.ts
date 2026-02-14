@@ -33,6 +33,8 @@ export interface UseTabManagerReturn {
 	activeTab: TabInfo;
 	/** Create a new tab with the given or default agent */
 	createTab: (agentId?: string) => void;
+	/** Switch to a tab by index */
+	switchTab: (index: number) => void;
 }
 
 // ============================================================================
@@ -112,6 +114,19 @@ export function useTabManager(
 		[viewId, resolveAgent],
 	);
 
+	/**
+	 * Switch to a tab by index.
+	 * No-op if index is out of bounds or already active.
+	 */
+	const switchTab = useCallback(
+		(index: number) => {
+			if (index >= 0 && index < tabs.length) {
+				setActiveTabIndex(index);
+			}
+		},
+		[tabs.length],
+	);
+
 	const activeTab = tabs[activeTabIndex];
 	const activeTabId = activeTab.tabId;
 
@@ -121,5 +136,6 @@ export function useTabManager(
 		activeTabId,
 		activeTab,
 		createTab,
+		switchTab,
 	};
 }

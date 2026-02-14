@@ -121,6 +121,12 @@ export interface UseChatReturn {
 	 * Should be registered with agentClient.onSessionUpdate().
 	 */
 	handleSessionUpdate: (update: SessionUpdate) => void;
+
+	/**
+	 * Restore the isSending state from a cached tab state.
+	 * Used when switching back to a previously active tab.
+	 */
+	restoreIsSending: (sending: boolean) => void;
 }
 
 /**
@@ -548,6 +554,14 @@ export function useChat(
 	);
 
 	/**
+	 * Restore the isSending state from a cached tab state.
+	 * Used when switching back to a previously active tab.
+	 */
+	const restoreIsSending = useCallback((sending: boolean): void => {
+		setIsSending(sending);
+	}, []);
+
+	/**
 	 * Clear the current error.
 	 */
 	const clearError = useCallback((): void => {
@@ -702,5 +716,6 @@ export function useChat(
 		updateMessage,
 		upsertToolCall,
 		handleSessionUpdate,
+		restoreIsSending,
 	};
 }

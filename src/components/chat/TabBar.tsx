@@ -7,9 +7,11 @@ export interface TabBarProps {
 	tabs: TabInfo[];
 	/** Index of the currently active tab */
 	activeTabIndex: number;
+	/** Called when a tab is clicked */
+	onTabClick: (index: number) => void;
 }
 
-export function TabBar({ tabs, activeTabIndex }: TabBarProps) {
+export function TabBar({ tabs, activeTabIndex, onTabClick }: TabBarProps) {
 	return (
 		<div className="agent-client-tab-bar">
 			{tabs.map((tab, index) => {
@@ -21,6 +23,7 @@ export function TabBar({ tabs, activeTabIndex }: TabBarProps) {
 					<div
 						key={tab.tabId}
 						className={`agent-client-tab${isActive ? " agent-client-tab-active" : ""}`}
+						onClick={() => onTabClick(index)}
 					>
 						<span className="agent-client-tab-label">{label}</span>
 					</div>
