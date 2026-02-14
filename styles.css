@@ -485,6 +485,8 @@ If your plugin does not need CSS, delete this file.
 	flex-direction: column;
 	gap: 4px;
 	flex: 1;
+	min-width: 0;
+	overflow: hidden;
 }
 
 .agent-client-chat-view-header-title {
