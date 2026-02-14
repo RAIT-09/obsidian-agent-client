@@ -399,6 +399,8 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	align-items: center;
 	gap: 4px;
+	overflow: hidden;
+	min-width: 0;
 }
 
 .agent-client-tab {
@@ -410,6 +412,10 @@ If your plugin does not need CSS, delete this file.
 	border: 1px solid transparent;
 	cursor: pointer;
 	transition: background-color 0.15s ease;
+	flex: 1 1 0;
+	min-width: 80px;
+	max-width: 200px;
+	overflow: hidden;
 }
 
 .agent-client-tab:hover:not(.agent-client-tab-active) {
@@ -428,7 +434,7 @@ If your plugin does not need CSS, delete this file.
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	max-width: 200px;
+	min-width: 0;
 }
 
 .agent-client-tab-close {
