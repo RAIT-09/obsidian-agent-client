@@ -82,7 +82,7 @@ https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 - [Claude Code](https://rait-09.github.io/obsidian-agent-client/agent-setup/claude-code.html)
 - [Codex](https://rait-09.github.io/obsidian-agent-client/agent-setup/codex.html)
 - [Gemini CLI](https://rait-09.github.io/obsidian-agent-client/agent-setup/gemini-cli.html)
-- [カスタムエージェント](https://rait-09.github.io/obsidian-agent-client/agent-setup/custom-agents.html)（OpenCode、Qwen Code、Mistral Vibeなど）
+- [カスタムエージェント](https://rait-09.github.io/obsidian-agent-client/agent-setup/custom-agents.html)（OpenCode、Qwen Code、Kiro、Mistral Vibeなど）
 
 **[ドキュメント全文](https://rait-09.github.io/obsidian-agent-client/)**
 

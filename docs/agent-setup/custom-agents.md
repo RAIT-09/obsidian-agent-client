@@ -4,7 +4,7 @@ You can use any agent that implements the [Agent Client Protocol (ACP)](https://
 
 ## Install and Configure
 
-1. Install your ACP-compatible agent (e.g., [OpenCode](https://github.com/sst/opencode), [Qwen Code](https://github.com/QwenLM/qwen-code)).
+1. Install your ACP-compatible agent (e.g., [OpenCode](https://github.com/sst/opencode), [Qwen Code](https://github.com/QwenLM/qwen-code), [Kiro](https://kiro.dev/)).
 
 2. Find the installation path by running the following command in your terminal (Terminal on macOS/Linux, PowerShell on Windows):
 
@@ -54,6 +54,20 @@ where.exe your-agent
 | **Path** | `/usr/local/bin/qwen` |
 | **Arguments** | `--experimental-acp` |
 | **Environment variables** | (optional) |
+
+### Kiro
+
+| Field | Value |
+|-------|-------|
+| **Agent ID** | `kiro-cli` |
+| **Display name** | `Kiro` |
+| **Path** | `/path/to/home/.local/bin/kiro-cli` |
+| **Arguments** | `acp` |
+| **Environment variables** | (optional) |
+
+::: tip
+Replace `/path/to/home` with your home directory (e.g., `/Users/john` on macOS, `/home/john` on Linux). `$HOME` and `~` may not be supported.
+:::
 
 ## Authentication
 

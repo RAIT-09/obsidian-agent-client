@@ -86,7 +86,7 @@ Open a terminal (Terminal on macOS/Linux, PowerShell on Windows) and run the fol
 - [Claude Code](https://rait-09.github.io/obsidian-agent-client/agent-setup/claude-code.html)
 - [Codex](https://rait-09.github.io/obsidian-agent-client/agent-setup/codex.html)
 - [Gemini CLI](https://rait-09.github.io/obsidian-agent-client/agent-setup/gemini-cli.html)
-- [Custom Agents](https://rait-09.github.io/obsidian-agent-client/agent-setup/custom-agents.html) (OpenCode, Qwen Code, Mistral Vibe, etc.)
+- [Custom Agents](https://rait-09.github.io/obsidian-agent-client/agent-setup/custom-agents.html) (OpenCode, Qwen Code, Kiro, Mistral Vibe, etc.)
 
 **[Full Documentation](https://rait-09.github.io/obsidian-agent-client/)**
 
