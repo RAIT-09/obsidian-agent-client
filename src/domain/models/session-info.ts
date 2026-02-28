@@ -1,4 +1,5 @@
 import type { SessionModeState, SessionModelState } from "./chat-session";
+import type { SessionConfigOption } from "./session-update";
 
 /**
  * Session metadata from session/list response.
@@ -35,10 +36,12 @@ export interface ListSessionsResult {
 export interface LoadSessionResult {
 	/** Session ID */
 	sessionId: string;
-	/** Session modes (if available) */
+	/** @deprecated Use configOptions instead. Kept for backward compatibility. */
 	modes?: SessionModeState;
-	/** Session models (if available) */
+	/** @deprecated Use configOptions instead. Kept for backward compatibility. */
 	models?: SessionModelState;
+	/** Session config options (supersedes modes/models) */
+	configOptions?: SessionConfigOption[];
 }
 
 /**
@@ -50,10 +53,12 @@ export interface LoadSessionResult {
 export interface ResumeSessionResult {
 	/** Session ID */
 	sessionId: string;
-	/** Session modes (if available) */
+	/** @deprecated Use configOptions instead. Kept for backward compatibility. */
 	modes?: SessionModeState;
-	/** Session models (if available) */
+	/** @deprecated Use configOptions instead. Kept for backward compatibility. */
 	models?: SessionModelState;
+	/** Session config options (supersedes modes/models) */
+	configOptions?: SessionConfigOption[];
 }
 
 /**
@@ -64,10 +69,12 @@ export interface ResumeSessionResult {
 export interface ForkSessionResult {
 	/** New session ID (different from original) */
 	sessionId: string;
-	/** Session modes (if available) */
+	/** @deprecated Use configOptions instead. Kept for backward compatibility. */
 	modes?: SessionModeState;
-	/** Session models (if available) */
+	/** @deprecated Use configOptions instead. Kept for backward compatibility. */
 	models?: SessionModelState;
+	/** Session config options (supersedes modes/models) */
+	configOptions?: SessionConfigOption[];
 }
 
 /**
