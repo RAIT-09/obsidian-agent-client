@@ -1134,6 +1134,23 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				});
 				break;
 			}
+
+			case "config_option_update": {
+				this.logger.log(
+					`[AcpAdapter] config_option_update:`,
+					update.configOptions,
+				);
+
+				this.sessionUpdateCallback?.({
+					type: "config_option_update",
+					sessionId,
+					configOptions:
+						AcpTypeConverter.toSessionConfigOptions(
+							update.configOptions,
+						),
+				});
+				break;
+			}
 		}
 		return Promise.resolve();
 	}

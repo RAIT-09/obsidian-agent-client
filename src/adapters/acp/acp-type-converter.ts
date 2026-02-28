@@ -1,6 +1,11 @@
 import * as acp from "@agentclientprotocol/sdk";
 import type { ToolCallContent } from "../../domain/models/chat-message";
 import type { PromptContent } from "../../domain/models/prompt-content";
+import type {
+	SessionConfigOption,
+	SessionConfigSelectGroup,
+	SessionConfigSelectOption,
+} from "../../domain/models/session-update";
 
 /**
  * Type converter between ACP Protocol types and Domain types.
@@ -55,6 +60,54 @@ export class AcpTypeConverter {
 	 * @param content - Domain prompt content (text, image, or resource)
 	 * @returns ACP ContentBlock for use with the prompt API
 	 */
+	/**
+	 * Convert ACP SessionConfigOption[] to domain SessionConfigOption[].
+	 *
+	 * @param acpOptions - Config options from ACP protocol
+	 * @returns Domain model config options
+	 */
+	static toSessionConfigOptions(
+		acpOptions: acp.SessionConfigOption[],
+	): SessionConfigOption[] {
+		return acpOptions.map((opt) => ({
+			id: opt.id,
+			name: opt.name,
+			description: opt.description ?? undefined,
+			category: opt.category ?? undefined,
+			type: opt.type,
+			currentValue: opt.currentValue,
+			options: this.toSessionConfigSelectOptions(opt.options),
+		}));
+	}
+
+	private static toSessionConfigSelectOptions(
+		acpOptions: acp.SessionConfigSelectOptions,
+	): SessionConfigSelectOption[] | SessionConfigSelectGroup[] {
+		if (acpOptions.length === 0) return [];
+
+		// Determine if grouped or flat by checking first element
+		const first = acpOptions[0];
+		if ("group" in first) {
+			return (acpOptions as acp.SessionConfigSelectGroup[]).map(
+				(g) => ({
+					group: g.group,
+					name: g.name,
+					options: g.options.map((o) => ({
+						value: o.value,
+						name: o.name,
+						description: o.description ?? undefined,
+					})),
+				}),
+			);
+		}
+
+		return (acpOptions as acp.SessionConfigSelectOption[]).map((o) => ({
+			value: o.value,
+			name: o.name,
+			description: o.description ?? undefined,
+		}));
+	}
+
 	static toAcpContentBlock(content: PromptContent): acp.ContentBlock {
 		switch (content.type) {
 			case "text":
