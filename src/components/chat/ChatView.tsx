@@ -95,6 +95,7 @@ function ChatComponent({
 		handleOpenHistory,
 		handleSetMode,
 		handleSetModel,
+		handleSetConfigOption,
 		inputValue,
 		setInputValue,
 		attachedImages,
@@ -577,6 +578,10 @@ function ChatComponent({
 				onModeChange={(modeId) => void handleSetMode(modeId)}
 				models={session.models}
 				onModelChange={(modelId) => void handleSetModel(modelId)}
+				configOptions={session.configOptions}
+				onConfigOptionChange={(configId, value) =>
+					void handleSetConfigOption(configId, value)
+				}
 				supportsImages={session.promptCapabilities?.image ?? false}
 				agentId={session.agentId}
 				// Controlled component props (for broadcast commands)

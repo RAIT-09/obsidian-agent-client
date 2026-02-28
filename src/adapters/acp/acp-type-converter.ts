@@ -88,17 +88,15 @@ export class AcpTypeConverter {
 		// Determine if grouped or flat by checking first element
 		const first = acpOptions[0];
 		if ("group" in first) {
-			return (acpOptions as acp.SessionConfigSelectGroup[]).map(
-				(g) => ({
-					group: g.group,
-					name: g.name,
-					options: g.options.map((o) => ({
-						value: o.value,
-						name: o.name,
-						description: o.description ?? undefined,
-					})),
-				}),
-			);
+			return (acpOptions as acp.SessionConfigSelectGroup[]).map((g) => ({
+				group: g.group,
+				name: g.name,
+				options: g.options.map((o) => ({
+					value: o.value,
+					name: o.name,
+					description: o.description ?? undefined,
+				})),
+			}));
 		}
 
 		return (acpOptions as acp.SessionConfigSelectOption[]).map((o) => ({

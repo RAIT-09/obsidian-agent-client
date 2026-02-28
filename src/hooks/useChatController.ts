@@ -31,6 +31,8 @@ import type {
 	SessionModeState,
 	SessionModelState,
 } from "../domain/models/chat-session";
+import type { SessionConfigOption } from "../domain/models/session-update";
+import { flattenConfigSelectOptions } from "../shared/config-option-utils";
 import type { ImagePromptContent } from "../domain/models/prompt-content";
 
 // Agent info for display (from plugin.getAvailableAgents())
@@ -100,6 +102,7 @@ export interface UseChatControllerReturn {
 	handleOpenHistory: () => void;
 	handleSetMode: (modeId: string) => Promise<void>;
 	handleSetModel: (modelId: string) => Promise<void>;
+	handleSetConfigOption: (configId: string, value: string) => Promise<void>;
 
 	// Input state (for broadcast commands - sidebar only)
 	inputValue: string;
@@ -209,15 +212,22 @@ export function useChatController(
 			sessionId: string,
 			modes?: SessionModeState,
 			models?: SessionModelState,
+			configOptions?: SessionConfigOption[],
 		) => {
 			logger.log(
 				`[useChatController] Session loaded/resumed/forked: ${sessionId}`,
 				{
 					modes,
 					models,
+					configOptions,
 				},
 			);
-			agentSession.updateSessionFromLoad(sessionId, modes, models);
+			agentSession.updateSessionFromLoad(
+				sessionId,
+				modes,
+				models,
+				configOptions,
+			);
 		},
 		[logger, agentSession],
 	);
@@ -587,6 +597,13 @@ export function useChatController(
 		[agentSession],
 	);
 
+	const handleSetConfigOption = useCallback(
+		async (configId: string, value: string) => {
+			await agentSession.setConfigOption(configId, value);
+		},
+		[agentSession],
+	);
+
 	// Update modal props when session history state changes
 	useEffect(() => {
 		if (historyModalRef.current) {
@@ -638,9 +655,35 @@ export function useChatController(
 		void agentSession.createSession(config?.agent || initialAgentId);
 	}, [agentSession.createSession, config?.agent, initialAgentId]);
 
-	// TODO(code-block): Apply configured model when session is ready
+	// Apply configured model when session is ready
 	useEffect(() => {
-		if (config?.model && isSessionReady && session.models) {
+		if (!config?.model || !isSessionReady) return;
+
+		// Prefer configOptions if available
+		if (session.configOptions) {
+			const modelOption = session.configOptions.find(
+				(o) => o.category === "model",
+			);
+			if (modelOption && modelOption.currentValue !== config.model) {
+				const valueExists = flattenConfigSelectOptions(
+					modelOption.options,
+				).some((o) => o.value === config.model);
+				if (valueExists) {
+					logger.log(
+						"[useChatController] Applying configured model via configOptions:",
+						config.model,
+					);
+					void agentSession.setConfigOption(
+						modelOption.id,
+						config.model,
+					);
+				}
+			}
+			return;
+		}
+
+		// Fallback to legacy models
+		if (session.models) {
 			const modelExists = session.models.availableModels.some(
 				(m) => m.modelId === config.model,
 			);
@@ -655,7 +698,9 @@ export function useChatController(
 	}, [
 		config?.model,
 		isSessionReady,
+		session.configOptions,
 		session.models,
+		agentSession.setConfigOption,
 		agentSession.setModel,
 		logger,
 	]);
@@ -708,6 +753,8 @@ export function useChatController(
 					agentSession.updateAvailableCommands(update.commands);
 				} else if (update.type === "current_mode_update") {
 					agentSession.updateCurrentMode(update.currentModeId);
+				} else if (update.type === "config_option_update") {
+					agentSession.updateConfigOptions(update.configOptions);
 				}
 				// Ignore all message-related updates (history replay)
 				return;
@@ -721,6 +768,8 @@ export function useChatController(
 				agentSession.updateAvailableCommands(update.commands);
 			} else if (update.type === "current_mode_update") {
 				agentSession.updateCurrentMode(update.currentModeId);
+			} else if (update.type === "config_option_update") {
+				agentSession.updateConfigOptions(update.configOptions);
 			}
 		});
 	}, [
@@ -843,6 +892,7 @@ export function useChatController(
 		handleOpenHistory,
 		handleSetMode,
 		handleSetModel,
+		handleSetConfigOption,
 
 		// Input state
 		inputValue,

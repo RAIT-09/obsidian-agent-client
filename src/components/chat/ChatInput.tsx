@@ -10,6 +10,11 @@ import type {
 	SessionModeState,
 	SessionModelState,
 } from "../../domain/models/chat-session";
+import type {
+	SessionConfigOption,
+	SessionConfigSelectGroup,
+} from "../../domain/models/session-update";
+import { flattenConfigSelectOptions } from "../../shared/config-option-utils";
 import type { ImagePromptContent } from "../../domain/models/prompt-content";
 import type { UseMentionsReturn } from "../../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../../hooks/useSlashCommands";
@@ -91,6 +96,10 @@ export interface ChatInputProps {
 	models?: SessionModelState;
 	/** Callback when model is changed */
 	onModelChange?: (modelId: string) => void;
+	/** Session config options (supersedes modes/models when present) */
+	configOptions?: SessionConfigOption[];
+	/** Callback when a config option is changed */
+	onConfigOptionChange?: (configId: string, value: string) => void;
 	/** Whether the agent supports image attachments */
 	supportsImages?: boolean;
 	/** Current agent ID (used to clear images on agent switch) */
@@ -144,6 +153,8 @@ export function ChatInput({
 	onModeChange,
 	models,
 	onModelChange,
+	configOptions,
+	onConfigOptionChange,
 	supportsImages = false,
 	agentId,
 	// Controlled component props
@@ -187,6 +198,10 @@ export function ChatInput({
 	const modeDropdownInstance = useRef<DropdownComponent | null>(null);
 	const modelDropdownRef = useRef<HTMLDivElement>(null);
 	const modelDropdownInstance = useRef<DropdownComponent | null>(null);
+	const configOptionsRef = useRef<HTMLDivElement>(null);
+	const configDropdownInstances = useRef<Map<string, DropdownComponent>>(
+		new Map(),
+	);
 
 	// Clear attached images when agent changes
 	useEffect(() => {
@@ -901,6 +916,82 @@ export function ChatInput({
 		}
 	}, [currentModelId]);
 
+	// Stable reference for configOption callback
+	const onConfigOptionChangeRef = useRef(onConfigOptionChange);
+	onConfigOptionChangeRef.current = onConfigOptionChange;
+
+	// Initialize configOptions dropdowns (dynamic, replaces mode/model when present)
+	useEffect(() => {
+		const containerEl = configOptionsRef.current;
+		if (!containerEl) return;
+
+		// Clean up existing dropdowns
+		containerEl.empty();
+		configDropdownInstances.current.clear();
+
+		if (!configOptions || configOptions.length === 0) return;
+
+		for (const option of configOptions) {
+			// Flatten options (handle both flat and grouped)
+			const flatOptions = flattenConfigSelectOptions(option.options);
+
+			// Only show if there are multiple values
+			if (flatOptions.length <= 1) continue;
+
+			// Create wrapper div with appropriate class based on category
+			const categoryClass = option.category
+				? `agent-client-config-selector-${option.category}`
+				: "agent-client-config-selector";
+			const wrapperEl = containerEl.createDiv({
+				cls: `agent-client-config-selector ${categoryClass}`,
+				attr: { title: option.description ?? option.name },
+			});
+
+			const dropdownContainer = wrapperEl.createDiv();
+			const dropdown = new DropdownComponent(dropdownContainer);
+
+			// Add options (with group prefix for grouped options)
+			if (option.options.length > 0 && "group" in option.options[0]) {
+				for (const group of option.options as SessionConfigSelectGroup[]) {
+					for (const opt of group.options) {
+						dropdown.addOption(
+							opt.value,
+							`${group.name} / ${opt.name}`,
+						);
+					}
+				}
+			} else {
+				for (const opt of flatOptions) {
+					dropdown.addOption(opt.value, opt.name);
+				}
+			}
+
+			// Set current value
+			dropdown.setValue(option.currentValue);
+
+			// Handle change
+			const configId = option.id;
+			dropdown.onChange((value) => {
+				if (onConfigOptionChangeRef.current) {
+					onConfigOptionChangeRef.current(configId, value);
+				}
+			});
+
+			// Add chevron icon
+			const iconEl = wrapperEl.createSpan({
+				cls: "agent-client-config-selector-icon",
+			});
+			setIcon(iconEl, "chevron-down");
+
+			configDropdownInstances.current.set(option.id, dropdown);
+		}
+
+		return () => {
+			containerEl.empty();
+			configDropdownInstances.current.clear();
+		};
+	}, [configOptions]);
+
 	// Placeholder text
 	const placeholder = `Message ${agentLabel} - @ to mention notes${availableCommands.length > 0 ? ", / for commands" : ""}`;
 
@@ -1032,46 +1123,58 @@ export function ChatInput({
 					/>
 				)}
 
-				{/* Input Actions (Mode Selector + Model Selector + Send Button) */}
+				{/* Input Actions (Config Options / Mode Selector / Model Selector + Send Button) */}
 				<div className="agent-client-chat-input-actions">
-					{/* Mode Selector */}
-					{modes && modes.availableModes.length > 1 && (
+					{/* Config Options (supersedes legacy mode/model selectors) */}
+					{configOptions && configOptions.length > 0 ? (
 						<div
-							className="agent-client-mode-selector"
-							title={
-								modes.availableModes.find(
-									(m) => m.id === modes.currentModeId,
-								)?.description ?? "Select mode"
-							}
-						>
-							<div ref={modeDropdownRef} />
-							<span
-								className="agent-client-mode-selector-icon"
-								ref={(el) => {
-									if (el) setIcon(el, "chevron-down");
-								}}
-							/>
-						</div>
-					)}
+							ref={configOptionsRef}
+							className="agent-client-config-options-container"
+						/>
+					) : (
+						<>
+							{/* Legacy Mode Selector */}
+							{modes && modes.availableModes.length > 1 && (
+								<div
+									className="agent-client-mode-selector"
+									title={
+										modes.availableModes.find(
+											(m) => m.id === modes.currentModeId,
+										)?.description ?? "Select mode"
+									}
+								>
+									<div ref={modeDropdownRef} />
+									<span
+										className="agent-client-mode-selector-icon"
+										ref={(el) => {
+											if (el) setIcon(el, "chevron-down");
+										}}
+									/>
+								</div>
+							)}
 
-					{/* Model Selector (experimental) */}
-					{models && models.availableModels.length > 1 && (
-						<div
-							className="agent-client-model-selector"
-							title={
-								models.availableModels.find(
-									(m) => m.modelId === models.currentModelId,
-								)?.description ?? "Select model"
-							}
-						>
-							<div ref={modelDropdownRef} />
-							<span
-								className="agent-client-model-selector-icon"
-								ref={(el) => {
-									if (el) setIcon(el, "chevron-down");
-								}}
-							/>
-						</div>
+							{/* Legacy Model Selector */}
+							{models && models.availableModels.length > 1 && (
+								<div
+									className="agent-client-model-selector"
+									title={
+										models.availableModels.find(
+											(m) =>
+												m.modelId ===
+												models.currentModelId,
+										)?.description ?? "Select model"
+									}
+								>
+									<div ref={modelDropdownRef} />
+									<span
+										className="agent-client-model-selector-icon"
+										ref={(el) => {
+											if (el) setIcon(el, "chevron-down");
+										}}
+									/>
+								</div>
+							)}
+						</>
 					)}
 
 					{/* Send/Stop Button */}
