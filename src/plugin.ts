@@ -27,6 +27,7 @@ import {
 	ensureUniqueCustomAgentIds,
 } from "./shared/settings-utils";
 import { parseChatFontSize } from "./shared/display-settings";
+import { tApp } from "./shared/i18n";
 import {
 	AgentEnvVar,
 	GeminiAgentSettings,
@@ -767,7 +768,7 @@ export default class AgentClientPlugin extends Plugin {
 	private broadcastPrompt(): void {
 		const allViews = this.viewRegistry.getAll();
 		if (allViews.length === 0) {
-			new Notice("[Agent Client] No chat views open");
+			new Notice(tApp(this.app, "noChatViewsOpen"));
 			return;
 		}
 
@@ -778,14 +779,14 @@ export default class AgentClientPlugin extends Plugin {
 			!inputState ||
 			(inputState.text.trim() === "" && inputState.images.length === 0)
 		) {
-			new Notice("[Agent Client] No prompt to broadcast");
+			new Notice(tApp(this.app, "noPromptToBroadcast"));
 			return;
 		}
 
 		const focusedId = this.viewRegistry.getFocusedId();
 		const targetViews = allViews.filter((v) => v.viewId !== focusedId);
 		if (targetViews.length === 0) {
-			new Notice("[Agent Client] No other chat views to broadcast to");
+			new Notice(tApp(this.app, "noOtherChatViewsToBroadcast"));
 			return;
 		}
 
@@ -800,13 +801,13 @@ export default class AgentClientPlugin extends Plugin {
 	private async broadcastSend(): Promise<void> {
 		const allViews = this.viewRegistry.getAll();
 		if (allViews.length === 0) {
-			new Notice("[Agent Client] No chat views open");
+			new Notice(tApp(this.app, "noChatViewsOpen"));
 			return;
 		}
 
 		const sendableViews = allViews.filter((v) => v.canSend());
 		if (sendableViews.length === 0) {
-			new Notice("[Agent Client] No views ready to send");
+			new Notice(tApp(this.app, "noViewsReadyToSend"));
 			return;
 		}
 
@@ -819,12 +820,12 @@ export default class AgentClientPlugin extends Plugin {
 	private async broadcastCancel(): Promise<void> {
 		const allViews = this.viewRegistry.getAll();
 		if (allViews.length === 0) {
-			new Notice("[Agent Client] No chat views open");
+			new Notice(tApp(this.app, "noChatViewsOpen"));
 			return;
 		}
 
 		await Promise.allSettled(allViews.map((v) => v.cancelOperation()));
-		new Notice("[Agent Client] Cancel broadcast to all views");
+		new Notice(tApp(this.app, "cancelBroadcastToAllViews"));
 	}
 
 	async loadSettings() {
@@ -1237,7 +1238,9 @@ export default class AgentClientPlugin extends Plugin {
 					? latestStable
 					: latestPrerelease;
 				new Notice(
-					`[Agent Client] Update available: v${newestVersion}`,
+					tApp(this.app, "updateAvailableVersion", {
+						version: newestVersion ?? "",
+					}),
 				);
 				return true;
 			}
@@ -1245,7 +1248,11 @@ export default class AgentClientPlugin extends Plugin {
 			// Stable version user: check stable only
 			const latestStable = await this.fetchLatestStable();
 			if (latestStable && semver.gt(latestStable, currentVersion)) {
-				new Notice(`[Agent Client] Update available: v${latestStable}`);
+				new Notice(
+					tApp(this.app, "updateAvailableVersion", {
+						version: latestStable,
+					}),
+				);
 				return true;
 			}
 		}

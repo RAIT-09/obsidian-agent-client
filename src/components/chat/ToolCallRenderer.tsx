@@ -7,6 +7,7 @@ import type AgentClientPlugin from "../../plugin";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { PermissionRequestSection } from "./PermissionRequestSection";
 import { toRelativePath } from "../../shared/path-utils";
+import { getUiLanguage, t } from "../../shared/i18n";
 import * as Diff from "diff";
 // import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 
@@ -27,6 +28,7 @@ export function ToolCallRenderer({
 	acpClient,
 	onApprovePermission,
 }: ToolCallRendererProps) {
+	const language = getUiLanguage(plugin.app);
 	const {
 		kind,
 		title,
@@ -163,6 +165,7 @@ export function ToolCallRenderer({
 								key={index}
 								diff={item}
 								plugin={plugin}
+								language={language}
 								autoCollapse={
 									plugin.settings.displaySettings
 										.autoCollapseDiffs
@@ -421,6 +424,7 @@ interface DiffRendererProps {
 		newText: string;
 	};
 	plugin: AgentClientPlugin;
+	language: ReturnType<typeof getUiLanguage>;
 	autoCollapse?: boolean;
 	collapseThreshold?: number;
 }
@@ -513,6 +517,7 @@ const CONTEXT_LINES = 3;
 
 function DiffRenderer({
 	diff,
+	language,
 	autoCollapse = false,
 	collapseThreshold = 10,
 }: DiffRendererProps) {
@@ -667,7 +672,9 @@ function DiffRenderer({
 	return (
 		<div className="agent-client-tool-call-diff">
 			{isNewFile(diff) ? (
-				<div className="agent-client-diff-line-info">New file</div>
+				<div className="agent-client-diff-line-info">
+					{t(language, "newFile")}
+				</div>
 			) : null}
 			<div className="agent-client-tool-call-diff-content">
 				{visibleLines.map((line, idx) => renderLine(line, idx))}
@@ -679,8 +686,10 @@ function DiffRenderer({
 				>
 					<span className="agent-client-diff-expand-text">
 						{isCollapsed
-							? `${remainingLines} more lines`
-							: "Collapse"}
+							? t(language, "moreLines", {
+									count: remainingLines,
+								})
+							: t(language, "collapse")}
 					</span>
 					<span className="agent-client-diff-expand-icon">
 						{isCollapsed ? "▶" : "▲"}

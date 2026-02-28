@@ -22,6 +22,7 @@ import { useInputHistory } from "../../hooks/useInputHistory";
 import { getLogger } from "../../shared/logger";
 import type { ErrorInfo } from "../../domain/models/agent-error";
 import { useSettings } from "../../hooks/useSettings";
+import { getUiLanguage, t, tApp } from "../../shared/i18n";
 
 // ============================================================================
 // Image Constants
@@ -159,6 +160,7 @@ export function ChatInput({
 }: ChatInputProps) {
 	const logger = getLogger();
 	const settings = useSettings(plugin);
+	const language = getUiLanguage(plugin.app);
 	const showEmojis = plugin.settings.displaySettings.showEmojis;
 
 	// Unofficial Obsidian API: app.vault.getConfig() is not in the public type definitions
@@ -249,7 +251,9 @@ export function ChatInput({
 				// Check image count
 				if (attachedImages.length + addedCount >= MAX_IMAGE_COUNT) {
 					new Notice(
-						`[Agent Client] Maximum ${MAX_IMAGE_COUNT} images allowed`,
+						tApp(plugin.app, "maxImagesAllowed", {
+							count: MAX_IMAGE_COUNT,
+						}),
 					);
 					break;
 				}
@@ -257,7 +261,9 @@ export function ChatInput({
 				// Check file size (before conversion - memory efficiency)
 				if (file.size > MAX_IMAGE_SIZE_BYTES) {
 					new Notice(
-						`[Agent Client] Image too large (max ${MAX_IMAGE_SIZE_MB}MB)`,
+						tApp(plugin.app, "imageTooLarge", {
+							size: MAX_IMAGE_SIZE_MB,
+						}),
 					);
 					continue;
 				}
@@ -273,11 +279,11 @@ export function ChatInput({
 					addedCount++;
 				} catch (error) {
 					console.error("Failed to convert image:", error);
-					new Notice("[Agent Client] Failed to attach image");
+					new Notice(tApp(plugin.app, "failedAttachImage"));
 				}
 			}
 		},
-		[attachedImages.length, addImage, fileToBase64],
+		[attachedImages.length, addImage, fileToBase64, plugin.app],
 	);
 
 	/**
@@ -306,9 +312,7 @@ export function ChatInput({
 			e.preventDefault();
 
 			if (!supportsImages) {
-				new Notice(
-					"[Agent Client] This agent does not support image attachments",
-				);
+				new Notice(tApp(plugin.app, "agentNoImageSupport"));
 				return;
 			}
 
@@ -372,9 +376,7 @@ export function ChatInput({
 			e.preventDefault();
 
 			if (!supportsImages) {
-				new Notice(
-					"[Agent Client] This agent does not support image attachments",
-				);
+				new Notice(tApp(plugin.app, "agentNoImageSupport"));
 				return;
 			}
 
@@ -902,7 +904,14 @@ export function ChatInput({
 	}, [currentModelId]);
 
 	// Placeholder text
-	const placeholder = `Message ${agentLabel} - @ to mention notes${availableCommands.length > 0 ? ", / for commands" : ""}`;
+	const placeholder =
+		availableCommands.length > 0
+			? t(language, "messagePlaceholderWithCommands", {
+					agent: agentLabel,
+				})
+			: t(language, "messagePlaceholderNoCommands", {
+					agent: agentLabel,
+				});
 
 	return (
 		<div className="agent-client-chat-input-container">
@@ -912,6 +921,7 @@ export function ChatInput({
 					errorInfo={errorInfo}
 					onClose={onClearError}
 					showEmojis={showEmojis}
+					plugin={plugin}
 					view={view}
 				/>
 			)}
@@ -981,8 +991,11 @@ export function ChatInput({
 							}}
 							title={
 								autoMention.isDisabled
-									? "Enable auto-mention"
-									: "Temporarily disable auto-mention"
+									? t(language, "enableAutoMention")
+									: t(
+											language,
+											"disableAutoMentionTemporarily",
+										)
 							}
 							ref={(el) => {
 								if (el) {
@@ -1027,6 +1040,7 @@ export function ChatInput({
 				{/* Image Preview Strip (only shown when agent supports images) */}
 				{supportsImages && (
 					<ImagePreviewStrip
+						plugin={plugin}
 						images={attachedImages}
 						onRemove={removeImage}
 					/>
@@ -1041,7 +1055,7 @@ export function ChatInput({
 							title={
 								modes.availableModes.find(
 									(m) => m.id === modes.currentModeId,
-								)?.description ?? "Select mode"
+								)?.description ?? t(language, "selectMode")
 							}
 						>
 							<div ref={modeDropdownRef} />
@@ -1061,7 +1075,7 @@ export function ChatInput({
 							title={
 								models.availableModels.find(
 									(m) => m.modelId === models.currentModelId,
-								)?.description ?? "Select model"
+								)?.description ?? t(language, "selectModel")
 							}
 						>
 							<div ref={modelDropdownRef} />
@@ -1082,10 +1096,10 @@ export function ChatInput({
 						className={`agent-client-chat-send-button ${isSending ? "sending" : ""} ${isButtonDisabled ? "agent-client-disabled" : ""}`}
 						title={
 							!isSessionReady
-								? "Connecting..."
+								? t(language, "connecting")
 								: isSending
-									? "Stop generation"
-									: "Send message"
+									? t(language, "stopGeneration")
+									: t(language, "sendMessage")
 						}
 					></button>
 				</div>

@@ -7,6 +7,7 @@ import type AgentClientPlugin from "../../plugin";
 import type { IChatViewHost } from "./types";
 import { setIcon } from "obsidian";
 import { MessageRenderer } from "./MessageRenderer";
+import { getUiLanguage, t } from "../../shared/i18n";
 
 /**
  * Props for ChatMessages component
@@ -55,6 +56,7 @@ export function ChatMessages({
 	acpClient,
 	onApprovePermission,
 }: ChatMessagesProps) {
+	const language = getUiLanguage(plugin.app);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
 
@@ -113,10 +115,14 @@ export function ChatMessages({
 			{messages.length === 0 ? (
 				<div className="agent-client-chat-empty-state">
 					{isRestoringSession
-						? "Restoring session..."
+						? t(language, "restoringSession")
 						: !isSessionReady
-							? `Connecting to ${agentLabel}...`
-							: `Start a conversation with ${agentLabel}...`}
+							? t(language, "connectingToAgent", {
+									agent: agentLabel,
+								})
+							: t(language, "startConversationWithAgent", {
+									agent: agentLabel,
+								})}
 				</div>
 			) : (
 				<>

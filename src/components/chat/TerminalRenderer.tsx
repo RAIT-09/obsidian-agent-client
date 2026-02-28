@@ -3,6 +3,7 @@ const { useState, useRef, useEffect } = React;
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 import { getLogger } from "../../shared/logger";
 import type AgentClientPlugin from "../../plugin";
+import { getUiLanguage, t } from "../../shared/i18n";
 
 interface TerminalRendererProps {
 	terminalId: string;
@@ -16,6 +17,7 @@ export function TerminalRenderer({
 	plugin,
 }: TerminalRendererProps) {
 	const logger = getLogger();
+	const language = getUiLanguage(plugin.app);
 	const [output, setOutput] = useState("");
 	const [exitStatus, setExitStatus] = useState<{
 		exitCode: number | null;
@@ -107,32 +109,37 @@ export function TerminalRenderer({
 	return (
 		<div className="agent-client-terminal-renderer">
 			<div className="agent-client-terminal-renderer-header">
-				{showEmojis && "🖥️ "}Terminal {terminalId.slice(0, 8)}
+				{showEmojis && "🖥️ "}
+				{t(language, "terminal")} {terminalId.slice(0, 8)}
 				{isRunning ? (
 					<span className="agent-client-terminal-status agent-client-running">
-						● RUNNING
+						● {t(language, "running")}
 					</span>
 				) : isCancelled ? (
 					<span className="agent-client-terminal-status agent-client-cancelled">
-						● CANCELLED
+						● {t(language, "cancelled")}
 					</span>
 				) : (
 					<span className="agent-client-terminal-status agent-client-finished">
-						● FINISHED
+						● {t(language, "finished")}
 					</span>
 				)}
 			</div>
 
 			<div className="agent-client-terminal-renderer-output">
-				{output || (isRunning ? "Waiting for output..." : "No output")}
+				{output ||
+					(isRunning
+						? t(language, "waitingForOutput")
+						: t(language, "noOutput"))}
 			</div>
 
 			{exitStatus && (
 				<div
 					className={`agent-client-terminal-renderer-exit ${exitStatus.exitCode === 0 ? "agent-client-success" : "agent-client-error"}`}
 				>
-					Exit Code: {exitStatus.exitCode}
-					{exitStatus.signal && ` | Signal: ${exitStatus.signal}`}
+					{t(language, "exitCode")}: {exitStatus.exitCode}
+					{exitStatus.signal &&
+						` | ${t(language, "signal")}: ${exitStatus.signal}`}
 				</div>
 			)}
 		</div>

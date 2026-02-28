@@ -2,11 +2,15 @@ import * as React from "react";
 const { useState, useCallback } = React;
 import { setIcon } from "obsidian";
 import type { SessionInfo } from "../../domain/models/session-info";
+import type { UiLanguage } from "../../shared/i18n";
+import { t } from "../../shared/i18n";
 
 /**
  * Props for SessionHistoryContent component.
  */
 export interface SessionHistoryContentProps {
+	/** UI language */
+	language?: UiLanguage;
 	/** List of sessions to display */
 	sessions: SessionInfo[];
 	/** Whether sessions are being fetched */
@@ -88,7 +92,7 @@ function IconButton({
  * Format timestamp as relative time.
  * Examples: "2 hours ago", "yesterday", "3 days ago"
  */
-function formatRelativeTime(date: Date): string {
+function formatRelativeTime(date: Date, language: UiLanguage): string {
 	const now = Date.now();
 	const timestamp = date.getTime();
 	const diffMs = now - timestamp;
@@ -98,17 +102,22 @@ function formatRelativeTime(date: Date): string {
 	const diffDays = Math.floor(diffHours / 24);
 
 	if (diffMinutes < 1) {
-		return "just now";
+		return t(language, "justNow");
 	} else if (diffMinutes < 60) {
-		return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
+		return diffMinutes === 1
+			? t(language, "minuteAgo")
+			: t(language, "minutesAgo", { count: diffMinutes });
 	} else if (diffHours < 24) {
-		return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+		return diffHours === 1
+			? t(language, "hourAgo")
+			: t(language, "hoursAgo", { count: diffHours });
 	} else if (diffDays === 1) {
-		return "yesterday";
+		return t(language, "yesterday");
 	} else if (diffDays < 7) {
-		return `${diffDays} days ago`;
+		return t(language, "daysAgo", { count: diffDays });
 	} else {
-		const month = date.toLocaleString("default", { month: "short" });
+		const locale = language === "zh" ? "zh-CN" : "en-US";
+		const month = date.toLocaleString(locale, { month: "short" });
 		const day = date.getDate();
 		const year = date.getFullYear();
 		return `${month} ${day}, ${year}`;
@@ -129,11 +138,13 @@ function truncateTitle(title: string): string {
  * Debug form for manual session input.
  */
 function DebugForm({
+	language,
 	currentCwd,
 	onRestoreSession,
 	onForkSession,
 	onClose,
 }: {
+	language: UiLanguage;
 	currentCwd: string;
 	onRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
@@ -158,14 +169,16 @@ function DebugForm({
 
 	return (
 		<div className="agent-client-session-history-debug">
-			<h3>Debug: Manual Session Input</h3>
+			<h3>{t(language, "debugManualSessionInput")}</h3>
 
 			<div className="agent-client-session-history-debug-group">
-				<label htmlFor="debug-session-id">Session ID:</label>
+				<label htmlFor="debug-session-id">
+					{t(language, "sessionId")}
+				</label>
 				<input
 					id="debug-session-id"
 					type="text"
-					placeholder="Enter session ID..."
+					placeholder={t(language, "enterSessionId")}
 					className="agent-client-session-history-debug-input"
 					value={sessionId}
 					onChange={(e) => setSessionId(e.target.value)}
@@ -173,11 +186,13 @@ function DebugForm({
 			</div>
 
 			<div className="agent-client-session-history-debug-group">
-				<label htmlFor="debug-cwd">Working Directory (cwd):</label>
+				<label htmlFor="debug-cwd">
+					{t(language, "workingDirectory")}
+				</label>
 				<input
 					id="debug-cwd"
 					type="text"
-					placeholder="Enter working directory..."
+					placeholder={t(language, "enterWorkingDirectory")}
 					className="agent-client-session-history-debug-input"
 					value={cwd}
 					onChange={(e) => setCwd(e.target.value)}
@@ -189,13 +204,13 @@ function DebugForm({
 					className="agent-client-session-history-debug-button"
 					onClick={handleRestore}
 				>
-					Restore
+					{t(language, "restore")}
 				</button>
 				<button
 					className="agent-client-session-history-debug-button"
 					onClick={handleFork}
 				>
-					Fork
+					{t(language, "fork")}
 				</button>
 			</div>
 
@@ -208,6 +223,7 @@ function DebugForm({
  * Session list item component.
  */
 function SessionItem({
+	language,
 	session,
 	canRestore,
 	canFork,
@@ -216,6 +232,7 @@ function SessionItem({
 	onDeleteSession,
 	onClose,
 }: {
+	language: UiLanguage;
 	session: SessionInfo;
 	canRestore: boolean;
 	canFork: boolean;
@@ -243,13 +260,18 @@ function SessionItem({
 			<div className="agent-client-session-history-item-content">
 				<div className="agent-client-session-history-item-title">
 					<span>
-						{truncateTitle(session.title ?? "Untitled Session")}
+						{truncateTitle(
+							session.title ?? t(language, "untitledSession"),
+						)}
 					</span>
 				</div>
 				<div className="agent-client-session-history-item-metadata">
 					{session.updatedAt && (
 						<span className="agent-client-session-history-item-timestamp">
-							{formatRelativeTime(new Date(session.updatedAt))}
+							{formatRelativeTime(
+								new Date(session.updatedAt),
+								language,
+							)}
 						</span>
 					)}
 				</div>
@@ -259,7 +281,7 @@ function SessionItem({
 				{canRestore && (
 					<IconButton
 						iconName="play"
-						label="Restore session"
+						label={t(language, "restoreSession")}
 						className="agent-client-session-history-action-icon agent-client-session-history-restore-icon"
 						onClick={handleRestore}
 					/>
@@ -267,14 +289,14 @@ function SessionItem({
 				{canFork && (
 					<IconButton
 						iconName="git-branch"
-						label="Fork session (create new branch)"
+						label={t(language, "forkSessionCreateBranch")}
 						className="agent-client-session-history-action-icon agent-client-session-history-fork-icon"
 						onClick={handleFork}
 					/>
 				)}
 				<IconButton
 					iconName="trash-2"
-					label="Delete session"
+					label={t(language, "deleteSession")}
 					className="agent-client-session-history-action-icon agent-client-session-history-delete-icon"
 					onClick={handleDelete}
 				/>
@@ -294,6 +316,7 @@ function SessionItem({
  * - Pagination
  */
 export function SessionHistoryContent({
+	language = "en",
 	sessions,
 	loading,
 	error,
@@ -344,7 +367,7 @@ export function SessionHistoryContent({
 	if (!isAgentReady) {
 		return (
 			<div className="agent-client-session-history-loading">
-				<p>Preparing agent...</p>
+				<p>{t(language, "preparingAgent")}</p>
 			</div>
 		);
 	}
@@ -363,6 +386,7 @@ export function SessionHistoryContent({
 			{/* Debug form */}
 			{debugMode && (
 				<DebugForm
+					language={language}
 					currentCwd={currentCwd}
 					onRestoreSession={onRestoreSession}
 					onForkSession={onForkSession}
@@ -373,14 +397,14 @@ export function SessionHistoryContent({
 			{/* Warning banner for agents that don't support restoration */}
 			{!canPerformAnyOperation && (
 				<div className="agent-client-session-history-warning-banner">
-					<p>This agent does not support session restoration.</p>
+					<p>{t(language, "agentNoSessionRestore")}</p>
 				</div>
 			)}
 
 			{/* Local sessions banner */}
 			{(isUsingLocalSessions || !canPerformAnyOperation) && (
 				<div className="agent-client-session-history-local-banner">
-					<span>These sessions are saved in the plugin.</span>
+					<span>{t(language, "sessionsSavedInPlugin")}</span>
 				</div>
 			)}
 
@@ -388,11 +412,10 @@ export function SessionHistoryContent({
 			{!canShowList && !debugMode && (
 				<div className="agent-client-session-history-empty">
 					<p className="agent-client-session-history-empty-text">
-						Session list is not available for this agent.
+						{t(language, "sessionListUnavailable")}
 					</p>
 					<p className="agent-client-session-history-empty-text">
-						Enable Debug Mode in settings to manually enter session
-						IDs.
+						{t(language, "enableDebugModeManualSession")}
 					</p>
 				</div>
 			)}
@@ -408,7 +431,9 @@ export function SessionHistoryContent({
 									checked={filterByCurrentVault}
 									onChange={handleFilterChange}
 								/>
-								<span>Show current vault only</span>
+								<span>
+									{t(language, "showCurrentVaultOnly")}
+								</span>
 							</label>
 							<label className="agent-client-session-history-filter-label">
 								<input
@@ -420,7 +445,12 @@ export function SessionHistoryContent({
 										)
 									}
 								/>
-								<span>Hide sessions without local data</span>
+								<span>
+									{t(
+										language,
+										"hideSessionsWithoutLocalData",
+									)}
+								</span>
 							</label>
 						</div>
 					)}
@@ -435,7 +465,7 @@ export function SessionHistoryContent({
 								className="agent-client-session-history-retry-button"
 								onClick={handleRetry}
 							>
-								Retry
+								{t(language, "retry")}
 							</button>
 						</div>
 					)}
@@ -443,7 +473,7 @@ export function SessionHistoryContent({
 					{/* Loading state */}
 					{!error && loading && filteredSessions.length === 0 && (
 						<div className="agent-client-session-history-loading">
-							<p>Loading sessions...</p>
+							<p>{t(language, "loadingSessions")}</p>
 						</div>
 					)}
 
@@ -451,7 +481,7 @@ export function SessionHistoryContent({
 					{!error && !loading && filteredSessions.length === 0 && (
 						<div className="agent-client-session-history-empty">
 							<p className="agent-client-session-history-empty-text">
-								No previous sessions
+								{t(language, "noPreviousSessions")}
 							</p>
 						</div>
 					)}
@@ -461,6 +491,7 @@ export function SessionHistoryContent({
 						<div className="agent-client-session-history-list">
 							{filteredSessions.map((session) => (
 								<SessionItem
+									language={language}
 									key={session.sessionId}
 									session={session}
 									canRestore={canRestore}
@@ -482,7 +513,9 @@ export function SessionHistoryContent({
 								disabled={loading}
 								onClick={onLoadMore}
 							>
-								{loading ? "Loading..." : "Load more"}
+								{loading
+									? t(language, "loading")
+									: t(language, "loadMore")}
 							</button>
 						</div>
 					)}

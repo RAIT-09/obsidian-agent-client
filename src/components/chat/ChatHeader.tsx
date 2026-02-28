@@ -1,10 +1,14 @@
 import * as React from "react";
 import { HeaderButton } from "./HeaderButton";
+import { getUiLanguage, t } from "../../shared/i18n";
+import type AgentClientPlugin from "../../plugin";
 
 /**
  * Props for ChatHeader component
  */
 export interface ChatHeaderProps {
+	/** Plugin instance for language detection */
+	plugin: AgentClientPlugin;
 	/** Display name of the active agent */
 	agentLabel: string;
 	/** Whether a plugin update is available */
@@ -30,6 +34,7 @@ export interface ChatHeaderProps {
  * - Action buttons (new chat, history, export, settings)
  */
 export function ChatHeader({
+	plugin,
 	agentLabel,
 	isUpdateAvailable,
 	hasHistoryCapability = false,
@@ -38,6 +43,8 @@ export function ChatHeader({
 	onShowMenu,
 	onOpenHistory,
 }: ChatHeaderProps) {
+	const language = getUiLanguage(plugin.app);
+
 	return (
 		<div className="agent-client-chat-view-header">
 			<div className="agent-client-chat-view-header-main">
@@ -47,30 +54,30 @@ export function ChatHeader({
 			</div>
 			{isUpdateAvailable && (
 				<p className="agent-client-chat-view-header-update">
-					Plugin update available!
+					{t(language, "pluginUpdateAvailable")}
 				</p>
 			)}
 			<div className="agent-client-chat-view-header-actions">
 				<HeaderButton
 					iconName="plus"
-					tooltip="New chat"
+					tooltip={t(language, "newChat")}
 					onClick={onNewChat}
 				/>
 				{onOpenHistory && (
 					<HeaderButton
 						iconName="history"
-						tooltip="Session history"
+						tooltip={t(language, "sessionHistory")}
 						onClick={onOpenHistory}
 					/>
 				)}
 				<HeaderButton
 					iconName="save"
-					tooltip="Export chat to Markdown"
+					tooltip={t(language, "exportChatToMarkdown")}
 					onClick={onExportChat}
 				/>
 				<HeaderButton
 					iconName="more-vertical"
-					tooltip="More"
+					tooltip={t(language, "more")}
 					onClick={onShowMenu}
 				/>
 			</div>

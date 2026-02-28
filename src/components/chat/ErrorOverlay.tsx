@@ -3,6 +3,8 @@ const { useRef, useEffect } = React;
 import { setIcon } from "obsidian";
 import type { ErrorInfo } from "../../domain/models/agent-error";
 import type { IChatViewHost } from "./types";
+import { getUiLanguage, t } from "../../shared/i18n";
+import type AgentClientPlugin from "../../plugin";
 
 export interface ErrorOverlayProps {
 	/** Error information to display */
@@ -11,6 +13,8 @@ export interface ErrorOverlayProps {
 	onClose: () => void;
 	/** Whether to show emojis */
 	showEmojis: boolean;
+	/** Plugin instance for language detection */
+	plugin: AgentClientPlugin;
 	/** View instance for event registration */
 	view: IChatViewHost;
 }
@@ -28,9 +32,11 @@ export function ErrorOverlay({
 	errorInfo,
 	onClose,
 	showEmojis,
+	plugin,
 	view,
 }: ErrorOverlayProps) {
 	const overlayRef = useRef<HTMLDivElement>(null);
+	const language = getUiLanguage(plugin.app);
 
 	// Handle outside click to close
 	useEffect(() => {
@@ -67,7 +73,7 @@ export function ErrorOverlay({
 				<button
 					className="agent-client-error-overlay-close"
 					onClick={onClose}
-					aria-label="Close error"
+					aria-label={t(language, "closeError")}
 					type="button"
 					ref={(el) => {
 						if (el) {

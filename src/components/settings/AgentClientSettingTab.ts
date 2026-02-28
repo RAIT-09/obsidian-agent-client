@@ -17,6 +17,7 @@ import {
 	CHAT_FONT_SIZE_MIN,
 	parseChatFontSize,
 } from "../../shared/display-settings";
+import { getUiLanguage } from "../../shared/i18n";
 
 export class AgentClientSettingTab extends PluginSettingTab {
 	plugin: AgentClientPlugin;
@@ -28,8 +29,13 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	private uiText(en: string, zh: string): string {
+		return getUiLanguage(this.app) === "zh" ? zh : en;
+	}
+
 	display(): void {
 		const { containerEl } = this;
+		const t = (en: string, zh: string) => this.uiText(en, zh);
 
 		containerEl.empty();
 		this.agentSelector = null;
@@ -44,9 +50,11 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		const docContainer = containerEl.createDiv({
 			cls: "agent-client-doc-link",
 		});
-		docContainer.createSpan({ text: "Need help? Check out the " });
+		docContainer.createSpan({
+			text: t("Need help? Check out the ", "需要帮助？查看"),
+		});
 		docContainer.createEl("a", {
-			text: "documentation",
+			text: t("documentation", "文档"),
 			href: "https://rait-09.github.io/obsidian-agent-client/",
 		});
 		docContainer.createSpan({ text: "." });
@@ -66,12 +74,17 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		this.updateAgentDropdown();
 
 		new Setting(containerEl)
-			.setName("Node.js path")
+			.setName(t("Node.js path", "Node.js 路径"))
 			.setDesc(
-				'Absolute path to Node.js executable. On macOS/Linux, use "which node", and on Windows, use "where node" to find it.',
+				t(
+					'Absolute path to Node.js executable. On macOS/Linux, use "which node", and on Windows, use "where node" to find it.',
+					'Node.js 可执行文件的绝对路径。macOS/Linux 可用 "which node"，Windows 可用 "where node" 查找。',
+				),
 			)
 			.addText((text) => {
-				text.setPlaceholder("Absolute path to node")
+				text.setPlaceholder(
+					t("Absolute path to node", "node 的绝对路径"),
+				)
 					.setValue(this.plugin.settings.nodePath)
 					.onChange(async (value) => {
 						this.plugin.settings.nodePath = value.trim();
@@ -80,19 +93,28 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(containerEl)
-			.setName("Send message shortcut")
+			.setName(t("Send message shortcut", "发送消息快捷键"))
 			.setDesc(
-				"Choose the keyboard shortcut to send messages. Note: If using Cmd/Ctrl+Enter, you may need to remove any hotkeys assigned to Cmd/Ctrl+Enter (Settings → Hotkeys).",
+				t(
+					"Choose the keyboard shortcut to send messages. Note: If using Cmd/Ctrl+Enter, you may need to remove any hotkeys assigned to Cmd/Ctrl+Enter (Settings → Hotkeys).",
+					"选择发送消息的快捷键。注意：如果使用 Cmd/Ctrl+Enter，可能需要先移除该快捷键在 Obsidian 中的占用（设置 → 快捷键）。",
+				),
 			)
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption(
 						"enter",
-						"Enter to send, Shift+Enter for newline",
+						t(
+							"Enter to send, Shift+Enter for newline",
+							"Enter 发送，Shift+Enter 换行",
+						),
 					)
 					.addOption(
 						"cmd-enter",
-						"Cmd/Ctrl+Enter to send, Enter for newline",
+						t(
+							"Cmd/Ctrl+Enter to send, Enter for newline",
+							"Cmd/Ctrl+Enter 发送，Enter 换行",
+						),
 					)
 					.setValue(this.plugin.settings.sendMessageShortcut)
 					.onChange(async (value) => {
@@ -107,12 +129,15 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// Mentions
 		// ─────────────────────────────────────────────────────────────────────
 
-		new Setting(containerEl).setName("Mentions").setHeading();
+		new Setting(containerEl).setName(t("Mentions", "引用")).setHeading();
 
 		new Setting(containerEl)
-			.setName("Auto-mention active note")
+			.setName(t("Auto-mention active note", "自动引用当前笔记"))
 			.setDesc(
-				"Include the current note in your messages automatically. The agent will have access to its content without typing @notename.",
+				t(
+					"Include the current note in your messages automatically. The agent will have access to its content without typing @notename.",
+					"自动将当前笔记加入消息上下文，无需手动输入 @笔记名。",
+				),
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -124,9 +149,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Max note length")
+			.setName(t("Max note length", "笔记最大长度"))
 			.setDesc(
-				"Maximum characters per mentioned note. Notes longer than this will be truncated.",
+				t(
+					"Maximum characters per mentioned note. Notes longer than this will be truncated.",
+					"每个被引用笔记允许的最大字符数，超出将被截断。",
+				),
 			)
 			.addText((text) =>
 				text
@@ -147,9 +175,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Max selection length")
+			.setName(t("Max selection length", "选区最大长度"))
 			.setDesc(
-				"Maximum characters for text selection in auto-mention. Selections longer than this will be truncated.",
+				t(
+					"Maximum characters for text selection in auto-mention. Selections longer than this will be truncated.",
+					"自动引用时选中文本的最大字符数，超出将被截断。",
+				),
 			)
 			.addText((text) =>
 				text
@@ -174,17 +205,29 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// Display
 		// ─────────────────────────────────────────────────────────────────────
 
-		new Setting(containerEl).setName("Display").setHeading();
+		new Setting(containerEl).setName(t("Display", "显示")).setHeading();
 
 		new Setting(containerEl)
-			.setName("Chat view location")
-			.setDesc("Where to open new chat views")
+			.setName(t("Chat view location", "聊天视图位置"))
+			.setDesc(t("Where to open new chat views", "新聊天视图的打开位置"))
 			.addDropdown((dropdown) =>
 				dropdown
-					.addOption("right-tab", "Right pane (tabs)")
-					.addOption("right-split", "Right pane (split)")
-					.addOption("editor-tab", "Editor area (tabs)")
-					.addOption("editor-split", "Editor area (split)")
+					.addOption(
+						"right-tab",
+						t("Right pane (tabs)", "右侧栏（标签）"),
+					)
+					.addOption(
+						"right-split",
+						t("Right pane (split)", "右侧栏（分栏）"),
+					)
+					.addOption(
+						"editor-tab",
+						t("Editor area (tabs)", "编辑区（标签）"),
+					)
+					.addOption(
+						"editor-split",
+						t("Editor area (split)", "编辑区（分栏）"),
+					)
 					.setValue(this.plugin.settings.chatViewLocation)
 					.onChange(async (value) => {
 						this.plugin.settings.chatViewLocation =
@@ -194,9 +237,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Chat font size")
+			.setName(t("Chat font size", "聊天字体大小"))
 			.setDesc(
-				`Adjust the font size of the chat message area (${CHAT_FONT_SIZE_MIN}-${CHAT_FONT_SIZE_MAX}px).`,
+				t(
+					`Adjust the font size of the chat message area (${CHAT_FONT_SIZE_MIN}-${CHAT_FONT_SIZE_MAX}px).`,
+					`调整聊天消息区域字体大小（${CHAT_FONT_SIZE_MIN}-${CHAT_FONT_SIZE_MAX}px）。`,
+				),
 			)
 			.addText((text) => {
 				const getCurrentDisplayValue = (): string => {
@@ -291,9 +337,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(containerEl)
-			.setName("Show emojis")
+			.setName(t("Show emojis", "显示表情图标"))
 			.setDesc(
-				"Display emoji icons in tool calls, thoughts, plans, and terminal blocks.",
+				t(
+					"Display emoji icons in tool calls, thoughts, plans, and terminal blocks.",
+					"在工具调用、思考、计划和终端块中显示表情图标。",
+				),
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -305,9 +354,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Auto-collapse long diffs")
+			.setName(t("Auto-collapse long diffs", "自动折叠长 diff"))
 			.setDesc(
-				"Automatically collapse diffs that exceed the line threshold.",
+				t(
+					"Automatically collapse diffs that exceed the line threshold.",
+					"当 diff 行数超过阈值时自动折叠。",
+				),
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -324,9 +376,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		if (this.plugin.settings.displaySettings.autoCollapseDiffs) {
 			new Setting(containerEl)
-				.setName("Collapse threshold")
+				.setName(t("Collapse threshold", "折叠阈值"))
 				.setDesc(
-					"Diffs with more lines than this will be collapsed by default.",
+					t(
+						"Diffs with more lines than this will be collapsed by default.",
+						"超过该行数的 diff 默认折叠。",
+					),
 				)
 				.addText((text) =>
 					text
@@ -352,12 +407,17 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// Floating chat
 		// ─────────────────────────────────────────────────────────────────────
 
-		new Setting(containerEl).setName("Floating chat").setHeading();
+		new Setting(containerEl)
+			.setName(t("Floating chat", "悬浮聊天"))
+			.setHeading();
 
 		new Setting(containerEl)
-			.setName("Show floating button")
+			.setName(t("Show floating button", "显示悬浮按钮"))
 			.setDesc(
-				"Display a floating chat button that opens a draggable chat window.",
+				t(
+					"Display a floating chat button that opens a draggable chat window.",
+					"显示悬浮聊天按钮，可打开可拖拽聊天窗口。",
+				),
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -384,13 +444,21 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Floating button image")
+			.setName(t("Floating button image", "悬浮按钮图片"))
 			.setDesc(
-				"URL or path to an image for the floating button. Leave empty for default icon.",
+				t(
+					"URL or path to an image for the floating button. Leave empty for default icon.",
+					"悬浮按钮图片的 URL 或路径，留空则使用默认图标。",
+				),
 			)
 			.addText((text) =>
 				text
-					.setPlaceholder("https://example.com/avatar.png")
+					.setPlaceholder(
+						t(
+							"https://example.com/avatar.png",
+							"https://example.com/avatar.png",
+						),
+					)
 					.setValue(this.plugin.settings.floatingButtonImage)
 					.onChange(async (value) => {
 						this.plugin.settings.floatingButtonImage = value.trim();
@@ -402,12 +470,15 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// Permissions
 		// ─────────────────────────────────────────────────────────────────────
 
-		new Setting(containerEl).setName("Permissions").setHeading();
+		new Setting(containerEl).setName(t("Permissions", "权限")).setHeading();
 
 		new Setting(containerEl)
-			.setName("Auto-allow permissions")
+			.setName(t("Auto-allow permissions", "自动允许权限请求"))
 			.setDesc(
-				"Automatically allow all permission requests from agents. ⚠️ Use with caution - this gives agents full access to your system.",
+				t(
+					"Automatically allow all permission requests from agents. Use with caution - this gives agents full access to your system.",
+					"自动允许代理发起的所有权限请求。请谨慎使用，这会给代理较高系统权限。",
+				),
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -424,13 +495,21 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		if (Platform.isWin) {
 			new Setting(containerEl)
-				.setName("Windows Subsystem for Linux")
+				.setName(
+					t(
+						"Windows Subsystem for Linux",
+						"Windows 子系统 Linux（WSL）",
+					),
+				)
 				.setHeading();
 
 			new Setting(containerEl)
-				.setName("Enable WSL mode")
+				.setName(t("Enable WSL mode", "启用 WSL 模式"))
 				.setDesc(
-					"Run agents inside Windows Subsystem for Linux. Recommended for agents like Codex that don't work well in native Windows environments.",
+					t(
+						"Run agents inside Windows Subsystem for Linux. Recommended for agents like Codex that don't work well in native Windows environments.",
+						"在 WSL 内运行代理。适用于在原生 Windows 环境下运行不稳定的代理（如 Codex）。",
+					),
 				)
 				.addToggle((toggle) =>
 					toggle
@@ -444,13 +523,18 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 			if (this.plugin.settings.windowsWslMode) {
 				new Setting(containerEl)
-					.setName("WSL distribution")
+					.setName(t("WSL distribution", "WSL 发行版"))
 					.setDesc(
-						"Specify WSL distribution name (leave empty for default). Example: Ubuntu, Debian",
+						t(
+							"Specify WSL distribution name (leave empty for default). Example: Ubuntu, Debian",
+							"指定 WSL 发行版名称（留空使用默认）。例如：Ubuntu、Debian",
+						),
 					)
 					.addText((text) =>
 						text
-							.setPlaceholder("Leave empty for default")
+							.setPlaceholder(
+								t("Leave empty for default", "留空使用默认"),
+							)
 							.setValue(
 								this.plugin.settings.windowsWslDistribution ||
 									"",
@@ -468,13 +552,17 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// Agents
 		// ─────────────────────────────────────────────────────────────────────
 
-		new Setting(containerEl).setName("Built-in agents").setHeading();
+		new Setting(containerEl)
+			.setName(t("Built-in agents", "内置代理"))
+			.setHeading();
 
 		this.renderClaudeSettings(containerEl);
 		this.renderCodexSettings(containerEl);
 		this.renderGeminiSettings(containerEl);
 
-		new Setting(containerEl).setName("Custom agents").setHeading();
+		new Setting(containerEl)
+			.setName(t("Custom agents", "自定义代理"))
+			.setHeading();
 
 		this.renderCustomAgents(containerEl);
 
@@ -482,14 +570,19 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// Export
 		// ─────────────────────────────────────────────────────────────────────
 
-		new Setting(containerEl).setName("Export").setHeading();
+		new Setting(containerEl).setName(t("Export", "导出")).setHeading();
 
 		new Setting(containerEl)
-			.setName("Export folder")
-			.setDesc("Folder where chat exports will be saved")
+			.setName(t("Export folder", "导出文件夹"))
+			.setDesc(
+				t(
+					"Folder where chat exports will be saved",
+					"聊天导出的保存目录",
+				),
+			)
 			.addText((text) =>
 				text
-					.setPlaceholder("Agent Client")
+					.setPlaceholder(t("Agent Client", "Agent Client"))
 					.setValue(this.plugin.settings.exportSettings.defaultFolder)
 					.onChange(async (value) => {
 						this.plugin.settings.exportSettings.defaultFolder =
@@ -499,13 +592,21 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Filename")
+			.setName(t("Filename", "文件名"))
 			.setDesc(
-				"Template for exported filenames. Use {date} for date and {time} for time",
+				t(
+					"Template for exported filenames. Use {date} for date and {time} for time",
+					"导出文件名模板，可使用 {date} 和 {time}。",
+				),
 			)
 			.addText((text) =>
 				text
-					.setPlaceholder("agent_client_{date}_{time}")
+					.setPlaceholder(
+						t(
+							"agent_client_{date}_{time}",
+							"agent_client_{date}_{time}",
+						),
+					)
 					.setValue(
 						this.plugin.settings.exportSettings.filenameTemplate,
 					)
@@ -517,13 +618,16 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Frontmatter tag")
+			.setName(t("Frontmatter tag", "Frontmatter 标签"))
 			.setDesc(
-				"Tag to add to exported notes. Supports nested tags (e.g., projects/agent-client). Leave empty to disable.",
+				t(
+					"Tag to add to exported notes. Supports nested tags (e.g., projects/agent-client). Leave empty to disable.",
+					"为导出笔记添加标签。支持多级标签（如 projects/agent-client），留空则禁用。",
+				),
 			)
 			.addText((text) =>
 				text
-					.setPlaceholder("agent-client")
+					.setPlaceholder(t("agent-client", "agent-client"))
 					.setValue(
 						this.plugin.settings.exportSettings.frontmatterTag,
 					)
@@ -535,8 +639,13 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Include images")
-			.setDesc("Include images in exported markdown files")
+			.setName(t("Include images", "包含图片"))
+			.setDesc(
+				t(
+					"Include images in exported markdown files",
+					"在导出的 Markdown 中包含图片",
+				),
+			)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.exportSettings.includeImages)
@@ -550,18 +659,29 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		if (this.plugin.settings.exportSettings.includeImages) {
 			new Setting(containerEl)
-				.setName("Image location")
-				.setDesc("Where to save exported images")
+				.setName(t("Image location", "图片保存位置"))
+				.setDesc(
+					t("Where to save exported images", "导出图片的保存方式"),
+				)
 				.addDropdown((dropdown) =>
 					dropdown
 						.addOption(
 							"obsidian",
-							"Use Obsidian's attachment setting",
+							t(
+								"Use Obsidian's attachment setting",
+								"使用 Obsidian 附件设置",
+							),
 						)
-						.addOption("custom", "Save to custom folder")
+						.addOption(
+							"custom",
+							t("Save to custom folder", "保存到自定义文件夹"),
+						)
 						.addOption(
 							"base64",
-							"Embed as Base64 (not recommended)",
+							t(
+								"Embed as Base64 (not recommended)",
+								"以内嵌 Base64 保存（不推荐）",
+							),
 						)
 						.setValue(
 							this.plugin.settings.exportSettings.imageLocation,
@@ -578,13 +698,16 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				this.plugin.settings.exportSettings.imageLocation === "custom"
 			) {
 				new Setting(containerEl)
-					.setName("Custom image folder")
+					.setName(t("Custom image folder", "自定义图片文件夹"))
 					.setDesc(
-						"Folder path for exported images (relative to vault root)",
+						t(
+							"Folder path for exported images (relative to vault root)",
+							"导出图片文件夹路径（相对于库根目录）",
+						),
 					)
 					.addText((text) =>
 						text
-							.setPlaceholder("Agent Client")
+							.setPlaceholder(t("Agent Client", "Agent Client"))
 							.setValue(
 								this.plugin.settings.exportSettings
 									.imageCustomFolder,
@@ -599,9 +722,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		}
 
 		new Setting(containerEl)
-			.setName("Auto-export on new chat")
+			.setName(t("Auto-export on new chat", "新建聊天时自动导出"))
 			.setDesc(
-				"Automatically export the current chat when starting a new chat",
+				t(
+					"Automatically export the current chat when starting a new chat",
+					"开始新聊天时自动导出当前聊天。",
+				),
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -616,9 +742,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Auto-export on close chat")
+			.setName(t("Auto-export on close chat", "关闭聊天时自动导出"))
 			.setDesc(
-				"Automatically export the current chat when closing the chat view",
+				t(
+					"Automatically export the current chat when closing the chat view",
+					"关闭聊天视图时自动导出当前聊天。",
+				),
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -634,8 +763,13 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Open note after export")
-			.setDesc("Automatically open the exported note after exporting")
+			.setName(t("Open note after export", "导出后打开笔记"))
+			.setDesc(
+				t(
+					"Automatically open the exported note after exporting",
+					"导出后自动打开导出的笔记",
+				),
+			)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(
@@ -652,12 +786,15 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// Developer
 		// ─────────────────────────────────────────────────────────────────────
 
-		new Setting(containerEl).setName("Developer").setHeading();
+		new Setting(containerEl).setName(t("Developer", "开发者")).setHeading();
 
 		new Setting(containerEl)
-			.setName("Debug mode")
+			.setName(t("Debug mode", "调试模式"))
 			.setDesc(
-				"Enable debug logging to console. Useful for development and troubleshooting.",
+				t(
+					"Enable debug logging to console. Useful for development and troubleshooting.",
+					"启用控制台调试日志，便于开发和故障排查。",
+				),
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -701,10 +838,16 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 	private renderAgentSelector(containerEl: HTMLElement) {
 		this.plugin.ensureDefaultAgentId();
+		const t = (en: string, zh: string) => this.uiText(en, zh);
 
 		new Setting(containerEl)
-			.setName("Default agent")
-			.setDesc("Choose which agent is used when opening a new chat view.")
+			.setName(t("Default agent", "默认代理"))
+			.setDesc(
+				t(
+					"Choose which agent is used when opening a new chat view.",
+					"选择打开新聊天视图时使用的代理。",
+				),
+			)
 			.addDropdown((dropdown) => {
 				this.agentSelector = dropdown;
 				this.populateAgentDropdown(dropdown);
@@ -778,18 +921,24 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 	private renderGeminiSettings(sectionEl: HTMLElement) {
 		const gemini = this.plugin.settings.gemini;
+		const t = (en: string, zh: string) => this.uiText(en, zh);
 
 		new Setting(sectionEl)
-			.setName(gemini.displayName || "Gemini CLI")
+			.setName(gemini.displayName || t("Gemini CLI", "Gemini CLI"))
 			.setHeading();
 
 		new Setting(sectionEl)
-			.setName("API key")
+			.setName(t("API key", "API Key"))
 			.setDesc(
-				"Gemini API key. Required if not logging in with a Google account. (Stored as plain text)",
+				t(
+					"Gemini API key. Required if not logging in with a Google account. (Stored as plain text)",
+					"Gemini API Key。未使用 Google 账号登录时必填。（明文存储）",
+				),
 			)
 			.addText((text) => {
-				text.setPlaceholder("Enter your Gemini API key")
+				text.setPlaceholder(
+					t("Enter your Gemini API key", "输入 Gemini API Key"),
+				)
 					.setValue(gemini.apiKey)
 					.onChange(async (value) => {
 						this.plugin.settings.gemini.apiKey = value.trim();
@@ -799,12 +948,17 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(sectionEl)
-			.setName("Path")
+			.setName(t("Path", "路径"))
 			.setDesc(
-				'Absolute path to the Gemini CLI. On macOS/Linux, use "which gemini", and on Windows, use "where gemini" to find it.',
+				t(
+					'Absolute path to the Gemini CLI. On macOS/Linux, use "which gemini", and on Windows, use "where gemini" to find it.',
+					'Gemini CLI 的绝对路径。macOS/Linux 可用 "which gemini"，Windows 可用 "where gemini" 查找。',
+				),
 			)
 			.addText((text) => {
-				text.setPlaceholder("Absolute path to gemini")
+				text.setPlaceholder(
+					t("Absolute path to gemini", "gemini 的绝对路径"),
+				)
 					.setValue(gemini.command)
 					.onChange(async (value) => {
 						this.plugin.settings.gemini.command = value.trim();
@@ -813,9 +967,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(sectionEl)
-			.setName("Arguments")
+			.setName(t("Arguments", "参数"))
 			.setDesc(
-				'Enter one argument per line. Leave empty to run without arguments.(Currently, the Gemini CLI requires the "--experimental-acp" option.)',
+				t(
+					'Enter one argument per line. Leave empty to run without arguments.(Currently, the Gemini CLI requires the "--experimental-acp" option.)',
+					'每行一个参数。留空则不传参数。（当前 Gemini CLI 需要 "--experimental-acp" 选项。）',
+				),
 			)
 			.addTextArea((text) => {
 				text.setPlaceholder("")
@@ -829,12 +986,15 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(sectionEl)
-			.setName("Environment variables")
+			.setName(t("Environment variables", "环境变量"))
 			.setDesc(
-				"Enter KEY=VALUE pairs, one per line. Required to authenticate with Vertex AI. GEMINI_API_KEY is derived from the field above.(Stored as plain text)",
+				t(
+					"Enter KEY=VALUE pairs, one per line. Required to authenticate with Vertex AI. GEMINI_API_KEY is derived from the field above.(Stored as plain text)",
+					"每行一个 KEY=VALUE。使用 Vertex AI 认证时需要。GEMINI_API_KEY 会由上面的字段自动注入。（明文存储）",
+				),
 			)
 			.addTextArea((text) => {
-				text.setPlaceholder("GOOGLE_CLOUD_PROJECT=...")
+				text.setPlaceholder("Google cloud project=...")
 					.setValue(this.formatEnv(gemini.env))
 					.onChange(async (value) => {
 						this.plugin.settings.gemini.env = this.parseEnv(value);
@@ -846,18 +1006,27 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 	private renderClaudeSettings(sectionEl: HTMLElement) {
 		const claude = this.plugin.settings.claude;
+		const t = (en: string, zh: string) => this.uiText(en, zh);
 
 		new Setting(sectionEl)
-			.setName(claude.displayName || "Claude Code (ACP)")
+			.setName(
+				claude.displayName ||
+					t("Claude Code (ACP)", "Claude Code (ACP)"),
+			)
 			.setHeading();
 
 		new Setting(sectionEl)
-			.setName("API key")
+			.setName(t("API key", "API Key"))
 			.setDesc(
-				"Anthropic API key. Required if not logging in with an Anthropic account. (Stored as plain text)",
+				t(
+					"Anthropic API key. Required if not logging in with an Anthropic account. (Stored as plain text)",
+					"Anthropic API Key。未使用 Anthropic 账号登录时必填。（明文存储）",
+				),
 			)
 			.addText((text) => {
-				text.setPlaceholder("Enter your Anthropic API key")
+				text.setPlaceholder(
+					t("Enter your Anthropic API key", "输入 Anthropic API Key"),
+				)
 					.setValue(claude.apiKey)
 					.onChange(async (value) => {
 						this.plugin.settings.claude.apiKey = value.trim();
@@ -867,12 +1036,20 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(sectionEl)
-			.setName("Path")
+			.setName(t("Path", "路径"))
 			.setDesc(
-				'Absolute path to the claude-agent-acp. On macOS/Linux, use "which claude-agent-acp", and on Windows, use "where claude-agent-acp" to find it.',
+				t(
+					'Absolute path to the claude-agent-acp. On macOS/Linux, use "which claude-agent-acp", and on Windows, use "where claude-agent-acp" to find it.',
+					'claude-agent-acp 的绝对路径。macOS/Linux 可用 "which claude-agent-acp"，Windows 可用 "where claude-agent-acp" 查找。',
+				),
 			)
 			.addText((text) => {
-				text.setPlaceholder("Absolute path to claude-agent-acp")
+				text.setPlaceholder(
+					t(
+						"Absolute path to claude-agent-acp",
+						"claude-agent-acp 的绝对路径",
+					),
+				)
 					.setValue(claude.command)
 					.onChange(async (value) => {
 						this.plugin.settings.claude.command = value.trim();
@@ -881,9 +1058,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(sectionEl)
-			.setName("Arguments")
+			.setName(t("Arguments", "参数"))
 			.setDesc(
-				"Enter one argument per line. Leave empty to run without arguments.",
+				t(
+					"Enter one argument per line. Leave empty to run without arguments.",
+					"每行一个参数。留空则不传参数。",
+				),
 			)
 			.addTextArea((text) => {
 				text.setPlaceholder("")
@@ -897,9 +1077,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(sectionEl)
-			.setName("Environment variables")
+			.setName(t("Environment variables", "环境变量"))
 			.setDesc(
-				"Enter KEY=VALUE pairs, one per line. ANTHROPIC_API_KEY is derived from the field above.",
+				t(
+					"Enter KEY=VALUE pairs, one per line. ANTHROPIC_API_KEY is derived from the field above.",
+					"每行一个 KEY=VALUE。ANTHROPIC_API_KEY 会由上面的字段自动注入。",
+				),
 			)
 			.addTextArea((text) => {
 				text.setPlaceholder("")
@@ -914,18 +1097,24 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 	private renderCodexSettings(sectionEl: HTMLElement) {
 		const codex = this.plugin.settings.codex;
+		const t = (en: string, zh: string) => this.uiText(en, zh);
 
 		new Setting(sectionEl)
-			.setName(codex.displayName || "Codex")
+			.setName(codex.displayName || t("Codex", "Codex"))
 			.setHeading();
 
 		new Setting(sectionEl)
-			.setName("API key")
+			.setName(t("API key", "API Key"))
 			.setDesc(
-				"OpenAI API key. Required if not logging in with an OpenAI account. (Stored as plain text)",
+				t(
+					"OpenAI API key. Required if not logging in with an OpenAI account. (Stored as plain text)",
+					"OpenAI API Key。未使用 OpenAI 账号登录时必填。（明文存储）",
+				),
 			)
 			.addText((text) => {
-				text.setPlaceholder("Enter your OpenAI API key")
+				text.setPlaceholder(
+					t("Enter your OpenAI API key", "输入 OpenAI API Key"),
+				)
 					.setValue(codex.apiKey)
 					.onChange(async (value) => {
 						this.plugin.settings.codex.apiKey = value.trim();
@@ -935,12 +1124,17 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(sectionEl)
-			.setName("Path")
+			.setName(t("Path", "路径"))
 			.setDesc(
-				'Absolute path to the codex-acp. On macOS/Linux, use "which codex-acp", and on Windows, use "where codex-acp" to find it.',
+				t(
+					'Absolute path to the codex-acp. On macOS/Linux, use "which codex-acp", and on Windows, use "where codex-acp" to find it.',
+					'codex-acp 的绝对路径。macOS/Linux 可用 "which codex-acp"，Windows 可用 "where codex-acp" 查找。',
+				),
 			)
 			.addText((text) => {
-				text.setPlaceholder("Absolute path to codex-acp")
+				text.setPlaceholder(
+					t("Absolute path to codex-acp", "codex-acp 的绝对路径"),
+				)
 					.setValue(codex.command)
 					.onChange(async (value) => {
 						this.plugin.settings.codex.command = value.trim();
@@ -949,9 +1143,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(sectionEl)
-			.setName("Arguments")
+			.setName(t("Arguments", "参数"))
 			.setDesc(
-				"Enter one argument per line. Leave empty to run without arguments.",
+				t(
+					"Enter one argument per line. Leave empty to run without arguments.",
+					"每行一个参数。留空则不传参数。",
+				),
 			)
 			.addTextArea((text) => {
 				text.setPlaceholder("")
@@ -964,9 +1161,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(sectionEl)
-			.setName("Environment variables")
+			.setName(t("Environment variables", "环境变量"))
 			.setDesc(
-				"Enter KEY=VALUE pairs, one per line. OPENAI_API_KEY is derived from the field above.",
+				t(
+					"Enter KEY=VALUE pairs, one per line. OPENAI_API_KEY is derived from the field above.",
+					"每行一个 KEY=VALUE。OPENAI_API_KEY 会由上面的字段自动注入。",
+				),
 			)
 			.addTextArea((text) => {
 				text.setPlaceholder("")
@@ -980,9 +1180,13 @@ export class AgentClientSettingTab extends PluginSettingTab {
 	}
 
 	private renderCustomAgents(containerEl: HTMLElement) {
+		const t = (en: string, zh: string) => this.uiText(en, zh);
 		if (this.plugin.settings.customAgents.length === 0) {
 			containerEl.createEl("p", {
-				text: "No custom agents configured yet.",
+				text: t(
+					"No custom agents configured yet.",
+					"还没有配置自定义代理。",
+				),
 			});
 		} else {
 			this.plugin.settings.customAgents.forEach((agent, index) => {
@@ -992,7 +1196,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl).addButton((button) => {
 			button
-				.setButtonText("Add custom agent")
+				.setButtonText(t("Add custom agent", "添加自定义代理"))
 				.setCta()
 				.onClick(async () => {
 					const newId = this.generateCustomAgentId();
@@ -1017,15 +1221,21 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		agent: CustomAgentSettings,
 		index: number,
 	) {
+		const t = (en: string, zh: string) => this.uiText(en, zh);
 		const blockEl = containerEl.createDiv({
 			cls: "agent-client-custom-agent",
 		});
 
 		const idSetting = new Setting(blockEl)
-			.setName("Agent ID")
-			.setDesc("Unique identifier used to reference this agent.")
+			.setName(t("Agent ID", "代理 ID"))
+			.setDesc(
+				t(
+					"Unique identifier used to reference this agent.",
+					"用于引用此代理的唯一标识。",
+				),
+			)
 			.addText((text) => {
-				text.setPlaceholder("custom-agent")
+				text.setPlaceholder(t("custom-agent", "自定义-id（建议英文）"))
 					.setValue(agent.id)
 					.onChange(async (value) => {
 						const previousId =
@@ -1051,7 +1261,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		idSetting.addExtraButton((button) => {
 			button
 				.setIcon("trash")
-				.setTooltip("Delete this agent")
+				.setTooltip(t("Delete this agent", "删除该代理"))
 				.onClick(async () => {
 					this.plugin.settings.customAgents.splice(index, 1);
 					this.plugin.ensureDefaultAgentId();
@@ -1061,10 +1271,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		});
 
 		new Setting(blockEl)
-			.setName("Display name")
-			.setDesc("Shown in menus and headers.")
+			.setName(t("Display name", "显示名称"))
+			.setDesc(t("Shown in menus and headers.", "显示在菜单和标题中。"))
 			.addText((text) => {
-				text.setPlaceholder("Custom agent")
+				text.setPlaceholder(t("Custom agent", "自定义代理"))
 					.setValue(agent.displayName || agent.id)
 					.onChange(async (value) => {
 						const trimmed = value.trim();
@@ -1078,10 +1288,17 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(blockEl)
-			.setName("Path")
-			.setDesc("Absolute path to the custom agent.")
+			.setName(t("Path", "路径"))
+			.setDesc(
+				t(
+					"Absolute path to the custom agent.",
+					"自定义代理的绝对路径。",
+				),
+			)
 			.addText((text) => {
-				text.setPlaceholder("Absolute path to custom agent")
+				text.setPlaceholder(
+					t("Absolute path to custom agent", "自定义代理的绝对路径"),
+				)
 					.setValue(agent.command)
 					.onChange(async (value) => {
 						this.plugin.settings.customAgents[index].command =
@@ -1091,12 +1308,17 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(blockEl)
-			.setName("Arguments")
+			.setName(t("Arguments", "参数"))
 			.setDesc(
-				"Enter one argument per line. Leave empty to run without arguments.",
+				t(
+					"Enter one argument per line. Leave empty to run without arguments.",
+					"每行一个参数。留空则不传参数。",
+				),
 			)
 			.addTextArea((text) => {
-				text.setPlaceholder("--flag\n--another=value")
+				text.setPlaceholder(
+					t("--flag\n--another=value", "--flag\n--another=value"),
+				)
 					.setValue(this.formatArgs(agent.args))
 					.onChange(async (value) => {
 						this.plugin.settings.customAgents[index].args =
@@ -1107,12 +1329,15 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(blockEl)
-			.setName("Environment variables")
+			.setName(t("Environment variables", "环境变量"))
 			.setDesc(
-				"Enter KEY=VALUE pairs, one per line. (Stored as plain text)",
+				t(
+					"Enter KEY=VALUE pairs, one per line. (Stored as plain text)",
+					"每行一个 KEY=VALUE。（明文存储）",
+				),
 			)
 			.addTextArea((text) => {
-				text.setPlaceholder("TOKEN=...")
+				text.setPlaceholder(t("TOKEN=...", "TOKEN=..."))
 					.setValue(this.formatEnv(agent.env))
 					.onChange(async (value) => {
 						this.plugin.settings.customAgents[index].env =
@@ -1124,7 +1349,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 	}
 
 	private generateCustomAgentDisplayName(): string {
-		const base = "Custom agent";
+		const base = this.uiText("Custom agent", "自定义代理");
 		const existing = new Set<string>();
 		existing.add(
 			this.plugin.settings.claude.displayName ||

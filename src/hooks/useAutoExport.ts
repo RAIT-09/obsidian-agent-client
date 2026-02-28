@@ -5,6 +5,7 @@ import { ChatExporter } from "../shared/chat-exporter";
 import { getLogger } from "../shared/logger";
 import { Notice } from "obsidian";
 import type AgentClientPlugin from "../plugin";
+import { tApp } from "../shared/i18n";
 
 // ============================================================================
 // Types
@@ -139,7 +140,9 @@ export function useAutoExport(plugin: AgentClientPlugin): UseAutoExportReturn {
 
 				if (filePath) {
 					// Show success notification
-					new Notice(`[Agent Client] Chat exported to ${filePath}`);
+					new Notice(
+						tApp(plugin.app, "chatExportedTo", { path: filePath }),
+					);
 
 					// Log success
 					const context =
@@ -148,7 +151,7 @@ export function useAutoExport(plugin: AgentClientPlugin): UseAutoExportReturn {
 				}
 			} catch {
 				// Show error notification
-				new Notice("[Agent Client] Failed to export chat");
+				new Notice(tApp(plugin.app, "failedExportChat"));
 				// Error already logged in exportChat
 			}
 		},

@@ -10,6 +10,7 @@ import { ConfirmDeleteModal } from "../components/chat/ConfirmDeleteModal";
 import { NoteMentionService } from "../adapters/obsidian/mention-service";
 import { getLogger, Logger } from "../shared/logger";
 import { ChatExporter } from "../shared/chat-exporter";
+import { tApp } from "../shared/i18n";
 
 // Adapter imports
 import { ObsidianVaultAdapter } from "../adapters/obsidian/vault.adapter";
@@ -355,7 +356,7 @@ export function useChatController(
 
 			// Skip if already empty AND not switching agents
 			if (messages.length === 0 && !isAgentSwitch) {
-				new Notice("[Agent Client] Already a new session");
+				new Notice(tApp(plugin.app, "alreadyNewSession"));
 				return;
 			}
 
@@ -402,7 +403,7 @@ export function useChatController(
 
 	const handleExportChat = useCallback(async () => {
 		if (messages.length === 0) {
-			new Notice("[Agent Client] No messages to export");
+			new Notice(tApp(plugin.app, "noMessagesToExport"));
 			return;
 		}
 
@@ -417,9 +418,9 @@ export function useChatController(
 				session.createdAt,
 				openFile,
 			);
-			new Notice(`[Agent Client] Chat exported to ${filePath}`);
+			new Notice(tApp(plugin.app, "chatExportedTo", { path: filePath }));
 		} catch (error) {
-			new Notice("[Agent Client] Failed to export chat");
+			new Notice(tApp(plugin.app, "failedExportChat"));
 			logger.error("Export error:", error);
 		}
 	}, [messages, session, plugin, logger]);
@@ -446,9 +447,9 @@ export function useChatController(
 
 		try {
 			await agentSession.forceRestartAgent();
-			new Notice("[Agent Client] Agent restarted");
+			new Notice(tApp(plugin.app, "agentRestarted"));
 		} catch (error) {
-			new Notice("[Agent Client] Failed to restart agent");
+			new Notice(tApp(plugin.app, "failedRestartAgent"));
 			logger.error("Restart error:", error);
 		}
 	}, [logger, messages, session, autoExport, chat, agentSession]);
@@ -472,13 +473,13 @@ export function useChatController(
 				);
 				chat.clearMessages();
 				await sessionHistory.restoreSession(sessionId, cwd);
-				new Notice("[Agent Client] Session restored");
+				new Notice(tApp(plugin.app, "sessionRestored"));
 			} catch (error) {
-				new Notice("[Agent Client] Failed to restore session");
+				new Notice(tApp(plugin.app, "failedRestoreSession"));
 				logger.error("Session restore error:", error);
 			}
 		},
-		[logger, chat, sessionHistory],
+		[logger, chat, sessionHistory, plugin.app],
 	);
 
 	const handleForkSession = useCallback(
@@ -487,13 +488,13 @@ export function useChatController(
 				logger.log(`[useChatController] Forking session: ${sessionId}`);
 				chat.clearMessages();
 				await sessionHistory.forkSession(sessionId, cwd);
-				new Notice("[Agent Client] Session forked");
+				new Notice(tApp(plugin.app, "sessionForked"));
 			} catch (error) {
-				new Notice("[Agent Client] Failed to fork session");
+				new Notice(tApp(plugin.app, "failedForkSession"));
 				logger.error("Session fork error:", error);
 			}
 		},
-		[logger, chat, sessionHistory],
+		[logger, chat, sessionHistory, plugin.app],
 	);
 
 	const handleDeleteSession = useCallback(
@@ -501,7 +502,8 @@ export function useChatController(
 			const targetSession = sessionHistory.sessions.find(
 				(s) => s.sessionId === sessionId,
 			);
-			const sessionTitle = targetSession?.title ?? "Untitled Session";
+			const sessionTitle =
+				targetSession?.title ?? tApp(plugin.app, "untitledSession");
 
 			const confirmModal = new ConfirmDeleteModal(
 				plugin.app,
@@ -512,9 +514,9 @@ export function useChatController(
 							`[useChatController] Deleting session: ${sessionId}`,
 						);
 						await sessionHistory.deleteSession(sessionId);
-						new Notice("[Agent Client] Session deleted");
+						new Notice(tApp(plugin.app, "sessionDeleted"));
 					} catch (error) {
-						new Notice("[Agent Client] Failed to delete session");
+						new Notice(tApp(plugin.app, "failedDeleteSession"));
 						logger.error("Session delete error:", error);
 					}
 				},

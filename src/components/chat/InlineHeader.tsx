@@ -2,6 +2,8 @@ import * as React from "react";
 import { useEffect, useRef } from "react";
 import { DropdownComponent, setIcon } from "obsidian";
 import { HeaderButton } from "./HeaderButton";
+import type AgentClientPlugin from "../../plugin";
+import { getUiLanguage, t } from "../../shared/i18n";
 
 // Agent info for display
 interface AgentInfo {
@@ -13,6 +15,8 @@ interface AgentInfo {
  * Props for InlineHeader component
  */
 export interface InlineHeaderProps {
+	/** Plugin instance for language detection */
+	plugin: AgentClientPlugin;
 	/** Display name of the active agent */
 	agentLabel: string;
 	/** Available agents for switching */
@@ -51,6 +55,7 @@ export interface InlineHeaderProps {
  * - Close button (floating variant only)
  */
 export function InlineHeader({
+	plugin,
 	agentLabel,
 	availableAgents,
 	currentAgentId,
@@ -65,6 +70,8 @@ export function InlineHeader({
 	onOpenNewWindow,
 	onClose,
 }: InlineHeaderProps) {
+	const language = getUiLanguage(plugin.app);
+
 	// Refs for agent dropdown
 	const agentDropdownRef = useRef<HTMLDivElement>(null);
 	const agentDropdownInstance = useRef<DropdownComponent | null>(null);
@@ -147,23 +154,23 @@ export function InlineHeader({
 			</div>
 			{isUpdateAvailable && (
 				<p className="agent-client-chat-view-header-update">
-					Plugin update available!
+					{t(language, "pluginUpdateAvailable")}
 				</p>
 			)}
 			<div className="agent-client-inline-header-actions">
 				<HeaderButton
 					iconName="plus"
-					tooltip="New session"
+					tooltip={t(language, "newSession")}
 					onClick={onNewSession}
 				/>
 				<HeaderButton
 					iconName="history"
-					tooltip="Session history"
+					tooltip={t(language, "sessionHistory")}
 					onClick={onOpenHistory}
 				/>
 				<HeaderButton
 					iconName="save"
-					tooltip="Export chat to Markdown"
+					tooltip={t(language, "exportChatToMarkdown")}
 					onClick={onExportChat}
 				/>
 				{/* <HeaderButton
@@ -174,14 +181,14 @@ export function InlineHeader({
 				{variant === "floating" && onOpenNewWindow && (
 					<HeaderButton
 						iconName="copy-plus"
-						tooltip="Open new floating chat"
+						tooltip={t(language, "openNewFloatingChat")}
 						onClick={onOpenNewWindow}
 					/>
 				)}
 				{variant === "floating" && onClose && (
 					<HeaderButton
 						iconName="x"
-						tooltip="Close"
+						tooltip={t(language, "close")}
 						onClick={onClose}
 					/>
 				)}

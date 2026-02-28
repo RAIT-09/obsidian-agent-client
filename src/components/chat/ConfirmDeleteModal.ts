@@ -6,6 +6,7 @@
  */
 
 import { Modal, App } from "obsidian";
+import { getUiLanguage, t } from "../../shared/i18n";
 
 /**
  * Confirmation modal for session deletion.
@@ -30,18 +31,23 @@ export class ConfirmDeleteModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
+		const language = getUiLanguage(this.app);
 
 		// Title
-		contentEl.createEl("h2", { text: "Delete session?" });
+		contentEl.createEl("h2", {
+			text: t(language, "deleteSessionConfirmTitle"),
+		});
 
 		// Message
 		contentEl.createEl("p", {
-			text: `Are you sure you want to delete "${this.sessionTitle}"?`,
+			text: t(language, "deleteSessionConfirmMessage", {
+				title: this.sessionTitle,
+			}),
 			cls: "agent-client-confirm-delete-message",
 		});
 
 		contentEl.createEl("p", {
-			text: "This only removes the session from this plugin. The session data will remain on the agent side.",
+			text: t(language, "deleteSessionWarning"),
 			cls: "agent-client-confirm-delete-warning",
 		});
 
@@ -52,7 +58,7 @@ export class ConfirmDeleteModal extends Modal {
 
 		// Cancel button
 		const cancelButton = buttonContainer.createEl("button", {
-			text: "Cancel",
+			text: t(language, "cancel"),
 			cls: "agent-client-confirm-delete-cancel",
 		});
 		cancelButton.addEventListener("click", () => {
@@ -61,7 +67,7 @@ export class ConfirmDeleteModal extends Modal {
 
 		// Delete button
 		const deleteButton = buttonContainer.createEl("button", {
-			text: "Delete",
+			text: t(language, "delete"),
 			cls: "agent-client-confirm-delete-confirm mod-warning",
 		});
 		deleteButton.addEventListener("click", () => {

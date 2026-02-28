@@ -7,6 +7,7 @@ import { CollapsibleThought } from "./CollapsibleThought";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { TextWithMentions } from "./TextWithMentions";
 import { ToolCallRenderer } from "./ToolCallRenderer";
+import { getUiLanguage, t } from "../../shared/i18n";
 
 interface MessageContentRendererProps {
 	content: MessageContent;
@@ -29,6 +30,7 @@ export function MessageContentRenderer({
 	acpClient,
 	onApprovePermission,
 }: MessageContentRendererProps) {
+	const language = getUiLanguage(plugin.app);
 	switch (content.type) {
 		case "text":
 			// User messages: render with mention support
@@ -66,7 +68,8 @@ export function MessageContentRenderer({
 			return (
 				<div className="agent-client-message-plan">
 					<div className="agent-client-message-plan-title">
-						{showEmojis && "📋 "}Plan
+						{showEmojis && "📋 "}
+						{t(language, "plan")}
 					</div>
 					{content.entries.map((entry, idx) => (
 						<div
@@ -105,13 +108,13 @@ export function MessageContentRenderer({
 				<div className="agent-client-message-image">
 					<img
 						src={`data:${content.mimeType};base64,${content.data}`}
-						alt="Attached image"
+						alt={t(language, "attachedImage")}
 						className="agent-client-message-image-thumbnail"
 					/>
 				</div>
 			);
 
 		default:
-			return <span>Unsupported content type</span>;
+			return <span>{t(language, "unsupportedContentType")}</span>;
 	}
 }

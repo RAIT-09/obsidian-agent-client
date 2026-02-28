@@ -1,5 +1,6 @@
 import type AgentClientPlugin from "../../plugin";
 import { getLogger } from "../../shared/logger";
+import { getUiLanguage, t } from "../../shared/i18n";
 import * as acp from "@agentclientprotocol/sdk";
 
 interface PermissionRequestSectionProps {
@@ -28,6 +29,7 @@ export function PermissionRequestSection({
 	onOptionSelected,
 }: PermissionRequestSectionProps) {
 	const logger = getLogger();
+	const language = getUiLanguage(plugin.app);
 	const showEmojis = plugin.settings.displaySettings.showEmojis;
 
 	const isSelected = permissionRequest.selectedOptionId !== undefined;
@@ -71,13 +73,16 @@ export function PermissionRequestSection({
 			)}
 			{isSelected && selectedOption && (
 				<div className="agent-client-message-permission-request-result agent-client-selected">
-					{showEmojis && "✓ "}Selected: {selectedOption.name}
+					{showEmojis && "✓ "}
+					{t(language, "permissionSelected", {
+						option: selectedOption.name,
+					})}
 				</div>
 			)}
 			{isCancelled && (
 				<div className="agent-client-message-permission-request-result agent-client-cancelled">
-					{showEmojis && "⚠ "}Cancelled: Permission request was
-					cancelled
+					{showEmojis && "⚠ "}
+					{t(language, "permissionRequestCancelled")}
 				</div>
 			)}
 		</div>

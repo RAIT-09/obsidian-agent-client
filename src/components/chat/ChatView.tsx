@@ -16,6 +16,7 @@ import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 // Utility imports
 import { getLogger, Logger } from "../../shared/logger";
+import { getUiLanguage, t, tApp } from "../../shared/i18n";
 
 // Adapter imports
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
@@ -175,11 +176,12 @@ function ChatComponent({
 	// ============================================================
 	const handleShowMenu = useCallback(
 		(e: React.MouseEvent<HTMLButtonElement>) => {
+			const language = getUiLanguage(plugin.app);
 			const menu = new Menu();
 
 			// -- Switch agent section --
 			menu.addItem((item) => {
-				item.setTitle("Switch agent").setIsLabel(true);
+				item.setTitle(t(language, "switchAgent")).setIsLabel(true);
 			});
 
 			for (const agent of availableAgents) {
@@ -196,7 +198,7 @@ function ChatComponent({
 
 			// -- Actions section --
 			menu.addItem((item) => {
-				item.setTitle("Open new view")
+				item.setTitle(t(language, "openNewView"))
 					.setIcon("plus")
 					.onClick(() => {
 						void plugin.openNewChatViewWithAgent(
@@ -206,7 +208,7 @@ function ChatComponent({
 			});
 
 			menu.addItem((item) => {
-				item.setTitle("Restart agent")
+				item.setTitle(t(language, "restartAgent"))
 					.setIcon("refresh-cw")
 					.onClick(() => {
 						void handleRestartAgent();
@@ -216,7 +218,7 @@ function ChatComponent({
 			menu.addSeparator();
 
 			menu.addItem((item) => {
-				item.setTitle("Plugin settings")
+				item.setTitle(t(language, "pluginSettings"))
 					.setIcon("settings")
 					.onClick(() => {
 						handleOpenSettings();
@@ -460,7 +462,7 @@ function ChatComponent({
 					const success = await permission.approveActivePermission();
 					if (!success) {
 						new Notice(
-							"[Agent Client] No active permission request",
+							tApp(plugin.app, "noActivePermissionRequest"),
 						);
 					}
 				})();
@@ -485,7 +487,7 @@ function ChatComponent({
 					const success = await permission.rejectActivePermission();
 					if (!success) {
 						new Notice(
-							"[Agent Client] No active permission request",
+							tApp(plugin.app, "noActivePermissionRequest"),
 						);
 					}
 				})();
@@ -536,6 +538,7 @@ function ChatComponent({
 			style={chatFontSizeStyle}
 		>
 			<ChatHeader
+				plugin={plugin}
 				agentLabel={activeAgentLabel}
 				isUpdateAvailable={isUpdateAvailable}
 				hasHistoryCapability={sessionHistory.canShowSessionHistory}
@@ -641,7 +644,7 @@ export class ChatView extends ItemView implements IChatViewContainer {
 	}
 
 	getDisplayText() {
-		return "Agent client";
+		return tApp(this.plugin.app, "agentClientDisplayName");
 	}
 
 	getIcon() {
@@ -744,7 +747,10 @@ export class ChatView extends ItemView implements IChatViewContainer {
 	}
 
 	getDisplayName(): string {
-		return this.getDisplayNameCallback?.() ?? "Chat";
+		return (
+			this.getDisplayNameCallback?.() ??
+			tApp(this.plugin.app, "chatDisplayName")
+		);
 	}
 
 	/**

@@ -12,6 +12,7 @@ import {
 	SessionHistoryContent,
 	SessionHistoryContentProps,
 } from "./SessionHistoryContent";
+import { getUiLanguage, t } from "../../shared/i18n";
 
 /**
  * Props for SessionHistoryModal (same as SessionHistoryContentProps minus onClose).
@@ -53,9 +54,12 @@ export class SessionHistoryModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
+		const language = getUiLanguage(this.app);
 
 		// Add modal title
-		contentEl.createEl("h2", { text: "Session history" });
+		contentEl.createEl("h2", {
+			text: t(language, "modalSessionHistoryTitle"),
+		});
 
 		// Create container for React content
 		const reactContainer = contentEl.createDiv();
@@ -70,9 +74,11 @@ export class SessionHistoryModal extends Modal {
 	 */
 	private renderContent() {
 		if (this.root) {
+			const language = getUiLanguage(this.app);
 			this.root.render(
 				React.createElement(SessionHistoryContent, {
 					...this.props,
+					language,
 					onClose: () => this.close(),
 				}),
 			);

@@ -6,6 +6,7 @@ import { setIcon } from "obsidian";
 import type AgentClientPlugin from "../../plugin";
 import { useSettings } from "../../hooks/useSettings";
 import { clampPosition } from "../../shared/floating-utils";
+import { getUiLanguage, t } from "../../shared/i18n";
 
 interface VaultAdapterWithResourcePath {
 	getResourcePath?: (path: string) => string;
@@ -53,6 +54,7 @@ interface FloatingButtonProps {
 
 function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 	const settings = useSettings(plugin);
+	const language = getUiLanguage(plugin.app);
 
 	const [showInstanceMenu, setShowInstanceMenu] = useState(false);
 	const instanceMenuRef = useRef<HTMLDivElement>(null);
@@ -263,7 +265,10 @@ function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 				}
 			>
 				{floatingButtonImageSrc ? (
-					<img src={floatingButtonImageSrc} alt="Open chat" />
+					<img
+						src={floatingButtonImageSrc}
+						alt={t(language, "openChat")}
+					/>
 				) : (
 					<div
 						className="agent-client-floating-button-fallback"
@@ -301,7 +306,7 @@ function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 					}
 				>
 					<div className="agent-client-floating-instance-menu-header">
-						Select session to open
+						{t(language, "selectSessionToOpen")}
 					</div>
 					{instanceLabels.map(({ viewId: id, label }) => (
 						<div
@@ -326,7 +331,7 @@ function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 											setShowInstanceMenu(false);
 										}
 									}}
-									title="Close session"
+									title={t(language, "closeSession")}
 								>
 									×
 								</button>
