@@ -755,6 +755,12 @@ export function useChatController(
 					agentSession.updateCurrentMode(update.currentModeId);
 				} else if (update.type === "config_option_update") {
 					agentSession.updateConfigOptions(update.configOptions);
+				} else if (update.type === "usage_update") {
+					agentSession.updateUsage({
+						used: update.used,
+						size: update.size,
+						cost: update.cost ?? undefined,
+					});
 				}
 				// Ignore all message-related updates (history replay)
 				return;
@@ -770,6 +776,12 @@ export function useChatController(
 				agentSession.updateCurrentMode(update.currentModeId);
 			} else if (update.type === "config_option_update") {
 				agentSession.updateConfigOptions(update.configOptions);
+			} else if (update.type === "usage_update") {
+				agentSession.updateUsage({
+					used: update.used,
+					size: update.size,
+					cost: update.cost ?? undefined,
+				});
 			}
 		});
 	}, [
