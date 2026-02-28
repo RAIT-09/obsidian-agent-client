@@ -514,8 +514,7 @@ export function useAgentSession(
 						(o) => o.category === "model",
 					);
 					if (modelOption) {
-						const savedModelId =
-							settings.lastUsedModels[agentId];
+						const savedModelId = settings.lastUsedModels[agentId];
 						if (
 							savedModelId &&
 							savedModelId !== modelOption.currentValue &&
@@ -539,10 +538,7 @@ export function useAgentSession(
 							}
 						}
 					}
-				} else if (
-					sessionResult.models &&
-					sessionResult.sessionId
-				) {
+				} else if (sessionResult.models && sessionResult.sessionId) {
 					// Legacy fallback: restore model via setSessionModel
 					const savedModelId = settings.lastUsedModels[agentId];
 					if (
@@ -1002,12 +998,11 @@ export function useAgentSession(
 			});
 
 			try {
-				const updatedOptions =
-					await agentClient.setSessionConfigOption(
-						session.sessionId,
-						configId,
-						value,
-					);
+				const updatedOptions = await agentClient.setSessionConfigOption(
+					session.sessionId,
+					configId,
+					value,
+				);
 				// Replace with server response (handles cascading changes)
 				setSession((prev) => ({
 					...prev,

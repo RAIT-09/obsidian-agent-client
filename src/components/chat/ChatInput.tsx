@@ -210,9 +210,9 @@ export function ChatInput({
 	const modelDropdownRef = useRef<HTMLDivElement>(null);
 	const modelDropdownInstance = useRef<DropdownComponent | null>(null);
 	const configOptionsRef = useRef<HTMLDivElement>(null);
-	const configDropdownInstances = useRef<
-		Map<string, DropdownComponent>
-	>(new Map());
+	const configDropdownInstances = useRef<Map<string, DropdownComponent>>(
+		new Map(),
+	);
 
 	// Clear attached images when agent changes
 	useEffect(() => {
@@ -962,10 +962,7 @@ export function ChatInput({
 			const dropdown = new DropdownComponent(dropdownContainer);
 
 			// Add options (with group prefix for grouped options)
-			if (
-				option.options.length > 0 &&
-				"group" in option.options[0]
-			) {
+			if (option.options.length > 0 && "group" in option.options[0]) {
 				for (const group of option.options as SessionConfigSelectGroup[]) {
 					for (const opt of group.options) {
 						dropdown.addOption(
@@ -1153,8 +1150,7 @@ export function ChatInput({
 									className="agent-client-mode-selector"
 									title={
 										modes.availableModes.find(
-											(m) =>
-												m.id === modes.currentModeId,
+											(m) => m.id === modes.currentModeId,
 										)?.description ?? "Select mode"
 									}
 								>
@@ -1162,39 +1158,33 @@ export function ChatInput({
 									<span
 										className="agent-client-mode-selector-icon"
 										ref={(el) => {
-											if (el)
-												setIcon(el, "chevron-down");
+											if (el) setIcon(el, "chevron-down");
 										}}
 									/>
 								</div>
 							)}
 
 							{/* Legacy Model Selector */}
-							{models &&
-								models.availableModels.length > 1 && (
-									<div
-										className="agent-client-model-selector"
-										title={
-											models.availableModels.find(
-												(m) =>
-													m.modelId ===
-													models.currentModelId,
-											)?.description ?? "Select model"
-										}
-									>
-										<div ref={modelDropdownRef} />
-										<span
-											className="agent-client-model-selector-icon"
-											ref={(el) => {
-												if (el)
-													setIcon(
-														el,
-														"chevron-down",
-													);
-											}}
-										/>
-									</div>
-								)}
+							{models && models.availableModels.length > 1 && (
+								<div
+									className="agent-client-model-selector"
+									title={
+										models.availableModels.find(
+											(m) =>
+												m.modelId ===
+												models.currentModelId,
+										)?.description ?? "Select model"
+									}
+								>
+									<div ref={modelDropdownRef} />
+									<span
+										className="agent-client-model-selector-icon"
+										ref={(el) => {
+											if (el) setIcon(el, "chevron-down");
+										}}
+									/>
+								</div>
+							)}
 						</>
 					)}
 
