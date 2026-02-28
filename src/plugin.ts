@@ -102,6 +102,8 @@ export interface AgentClientPluginSettings {
 	savedSessions: SavedSessionInfo[];
 	// Last used model per agent (agentId → modelId)
 	lastUsedModels: Record<string, string>;
+	// Last used mode per agent (agentId → modeId)
+	lastUsedModes: Record<string, string>;
 	// Floating chat button settings
 	showFloatingButton: boolean;
 	floatingButtonImage: string;
@@ -166,6 +168,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	},
 	savedSessions: [],
 	lastUsedModels: {},
+	lastUsedModes: {},
 	showFloatingButton: false,
 	floatingButtonImage: "",
 	floatingWindowSize: { width: 400, height: 500 },
@@ -1110,6 +1113,26 @@ export default class AgentClientPlugin extends Plugin {
 					return result;
 				}
 				return DEFAULT_SETTINGS.lastUsedModels;
+			})(),
+			lastUsedModes: (() => {
+				const raw = rawSettings.lastUsedModes;
+				if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+					const result: Record<string, string> = {};
+					for (const [key, value] of Object.entries(
+						raw as Record<string, unknown>,
+					)) {
+						if (
+							typeof key === "string" &&
+							key.length > 0 &&
+							typeof value === "string" &&
+							value.length > 0
+						) {
+							result[key] = value;
+						}
+					}
+					return result;
+				}
+				return DEFAULT_SETTINGS.lastUsedModes;
 			})(),
 			showFloatingButton:
 				typeof rawSettings.showFloatingButton === "boolean"

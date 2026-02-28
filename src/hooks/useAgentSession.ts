@@ -524,6 +524,36 @@ export function useAgentSession(
 							}
 						}
 					}
+
+					// Restore last used mode via configOptions
+					const modeOption = sessionResult.configOptions.find(
+						(o) => o.category === "mode",
+					);
+					if (modeOption) {
+						const savedModeId = settings.lastUsedModes[agentId];
+						if (
+							savedModeId &&
+							savedModeId !== modeOption.currentValue &&
+							flattenConfigSelectOptions(
+								modeOption.options,
+							).some((o) => o.value === savedModeId)
+						) {
+							try {
+								const updatedOptions =
+									await agentClient.setSessionConfigOption(
+										sessionResult.sessionId,
+										modeOption.id,
+										savedModeId,
+									);
+								setSession((prev) => ({
+									...prev,
+									configOptions: updatedOptions,
+								}));
+							} catch {
+								// Agent default is fine as fallback
+							}
+						}
+					}
 				} else if (sessionResult.models && sessionResult.sessionId) {
 					// Legacy fallback: restore model via setSessionModel
 					const savedModelId = settings.lastUsedModels[agentId];
@@ -551,6 +581,41 @@ export function useAgentSession(
 							});
 						} catch {
 							// Agent default model is fine as fallback
+						}
+					}
+				}
+
+				// Legacy fallback: restore mode via setSessionMode
+				if (
+					sessionResult.modes &&
+					sessionResult.sessionId &&
+					!sessionResult.configOptions
+				) {
+					const savedModeId = settings.lastUsedModes[agentId];
+					if (
+						savedModeId &&
+						savedModeId !== sessionResult.modes.currentModeId &&
+						sessionResult.modes.availableModes.some(
+							(m) => m.id === savedModeId,
+						)
+					) {
+						try {
+							await agentClient.setSessionMode(
+								sessionResult.sessionId,
+								savedModeId,
+							);
+							setSession((prev) => {
+								if (!prev.modes) return prev;
+								return {
+									...prev,
+									modes: {
+										...prev.modes,
+										currentModeId: savedModeId,
+									},
+								};
+							});
+						} catch {
+							// Agent default mode is fine as fallback
 						}
 					}
 				}
@@ -869,6 +934,17 @@ export function useAgentSession(
 				// Per ACP protocol, current_mode_update is only sent when the agent
 				// changes its own mode, not in response to client's setSessionMode.
 				// UI is already updated optimistically above.
+
+				// Persist last used mode for this agent
+				if (session.agentId) {
+					const currentSettings = settingsAccess.getSnapshot();
+					void settingsAccess.updateSettings({
+						lastUsedModes: {
+							...currentSettings.lastUsedModes,
+							[session.agentId]: modeId,
+						},
+					});
+				}
 			} catch (error) {
 				console.error("Failed to set mode:", error);
 				// Rollback to previous mode on error
@@ -886,7 +962,13 @@ export function useAgentSession(
 				}
 			}
 		},
-		[agentClient, session.sessionId, session.modes?.currentModeId],
+		[
+			agentClient,
+			session.sessionId,
+			session.modes?.currentModeId,
+			settingsAccess,
+			session.agentId,
+		],
 	);
 
 	/**
@@ -995,7 +1077,7 @@ export function useAgentSession(
 					configOptions: updatedOptions,
 				}));
 
-				// Persist last used value for config options with 'model' category
+				// Persist last used value for config options with 'model' or 'mode' category
 				const changedOption = updatedOptions.find(
 					(o) => o.id === configId,
 				);
@@ -1004,6 +1086,15 @@ export function useAgentSession(
 					void settingsAccess.updateSettings({
 						lastUsedModels: {
 							...currentSettings.lastUsedModels,
+							[session.agentId]: value,
+						},
+					});
+				}
+				if (changedOption?.category === "mode" && session.agentId) {
+					const currentSettings = settingsAccess.getSnapshot();
+					void settingsAccess.updateSettings({
+						lastUsedModes: {
+							...currentSettings.lastUsedModes,
 							[session.agentId]: value,
 						},
 					});
