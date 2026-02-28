@@ -12,7 +12,10 @@ import type {
 	MessageContent,
 	PermissionOption,
 } from "../../domain/models/chat-message";
-import type { SessionUpdate } from "../../domain/models/session-update";
+import type {
+	SessionConfigOption,
+	SessionUpdate,
+} from "../../domain/models/session-update";
 import type { PromptContent } from "../../domain/models/prompt-content";
 import type { ProcessError } from "../../domain/models/agent-error";
 import type {
@@ -596,10 +599,22 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				);
 			}
 
+			// Convert configOptions from ACP format to domain format
+			let configOptions: SessionConfigOption[] | undefined;
+			if (sessionResult.configOptions) {
+				configOptions = AcpTypeConverter.toSessionConfigOptions(
+					sessionResult.configOptions,
+				);
+				this.logger.log(
+					`[AcpAdapter] Session configOptions: ${configOptions.map((o) => o.id).join(", ")}`,
+				);
+			}
+
 			return {
 				sessionId: sessionResult.sessionId,
 				modes,
 				models,
+				configOptions,
 			};
 		} catch (error) {
 			this.logger.error("[AcpAdapter] New Session Error:", error);
@@ -821,6 +836,8 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	/**
+	 * @deprecated Use setSessionConfigOption instead.
+	 *
 	 * Set the session mode.
 	 *
 	 * Changes the agent's operating mode for the current session.
@@ -855,6 +872,8 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	/**
+	 * @deprecated Use setSessionConfigOption instead.
+	 *
 	 * Implementation of IAgentClient.setSessionModel()
 	 */
 	async setSessionModel(sessionId: string, modelId: string): Promise<void> {
@@ -877,6 +896,50 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		} catch (error) {
 			this.logger.error(
 				"[AcpAdapter] Failed to set session model:",
+				error,
+			);
+			throw error;
+		}
+	}
+
+	/**
+	 * Set a session configuration option.
+	 *
+	 * Sends a config option change to the agent. The response contains the
+	 * complete set of all config options with their current values, as changing
+	 * one option may affect others.
+	 */
+	async setSessionConfigOption(
+		sessionId: string,
+		configId: string,
+		value: string,
+	): Promise<SessionConfigOption[]> {
+		if (!this.connection) {
+			throw new Error(
+				"Connection not initialized. Call initialize() first.",
+			);
+		}
+
+		this.logger.log(
+			`[AcpAdapter] Setting config option: ${configId}=${value} for session: ${sessionId}`,
+		);
+
+		try {
+			const response = await this.connection.setSessionConfigOption({
+				sessionId,
+				configId,
+				value,
+			});
+			this.logger.log(
+				`[AcpAdapter] Config option set. Updated options:`,
+				response.configOptions,
+			);
+			return AcpTypeConverter.toSessionConfigOptions(
+				response.configOptions,
+			);
+		} catch (error) {
+			this.logger.error(
+				"[AcpAdapter] Failed to set config option:",
 				error,
 			);
 			throw error;
@@ -1562,10 +1625,19 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				};
 			}
 
+			// Convert configOptions from ACP format to domain format
+			let configOptions: SessionConfigOption[] | undefined;
+			if (response.configOptions) {
+				configOptions = AcpTypeConverter.toSessionConfigOptions(
+					response.configOptions,
+				);
+			}
+
 			return {
 				sessionId,
 				modes,
 				models,
+				configOptions,
 			};
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Load Session Error:", error);
@@ -1636,10 +1708,19 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				};
 			}
 
+			// Convert configOptions from ACP format to domain format
+			let configOptions: SessionConfigOption[] | undefined;
+			if (response.configOptions) {
+				configOptions = AcpTypeConverter.toSessionConfigOptions(
+					response.configOptions,
+				);
+			}
+
 			return {
 				sessionId,
 				modes,
 				models,
+				configOptions,
 			};
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Resume Session Error:", error);
@@ -1713,10 +1794,19 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				};
 			}
 
+			// Convert configOptions from ACP format to domain format
+			let configOptions: SessionConfigOption[] | undefined;
+			if (response.configOptions) {
+				configOptions = AcpTypeConverter.toSessionConfigOptions(
+					response.configOptions,
+				);
+			}
+
 			return {
 				sessionId: newSessionId,
 				modes,
 				models,
+				configOptions,
 			};
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Fork Session Error:", error);

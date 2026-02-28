@@ -7,6 +7,11 @@ import type {
 	SlashCommand,
 	AuthenticationMethod,
 } from "../domain/models/chat-session";
+import type {
+	SessionConfigOption,
+	SessionConfigSelectGroup,
+	SessionConfigSelectOption,
+} from "../domain/models/session-update";
 import type { IAgentClient } from "../domain/ports/agent-client.port";
 import type { ISettingsAccess } from "../domain/ports/settings-access.port";
 import type { AgentClientPluginSettings } from "../plugin";
@@ -109,11 +114,13 @@ export interface UseAgentSessionReturn {
 	 * @param sessionId - New session ID
 	 * @param modes - Session modes (optional)
 	 * @param models - Session models (optional)
+	 * @param configOptions - Session config options (optional)
 	 */
 	updateSessionFromLoad: (
 		sessionId: string,
 		modes?: SessionModeState,
 		models?: SessionModelState,
+		configOptions?: SessionConfigOption[],
 	) => void;
 
 	/**
@@ -123,12 +130,22 @@ export interface UseAgentSessionReturn {
 	updateAvailableCommands: (commands: SlashCommand[]) => void;
 
 	/**
+	 * @deprecated Use updateConfigOptions instead.
+	 *
 	 * Callback to update current mode.
 	 * Called by AcpAdapter when agent sends current_mode_update.
 	 */
 	updateCurrentMode: (modeId: string) => void;
 
 	/**
+	 * Callback to update config options.
+	 * Called when agent sends config_option_update notification.
+	 */
+	updateConfigOptions: (configOptions: SessionConfigOption[]) => void;
+
+	/**
+	 * @deprecated Use setConfigOption instead.
+	 *
 	 * Set the session mode.
 	 * Sends a request to the agent to change the mode.
 	 * @param modeId - ID of the mode to set
@@ -136,11 +153,21 @@ export interface UseAgentSessionReturn {
 	setMode: (modeId: string) => Promise<void>;
 
 	/**
+	 * @deprecated Use setConfigOption instead.
+	 *
 	 * Set the session model (experimental).
 	 * Sends a request to the agent to change the model.
 	 * @param modelId - ID of the model to set
 	 */
 	setModel: (modelId: string) => Promise<void>;
+
+	/**
+	 * Set a session configuration option.
+	 * Sends a config option change to the agent.
+	 * @param configId - ID of the config option to change
+	 * @param value - New value to set
+	 */
+	setConfigOption: (configId: string, value: string) => Promise<void>;
 }
 
 // ============================================================================
@@ -278,6 +305,17 @@ function buildAgentConfigWithApiKey(
 /**
  * Create initial session state.
  */
+/**
+ * Flatten config option values, handling both flat and grouped options.
+ */
+function flattenConfigOptions(
+	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],
+): SessionConfigSelectOption[] {
+	if (options.length === 0) return [];
+	if ("value" in options[0]) return options as SessionConfigSelectOption[];
+	return (options as SessionConfigSelectGroup[]).flatMap((g) => g.options);
+}
+
 function createInitialSession(
 	agentId: string,
 	agentDisplayName: string,
@@ -365,6 +403,7 @@ export function useAgentSession(
 				availableCommands: undefined,
 				modes: undefined,
 				models: undefined,
+				configOptions: undefined,
 				// Keep capabilities/info from previous session if same agent
 				// They will be updated if re-initialization is needed
 				promptCapabilities: prev.promptCapabilities,
@@ -456,6 +495,7 @@ export function useAgentSession(
 					authMethods: authMethods,
 					modes: sessionResult.modes,
 					models: sessionResult.models,
+					configOptions: sessionResult.configOptions,
 					// Only update capabilities/info if we re-initialized
 					// Otherwise, keep the previous value (from the same agent)
 					promptCapabilities: needsInitialize
@@ -468,8 +508,42 @@ export function useAgentSession(
 					lastActivityAt: new Date(),
 				}));
 
-				// Restore last used model if available
-				if (sessionResult.models && sessionResult.sessionId) {
+				// Restore last used model via configOptions if available
+				if (sessionResult.configOptions && sessionResult.sessionId) {
+					const modelOption = sessionResult.configOptions.find(
+						(o) => o.category === "model",
+					);
+					if (modelOption) {
+						const savedModelId =
+							settings.lastUsedModels[agentId];
+						if (
+							savedModelId &&
+							savedModelId !== modelOption.currentValue &&
+							flattenConfigOptions(modelOption.options).some(
+								(o) => o.value === savedModelId,
+							)
+						) {
+							try {
+								const updatedOptions =
+									await agentClient.setSessionConfigOption(
+										sessionResult.sessionId,
+										modelOption.id,
+										savedModelId,
+									);
+								setSession((prev) => ({
+									...prev,
+									configOptions: updatedOptions,
+								}));
+							} catch {
+								// Agent default is fine as fallback
+							}
+						}
+					}
+				} else if (
+					sessionResult.models &&
+					sessionResult.sessionId
+				) {
+					// Legacy fallback: restore model via setSessionModel
 					const savedModelId = settings.lastUsedModels[agentId];
 					if (
 						savedModelId &&
@@ -539,6 +613,7 @@ export function useAgentSession(
 				availableCommands: undefined,
 				modes: undefined,
 				models: undefined,
+				configOptions: undefined,
 				promptCapabilities: prev.promptCapabilities,
 				createdAt: new Date(),
 				lastActivityAt: new Date(),
@@ -628,6 +703,7 @@ export function useAgentSession(
 					authMethods: authMethods,
 					modes: loadResult.modes,
 					models: loadResult.models,
+					configOptions: loadResult.configOptions,
 					promptCapabilities: needsInitialize
 						? promptCapabilities
 						: prev.promptCapabilities,
@@ -898,6 +974,92 @@ export function useAgentSession(
 		],
 	);
 
+	/**
+	 * Set a session configuration option.
+	 * Optimistic update with rollback on error.
+	 */
+	const setConfigOption = useCallback(
+		async (configId: string, value: string) => {
+			if (!session.sessionId) {
+				console.warn("Cannot set config option: no active session");
+				return;
+			}
+
+			// Store previous configOptions for rollback on error
+			const previousConfigOptions = session.configOptions;
+
+			// Optimistic update - update only the specific option's currentValue
+			setSession((prev) => {
+				if (!prev.configOptions) return prev;
+				return {
+					...prev,
+					configOptions: prev.configOptions.map((opt) =>
+						opt.id === configId
+							? { ...opt, currentValue: value }
+							: opt,
+					),
+				};
+			});
+
+			try {
+				const updatedOptions =
+					await agentClient.setSessionConfigOption(
+						session.sessionId,
+						configId,
+						value,
+					);
+				// Replace with server response (handles cascading changes)
+				setSession((prev) => ({
+					...prev,
+					configOptions: updatedOptions,
+				}));
+
+				// Persist last used value for config options with 'model' category
+				const changedOption = updatedOptions.find(
+					(o) => o.id === configId,
+				);
+				if (changedOption?.category === "model" && session.agentId) {
+					const currentSettings = settingsAccess.getSnapshot();
+					void settingsAccess.updateSettings({
+						lastUsedModels: {
+							...currentSettings.lastUsedModels,
+							[session.agentId]: value,
+						},
+					});
+				}
+			} catch (error) {
+				console.error("Failed to set config option:", error);
+				// Rollback to previous state on error
+				if (previousConfigOptions) {
+					setSession((prev) => ({
+						...prev,
+						configOptions: previousConfigOptions,
+					}));
+				}
+			}
+		},
+		[
+			agentClient,
+			session.sessionId,
+			session.configOptions,
+			settingsAccess,
+			session.agentId,
+		],
+	);
+
+	/**
+	 * Update config options from agent notification.
+	 */
+	const updateConfigOptions = useCallback(
+		(configOptions: SessionConfigOption[]) => {
+			setSession((prev) => ({
+				...prev,
+				configOptions,
+			}));
+		},
+		[],
+	);
+
 	// Register error callback for process-level errors
 	useEffect(() => {
 		agentClient.onError((error) => {
@@ -919,6 +1081,7 @@ export function useAgentSession(
 			sessionId: string,
 			modes?: SessionModeState,
 			models?: SessionModelState,
+			configOptions?: SessionConfigOption[],
 		) => {
 			setSession((prev) => ({
 				...prev,
@@ -926,6 +1089,7 @@ export function useAgentSession(
 				state: "ready",
 				modes: modes ?? prev.modes,
 				models: models ?? prev.models,
+				configOptions: configOptions ?? prev.configOptions,
 				lastActivityAt: new Date(),
 			}));
 		},
@@ -946,7 +1110,9 @@ export function useAgentSession(
 		updateSessionFromLoad,
 		updateAvailableCommands,
 		updateCurrentMode,
+		updateConfigOptions,
 		setMode,
 		setModel,
+		setConfigOption,
 	};
 }
