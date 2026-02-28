@@ -1103,6 +1103,37 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 				});
 				break;
 			}
+
+			case "session_info_update": {
+				this.logger.log(
+					`[AcpAdapter] session_info_update:`,
+					{ title: update.title, updatedAt: update.updatedAt },
+				);
+
+				this.sessionUpdateCallback?.({
+					type: "session_info_update",
+					sessionId,
+					title: update.title,
+					updatedAt: update.updatedAt,
+				});
+				break;
+			}
+
+			case "usage_update": {
+				this.logger.log(
+					`[AcpAdapter] usage_update:`,
+					{ size: update.size, used: update.used, cost: update.cost },
+				);
+
+				this.sessionUpdateCallback?.({
+					type: "usage_update",
+					sessionId,
+					size: update.size,
+					used: update.used,
+					cost: update.cost ?? undefined,
+				});
+				break;
+			}
 		}
 		return Promise.resolve();
 	}
