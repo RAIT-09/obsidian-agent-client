@@ -836,7 +836,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	/**
-	 * @deprecated Use setSessionConfigOption instead.
+	 * DEPRECATED: Use setSessionConfigOption instead.
 	 *
 	 * Set the session mode.
 	 *
@@ -872,7 +872,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	/**
-	 * @deprecated Use setSessionConfigOption instead.
+	 * DEPRECATED: Use setSessionConfigOption instead.
 	 *
 	 * Implementation of IAgentClient.setSessionModel()
 	 */

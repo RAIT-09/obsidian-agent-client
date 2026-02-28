@@ -204,10 +204,10 @@ export interface NewSessionResult {
 	/** Unique identifier for the new session */
 	sessionId: string;
 
-	/** @deprecated Use configOptions instead. Kept for backward compatibility. */
+	/** DEPRECATED: Use configOptions instead. Kept for backward compatibility. */
 	modes?: SessionModeState;
 
-	/** @deprecated Use configOptions instead. Kept for backward compatibility. */
+	/** DEPRECATED: Use configOptions instead. Kept for backward compatibility. */
 	models?: SessionModelState;
 
 	/** Session config options (supersedes modes/models) */
@@ -345,7 +345,7 @@ export interface IAgentClient {
 	getCurrentAgentId(): string | null;
 
 	/**
-	 * @deprecated Use setSessionConfigOption instead.
+	 * DEPRECATED: Use setSessionConfigOption instead.
 	 *
 	 * Set the session mode.
 	 *
@@ -362,7 +362,7 @@ export interface IAgentClient {
 	setSessionMode(sessionId: string, modeId: string): Promise<void>;
 
 	/**
-	 * @deprecated Use setSessionConfigOption instead.
+	 * DEPRECATED: Use setSessionConfigOption instead.
 	 *
 	 * Set the session model (experimental).
 	 * @param sessionId - The session ID

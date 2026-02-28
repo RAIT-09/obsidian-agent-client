@@ -130,7 +130,7 @@ export interface UseAgentSessionReturn {
 	updateAvailableCommands: (commands: SlashCommand[]) => void;
 
 	/**
-	 * @deprecated Use updateConfigOptions instead.
+	 * DEPRECATED: Use updateConfigOptions instead.
 	 *
 	 * Callback to update current mode.
 	 * Called by AcpAdapter when agent sends current_mode_update.
@@ -144,7 +144,7 @@ export interface UseAgentSessionReturn {
 	updateConfigOptions: (configOptions: SessionConfigOption[]) => void;
 
 	/**
-	 * @deprecated Use setConfigOption instead.
+	 * DEPRECATED: Use setConfigOption instead.
 	 *
 	 * Set the session mode.
 	 * Sends a request to the agent to change the mode.
@@ -153,7 +153,7 @@ export interface UseAgentSessionReturn {
 	setMode: (modeId: string) => Promise<void>;
 
 	/**
-	 * @deprecated Use setConfigOption instead.
+	 * DEPRECATED: Use setConfigOption instead.
 	 *
 	 * Set the session model (experimental).
 	 * Sends a request to the agent to change the model.
