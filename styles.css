@@ -962,6 +962,71 @@ If your plugin does not need CSS, delete this file.
 	box-shadow: none !important;
 }
 
+/* Config option selector (configOptions API - supersedes mode/model selectors) */
+
+.agent-client-config-options-container {
+	display: contents;
+}
+
+.agent-client-config-selector {
+	display: inline-flex;
+	align-items: center;
+	padding: 0 4px;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: background-color 0.1s ease;
+	height: 20px;
+	max-width: 120px;
+}
+
+.agent-client-config-selector:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.agent-client-config-selector-icon {
+	display: flex;
+	align-items: center;
+	pointer-events: none;
+	color: var(--text-faint);
+	margin-left: 2px;
+	order: 2;
+}
+
+.agent-client-config-selector-icon svg {
+	width: 12px;
+	height: 12px;
+}
+
+.agent-client-config-selector select.dropdown {
+	padding: 0 !important;
+	margin: 0 !important;
+	border: none !important;
+	border-radius: 0 !important;
+	background: none !important;
+	background-color: transparent !important;
+	background-image: none !important;
+	box-shadow: none !important;
+	color: var(--text-faint) !important;
+	font-size: 11px !important;
+	cursor: pointer !important;
+	outline: none !important;
+	appearance: none !important;
+	-webkit-appearance: none !important;
+	-moz-appearance: none !important;
+	order: 1;
+	max-width: 100px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.agent-client-config-selector select.dropdown:hover,
+.agent-client-config-selector select.dropdown:focus {
+	color: var(--text-faint) !important;
+	background-color: transparent !important;
+	box-shadow: none !important;
+}
+
 /* Send button */
 .agent-client-chat-send-button {
 	width: 20px;
