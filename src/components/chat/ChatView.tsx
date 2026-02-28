@@ -582,6 +582,7 @@ function ChatComponent({
 				onConfigOptionChange={(configId, value) =>
 					void handleSetConfigOption(configId, value)
 				}
+				usage={session.usage}
 				supportsImages={session.promptCapabilities?.image ?? false}
 				agentId={session.agentId}
 				// Controlled component props (for broadcast commands)

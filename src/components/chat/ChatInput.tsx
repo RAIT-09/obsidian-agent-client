@@ -9,6 +9,7 @@ import type {
 	SlashCommand,
 	SessionModeState,
 	SessionModelState,
+	SessionUsage,
 } from "../../domain/models/chat-session";
 import type {
 	SessionConfigOption,
@@ -50,6 +51,25 @@ const SUPPORTED_IMAGE_TYPES = [
 ] as const;
 
 type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
+
+// ============================================================================
+// Usage Indicator Helpers
+// ============================================================================
+
+/** Format token count for display (e.g., 21367 → "21.4K", 200000 → "200K") */
+function formatTokenCount(tokens: number): string {
+	if (tokens < 1000) return String(tokens);
+	const k = tokens / 1000;
+	return k >= 100 ? `${Math.round(k)}K` : `${k.toFixed(1)}K`;
+}
+
+/** Get CSS class for usage percentage color thresholds */
+function getUsageColorClass(percentage: number): string {
+	if (percentage > 95) return "agent-client-usage-danger";
+	if (percentage > 90) return "agent-client-usage-warning";
+	if (percentage > 75) return "agent-client-usage-caution";
+	return "agent-client-usage-normal";
+}
 
 /**
  * Props for ChatInput component
@@ -100,6 +120,8 @@ export interface ChatInputProps {
 	configOptions?: SessionConfigOption[];
 	/** Callback when a config option is changed */
 	onConfigOptionChange?: (configId: string, value: string) => void;
+	/** Context window usage (shown as percentage indicator) */
+	usage?: SessionUsage;
 	/** Whether the agent supports image attachments */
 	supportsImages?: boolean;
 	/** Current agent ID (used to clear images on agent switch) */
@@ -155,6 +177,7 @@ export function ChatInput({
 	onModelChange,
 	configOptions,
 	onConfigOptionChange,
+	usage,
 	supportsImages = false,
 	agentId,
 	// Controlled component props
@@ -1175,6 +1198,21 @@ export function ChatInput({
 								</div>
 							)}
 						</>
+					)}
+
+					{/* Context Usage Indicator */}
+					{usage && (
+						<span
+							className={`agent-client-usage-indicator ${getUsageColorClass(Math.round((usage.used / usage.size) * 100))}`}
+							title={
+								usage.cost
+									? `${formatTokenCount(usage.used)} / ${formatTokenCount(usage.size)} tokens\n$${usage.cost.amount.toFixed(2)}`
+									: `${formatTokenCount(usage.used)} / ${formatTokenCount(usage.size)} tokens`
+							}
+						>
+							{Math.round((usage.used / usage.size) * 100)}
+							%
+						</span>
 					)}
 
 					{/* Send/Stop Button */}
