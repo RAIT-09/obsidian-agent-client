@@ -65,9 +65,9 @@ function formatTokenCount(tokens: number): string {
 
 /** Get CSS class for usage percentage color thresholds */
 function getUsageColorClass(percentage: number): string {
-	if (percentage > 95) return "agent-client-usage-danger";
-	if (percentage > 90) return "agent-client-usage-warning";
-	if (percentage > 75) return "agent-client-usage-caution";
+	if (percentage >= 90) return "agent-client-usage-danger";
+	if (percentage >= 80) return "agent-client-usage-warning";
+	if (percentage >= 70) return "agent-client-usage-caution";
 	return "agent-client-usage-normal";
 }
 
@@ -1148,6 +1148,21 @@ export function ChatInput({
 
 				{/* Input Actions (Config Options / Mode Selector / Model Selector + Send Button) */}
 				<div className="agent-client-chat-input-actions">
+					{/* Context Usage Indicator (left-aligned via margin-right: auto) */}
+					{usage && (
+						<span
+							className={`agent-client-usage-indicator ${getUsageColorClass(Math.round((usage.used / usage.size) * 100))}`}
+							aria-label={
+								usage.cost
+									? `${formatTokenCount(usage.used)} / ${formatTokenCount(usage.size)} tokens\n$${usage.cost.amount.toFixed(2)}`
+									: `${formatTokenCount(usage.used)} / ${formatTokenCount(usage.size)} tokens`
+							}
+						>
+							{Math.round((usage.used / usage.size) * 100)}
+							%
+						</span>
+					)}
+
 					{/* Config Options (supersedes legacy mode/model selectors) */}
 					{configOptions && configOptions.length > 0 ? (
 						<div
@@ -1198,21 +1213,6 @@ export function ChatInput({
 								</div>
 							)}
 						</>
-					)}
-
-					{/* Context Usage Indicator */}
-					{usage && (
-						<span
-							className={`agent-client-usage-indicator ${getUsageColorClass(Math.round((usage.used / usage.size) * 100))}`}
-							title={
-								usage.cost
-									? `${formatTokenCount(usage.used)} / ${formatTokenCount(usage.size)} tokens\n$${usage.cost.amount.toFixed(2)}`
-									: `${formatTokenCount(usage.used)} / ${formatTokenCount(usage.size)} tokens`
-							}
-						>
-							{Math.round((usage.used / usage.size) * 100)}
-							%
-						</span>
 					)}
 
 					{/* Send/Stop Button */}

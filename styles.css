@@ -1030,13 +1030,14 @@ If your plugin does not need CSS, delete this file.
 /* Context Usage Indicator */
 .agent-client-usage-indicator {
 	font-size: var(--font-smallest);
+	margin-right: auto;
 	cursor: default;
 	user-select: none;
 	white-space: nowrap;
 }
 
 .agent-client-usage-normal {
-	color: var(--text-muted);
+	color: var(--text-faint);
 }
 
 .agent-client-usage-caution {
