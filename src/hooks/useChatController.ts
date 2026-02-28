@@ -31,23 +31,9 @@ import type {
 	SessionModeState,
 	SessionModelState,
 } from "../domain/models/chat-session";
-import type {
-	SessionConfigOption,
-	SessionConfigSelectGroup,
-	SessionConfigSelectOption,
-} from "../domain/models/session-update";
+import type { SessionConfigOption } from "../domain/models/session-update";
+import { flattenConfigSelectOptions } from "../shared/config-option-utils";
 import type { ImagePromptContent } from "../domain/models/prompt-content";
-
-/**
- * Flatten config option values, handling both flat and grouped options.
- */
-function flattenConfigOptions(
-	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],
-): SessionConfigSelectOption[] {
-	if (options.length === 0) return [];
-	if ("value" in options[0]) return options as SessionConfigSelectOption[];
-	return (options as SessionConfigSelectGroup[]).flatMap((g) => g.options);
-}
 
 // Agent info for display (from plugin.getAvailableAgents())
 interface AgentInfo {
@@ -679,7 +665,7 @@ export function useChatController(
 				(o) => o.category === "model",
 			);
 			if (modelOption && modelOption.currentValue !== config.model) {
-				const valueExists = flattenConfigOptions(
+				const valueExists = flattenConfigSelectOptions(
 					modelOption.options,
 				).some((o) => o.value === config.model);
 				if (valueExists) {

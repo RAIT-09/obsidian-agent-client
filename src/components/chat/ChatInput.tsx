@@ -13,8 +13,8 @@ import type {
 import type {
 	SessionConfigOption,
 	SessionConfigSelectGroup,
-	SessionConfigSelectOption,
 } from "../../domain/models/session-update";
+import { flattenConfigSelectOptions } from "../../shared/config-option-utils";
 import type { ImagePromptContent } from "../../domain/models/prompt-content";
 import type { UseMentionsReturn } from "../../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../../hooks/useSlashCommands";
@@ -50,17 +50,6 @@ const SUPPORTED_IMAGE_TYPES = [
 ] as const;
 
 type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
-
-/**
- * Flatten config select options, handling both flat and grouped options.
- */
-function flattenSelectOptions(
-	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],
-): SessionConfigSelectOption[] {
-	if (options.length === 0) return [];
-	if ("value" in options[0]) return options as SessionConfigSelectOption[];
-	return (options as SessionConfigSelectGroup[]).flatMap((g) => g.options);
-}
 
 /**
  * Props for ChatInput component
@@ -944,7 +933,7 @@ export function ChatInput({
 
 		for (const option of configOptions) {
 			// Flatten options (handle both flat and grouped)
-			const flatOptions = flattenSelectOptions(option.options);
+			const flatOptions = flattenConfigSelectOptions(option.options);
 
 			// Only show if there are multiple values
 			if (flatOptions.length <= 1) continue;

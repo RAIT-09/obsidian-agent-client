@@ -7,11 +7,8 @@ import type {
 	SlashCommand,
 	AuthenticationMethod,
 } from "../domain/models/chat-session";
-import type {
-	SessionConfigOption,
-	SessionConfigSelectGroup,
-	SessionConfigSelectOption,
-} from "../domain/models/session-update";
+import type { SessionConfigOption } from "../domain/models/session-update";
+import { flattenConfigSelectOptions } from "../shared/config-option-utils";
 import type { IAgentClient } from "../domain/ports/agent-client.port";
 import type { ISettingsAccess } from "../domain/ports/settings-access.port";
 import type { AgentClientPluginSettings } from "../plugin";
@@ -305,17 +302,6 @@ function buildAgentConfigWithApiKey(
 /**
  * Create initial session state.
  */
-/**
- * Flatten config option values, handling both flat and grouped options.
- */
-function flattenConfigOptions(
-	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],
-): SessionConfigSelectOption[] {
-	if (options.length === 0) return [];
-	if ("value" in options[0]) return options as SessionConfigSelectOption[];
-	return (options as SessionConfigSelectGroup[]).flatMap((g) => g.options);
-}
-
 function createInitialSession(
 	agentId: string,
 	agentDisplayName: string,
@@ -518,9 +504,9 @@ export function useAgentSession(
 						if (
 							savedModelId &&
 							savedModelId !== modelOption.currentValue &&
-							flattenConfigOptions(modelOption.options).some(
-								(o) => o.value === savedModelId,
-							)
+							flattenConfigSelectOptions(
+								modelOption.options,
+							).some((o) => o.value === savedModelId)
 						) {
 							try {
 								const updatedOptions =
