@@ -1,11 +1,26 @@
 /**
- * Attached image for ChatInput.
- * Matches the AttachedImage interface in ImagePreviewStrip.tsx.
+ * Attached file for ChatInput.
+ *
+ * Two kinds:
+ * - "image": Base64 embedded image (from paste or D&D with image capability)
+ * - "file": File reference by path (D&D non-image, or D&D image without capability)
  */
-export interface AttachedImage {
+export interface AttachedFile {
 	id: string;
-	data: string;
+	kind: "image" | "file";
 	mimeType: string;
+
+	/** Base64-encoded data (only for kind === "image") */
+	data?: string;
+
+	/** File name for display (only for kind === "file") */
+	name?: string;
+
+	/** Absolute file path (only for kind === "file") */
+	path?: string;
+
+	/** File size in bytes (only for kind === "file", for display + resource_link) */
+	size?: number;
 }
 
 /**
@@ -15,6 +30,6 @@ export interface AttachedImage {
 export interface ChatInputState {
 	/** Text content in the input field */
 	text: string;
-	/** Attached images (base64 encoded) */
-	images: AttachedImage[];
+	/** Attached files (images and non-image files) */
+	files: AttachedFile[];
 }
