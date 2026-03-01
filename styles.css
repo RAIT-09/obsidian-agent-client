@@ -1027,6 +1027,32 @@ If your plugin does not need CSS, delete this file.
 	box-shadow: none !important;
 }
 
+/* Context Usage Indicator */
+.agent-client-usage-indicator {
+	font-size: var(--font-smallest);
+	margin-right: auto;
+	cursor: default;
+	user-select: none;
+	white-space: nowrap;
+}
+
+.agent-client-usage-normal {
+	color: var(--text-faint);
+}
+
+.agent-client-usage-caution {
+	color: var(--color-yellow);
+}
+
+.agent-client-usage-warning {
+	color: var(--color-orange);
+}
+
+.agent-client-usage-danger {
+	color: var(--color-red);
+	font-weight: var(--font-semibold);
+}
+
 /* Send button */
 .agent-client-chat-send-button {
 	width: 20px;

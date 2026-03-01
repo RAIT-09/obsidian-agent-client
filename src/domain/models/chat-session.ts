@@ -162,6 +162,19 @@ export interface SessionModelState {
 	currentModelId: string;
 }
 
+/**
+ * Context window usage and cost information for a session.
+ * Reported by the agent via `usage_update` session notifications.
+ */
+export interface SessionUsage {
+	/** Tokens currently in context */
+	used: number;
+	/** Total context window size in tokens */
+	size: number;
+	/** Cumulative session cost (optional — not all agents track this) */
+	cost?: { amount: number; currency: string };
+}
+
 // ============================================================================
 // Chat Session
 // ============================================================================
@@ -219,6 +232,13 @@ export interface ChatSession {
 	 * When present, UI should use this instead of modes/models.
 	 */
 	configOptions?: SessionConfigOption[];
+
+	/**
+	 * Context window usage and cost information.
+	 * Updated dynamically via ACP's `usage_update` notification.
+	 * Agent sends this after each prompt response and on session load/resume.
+	 */
+	usage?: SessionUsage;
 
 	/**
 	 * Prompt capabilities supported by the agent.

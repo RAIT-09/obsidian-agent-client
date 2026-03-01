@@ -4,6 +4,7 @@ import type {
 	SessionState,
 	SessionModeState,
 	SessionModelState,
+	SessionUsage,
 	SlashCommand,
 	AuthenticationMethod,
 } from "../domain/models/chat-session";
@@ -139,6 +140,12 @@ export interface UseAgentSessionReturn {
 	 * Called when agent sends config_option_update notification.
 	 */
 	updateConfigOptions: (configOptions: SessionConfigOption[]) => void;
+
+	/**
+	 * Callback to update context window usage.
+	 * Called when agent sends usage_update notification.
+	 */
+	updateUsage: (usage: SessionUsage) => void;
 
 	/**
 	 * DEPRECATED: Use setConfigOption instead.
@@ -390,6 +397,7 @@ export function useAgentSession(
 				modes: undefined,
 				models: undefined,
 				configOptions: undefined,
+				usage: undefined,
 				// Keep capabilities/info from previous session if same agent
 				// They will be updated if re-initialization is needed
 				promptCapabilities: prev.promptCapabilities,
@@ -534,9 +542,9 @@ export function useAgentSession(
 						if (
 							savedModeId &&
 							savedModeId !== modeOption.currentValue &&
-							flattenConfigSelectOptions(
-								modeOption.options,
-							).some((o) => o.value === savedModeId)
+							flattenConfigSelectOptions(modeOption.options).some(
+								(o) => o.value === savedModeId,
+							)
 						) {
 							try {
 								const updatedOptions =
@@ -1132,6 +1140,17 @@ export function useAgentSession(
 		[],
 	);
 
+	/**
+	 * Update context window usage.
+	 * Called when agent sends usage_update notification.
+	 */
+	const updateUsage = useCallback((usage: SessionUsage) => {
+		setSession((prev) => ({
+			...prev,
+			usage,
+		}));
+	}, []);
+
 	// Register error callback for process-level errors
 	useEffect(() => {
 		agentClient.onError((error) => {
@@ -1183,6 +1202,7 @@ export function useAgentSession(
 		updateAvailableCommands,
 		updateCurrentMode,
 		updateConfigOptions,
+		updateUsage,
 		setMode,
 		setModel,
 		setConfigOption,
