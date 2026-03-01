@@ -1497,8 +1497,8 @@ If your plugin does not need CSS, delete this file.
 	word-break: break-word;
 }
 
-/* ===== Image Preview Strip ===== */
-.agent-client-image-preview-strip {
+/* ===== Attachment Preview Strip ===== */
+.agent-client-attachment-preview-strip {
 	display: flex;
 	gap: 8px;
 	padding: 8px 12px;
@@ -1508,27 +1508,27 @@ If your plugin does not need CSS, delete this file.
 	-ms-overflow-style: none;
 }
 
-.agent-client-image-preview-strip::-webkit-scrollbar {
+.agent-client-attachment-preview-strip::-webkit-scrollbar {
 	height: 4px;
 }
 
-.agent-client-image-preview-strip::-webkit-scrollbar-track {
+.agent-client-attachment-preview-strip::-webkit-scrollbar-track {
 	background: transparent;
 }
 
-.agent-client-image-preview-strip::-webkit-scrollbar-thumb {
+.agent-client-attachment-preview-strip::-webkit-scrollbar-thumb {
 	background-color: var(--background-modifier-border);
 	border-radius: 2px;
 }
 
-.agent-client-image-preview-item {
+.agent-client-attachment-preview-item {
 	position: relative;
 	flex-shrink: 0;
 	width: 64px;
 	height: 64px;
 }
 
-.agent-client-image-preview-thumbnail {
+.agent-client-attachment-preview-thumbnail {
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
@@ -1537,7 +1537,42 @@ If your plugin does not need CSS, delete this file.
 	border: 1px solid var(--background-modifier-border);
 }
 
-.agent-client-image-preview-remove {
+/* Non-image file preview: icon + filename */
+.agent-client-attachment-preview-file {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	border-radius: 8px;
+	border: 1px solid var(--background-modifier-border);
+	background-color: var(--background-primary);
+	overflow: hidden;
+}
+
+.agent-client-attachment-preview-file-icon {
+	color: var(--text-muted);
+}
+
+.agent-client-attachment-preview-file-icon svg {
+	width: 24px;
+	height: 24px;
+}
+
+.agent-client-attachment-preview-file-name {
+	font-size: 9px;
+	color: var(--text-muted);
+	text-align: center;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 0 4px;
+}
+
+.agent-client-attachment-preview-remove {
 	position: absolute;
 	top: -6px;
 	right: -6px;
@@ -1557,13 +1592,51 @@ If your plugin does not need CSS, delete this file.
 	box-shadow: none !important;
 }
 
-.agent-client-image-preview-remove svg {
+.agent-client-attachment-preview-remove svg {
 	width: 12px;
 	height: 12px;
 }
 
-.agent-client-image-preview-item:hover .agent-client-image-preview-remove {
+.agent-client-attachment-preview-item:hover
+	.agent-client-attachment-preview-remove {
 	opacity: 1;
+}
+
+/* ===== Message Resource Link (in chat history) ===== */
+.agent-client-message-resource-link {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	width: 120px;
+	height: 120px;
+	margin: 4px 4px 4px 0;
+	border-radius: 8px;
+	border: 1px solid var(--background-modifier-border);
+	background-color: var(--background-primary);
+	overflow: hidden;
+}
+
+.agent-client-message-resource-link-icon {
+	color: var(--text-muted);
+	display: flex;
+}
+
+.agent-client-message-resource-link-icon svg {
+	width: 32px;
+	height: 32px;
+}
+
+.agent-client-message-resource-link-name {
+	font-size: 10px;
+	color: var(--text-muted);
+	text-align: center;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 0 8px;
 }
 
 /* ===== Message Image (in chat history) ===== */
@@ -1605,6 +1678,11 @@ If your plugin does not need CSS, delete this file.
 }
 
 .agent-client-message-images-strip .agent-client-message-image {
+	flex-shrink: 0;
+	margin: 0;
+}
+
+.agent-client-message-images-strip .agent-client-message-resource-link {
 	flex-shrink: 0;
 	margin: 0;
 }
