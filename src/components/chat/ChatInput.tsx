@@ -1158,8 +1158,7 @@ export function ChatInput({
 									: `${formatTokenCount(usage.used)} / ${formatTokenCount(usage.size)} tokens`
 							}
 						>
-							{Math.round((usage.used / usage.size) * 100)}
-							%
+							{Math.round((usage.used / usage.size) * 100)}%
 						</span>
 					)}
 

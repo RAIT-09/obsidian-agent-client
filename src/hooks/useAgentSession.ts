@@ -542,9 +542,9 @@ export function useAgentSession(
 						if (
 							savedModeId &&
 							savedModeId !== modeOption.currentValue &&
-							flattenConfigSelectOptions(
-								modeOption.options,
-							).some((o) => o.value === savedModeId)
+							flattenConfigSelectOptions(modeOption.options).some(
+								(o) => o.value === savedModeId,
+							)
 						) {
 							try {
 								const updatedOptions =
@@ -1144,15 +1144,12 @@ export function useAgentSession(
 	 * Update context window usage.
 	 * Called when agent sends usage_update notification.
 	 */
-	const updateUsage = useCallback(
-		(usage: SessionUsage) => {
-			setSession((prev) => ({
-				...prev,
-				usage,
-			}));
-		},
-		[],
-	);
+	const updateUsage = useCallback((usage: SessionUsage) => {
+		setSession((prev) => ({
+			...prev,
+			usage,
+		}));
+	}, []);
 
 	// Register error callback for process-level errors
 	useEffect(() => {
