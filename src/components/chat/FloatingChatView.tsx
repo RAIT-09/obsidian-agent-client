@@ -784,6 +784,7 @@ function FloatingChatComponent({
 					onConfigOptionChange={(configId, value) =>
 						void handleSetConfigOption(configId, value)
 					}
+					usage={session.usage}
 					supportsImages={session.promptCapabilities?.image ?? false}
 					agentId={session.agentId}
 					inputValue={inputValue}
