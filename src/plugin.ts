@@ -779,7 +779,7 @@ export default class AgentClientPlugin extends Plugin {
 		);
 		if (
 			!inputState ||
-			(inputState.text.trim() === "" && inputState.images.length === 0)
+			(inputState.text.trim() === "" && inputState.files.length === 0)
 		) {
 			new Notice("[Agent Client] No prompt to broadcast");
 			return;

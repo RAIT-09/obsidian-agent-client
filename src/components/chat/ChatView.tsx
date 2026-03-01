@@ -23,9 +23,6 @@ import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 // Hooks imports
 import { useChatController } from "../../hooks/useChatController";
 
-// Domain model imports
-import type { ImagePromptContent } from "../../domain/models/prompt-content";
-
 // Type definitions for Obsidian internal APIs
 interface AppWithSettings {
 	setting: {
@@ -98,8 +95,8 @@ function ChatComponent({
 		handleSetConfigOption,
 		inputValue,
 		setInputValue,
-		attachedImages,
-		setAttachedImages,
+		attachedFiles,
+		setAttachedFiles,
 		restoredMessage,
 		handleRestoredMessageConsumed,
 	} = controller;
@@ -272,23 +269,23 @@ function ChatComponent({
 	const getInputState = useCallback((): ChatInputState | null => {
 		return {
 			text: inputValue,
-			images: attachedImages,
+			files: attachedFiles,
 		};
-	}, [inputValue, attachedImages]);
+	}, [inputValue, attachedFiles]);
 
 	/** Set input state from broadcast commands */
 	const setInputState = useCallback(
 		(state: ChatInputState) => {
 			setInputValue(state.text);
-			setAttachedImages(state.images);
+			setAttachedFiles(state.files);
 		},
-		[setInputValue, setAttachedImages],
+		[setInputValue, setAttachedFiles],
 	);
 
 	/** Send message for broadcast commands (returns true if sent) */
 	const sendMessageForBroadcast = useCallback(async (): Promise<boolean> => {
-		// Allow sending if there's text OR images
-		if (!inputValue.trim() && attachedImages.length === 0) {
+		// Allow sending if there's text OR attachments
+		if (!inputValue.trim() && attachedFiles.length === 0) {
 			return false;
 		}
 		if (!isSessionReady || sessionHistory.loading) {
@@ -298,40 +295,29 @@ function ChatComponent({
 			return false;
 		}
 
-		// Convert attached images to ImagePromptContent format
-		const imagesToSend: ImagePromptContent[] = attachedImages.map(
-			(img) => ({
-				type: "image",
-				data: img.data,
-				mimeType: img.mimeType,
-			}),
-		);
-
 		// Clear input before sending
 		const messageToSend = inputValue.trim();
+		const filesToSend =
+			attachedFiles.length > 0 ? [...attachedFiles] : undefined;
 		setInputValue("");
-		setAttachedImages([]);
+		setAttachedFiles([]);
 
-		await handleSendMessage(
-			messageToSend,
-			imagesToSend.length > 0 ? imagesToSend : undefined,
-		);
+		await handleSendMessage(messageToSend, filesToSend);
 		return true;
 	}, [
 		inputValue,
-		attachedImages,
+		attachedFiles,
 		isSessionReady,
 		sessionHistory.loading,
 		isSending,
 		handleSendMessage,
 		setInputValue,
-		setAttachedImages,
+		setAttachedFiles,
 	]);
 
 	/** Check if this view can send a message */
 	const canSendForBroadcast = useCallback((): boolean => {
-		const hasContent =
-			inputValue.trim() !== "" || attachedImages.length > 0;
+		const hasContent = inputValue.trim() !== "" || attachedFiles.length > 0;
 		return (
 			hasContent &&
 			isSessionReady &&
@@ -340,7 +326,7 @@ function ChatComponent({
 		);
 	}, [
 		inputValue,
-		attachedImages,
+		attachedFiles,
 		isSessionReady,
 		sessionHistory.loading,
 		isSending,
@@ -588,8 +574,8 @@ function ChatComponent({
 				// Controlled component props (for broadcast commands)
 				inputValue={inputValue}
 				onInputChange={setInputValue}
-				attachedImages={attachedImages}
-				onAttachedImagesChange={setAttachedImages}
+				attachedFiles={attachedFiles}
+				onAttachedFilesChange={setAttachedFiles}
 				// Error overlay props
 				errorInfo={errorInfo}
 				onClearError={handleClearError}

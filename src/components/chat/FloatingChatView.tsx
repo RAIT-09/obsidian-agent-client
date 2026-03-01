@@ -10,7 +10,6 @@ import type {
 } from "../../domain/ports/chat-view-container.port";
 import type { ChatInputState } from "../../domain/models/chat-input-state";
 import type { IChatViewHost } from "./types";
-import type { ImagePromptContent } from "../../domain/models/prompt-content";
 
 // Component imports
 import { ChatMessages } from "./ChatMessages";
@@ -237,8 +236,8 @@ function FloatingChatComponent({
 		handleSetConfigOption,
 		inputValue,
 		setInputValue,
-		attachedImages,
-		setAttachedImages,
+		attachedFiles,
+		setAttachedFiles,
 		restoredMessage,
 		handleRestoredMessageConsumed,
 	} = controller;
@@ -470,16 +469,16 @@ function FloatingChatComponent({
 				getDisplayName: () => activeAgentLabel,
 				getInputState: () => ({
 					text: inputValue,
-					images: attachedImages,
+					files: attachedFiles,
 				}),
 				setInputState: (state) => {
 					setInputValue(state.text);
-					setAttachedImages(state.images);
+					setAttachedFiles(state.files);
 				},
 				// Match ChatView.canSendForBroadcast exactly
 				canSend: () => {
 					const hasContent =
-						inputValue.trim() !== "" || attachedImages.length > 0;
+						inputValue.trim() !== "" || attachedFiles.length > 0;
 					return (
 						hasContent &&
 						isSessionReady &&
@@ -489,8 +488,8 @@ function FloatingChatComponent({
 				},
 				// Match ChatView.sendMessageForBroadcast exactly
 				sendMessage: async () => {
-					// Allow sending if there's text OR images
-					if (!inputValue.trim() && attachedImages.length === 0) {
+					// Allow sending if there's text OR attachments
+					if (!inputValue.trim() && attachedFiles.length === 0) {
 						return false;
 					}
 					if (!isSessionReady || sessionHistory.loading) {
@@ -500,23 +499,16 @@ function FloatingChatComponent({
 						return false;
 					}
 
-					// Convert attached images to ImagePromptContent format
-					const imagesToSend: ImagePromptContent[] =
-						attachedImages.map((img) => ({
-							type: "image",
-							data: img.data,
-							mimeType: img.mimeType,
-						}));
-
 					// Clear input before sending
 					const messageToSend = inputValue.trim();
+					const filesToSend =
+						attachedFiles.length > 0
+							? [...attachedFiles]
+							: undefined;
 					setInputValue("");
-					setAttachedImages([]);
+					setAttachedFiles([]);
 
-					await handleSendMessage(
-						messageToSend,
-						imagesToSend.length > 0 ? imagesToSend : undefined,
-					);
+					await handleSendMessage(messageToSend, filesToSend);
 					return true;
 				},
 				cancelOperation: handleStopGeneration,
@@ -552,7 +544,7 @@ function FloatingChatComponent({
 		onRegisterCallbacks,
 		activeAgentLabel,
 		inputValue,
-		attachedImages,
+		attachedFiles,
 		isSessionReady,
 		isSending,
 		sessionHistory.loading,
@@ -796,8 +788,8 @@ function FloatingChatComponent({
 					agentId={session.agentId}
 					inputValue={inputValue}
 					onInputChange={setInputValue}
-					attachedImages={attachedImages}
-					onAttachedImagesChange={setAttachedImages}
+					attachedFiles={attachedFiles}
+					onAttachedFilesChange={setAttachedFiles}
 					errorInfo={errorInfo}
 					onClearError={handleClearError}
 					messages={messages}
