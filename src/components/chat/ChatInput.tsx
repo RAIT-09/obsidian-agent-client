@@ -348,41 +348,73 @@ export function ChatInput({
 	);
 
 	/**
-	 * Handle paste event for image attachment.
+	 * Handle paste event for file attachment.
+	 * Images are embedded as Base64 if agent supports it, otherwise sent as resource_link.
+	 * Non-image files are sent as resource_link.
 	 */
 	const handlePaste = useCallback(
 		async (e: React.ClipboardEvent) => {
 			const items = e.clipboardData?.items;
 			if (!items) return;
 
-			// Extract image files from clipboard
+			// Extract files from clipboard, split by type
 			const imageFiles: File[] = [];
+			const nonImageFiles: File[] = [];
+
 			for (const item of Array.from(items)) {
+				if (item.kind !== "file") continue;
+				const file = item.getAsFile();
+				if (!file) continue;
+
 				if (
 					SUPPORTED_IMAGE_TYPES.includes(
 						item.type as SupportedImageType,
 					)
 				) {
-					const file = item.getAsFile();
-					if (file) imageFiles.push(file);
+					imageFiles.push(file);
+				} else {
+					nonImageFiles.push(file);
 				}
 			}
 
-			if (imageFiles.length === 0) return;
+			if (imageFiles.length === 0 && nonImageFiles.length === 0) return;
 
 			e.preventDefault();
 
-			if (!supportsImages) {
-				new Notice(
-					"[Agent Client] This agent does not support image paste. Try drag & drop instead.",
-				);
-				return;
+			const newAttachments: AttachedFile[] = [];
+
+			if (imageFiles.length > 0) {
+				if (supportsImages) {
+					newAttachments.push(
+						...(await convertImagesToAttachments(imageFiles)),
+					);
+				} else {
+					// Try resource_link fallback (works for files copied from Finder, not for screenshots)
+					const converted = convertFilesToAttachments(imageFiles);
+					if (converted.length > 0) {
+						newAttachments.push(...converted);
+					} else {
+						new Notice(
+							"[Agent Client] This agent does not support image paste. Try drag & drop instead.",
+						);
+					}
+				}
 			}
 
-			const newAttachments = await convertImagesToAttachments(imageFiles);
+			if (nonImageFiles.length > 0) {
+				newAttachments.push(
+					...convertFilesToAttachments(nonImageFiles),
+				);
+			}
+
 			addAttachments(newAttachments);
 		},
-		[supportsImages, convertImagesToAttachments, addAttachments],
+		[
+			supportsImages,
+			convertImagesToAttachments,
+			convertFilesToAttachments,
+			addAttachments,
+		],
 	);
 
 	/**
