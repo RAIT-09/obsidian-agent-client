@@ -9,7 +9,10 @@ import type { IVaultAccess } from "../domain/ports/vault-access.port";
 import type { NoteMetadata } from "../domain/ports/vault-access.port";
 import type { AuthenticationMethod } from "../domain/models/chat-session";
 import type { ErrorInfo } from "../domain/models/agent-error";
-import type { ImagePromptContent } from "../domain/models/prompt-content";
+import type {
+	ImagePromptContent,
+	ResourceLinkPromptContent,
+} from "../domain/models/prompt-content";
 import type { IMentionService } from "../shared/mention-utils";
 import { preparePrompt, sendPreparedPrompt } from "../shared/message-service";
 import { Platform } from "obsidian";
@@ -31,8 +34,10 @@ export interface SendMessageOptions {
 	vaultBasePath: string;
 	/** Whether auto-mention is temporarily disabled */
 	isAutoMentionDisabled?: boolean;
-	/** Attached images */
+	/** Attached images (Base64 embedded) */
 	images?: ImagePromptContent[];
+	/** Attached file references (resource links) */
+	resourceLinks?: ResourceLinkPromptContent[];
 }
 
 /**
@@ -582,6 +587,7 @@ export function useChat(
 				{
 					message: content,
 					images: options.images,
+					resourceLinks: options.resourceLinks,
 					activeNote: options.activeNote,
 					vaultBasePath: options.vaultBasePath,
 					isAutoMentionDisabled: options.isAutoMentionDisabled,
@@ -620,6 +626,19 @@ export function useChat(
 						type: "image",
 						data: img.data,
 						mimeType: img.mimeType,
+					});
+				}
+			}
+
+			// Resource link parts
+			if (options.resourceLinks && options.resourceLinks.length > 0) {
+				for (const link of options.resourceLinks) {
+					userMessageContent.push({
+						type: "resource_link",
+						uri: link.uri,
+						name: link.name,
+						mimeType: link.mimeType,
+						size: link.size,
 					});
 				}
 			}
