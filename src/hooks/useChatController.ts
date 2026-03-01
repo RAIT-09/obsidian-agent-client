@@ -39,6 +39,8 @@ import type {
 } from "../domain/models/prompt-content";
 import { buildFileUri } from "../shared/path-utils";
 import { convertWindowsPathToWsl } from "../shared/wsl-utils";
+import type { AgentUpdateNotification } from "../shared/agent-update-checker";
+import { checkAgentUpdate } from "../shared/agent-update-checker";
 
 // Agent info for display (from plugin.getAvailableAgents())
 interface AgentInfo {
@@ -89,6 +91,7 @@ export interface UseChatControllerReturn {
 	errorInfo:
 		| ReturnType<typeof useChat>["errorInfo"]
 		| ReturnType<typeof useAgentSession>["errorInfo"];
+	agentUpdateNotification: AgentUpdateNotification | null;
 
 	// Core callbacks
 	handleSendMessage: (
@@ -101,6 +104,7 @@ export interface UseChatControllerReturn {
 	handleSwitchAgent: (agentId: string) => Promise<void>;
 	handleRestartAgent: () => Promise<void>;
 	handleClearError: () => void;
+	handleClearAgentUpdate: () => void;
 	handleRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	handleForkSession: (sessionId: string, cwd: string) => Promise<void>;
 	handleDeleteSession: (sessionId: string) => void;
@@ -274,6 +278,8 @@ export function useChatController(
 	// Local State
 	// ============================================================
 	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+	const [agentUpdateNotification, setAgentUpdateNotification] =
+		useState<AgentUpdateNotification | null>(null);
 	const [restoredMessage, setRestoredMessage] = useState<string | null>(null);
 
 	// Input state (for broadcast commands - sidebar only)
@@ -322,6 +328,10 @@ export function useChatController(
 
 	const handleSendMessage = useCallback(
 		async (content: string, attachments?: AttachedFile[]) => {
+			// Dismiss overlays on send
+			chat.clearError();
+			setAgentUpdateNotification(null);
+
 			const isFirstMessage = messages.length === 0;
 
 			// Split attachments by kind
@@ -507,6 +517,10 @@ export function useChatController(
 	const handleClearError = useCallback(() => {
 		chat.clearError();
 	}, [chat]);
+
+	const handleClearAgentUpdate = useCallback(() => {
+		setAgentUpdateNotification(null);
+	}, []);
 
 	const handleRestoredMessageConsumed = useCallback(() => {
 		setRestoredMessage(null);
@@ -853,6 +867,23 @@ export function useChatController(
 	}, [plugin, logger]);
 
 	// ============================================================
+	// Effects - Agent Update Check
+	// ============================================================
+	useEffect(() => {
+		if (!isSessionReady || !session.agentInfo?.name) {
+			return;
+		}
+
+		checkAgentUpdate(
+			session.agentInfo as { name: string; version?: string },
+		)
+			.then(setAgentUpdateNotification)
+			.catch((error) => {
+				logger.error("Failed to check agent update:", error);
+			});
+	}, [isSessionReady, session.agentInfo, logger]);
+
+	// ============================================================
 	// Effects - Save Session Messages on Turn End
 	// ============================================================
 	const prevIsSendingRef = useRef<boolean>(false);
@@ -930,6 +961,7 @@ export function useChatController(
 		activeAgentLabel,
 		availableAgents,
 		errorInfo,
+		agentUpdateNotification,
 
 		// Core callbacks
 		handleSendMessage,
@@ -939,6 +971,7 @@ export function useChatController(
 		handleSwitchAgent,
 		handleRestartAgent,
 		handleClearError,
+		handleClearAgentUpdate,
 		handleRestoreSession,
 		handleForkSession,
 		handleDeleteSession,

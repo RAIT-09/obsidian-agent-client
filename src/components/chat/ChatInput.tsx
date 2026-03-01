@@ -27,6 +27,7 @@ import { AttachmentPreviewStrip } from "./AttachmentPreviewStrip";
 import { useInputHistory } from "../../hooks/useInputHistory";
 import { getLogger } from "../../shared/logger";
 import type { ErrorInfo } from "../../domain/models/agent-error";
+import type { AgentUpdateNotification } from "../../shared/agent-update-checker";
 import { useSettings } from "../../hooks/useSettings";
 
 // ============================================================================
@@ -139,6 +140,10 @@ export interface ChatInputProps {
 	errorInfo: ErrorInfo | null;
 	/** Callback to clear the error */
 	onClearError: () => void;
+	/** Agent update notification (version update or migration) */
+	agentUpdateNotification: AgentUpdateNotification | null;
+	/** Callback to dismiss the agent update notification */
+	onClearAgentUpdate: () => void;
 	/** Messages array for input history navigation */
 	messages: ChatMessage[];
 }
@@ -188,6 +193,9 @@ export function ChatInput({
 	// Error overlay props
 	errorInfo,
 	onClearError,
+	// Agent update notification props
+	agentUpdateNotification,
+	onClearAgentUpdate,
 	// Input history
 	messages,
 }: ChatInputProps) {
@@ -1111,6 +1119,17 @@ export function ChatInput({
 					onClose={onClearError}
 					showEmojis={showEmojis}
 					view={view}
+				/>
+			)}
+
+			{/* Agent Update Notification - hidden when error is showing */}
+			{!errorInfo && agentUpdateNotification && (
+				<ErrorOverlay
+					errorInfo={agentUpdateNotification}
+					onClose={onClearAgentUpdate}
+					showEmojis={showEmojis}
+					view={view}
+					variant={agentUpdateNotification.variant}
 				/>
 			)}
 
