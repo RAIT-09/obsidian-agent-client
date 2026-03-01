@@ -65,7 +65,7 @@ export function ChatMessages({
 		const container = containerRef.current;
 		if (!container) return true;
 
-		const threshold = 20;
+		const threshold = 35;
 		const isNearBottom =
 			container.scrollTop + container.clientHeight >=
 			container.scrollHeight - threshold;
