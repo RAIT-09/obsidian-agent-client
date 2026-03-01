@@ -232,16 +232,26 @@ export function ChatInput({
 	}, [agentId, onAttachedFilesChange]);
 
 	/**
-	 * Add a file to the attached files list.
-	 * Simple addition - validation is done in caller.
+	 * Add multiple attachments at once with limit enforcement.
+	 * Single state update avoids stale closure issues.
 	 */
-	const addFile = useCallback(
-		(file: AttachedFile) => {
-			// Safety check for max count
-			if (attachedFiles.length >= MAX_ATTACHMENT_COUNT) {
+	const addAttachments = useCallback(
+		(newFiles: AttachedFile[]) => {
+			if (newFiles.length === 0) return;
+			const remaining = MAX_ATTACHMENT_COUNT - attachedFiles.length;
+			if (remaining <= 0) {
+				new Notice(
+					`[Agent Client] Maximum ${MAX_ATTACHMENT_COUNT} attachments allowed`,
+				);
 				return;
 			}
-			onAttachedFilesChange([...attachedFiles, file]);
+			const toAdd = newFiles.slice(0, remaining);
+			if (toAdd.length < newFiles.length) {
+				new Notice(
+					`[Agent Client] Maximum ${MAX_ATTACHMENT_COUNT} attachments allowed`,
+				);
+			}
+			onAttachedFilesChange([...attachedFiles, ...toAdd]);
 		},
 		[attachedFiles, onAttachedFilesChange],
 	);
@@ -274,78 +284,56 @@ export function ChatInput({
 	}, []);
 
 	/**
-	 * Process and attach image files as Base64.
-	 * Common logic for paste and drop handlers.
+	 * Convert image files to Base64 AttachedFile objects.
+	 * Returns the converted attachments without updating state.
 	 */
-	const processImageFiles = useCallback(
-		async (files: File[]) => {
-			let addedCount = 0;
-
+	const convertImagesToAttachments = useCallback(
+		async (files: File[]): Promise<AttachedFile[]> => {
+			const result: AttachedFile[] = [];
 			for (const file of files) {
-				// Check attachment count
-				if (attachedFiles.length + addedCount >= MAX_ATTACHMENT_COUNT) {
-					new Notice(
-						`[Agent Client] Maximum ${MAX_ATTACHMENT_COUNT} attachments allowed`,
-					);
-					break;
-				}
-
-				// Check file size (before conversion - memory efficiency)
 				if (file.size > MAX_IMAGE_SIZE_BYTES) {
 					new Notice(
 						`[Agent Client] Image too large (max ${MAX_IMAGE_SIZE_MB}MB)`,
 					);
 					continue;
 				}
-
-				// Convert to Base64 and add
 				try {
 					const base64 = await fileToBase64(file);
-					addFile({
+					result.push({
 						id: crypto.randomUUID(),
 						kind: "image",
 						data: base64,
 						mimeType: file.type,
 					});
-					addedCount++;
 				} catch (error) {
 					console.error("Failed to convert image:", error);
 					new Notice("[Agent Client] Failed to attach image");
 				}
 			}
+			return result;
 		},
-		[attachedFiles.length, addFile, fileToBase64],
+		[fileToBase64],
 	);
 
 	/**
-	 * Process files as resource_link references (no Base64 conversion).
-	 * Used for non-image files and for image files when agent lacks image capability.
+	 * Convert files to resource_link AttachedFile objects.
+	 * Returns the converted attachments without updating state.
 	 */
-	const processFileReferences = useCallback(
-		(files: File[]) => {
+	const convertFilesToAttachments = useCallback(
+		(files: File[]): AttachedFile[] => {
 			// Get file path via Electron's webUtils API (File.path was removed in Electron 32)
 			// eslint-disable-next-line @typescript-eslint/no-require-imports
 			const { webUtils } = require("electron") as {
 				webUtils: { getPathForFile: (file: File) => string };
 			};
-
-			let addedCount = 0;
-
+			const result: AttachedFile[] = [];
 			for (const file of files) {
-				if (attachedFiles.length + addedCount >= MAX_ATTACHMENT_COUNT) {
-					new Notice(
-						`[Agent Client] Maximum ${MAX_ATTACHMENT_COUNT} attachments allowed`,
-					);
-					break;
-				}
-
 				const filePath = webUtils.getPathForFile(file);
 				if (!filePath) {
 					new Notice("[Agent Client] Could not determine file path");
 					continue;
 				}
-
-				addFile({
+				result.push({
 					id: crypto.randomUUID(),
 					kind: "file",
 					mimeType: file.type || "application/octet-stream",
@@ -353,10 +341,10 @@ export function ChatInput({
 					path: filePath,
 					size: file.size,
 				});
-				addedCount++;
 			}
+			return result;
 		},
-		[attachedFiles.length, addFile],
+		[],
 	);
 
 	/**
@@ -391,9 +379,10 @@ export function ChatInput({
 				return;
 			}
 
-			await processImageFiles(imageFiles);
+			const newAttachments = await convertImagesToAttachments(imageFiles);
+			addAttachments(newAttachments);
 		},
-		[supportsImages, processImageFiles],
+		[supportsImages, convertImagesToAttachments, addAttachments],
 	);
 
 	/**
@@ -461,23 +450,35 @@ export function ChatInput({
 				}
 			}
 
-			// Process image files
+			// Convert all files, then update state once
+			const newAttachments: AttachedFile[] = [];
+
 			if (imageFiles.length > 0) {
 				if (supportsImages) {
-					// Agent supports images → embed as Base64
-					await processImageFiles(imageFiles);
+					newAttachments.push(
+						...(await convertImagesToAttachments(imageFiles)),
+					);
 				} else {
-					// Agent doesn't support images → fallback to resource_link
-					processFileReferences(imageFiles);
+					newAttachments.push(
+						...convertFilesToAttachments(imageFiles),
+					);
 				}
 			}
 
-			// Process non-image files as resource_link
 			if (nonImageFiles.length > 0) {
-				processFileReferences(nonImageFiles);
+				newAttachments.push(
+					...convertFilesToAttachments(nonImageFiles),
+				);
 			}
+
+			addAttachments(newAttachments);
 		},
-		[supportsImages, processImageFiles, processFileReferences],
+		[
+			supportsImages,
+			convertImagesToAttachments,
+			convertFilesToAttachments,
+			addAttachments,
+		],
 	);
 
 	/**
