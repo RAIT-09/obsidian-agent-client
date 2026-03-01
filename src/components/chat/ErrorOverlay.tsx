@@ -1,8 +1,11 @@
 import * as React from "react";
-const { useRef, useEffect } = React;
+const { useEffect } = React;
 import { setIcon } from "obsidian";
 import type { ErrorInfo } from "../../domain/models/agent-error";
 import type { IChatViewHost } from "./types";
+
+/** Visual variant for the overlay */
+export type OverlayVariant = "error" | "info";
 
 export interface ErrorOverlayProps {
 	/** Error information to display */
@@ -13,15 +16,20 @@ export interface ErrorOverlayProps {
 	showEmojis: boolean;
 	/** View instance for event registration */
 	view: IChatViewHost;
+	/** Visual variant. Defaults to "error" for backward compatibility. */
+	variant?: OverlayVariant;
 }
 
 /**
- * Error overlay component displayed above the input field.
+ * Overlay component displayed above the input field.
+ *
+ * Supports visual variants:
+ * - "error" (default): Red border/title — for process errors and failures
+ * - "info": Subtle border/title — for update notifications
  *
  * Design decisions:
  * - Uses same positioning pattern as SuggestionDropdown (position: absolute; bottom: 100%)
- * - Closes on outside click (consistent with SuggestionDropdown)
- * - Closes on Escape key (consistent with Obsidian's native Menu)
+ * - Closes on Escape key or close button
  * - Does not block chat messages from being visible
  */
 export function ErrorOverlay({
@@ -29,23 +37,8 @@ export function ErrorOverlay({
 	onClose,
 	showEmojis,
 	view,
+	variant = "error",
 }: ErrorOverlayProps) {
-	const overlayRef = useRef<HTMLDivElement>(null);
-
-	// Handle outside click to close
-	useEffect(() => {
-		const handleClickOutside = (event: MouseEvent) => {
-			if (
-				overlayRef.current &&
-				!overlayRef.current.contains(event.target as Node)
-			) {
-				onClose();
-			}
-		};
-
-		view.registerDomEvent(document, "mousedown", handleClickOutside);
-	}, [onClose, view]);
-
 	// Handle Escape key to close
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
@@ -59,7 +52,9 @@ export function ErrorOverlay({
 	}, [onClose, view]);
 
 	return (
-		<div ref={overlayRef} className="agent-client-error-overlay">
+		<div
+			className={`agent-client-error-overlay agent-client-error-overlay--${variant}`}
+		>
 			<div className="agent-client-error-overlay-header">
 				<h4 className="agent-client-error-overlay-title">
 					{errorInfo.title}
@@ -67,7 +62,7 @@ export function ErrorOverlay({
 				<button
 					className="agent-client-error-overlay-close"
 					onClick={onClose}
-					aria-label="Close error"
+					aria-label="Close"
 					type="button"
 					ref={(el) => {
 						if (el) {
@@ -80,10 +75,16 @@ export function ErrorOverlay({
 				{errorInfo.message}
 			</p>
 			{errorInfo.suggestion && (
-				<p className="agent-client-error-overlay-suggestion">
-					{showEmojis && "💡 "}
-					{errorInfo.suggestion}
-				</p>
+				<div className="agent-client-error-overlay-suggestion">
+					{showEmojis && variant === "error" && "💡 "}
+					{variant !== "error" ? (
+						<code className="agent-client-error-overlay-code">
+							{errorInfo.suggestion}
+						</code>
+					) : (
+						errorInfo.suggestion
+					)}
+				</div>
 			)}
 		</div>
 	);
