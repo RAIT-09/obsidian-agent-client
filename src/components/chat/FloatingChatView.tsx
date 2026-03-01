@@ -223,6 +223,7 @@ function FloatingChatComponent({
 		activeAgentLabel,
 		availableAgents,
 		errorInfo,
+		agentUpdateNotification,
 		handleSendMessage,
 		handleStopGeneration,
 		handleNewChat,
@@ -230,6 +231,7 @@ function FloatingChatComponent({
 		handleSwitchAgent,
 		handleRestartAgent,
 		handleClearError,
+		handleClearAgentUpdate,
 		handleOpenHistory,
 		handleSetMode,
 		handleSetModel,
@@ -793,6 +795,8 @@ function FloatingChatComponent({
 					onAttachedFilesChange={setAttachedFiles}
 					errorInfo={errorInfo}
 					onClearError={handleClearError}
+					agentUpdateNotification={agentUpdateNotification}
+					onClearAgentUpdate={handleClearAgentUpdate}
 					messages={messages}
 				/>
 			</div>

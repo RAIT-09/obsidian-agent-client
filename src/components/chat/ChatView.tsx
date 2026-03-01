@@ -83,12 +83,14 @@ function ChatComponent({
 		activeAgentLabel,
 		availableAgents,
 		errorInfo,
+		agentUpdateNotification,
 		handleSendMessage,
 		handleStopGeneration,
 		handleNewChat,
 		handleExportChat,
 		handleRestartAgent,
 		handleClearError,
+		handleClearAgentUpdate,
 		handleOpenHistory,
 		handleSetMode,
 		handleSetModel,
@@ -579,6 +581,9 @@ function ChatComponent({
 				// Error overlay props
 				errorInfo={errorInfo}
 				onClearError={handleClearError}
+				// Agent update notification props
+				agentUpdateNotification={agentUpdateNotification}
+				onClearAgentUpdate={handleClearAgentUpdate}
 				messages={messages}
 			/>
 		</div>
