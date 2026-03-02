@@ -6,6 +6,8 @@ export interface PickerItem {
 	category: PickerCategory;
 	/** Whether this item is a navigable category header (like "Files & Folders") */
 	isCategory?: boolean;
+	/** Whether this item is a "back" button to exit the current category filter */
+	isBack?: boolean;
 	/** Sub-label shown below the main label (e.g. file path) */
 	sublabel?: string;
 	/** Badge to show next to the item (e.g. "command", "mcp", "skill") */

@@ -1,19 +1,26 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type {
 	PickerItem,
 	PickerPreview,
 	PickerProvider,
+	PickerCategory,
 } from "../components/picker/types";
+import { CATEGORY_LABELS, CATEGORY_ICONS } from "../components/picker/types";
 
 export interface UsePickerReturn {
 	isOpen: boolean;
 	query: string;
+	/** Items to display (filtered + category entries when applicable) */
 	items: PickerItem[];
+	/** All search-result items before filtering */
+	allItems: PickerItem[];
 	selectedIndex: number;
 	preview: PickerPreview | null;
+	activeFilter: PickerCategory | null;
 	open: (initialQuery?: string) => void;
 	close: () => void;
 	setQuery: (query: string) => void;
+	setFilter: (filter: PickerCategory | null) => void;
 	navigate: (direction: "up" | "down") => void;
 	selectCurrent: () => void;
 	selectAt: (index: number) => void;
@@ -25,15 +32,24 @@ export type PickerSortFn = (
 	query: string,
 ) => PickerItem[];
 
+/**
+ * @param providers  - search providers
+ * @param sortFn     - optional sort applied after merging provider results
+ * @param categoryEntries - categories to show as navigable items (drill-down)
+ */
 export function usePicker(
 	providers: PickerProvider[],
 	sortFn?: PickerSortFn,
+	categoryEntries?: PickerCategory[],
 ): UsePickerReturn {
 	const [isOpen, setIsOpen] = useState(false);
 	const [query, setQueryState] = useState("");
-	const [items, setItems] = useState<PickerItem[]>([]);
+	const [searchItems, setSearchItems] = useState<PickerItem[]>([]);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [preview, setPreview] = useState<PickerPreview | null>(null);
+	const [activeFilter, setActiveFilterState] = useState<PickerCategory | null>(
+		null,
+	);
 
 	const providersRef = useRef(providers);
 	providersRef.current = providers;
@@ -42,28 +58,75 @@ export function usePicker(
 	sortFnRef.current = sortFn;
 
 	const searchIdRef = useRef(0);
+	const lastQueryRef = useRef("");
+
+	const allItems = useMemo(() => {
+		if (!activeFilter) return searchItems;
+		return searchItems.filter((item) => item.category === activeFilter);
+	}, [searchItems, activeFilter]);
+
+	const items = useMemo(() => {
+		if (activeFilter) {
+			const backItem: PickerItem = {
+				id: "__back__",
+				label: CATEGORY_LABELS[activeFilter],
+				icon: "chevron-left",
+				category: activeFilter,
+				isBack: true,
+				data: null,
+			};
+			return [backItem, ...allItems];
+		}
+		if (!categoryEntries || categoryEntries.length === 0) {
+			return allItems;
+		}
+
+		const q = query.toLowerCase();
+		const afterFilter = categoryEntries.filter((cat) => {
+			if (q) return CATEGORY_LABELS[cat].toLowerCase().includes(q);
+			return searchItems.some((item) => item.category === cat);
+		});
+		const catItems: PickerItem[] = afterFilter
+			.map((cat) => ({
+				id: `__category__:${cat}`,
+				label: CATEGORY_LABELS[cat],
+				icon: CATEGORY_ICONS[cat],
+				category: cat,
+				isCategory: true,
+				data: null,
+			}));
+
+		const combined = [...allItems, ...catItems];
+		const sorted = sortFnRef.current
+			? sortFnRef.current(combined, query)
+			: combined;
+		return sorted;
+	}, [allItems, searchItems, categoryEntries, activeFilter, query]);
 
 	const runSearch = useCallback(async (q: string) => {
 		const id = ++searchIdRef.current;
-		const allItems: PickerItem[] = [];
+		const merged: PickerItem[] = [];
 
 		for (const provider of providersRef.current) {
 			const result = await provider.search(q);
 			if (searchIdRef.current !== id) return;
-			allItems.push(...result);
+			merged.push(...result);
 		}
 
 		const sorted = sortFnRef.current
-			? sortFnRef.current(allItems, q)
-			: allItems;
-		setItems(sorted);
+			? sortFnRef.current(merged, q)
+			: merged;
+		setSearchItems(sorted);
 		setSelectedIndex(0);
 		setPreview(null);
 	}, []);
 
 	const setQuery = useCallback(
 		(q: string) => {
+			if (q === lastQueryRef.current) return;
+			lastQueryRef.current = q;
 			setQueryState(q);
+			setActiveFilterState(null);
 			void runSearch(q);
 		},
 		[runSearch],
@@ -71,21 +134,38 @@ export function usePicker(
 
 	const open = useCallback(
 		(initialQuery = "") => {
+			lastQueryRef.current = initialQuery;
 			setIsOpen(true);
 			setQueryState(initialQuery);
+			setActiveFilterState(null);
 			void runSearch(initialQuery);
 		},
 		[runSearch],
 	);
 
 	const close = useCallback(() => {
+		lastQueryRef.current = "";
 		setIsOpen(false);
 		setQueryState("");
-		setItems([]);
+		setSearchItems([]);
 		setSelectedIndex(0);
 		setPreview(null);
+		setActiveFilterState(null);
 		searchIdRef.current++;
 	}, []);
+
+	const setFilter = useCallback(
+		(filter: PickerCategory | null) => {
+			setActiveFilterState(filter);
+			setSelectedIndex(0);
+			if (filter !== null) {
+				void runSearch("");
+			} else {
+				void runSearch(lastQueryRef.current);
+			}
+		},
+		[runSearch],
+	);
 
 	const navigate = useCallback(
 		(direction: "up" | "down") => {
@@ -101,6 +181,14 @@ export function usePicker(
 
 	const applyItem = useCallback(
 		(item: PickerItem) => {
+			if (item.isBack) {
+				setFilter(null);
+				return;
+			}
+			if (item.isCategory) {
+				setFilter(item.category);
+				return;
+			}
 			for (const provider of providersRef.current) {
 				if (provider.category === item.category) {
 					provider.apply(item);
@@ -109,7 +197,7 @@ export function usePicker(
 			}
 			close();
 		},
-		[close],
+		[close, setFilter],
 	);
 
 	const selectCurrent = useCallback(() => {
@@ -134,7 +222,10 @@ export function usePicker(
 		}
 
 		const item = items[selectedIndex];
-		if (!item) return;
+		if (!item || item.isCategory) {
+			setPreview(null);
+			return;
+		}
 
 		let cancelled = false;
 
@@ -161,11 +252,14 @@ export function usePicker(
 		isOpen,
 		query,
 		items,
+		allItems: searchItems,
 		selectedIndex,
 		preview,
+		activeFilter,
 		open,
 		close,
 		setQuery,
+		setFilter,
 		navigate,
 		selectCurrent,
 		selectAt,

@@ -22,6 +22,7 @@ import {
 } from "../picker/mention-provider";
 import { CommandPickerProvider } from "../picker/command-provider";
 import { usePicker, type PickerSortFn } from "../../hooks/usePicker";
+import type { PickerCategory } from "../picker/types";
 import { classifyCommands } from "../../shared/command-classification";
 import { ErrorOverlay } from "./ErrorOverlay";
 import { ImagePreviewStrip, type AttachedImage } from "./ImagePreviewStrip";
@@ -252,46 +253,84 @@ export function ChatInput({
 		});
 	}, []);
 
-	const mentionPicker = usePicker(mentionProviders, mentionSort);
-	const commandPicker = usePicker(commandProviders, commandSort);
+	const mentionCategoryEntries = React.useMemo<PickerCategory[]>(
+		() => ["file", "folder"],
+		[],
+	);
+	const commandCategoryEntries = React.useMemo<PickerCategory[]>(
+		() => ["command", "mcp", "skill"],
+		[],
+	);
 
-	const prevMentionOpen = useRef(false);
+	const mentionPicker = usePicker(
+		mentionProviders,
+		mentionSort,
+		mentionCategoryEntries,
+	);
+	const commandPicker = usePicker(
+		commandProviders,
+		commandSort,
+		commandCategoryEntries,
+	);
+
+	const mentionPickerRef = useRef(mentionPicker);
+	mentionPickerRef.current = mentionPicker;
+	const commandPickerRef = useRef(commandPicker);
+	commandPickerRef.current = commandPicker;
+	const mentionsRef = useRef(mentions);
+	mentionsRef.current = mentions;
+	const slashCommandsRef = useRef(slashCommands);
+	slashCommandsRef.current = slashCommands;
+
+	const mentionQuery = mentions.context?.query ?? "";
+	const hasMentionContext = mentions.context !== null;
+	const prevMentionCtx = useRef(false);
 	useEffect(() => {
-		if (mentions.isOpen && !prevMentionOpen.current) {
-			mentionPicker.open(mentions.context?.query ?? "");
-		} else if (!mentions.isOpen && prevMentionOpen.current) {
-			mentionPicker.close();
+		const picker = mentionPickerRef.current;
+		if (hasMentionContext && !prevMentionCtx.current) {
+			picker.open(mentionQuery);
+		} else if (hasMentionContext && prevMentionCtx.current) {
+			picker.setQuery(mentionQuery);
+		} else if (!hasMentionContext && prevMentionCtx.current) {
+			picker.close();
 		}
-		prevMentionOpen.current = mentions.isOpen;
-	}, [mentions.isOpen, mentions.context?.query, mentionPicker]);
+		prevMentionCtx.current = hasMentionContext;
+	}, [hasMentionContext, mentionQuery]);
 
-	const prevCommandOpen = useRef(false);
+	const commandQuery = slashCommands.context?.query ?? "";
+	const hasCommandContext = slashCommands.context !== null;
+	const prevCommandCtx = useRef(false);
 	useEffect(() => {
-		if (slashCommands.isOpen && !prevCommandOpen.current) {
-			commandPicker.open("");
-		} else if (!slashCommands.isOpen && prevCommandOpen.current) {
-			commandPicker.close();
+		const picker = commandPickerRef.current;
+		if (hasCommandContext && !prevCommandCtx.current) {
+			picker.open(commandQuery);
+		} else if (hasCommandContext && prevCommandCtx.current) {
+			picker.setQuery(commandQuery);
+		} else if (!hasCommandContext && prevCommandCtx.current) {
+			picker.close();
 		}
-		prevCommandOpen.current = slashCommands.isOpen;
-	}, [slashCommands.isOpen, commandPicker]);
+		prevCommandCtx.current = hasCommandContext;
+	}, [hasCommandContext, commandQuery]);
 
+	const mentionPickerOpen = mentionPicker.isOpen;
 	const prevMentionPickerOpen = useRef(false);
 	useEffect(() => {
-		if (!mentionPicker.isOpen && prevMentionPickerOpen.current) {
-			mentions.close();
+		if (!mentionPickerOpen && prevMentionPickerOpen.current) {
+			mentionsRef.current.close();
 			richTextareaRef.current?.focus();
 		}
-		prevMentionPickerOpen.current = mentionPicker.isOpen;
-	}, [mentionPicker.isOpen, mentions, richTextareaRef]);
+		prevMentionPickerOpen.current = mentionPickerOpen;
+	}, [mentionPickerOpen]);
 
+	const commandPickerOpen = commandPicker.isOpen;
 	const prevCommandPickerOpen = useRef(false);
 	useEffect(() => {
-		if (!commandPicker.isOpen && prevCommandPickerOpen.current) {
-			slashCommands.close();
+		if (!commandPickerOpen && prevCommandPickerOpen.current) {
+			slashCommandsRef.current.close();
 			richTextareaRef.current?.focus();
 		}
-		prevCommandPickerOpen.current = commandPicker.isOpen;
-	}, [commandPicker.isOpen, slashCommands, richTextareaRef]);
+		prevCommandPickerOpen.current = commandPickerOpen;
+	}, [commandPickerOpen]);
 
 	/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
 	const obsidianSpellcheck: boolean =
@@ -392,6 +431,8 @@ export function ChatInput({
 	} = useChatInputBehavior({
 		mentions,
 		slashCommands,
+		mentionPicker,
+		commandPicker,
 		inputValue,
 		onInputChange,
 		richTextareaRef,
@@ -511,19 +552,11 @@ export function ChatInput({
 			)}
 
 			{mentionPicker.isOpen && (
-				<UnifiedPickerPanel
-					picker={mentionPicker}
-					mode="mention"
-					onKeyDown={() => false}
-				/>
+				<UnifiedPickerPanel picker={mentionPicker} mode="mention" />
 			)}
 
 			{commandPicker.isOpen && !mentionPicker.isOpen && (
-				<UnifiedPickerPanel
-					picker={commandPicker}
-					mode="command"
-					onKeyDown={() => false}
-				/>
+				<UnifiedPickerPanel picker={commandPicker} mode="command" />
 			)}
 
 			<div

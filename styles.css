@@ -978,9 +978,36 @@ If your plugin does not need CSS, delete this file.
 
 /* Empty state */
 .obsius-chat-empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	flex: 1;
+	gap: 20px;
+	color: var(--text-faint);
+}
+
+.obsius-empty-state-icon {
+	width: 96px;
+	height: 96px;
+}
+
+.obsius-empty-state-icon--spinning {
+	animation: obsius-spin 1.8s linear infinite;
+}
+
+@keyframes obsius-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.obsius-empty-state-ready {
+	font-size: var(--font-ui-small);
 	color: var(--text-muted);
-	text-align: center;
-	margin-top: 20px;
 }
 
 /* Input area */
@@ -2797,109 +2824,109 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* ============================================================
-   Unified Picker Panel (Cursor-like two-pane palette)
+   Picker Panel (inline autocomplete for @ mentions and / commands)
    ============================================================ */
 
-.obsius-picker-panel {
+/* Wrapper: flex row that holds main panel + detail panel */
+
+.obsius-picker-wrapper {
 	position: absolute;
 	bottom: 100%;
 	left: 0;
 	right: 0;
-	max-height: 440px;
+	display: flex;
+	align-items: flex-end;
+	gap: 4px;
+	margin-bottom: 4px;
+	z-index: var(--layer-popover);
+}
+
+/* Main panel (item list + filter tabs) */
+
+.obsius-picker-panel {
+	flex: 1;
+	min-width: 0;
 	display: flex;
 	flex-direction: column;
 	background-color: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 8px;
-	box-shadow: var(--shadow-s);
-	z-index: var(--layer-popover);
-	overflow: hidden;
-	margin-bottom: 4px;
-}
-
-/* Search bar */
-
-.obsius-picker-search {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding: 8px 10px;
-	border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.obsius-picker-search-icon {
-	flex-shrink: 0;
-	color: var(--text-faint);
-}
-
-.obsius-picker-search-input {
-	flex: 1;
-	padding: 0;
-	border: none;
-	background: transparent;
-	color: var(--text-normal);
-	font-size: var(--font-ui-small);
-	outline: none;
-}
-
-/* Two-pane body */
-
-.obsius-picker-body {
-	display: flex;
-	flex: 1;
-	min-height: 0;
+	box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
 	overflow: hidden;
 }
 
-/* Item list pane */
+.obsius-picker-wrapper--mention .obsius-picker-panel {
+	max-height: 360px;
+}
+
+.obsius-picker-wrapper--command .obsius-picker-panel {
+	max-height: 340px;
+}
+
+/* Scrollable item list */
 
 .obsius-picker-list {
 	flex: 1;
 	overflow-y: auto;
-	min-width: 0;
+	min-height: 0;
 	padding: 4px 0;
 }
 
 .obsius-picker-empty {
-	padding: 24px 16px;
+	padding: 20px 16px;
 	text-align: center;
 	color: var(--text-faint);
 	font-size: var(--font-ui-small);
 }
 
-.obsius-picker-group {
-	padding-bottom: 2px;
-}
-
-.obsius-picker-group-label {
-	padding: 8px 12px 4px;
-	font-size: 11px;
-	font-weight: 600;
-	color: var(--text-faint);
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
-}
-
-/* Item rows */
+/* Single-line item rows */
 
 .obsius-picker-item {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	padding: 5px 12px;
+	padding: 4px 12px;
 	cursor: pointer;
 	font-size: var(--font-ui-small);
 	color: var(--text-normal);
 	border-radius: 4px;
-	margin: 0 4px;
+	margin: 1px 4px;
+	height: 28px;
 }
 
-.obsius-picker-item:hover {
-	background-color: var(--background-modifier-hover);
-}
-
+.obsius-picker-item:hover,
 .obsius-picker-item--selected {
 	background-color: var(--background-modifier-hover);
+}
+
+/* Back item (return from category filter) */
+
+.obsius-picker-item--back {
+	color: var(--text-muted);
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-size: var(--font-ui-small);
+}
+
+.obsius-picker-item--back:hover,
+.obsius-picker-item--back.obsius-picker-item--selected {
+	color: var(--text-normal);
+}
+
+/* Category item (drill-down row) */
+
+.obsius-picker-item--category {
+	color: var(--text-muted);
+}
+
+.obsius-picker-item--category:hover,
+.obsius-picker-item--category.obsius-picker-item--selected {
+	color: var(--text-normal);
+}
+
+.obsius-picker-item-chevron {
+	margin-left: auto;
+	flex-shrink: 0;
+	color: var(--text-faint);
 }
 
 .obsius-picker-item-icon {
@@ -2912,40 +2939,27 @@ If your plugin does not need CSS, delete this file.
 	justify-content: center;
 }
 
-.obsius-picker-item-text {
-	flex: 1;
-	min-width: 0;
-	display: flex;
-	flex-direction: column;
-	gap: 1px;
-}
-
 .obsius-picker-item-label {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	font-weight: 500;
-}
-
-.obsius-picker-item-sublabel {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-size: var(--font-ui-smaller);
-	color: var(--text-faint);
+	flex-shrink: 1;
+	min-width: 0;
 }
 
 .obsius-picker-item-desc {
+	margin-left: auto;
 	flex-shrink: 0;
-	max-width: 45%;
+	max-width: 50%;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	color: var(--text-muted);
+	color: var(--text-faint);
 	font-size: var(--font-ui-smaller);
 }
 
-/* Badges (yellow pill for command types) */
+/* Badges (colored pill for command types) */
 
 .obsius-picker-badge {
 	display: inline-flex;
@@ -2972,28 +2986,20 @@ If your plugin does not need CSS, delete this file.
 	flex-shrink: 0;
 }
 
-/* Detail pane (right side) */
+/* Detail panel (independent floating pane, height fits content) */
 
 .obsius-picker-detail {
 	width: 240px;
 	flex-shrink: 0;
+	max-height: 280px;
 	overflow-y: auto;
 	padding: 10px 12px;
 	display: flex;
 	flex-direction: column;
-	border-left: 1px solid var(--background-modifier-border);
 	background-color: var(--background-secondary);
-}
-
-.obsius-picker-detail--empty {
-	align-items: center;
-	justify-content: center;
-}
-
-.obsius-picker-detail-empty-text {
-	color: var(--text-faint);
-	font-size: var(--font-ui-smaller);
-	text-align: center;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
 }
 
 .obsius-picker-detail-title {
@@ -3011,7 +3017,7 @@ If your plugin does not need CSS, delete this file.
 	line-height: 1.5;
 }
 
-/* Tree view (vault path hierarchy) */
+/* Tree view (vault path hierarchy in detail panel) */
 
 .obsius-picker-tree {
 	display: flex;
@@ -3034,6 +3040,7 @@ If your plugin does not need CSS, delete this file.
 	flex-shrink: 0;
 	color: var(--text-faint);
 }
+
 
 /* ============================================================
    Session Restore Toolbar (Notion-like)

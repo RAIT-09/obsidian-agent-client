@@ -111,11 +111,34 @@ export function ChatMessages({
 		<div ref={containerRef} className="obsius-chat-view-messages">
 			{messages.length === 0 ? (
 				<div className="obsius-chat-empty-state">
-					{isRestoringSession
-						? "Restoring session..."
-						: !isSessionReady
-							? `Connecting to ${agentLabel}...`
-							: `Start a conversation with ${agentLabel}...`}
+					<svg
+						className={`obsius-empty-state-icon${!isSessionReady || isRestoringSession ? " obsius-empty-state-icon--spinning" : ""}`}
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 100 100"
+					>
+						<defs>
+							<mask id="obsius-empty-o-mask">
+								<rect width="100" height="100" fill="black" />
+								<g transform="rotate(18 50 50)">
+									<ellipse cx="50" cy="50" rx="41" ry="34" fill="white" />
+								</g>
+								<g transform="rotate(-23 47 54)">
+									<ellipse cx="47" cy="54" rx="18" ry="13" fill="black" />
+								</g>
+							</mask>
+						</defs>
+						<rect
+							width="100"
+							height="100"
+							fill="currentColor"
+							mask="url(#obsius-empty-o-mask)"
+						/>
+					</svg>
+					<div className="obsius-empty-state-ready">
+						{isSessionReady && !isRestoringSession
+							? "We are ready."
+							: "just a moment..."}
+					</div>
 				</div>
 			) : (
 				<>

@@ -1,21 +1,20 @@
 import * as React from "react";
 import type { UsePickerReturn } from "../../hooks/usePicker";
-import {
-	type PickerItem,
-	type PickerMode,
-	type PickerTreeNode,
-} from "./types";
+import { type PickerItem, type PickerMode, type PickerTreeNode } from "./types";
 import { ObsidianIcon } from "../chat/ObsidianIcon";
 
 const { useRef, useEffect, useCallback } = React;
 
-interface UnifiedPickerPanelProps {
+interface PickerPanelProps {
 	picker: UsePickerReturn;
 	mode: PickerMode;
-	onKeyDown?: (e: React.KeyboardEvent) => boolean;
 }
 
-function MentionItemRow({
+/* ------------------------------------------------------------------ */
+/*  Item rows                                                         */
+/* ------------------------------------------------------------------ */
+
+function PickerItemRow({
 	item,
 	isSelected,
 	onClick,
@@ -26,49 +25,55 @@ function MentionItemRow({
 	onClick: () => void;
 	onHover: () => void;
 }) {
-	return (
-		<div
-			className={`obsius-picker-item ${isSelected ? "obsius-picker-item--selected" : ""}`}
-			data-selected={isSelected}
-			onClick={onClick}
-			onMouseEnter={onHover}
-		>
-			<ObsidianIcon
-				name={item.icon}
-				className="obsius-picker-item-icon"
-				size={16}
-			/>
-			<div className="obsius-picker-item-text">
+	if (item.isBack) {
+		return (
+			<div
+				className={`obsius-picker-item obsius-picker-item--back${isSelected ? " obsius-picker-item--selected" : ""}`}
+				data-selected={isSelected}
+				onClick={onClick}
+				onMouseEnter={onHover}
+			>
+				<ObsidianIcon
+					name="chevron-left"
+					className="obsius-picker-item-icon"
+					size={14}
+				/>
 				<span className="obsius-picker-item-label">{item.label}</span>
-				{item.sublabel && (
-					<span className="obsius-picker-item-sublabel">
-						{item.sublabel}
-					</span>
-				)}
 			</div>
-		</div>
-	);
-}
+		);
+	}
 
-function CommandItemRow({
-	item,
-	isSelected,
-	onClick,
-	onHover,
-}: {
-	item: PickerItem;
-	isSelected: boolean;
-	onClick: () => void;
-	onHover: () => void;
-}) {
+	if (item.isCategory) {
+		return (
+			<div
+				className={`obsius-picker-item obsius-picker-item--category${isSelected ? " obsius-picker-item--selected" : ""}`}
+				data-selected={isSelected}
+				onClick={onClick}
+				onMouseEnter={onHover}
+			>
+				<ObsidianIcon
+					name={item.icon}
+					className="obsius-picker-item-icon"
+					size={16}
+				/>
+				<span className="obsius-picker-item-label">{item.label}</span>
+				<ObsidianIcon
+					name="chevron-right"
+					className="obsius-picker-item-chevron"
+					size={14}
+				/>
+			</div>
+		);
+	}
+
 	return (
 		<div
-			className={`obsius-picker-item ${isSelected ? "obsius-picker-item--selected" : ""}`}
+			className={`obsius-picker-item${isSelected ? " obsius-picker-item--selected" : ""}`}
 			data-selected={isSelected}
 			onClick={onClick}
 			onMouseEnter={onHover}
 		>
-			{item.badge && (
+			{item.badge ? (
 				<span className="obsius-picker-badge">
 					<ObsidianIcon
 						name={item.badge.icon}
@@ -77,21 +82,29 @@ function CommandItemRow({
 					/>
 					{item.badge.label}
 				</span>
+			) : (
+				<ObsidianIcon
+					name={item.icon}
+					className="obsius-picker-item-icon"
+					size={16}
+				/>
 			)}
-			<div className="obsius-picker-item-text">
-				<span className="obsius-picker-item-label">{item.label}</span>
-				{item.sublabel && (
-					<span className="obsius-picker-item-sublabel">
-						{item.sublabel}
-					</span>
-				)}
-			</div>
-			{item.description && (
-				<span className="obsius-picker-item-desc">{item.description}</span>
+			<span className="obsius-picker-item-label">{item.label}</span>
+			{item.sublabel && (
+				<span className="obsius-picker-item-desc">{item.sublabel}</span>
+			)}
+			{item.description && !item.sublabel && (
+				<span className="obsius-picker-item-desc">
+					{item.description}
+				</span>
 			)}
 		</div>
 	);
 }
+
+/* ------------------------------------------------------------------ */
+/*  Detail pane (independent floating panel)                          */
+/* ------------------------------------------------------------------ */
 
 function TreePreview({ nodes }: { nodes: PickerTreeNode[] }) {
 	return (
@@ -120,24 +133,8 @@ function TreeNode({ node, depth }: { node: PickerTreeNode; depth: number }) {
 	);
 }
 
-function DetailPane({
-	preview,
-	mode,
-}: {
-	preview: UsePickerReturn["preview"];
-	mode: PickerMode;
-}) {
-	if (!preview) {
-		return (
-			<div className="obsius-picker-detail obsius-picker-detail--empty">
-				<span className="obsius-picker-detail-empty-text">
-					{mode === "mention"
-						? "Select a file to see its path"
-						: "Select a command for details"}
-				</span>
-			</div>
-		);
-	}
+function DetailPanel({ preview }: { preview: UsePickerReturn["preview"] }) {
+	if (!preview) return null;
 
 	if (preview.tree && preview.tree.length > 0) {
 		return (
@@ -147,61 +144,28 @@ function DetailPane({
 		);
 	}
 
+	if (!preview.body && !preview.title) return null;
+
 	return (
 		<div className="obsius-picker-detail">
-			<div className="obsius-picker-detail-title">{preview.title}</div>
-			<div className="obsius-picker-detail-body">{preview.body}</div>
-		</div>
-	);
-}
-
-function ItemList({
-	items,
-	selectedIndex,
-	listRef,
-	mode,
-	onSelect,
-	onHover,
-}: {
-	items: PickerItem[];
-	selectedIndex: number;
-	listRef: React.RefObject<HTMLDivElement | null>;
-	mode: PickerMode;
-	onSelect: (index: number) => void;
-	onHover: (index: number) => void;
-}) {
-	const Row = mode === "mention" ? MentionItemRow : CommandItemRow;
-
-	return (
-		<div className="obsius-picker-list" ref={listRef}>
-			{items.length === 0 && (
-				<div className="obsius-picker-empty">No results</div>
+			{preview.title && (
+				<div className="obsius-picker-detail-title">{preview.title}</div>
 			)}
-			{items.map((item, idx) => (
-				<Row
-					key={item.id}
-					item={item}
-					isSelected={idx === selectedIndex}
-					onClick={() => onSelect(idx)}
-					onHover={() => onHover(idx)}
-				/>
-			))}
+			{preview.body && (
+				<div className="obsius-picker-detail-body">{preview.body}</div>
+			)}
 		</div>
 	);
 }
 
-export function UnifiedPickerPanel({
-	picker,
-	mode,
-	onKeyDown,
-}: UnifiedPickerPanelProps) {
-	const panelRef = useRef<HTMLDivElement>(null);
-	const inputRef = useRef<HTMLInputElement>(null);
-	const listRef = useRef<HTMLDivElement>(null);
+/* ------------------------------------------------------------------ */
+/*  Main panel                                                        */
+/* ------------------------------------------------------------------ */
 
-	useEffect(() => {
-		inputRef.current?.focus();
-	}, []);
+export function UnifiedPickerPanel({ picker, mode }: PickerPanelProps) {
+	const listRef = useRef<HTMLDivElement>(null);
+	const pickerRef = useRef(picker);
+	pickerRef.current = picker;
 
 	useEffect(() => {
 		if (!listRef.current) return;
@@ -210,85 +174,37 @@ export function UnifiedPickerPanel({
 		selected?.scrollIntoView({ block: "nearest" });
 	}, [picker.selectedIndex]);
 
-	const handleKeyDown = useCallback(
-		(e: React.KeyboardEvent) => {
-			if (onKeyDown?.(e)) return;
+	const handleItemSelect = useCallback((index: number) => {
+		pickerRef.current.selectAt(index);
+	}, []);
 
-			if (e.key === "ArrowDown") {
-				e.preventDefault();
-				picker.navigate("down");
-			} else if (e.key === "ArrowUp") {
-				e.preventDefault();
-				picker.navigate("up");
-			} else if (e.key === "Enter") {
-				e.preventDefault();
-				picker.selectCurrent();
-			} else if (e.key === "Escape") {
-				e.preventDefault();
-				picker.close();
-			}
-		},
-		[picker, onKeyDown],
-	);
-
-	const handleItemSelect = useCallback(
-		(index: number) => {
-			picker.selectAt(index);
-		},
-		[picker],
-	);
-
-	const handleItemHover = useCallback(
-		(index: number) => {
-			picker.setSelectedIndex(index);
-		},
-		[picker],
-	);
-
-	const placeholder =
-		mode === "mention"
-			? "Search files, folders..."
-			: "Search commands, tools, skills...";
-
-	const listPane = (
-		<ItemList
-			items={picker.items}
-			selectedIndex={picker.selectedIndex}
-			listRef={listRef}
-			mode={mode}
-			onSelect={handleItemSelect}
-			onHover={handleItemHover}
-		/>
-	);
-
-	const detailPane = <DetailPane preview={picker.preview} mode={mode} />;
+	const handleItemHover = useCallback((index: number) => {
+		pickerRef.current.setSelectedIndex(index);
+	}, []);
 
 	return (
 		<div
-			className={`obsius-picker-panel obsius-picker-panel--${mode}`}
-			ref={panelRef}
-			onKeyDown={handleKeyDown}
+			className={`obsius-picker-wrapper obsius-picker-wrapper--${mode}`}
+			onMouseDown={(e) => e.preventDefault()}
 		>
-			<div className="obsius-picker-search">
-				<ObsidianIcon
-					name="search"
-					className="obsius-picker-search-icon"
-					size={14}
-				/>
-				<input
-					ref={inputRef}
-					type="text"
-					className="obsius-picker-search-input"
-					placeholder={placeholder}
-					value={picker.query}
-					onChange={(e) => picker.setQuery(e.target.value)}
-				/>
+			<div className="obsius-picker-panel">
+				<div className="obsius-picker-list" ref={listRef}>
+					{picker.items.length === 0 && (
+						<div className="obsius-picker-empty">No results</div>
+					)}
+					{picker.items.map((item, idx) => (
+						<PickerItemRow
+							key={item.id}
+							item={item}
+							isSelected={idx === picker.selectedIndex}
+							onClick={() => handleItemSelect(idx)}
+							onHover={() => handleItemHover(idx)}
+						/>
+					))}
+				</div>
 			</div>
 
-			<div className="obsius-picker-body">
-				{listPane}
-				{detailPane}
-			</div>
+			<DetailPanel preview={picker.preview} />
 		</div>
 	);
 }

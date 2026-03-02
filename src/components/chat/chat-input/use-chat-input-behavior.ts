@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type * as React from "react";
 
 import type { SlashCommand } from "../../../domain/models/chat-session";
 import type { NoteMetadata } from "../../../domain/ports/vault-access.port";
 import type { UseMentionsReturn } from "../../../hooks/useMentions";
+import type { UsePickerReturn } from "../../../hooks/usePicker";
 import type { UseSlashCommandsReturn } from "../../../hooks/useSlashCommands";
 import {
 	buildMessageWithContextTokens,
@@ -15,6 +16,8 @@ import type { RichTextareaHandle } from "./RichTextarea";
 interface UseChatInputBehaviorParams {
 	mentions: UseMentionsReturn;
 	slashCommands: UseSlashCommandsReturn;
+	mentionPicker: UsePickerReturn;
+	commandPicker: UsePickerReturn;
 	inputValue: string;
 	onInputChange: (value: string) => void;
 	richTextareaRef: React.RefObject<RichTextareaHandle | null>;
@@ -31,6 +34,8 @@ interface UseChatInputBehaviorParams {
 export function useChatInputBehavior({
 	mentions,
 	slashCommands,
+	mentionPicker,
+	commandPicker,
 	inputValue,
 	onInputChange,
 	richTextareaRef,
@@ -90,32 +95,33 @@ export function useChatInputBehavior({
 		[slashCommands, inputValue, onInputChange, richTextareaRef],
 	);
 
-	const handleDropdownKeyPress = useCallback(
-		(e: React.KeyboardEvent): boolean => {
-			const isSlashCommandActive = slashCommands.isOpen;
-			const isMentionActive = mentions.isOpen;
+	const mentionPickerRef = useRef(mentionPicker);
+	mentionPickerRef.current = mentionPicker;
+	const commandPickerRef = useRef(commandPicker);
+	commandPickerRef.current = commandPicker;
 
-			if (!isSlashCommandActive && !isMentionActive) {
+	const handlePickerKeyPress = useCallback(
+		(e: React.KeyboardEvent): boolean => {
+			const mp = mentionPickerRef.current;
+			const cp = commandPickerRef.current;
+			const isMentionActive = mp.isOpen;
+			const isCommandActive = cp.isOpen && !isMentionActive;
+
+			if (!isMentionActive && !isCommandActive) {
 				return false;
 			}
 
+			const activePicker = isMentionActive ? mp : cp;
+
 			if (e.key === "ArrowDown") {
 				e.preventDefault();
-				if (isSlashCommandActive) {
-					slashCommands.navigate("down");
-				} else {
-					mentions.navigate("down");
-				}
+				activePicker.navigate("down");
 				return true;
 			}
 
 			if (e.key === "ArrowUp") {
 				e.preventDefault();
-				if (isSlashCommandActive) {
-					slashCommands.navigate("up");
-				} else {
-					mentions.navigate("up");
-				}
+				activePicker.navigate("up");
 				return true;
 			}
 
@@ -124,40 +130,28 @@ export function useChatInputBehavior({
 					return false;
 				}
 				e.preventDefault();
-				if (isSlashCommandActive) {
-					const selectedCommand =
-						slashCommands.suggestions[slashCommands.selectedIndex];
-					if (selectedCommand) {
-						handleSelectSlashCommand(selectedCommand);
-					}
-				} else {
-					const selectedSuggestion =
-						mentions.suggestions[mentions.selectedIndex];
-					if (selectedSuggestion) {
-						selectMention(selectedSuggestion);
-					}
-				}
+				activePicker.selectCurrent();
 				return true;
 			}
 
 			if (e.key === "Escape") {
 				e.preventDefault();
-				if (isSlashCommandActive) {
-					slashCommands.close();
+				if (activePicker.activeFilter) {
+					activePicker.setFilter(null);
 				} else {
-					mentions.close();
+					activePicker.close();
 				}
 				return true;
 			}
 
 			return false;
 		},
-		[slashCommands, mentions, handleSelectSlashCommand, selectMention],
+		[],
 	);
 
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
-			if (handleDropdownKeyPress(e)) {
+			if (handlePickerKeyPress(e)) {
 				return;
 			}
 
@@ -179,7 +173,7 @@ export function useChatInputBehavior({
 			}
 		},
 		[
-			handleDropdownKeyPress,
+			handlePickerKeyPress,
 			handleHistoryKeyDown,
 			sendMessageShortcut,
 			isButtonDisabled,
