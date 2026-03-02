@@ -1,10 +1,11 @@
-import type { ChatMessage } from "../domain/models/chat-message";
+import type { ChatMessage, ToolKind } from "../domain/models/chat-message";
 import { toRelativePath } from "./path-utils";
 
 export interface FileChange {
 	path: string;
 	vaultPath: string | null;
 	isNewFile: boolean;
+	isDeleted: boolean;
 	canRevert: boolean;
 	originalText: string | null;
 	finalText: string;
@@ -62,6 +63,8 @@ export interface DiscoveredFile {
 	rawPath: string;
 	/** First oldText seen for this path — string for existing, null/undefined for new/unknown */
 	firstOldText: string | null | undefined;
+	/** True when any tool call with `kind === "delete"` targeted this path */
+	wasDeleted: boolean;
 }
 
 /**
@@ -82,24 +85,37 @@ export function discoverModifiedFiles(
 ): DiscoveredFile[] {
 	const found = new Map<string, DiscoveredFile>();
 
-	const add = (rawPath: string, oldText?: string | null) => {
+	const add = (
+		rawPath: string,
+		oldText?: string | null,
+		kind?: ToolKind,
+	) => {
 		const vaultPath = toVaultRelativePath(rawPath, vaultBasePath);
-		if (!vaultPath || found.has(vaultPath)) return;
+		if (!vaultPath) return;
+
+		const existing = found.get(vaultPath);
+		if (existing) {
+			if (kind === "delete") existing.wasDeleted = true;
+			return;
+		}
+
 		found.set(vaultPath, {
 			vaultPath,
 			rawPath,
 			firstOldText: oldText,
+			wasDeleted: kind === "delete",
 		});
 	};
 
 	for (const msg of messages) {
 		for (const content of msg.content) {
 			if (content.type !== "tool_call") continue;
+			const kind = content.kind;
 
 			if (content.content) {
 				for (const item of content.content) {
 					if (item.type !== "diff") continue;
-					add(item.path, item.oldText ?? null);
+					add(item.path, item.oldText ?? null, kind);
 				}
 			}
 
@@ -107,12 +123,12 @@ export function discoverModifiedFiles(
 				const rawPath =
 					getPathFromRawInput(content.rawInput) ||
 					content.locations?.[0]?.path;
-				if (rawPath) add(rawPath);
+				if (rawPath) add(rawPath, undefined, kind);
 			}
 
-			if (content.locations && content.kind !== "search") {
+			if (content.locations && kind !== "search") {
 				for (const loc of content.locations) {
-					add(loc.path);
+					add(loc.path, undefined, kind);
 				}
 			}
 		}

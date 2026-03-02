@@ -19,6 +19,8 @@ export interface RevertResult {
 interface OriginalFileState {
 	content: string | null;
 	isNew: boolean;
+	/** A tool call with `kind: "delete"` targeted this path */
+	wasDeletedByAgent: boolean;
 	rawPath: string;
 }
 
@@ -42,8 +44,8 @@ export class SnapshotManager {
 		{ action: "kept" | "reverted" }
 	>();
 
-	/** vault-relative path -> content right before we reverted (for undo) */
-	private preRevertBackups = new Map<string, string>();
+	/** vault-relative path -> content right before we reverted (null = file didn't exist) */
+	private preRevertBackups = new Map<string, string | null>();
 
 	/**
 	 * Discover all files mentioned in the conversation and record their
@@ -63,12 +65,19 @@ export class SnapshotManager {
 		const files = discoverModifiedFiles(messages, vaultBasePath);
 
 		for (const file of files) {
-			if (this.originals.has(file.vaultPath)) continue;
+			const existing = this.originals.get(file.vaultPath);
+			if (existing) {
+				if (file.wasDeleted && !existing.wasDeletedByAgent) {
+					existing.wasDeletedByAgent = true;
+				}
+				continue;
+			}
 
 			if (typeof file.firstOldText === "string") {
 				this.originals.set(file.vaultPath, {
 					content: file.firstOldText,
 					isNew: false,
+					wasDeletedByAgent: file.wasDeleted,
 					rawPath: file.rawPath,
 				});
 				continue;
@@ -78,6 +87,7 @@ export class SnapshotManager {
 				this.originals.set(file.vaultPath, {
 					content: null,
 					isNew: true,
+					wasDeletedByAgent: file.wasDeleted,
 					rawPath: file.rawPath,
 				});
 				continue;
@@ -89,7 +99,8 @@ export class SnapshotManager {
 			);
 			this.originals.set(file.vaultPath, {
 				content,
-				isNew: content == null,
+				isNew: file.wasDeleted ? false : content == null,
+				wasDeletedByAgent: file.wasDeleted,
 				rawPath: file.rawPath,
 			});
 		}
@@ -117,6 +128,8 @@ export class SnapshotManager {
 				vaultPath,
 			);
 
+			const isDeleted = !original.isNew && current == null;
+
 			if (original.isNew && current == null) continue;
 
 			if (
@@ -127,13 +140,14 @@ export class SnapshotManager {
 				continue;
 			}
 
-			if (original.content === current) continue;
+			if (original.content === current && !isDeleted) continue;
 
 			changes.push({
 				path: original.rawPath,
 				vaultPath,
 				isNewFile: original.isNew,
-				canRevert: true,
+				isDeleted,
+				canRevert: isDeleted ? original.content != null : true,
 				originalText: original.content,
 				finalText: current ?? "",
 			});
@@ -158,9 +172,7 @@ export class SnapshotManager {
 
 		try {
 			const current = await this.tryReadFile(io, vaultPath);
-			if (current != null) {
-				this.preRevertBackups.set(vaultPath, current);
-			}
+			this.preRevertBackups.set(vaultPath, current);
 
 			const writePath = vaultPath.normalize("NFC");
 			if (original.isNew) {
@@ -212,11 +224,13 @@ export class SnapshotManager {
 		this.preRevertBackups.clear();
 	}
 
-	async undoRevert(
-		writeFile: (path: string, content: string) => Promise<void>,
-	): Promise<void> {
+	async undoRevert(io: Pick<FileIo, "writeFile" | "deleteFile">): Promise<void> {
 		for (const [path, content] of this.preRevertBackups) {
-			await writeFile(path, content);
+			if (content == null) {
+				await io.deleteFile(path);
+			} else {
+				await io.writeFile(path, content);
+			}
 		}
 		this.preRevertBackups.clear();
 	}

@@ -112,6 +112,65 @@ describe("discoverModifiedFiles", () => {
 		expect(files).toHaveLength(0);
 	});
 
+	it("sets wasDeleted for delete tool calls", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc1",
+					status: "completed",
+					kind: "delete",
+					rawInput: { path: "notes/old.md" },
+				},
+			]),
+		];
+		const files = discoverModifiedFiles(messages);
+		expect(files).toHaveLength(1);
+		expect(files[0].wasDeleted).toBe(true);
+	});
+
+	it("propagates wasDeleted even if file was seen earlier", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc1",
+					status: "completed",
+					kind: "read",
+					locations: [{ path: "notes/a.md" }],
+				},
+			]),
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc2",
+					status: "completed",
+					kind: "delete",
+					rawInput: { path: "notes/a.md" },
+				},
+			]),
+		];
+		const files = discoverModifiedFiles(messages);
+		expect(files).toHaveLength(1);
+		expect(files[0].wasDeleted).toBe(true);
+	});
+
+	it("wasDeleted defaults to false for non-delete tools", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc1",
+					status: "completed",
+					kind: "edit",
+					rawInput: { path: "a.ts" },
+				},
+			]),
+		];
+		const files = discoverModifiedFiles(messages);
+		expect(files[0].wasDeleted).toBe(false);
+	});
+
 	it("discovers files from locations when kind is undefined (custom MCP tools)", () => {
 		const messages: ChatMessage[] = [
 			makeMessage("assistant", [

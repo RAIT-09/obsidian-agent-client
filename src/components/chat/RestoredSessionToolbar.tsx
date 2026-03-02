@@ -56,6 +56,25 @@ export function RestoredSessionToolbar({
 					change.originalText !== "") ||
 				(change.finalText !== undefined && change.finalText !== "");
 
+			if (change.isDeleted) {
+				const lines = change.originalText
+					? change.originalText.split("\n").length
+					: 0;
+				return {
+					key: change.path,
+					change,
+					openPath: null,
+					displayPath,
+					hasInlineDiff: change.originalText != null,
+					path: change.vaultPath ?? change.path,
+					added: 0,
+					removed: lines,
+					isNewFile: false,
+					isDeleted: true,
+					canRevert: change.canRevert,
+				};
+			}
+
 			if (change.isNewFile) {
 				return {
 					key: change.path,
@@ -67,6 +86,7 @@ export function RestoredSessionToolbar({
 					added: change.finalText ? change.finalText.split("\n").length : 0,
 					removed: 0,
 					isNewFile: true,
+					isDeleted: false,
 					canRevert: change.canRevert,
 				};
 			}
@@ -90,6 +110,7 @@ export function RestoredSessionToolbar({
 				added,
 				removed,
 				isNewFile: false,
+				isDeleted: false,
 				canRevert: change.canRevert,
 			};
 		});
@@ -207,6 +228,9 @@ export function RestoredSessionToolbar({
 								{row.isNewFile && (
 									<span className="obsius-changes-badge">NEW</span>
 								)}
+								{row.isDeleted && (
+									<span className="obsius-changes-badge obsius-changes-badge--deleted">DELETED</span>
+								)}
 
 								<span className="obsius-changes-file-stats">
 									<span className="obsius-changes-file-stat--add">+{row.added}</span>
@@ -248,15 +272,15 @@ export function RestoredSessionToolbar({
 
 							{isExpanded && row.hasInlineDiff && (
 								<div className="obsius-changes-file-diff">
-									<DiffRenderer
-										diff={{
-											type: "diff",
-											path: row.change.path,
-											oldText: row.change.isNewFile
-												? null
-												: row.change.originalText ?? undefined,
-											newText: row.change.finalText,
-										}}
+								<DiffRenderer
+									diff={{
+										type: "diff",
+										path: row.change.path,
+										oldText: row.change.isNewFile
+											? null
+											: row.change.originalText ?? undefined,
+										newText: row.isDeleted ? "" : row.change.finalText,
+									}}
 										plugin={plugin}
 										showHeader={false}
 										autoCollapse={plugin.settings.displaySettings.autoCollapseDiffs}

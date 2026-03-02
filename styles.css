@@ -3748,6 +3748,12 @@ If your plugin does not need CSS, delete this file.
 	border: 1px solid color-mix(in srgb, var(--color-green) 30%, transparent);
 }
 
+.obsius-changes-badge--deleted {
+	color: var(--color-red);
+	background: color-mix(in srgb, var(--color-red) 16%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-red) 30%, transparent);
+}
+
 .obsius-changes-badge--muted {
 	background: var(--background-modifier-hover);
 	color: var(--text-faint);

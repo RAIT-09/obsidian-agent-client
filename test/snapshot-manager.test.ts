@@ -34,6 +34,7 @@ function makeLocationMessage(
 	title: string,
 	locations: { path: string }[],
 	kind?: string,
+	rawInput?: Record<string, unknown>,
 ): ChatMessage {
 	return makeMessage("assistant", [
 		{
@@ -43,6 +44,7 @@ function makeLocationMessage(
 			title,
 			kind: kind as never,
 			locations,
+			rawInput,
 		},
 	]);
 }
@@ -301,6 +303,7 @@ describe("SnapshotManager", () => {
 				path: "/outside/vault.ts",
 				vaultPath: null,
 				isNewFile: false,
+				isDeleted: false,
 				canRevert: true,
 				originalText: "original",
 				finalText: "new",
@@ -366,9 +369,32 @@ describe("SnapshotManager", () => {
 			expect(io.files["a.ts"]).toBe("original");
 			expect(manager.canUndo).toBe(true);
 
-			await manager.undoRevert(io.writeFile);
+			await manager.undoRevert(io);
 			expect(io.files["a.ts"]).toBe("agent content");
 			expect(manager.canUndo).toBe(false);
+		});
+
+		it("re-deletes file when undoing revert of a deletion", async () => {
+			const io = mockFileIo({ "a.ts": "original content" });
+			const readMessages = [
+				makeLocationMessage("Read", [{ path: "a.ts" }], "read"),
+			];
+			await manager.captureSnapshots(readMessages, undefined, io.readFile);
+
+			delete io.files["a.ts"];
+			const deleteMessages = [
+				...readMessages,
+				makeLocationMessage("Delete", [{ path: "a.ts" }], "delete", { path: "a.ts" }),
+			];
+			const cs = await manager.computeChanges(deleteMessages, undefined, io.readFile);
+			expect(cs!.changes[0].isDeleted).toBe(true);
+
+			await manager.revertFile(cs!.changes[0], io);
+			expect(io.files["a.ts"]).toBe("original content");
+
+			await manager.undoRevert(io);
+			expect(io.files["a.ts"]).toBeUndefined();
+			expect(io.deleted).toContain("a.ts");
 		});
 	});
 
@@ -384,6 +410,139 @@ describe("SnapshotManager", () => {
 			const csAfter = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(csAfter).not.toBeNull();
 			expect(csAfter!.changes).toHaveLength(1);
+		});
+	});
+
+	describe("deletion tracking", () => {
+		it("detects deletion when original was captured before delete", async () => {
+			const io = mockFileIo({ "a.ts": "original content" });
+			const readMessages = [
+				makeLocationMessage("Read", [{ path: "a.ts" }], "read"),
+			];
+			await manager.captureSnapshots(readMessages, undefined, io.readFile);
+
+			delete io.files["a.ts"];
+			const allMessages = [
+				...readMessages,
+				makeLocationMessage("Delete", [{ path: "a.ts" }], "delete", { path: "a.ts" }),
+			];
+			const cs = await manager.computeChanges(allMessages, undefined, io.readFile);
+			expect(cs).not.toBeNull();
+			expect(cs!.changes).toHaveLength(1);
+			expect(cs!.changes[0].isDeleted).toBe(true);
+			expect(cs!.changes[0].isNewFile).toBe(false);
+			expect(cs!.changes[0].canRevert).toBe(true);
+			expect(cs!.changes[0].originalText).toBe("original content");
+			expect(cs!.changes[0].finalText).toBe("");
+		});
+
+		it("detects deletion via kind hint even without prior snapshot", async () => {
+			const io = mockFileIo();
+			const messages: ChatMessage[] = [
+				makeMessage("assistant", [
+					{
+						type: "tool_call",
+						toolCallId: "tc1",
+						status: "completed",
+						kind: "delete",
+						rawInput: { path: "notes/gone.md" },
+					},
+				]),
+			];
+
+			const cs = await manager.computeChanges(messages, undefined, io.readFile);
+			expect(cs).not.toBeNull();
+			expect(cs!.changes[0].isDeleted).toBe(true);
+			expect(cs!.changes[0].canRevert).toBe(false);
+			expect(cs!.changes[0].originalText).toBeNull();
+		});
+
+		it("reverts deletion by recreating file with original content", async () => {
+			const io = mockFileIo({ "a.md": "the original" });
+			const readMessages = [makeLocationMessage("Read", [{ path: "a.md" }], "read")];
+			await manager.captureSnapshots(readMessages, undefined, io.readFile);
+
+			delete io.files["a.md"];
+			const allMessages = [
+				...readMessages,
+				makeLocationMessage("Delete", [{ path: "a.md" }], "delete", { path: "a.md" }),
+			];
+			const cs = await manager.computeChanges(allMessages, undefined, io.readFile);
+			const result = await manager.revertFile(cs!.changes[0], io);
+
+			expect(result).toEqual({ reverted: true, conflict: false });
+			expect(io.files["a.md"]).toBe("the original");
+		});
+
+		it("cannot revert deletion without original content", async () => {
+			const io = mockFileIo();
+			const messages: ChatMessage[] = [
+				makeMessage("assistant", [
+					{
+						type: "tool_call",
+						toolCallId: "tc1",
+						status: "completed",
+						kind: "delete",
+						rawInput: { path: "notes/gone.md" },
+					},
+				]),
+			];
+
+			const cs = await manager.computeChanges(messages, undefined, io.readFile);
+			const result = await manager.revertFile(cs!.changes[0], io);
+			expect(result).toEqual({ reverted: false, conflict: true });
+		});
+
+		it("create then delete: no net change", async () => {
+			const io = mockFileIo();
+			const messages = [
+				makeDiffMessage("temp.ts", null, "content"),
+			];
+
+			const cs = await manager.computeChanges(messages, undefined, io.readFile);
+			expect(cs).toBeNull();
+		});
+
+		it("edit then delete: detects as deleted", async () => {
+			const io = mockFileIo({ "a.ts": "v2" });
+			const messages = [makeDiffMessage("a.ts", "v1", "v2")];
+			await manager.captureSnapshots(messages, undefined, io.readFile);
+
+			delete io.files["a.ts"];
+			const deleteMessages: ChatMessage[] = [
+				...messages,
+				makeMessage("assistant", [
+					{
+						type: "tool_call",
+						toolCallId: "tc2",
+						status: "completed",
+						kind: "delete",
+						rawInput: { path: "a.ts" },
+					},
+				]),
+			];
+			const cs = await manager.computeChanges(deleteMessages, undefined, io.readFile);
+			expect(cs!.changes[0].isDeleted).toBe(true);
+			expect(cs!.changes[0].originalText).toBe("v1");
+			expect(cs!.changes[0].canRevert).toBe(true);
+		});
+
+		it("modified files have isDeleted false", async () => {
+			const io = mockFileIo({ "a.ts": "new content" });
+			const messages = [makeDiffMessage("a.ts", "old content", "new content")];
+
+			const cs = await manager.computeChanges(messages, undefined, io.readFile);
+			expect(cs!.changes[0].isDeleted).toBe(false);
+			expect(cs!.changes[0].isNewFile).toBe(false);
+		});
+
+		it("new files have isDeleted false", async () => {
+			const io = mockFileIo({ "new.ts": "content" });
+			const messages = [makeDiffMessage("new.ts", null, "content")];
+
+			const cs = await manager.computeChanges(messages, undefined, io.readFile);
+			expect(cs!.changes[0].isDeleted).toBe(false);
+			expect(cs!.changes[0].isNewFile).toBe(true);
 		});
 	});
 
