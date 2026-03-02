@@ -6,7 +6,7 @@ import type {
 } from "../plugin";
 import { hasMigrationPath, migrateSettings } from "./settings-migrations";
 
-export const SETTINGS_SCHEMA_VERSION = 5;
+export const SETTINGS_SCHEMA_VERSION = 6;
 
 const sendMessageShortcutSchema = z.union([
 	z.literal("enter"),
@@ -32,6 +32,9 @@ const commonAgentSettingsSchema = z.object({
 	args: z.array(z.string()),
 	env: z.array(envVarSchema),
 });
+const apiKeyAgentSettingsSchema = commonAgentSettingsSchema.extend({
+	apiKeySecretId: z.string().regex(/^[a-z0-9-]+$/),
+});
 
 const displaySettingsSchema = z.object({
 	autoCollapseDiffs: z.boolean(),
@@ -53,9 +56,9 @@ const savedSessionSchema = z.object({
 
 const settingsSchema = z.object({
 	schemaVersion: z.literal(SETTINGS_SCHEMA_VERSION),
-	claude: commonAgentSettingsSchema,
-	codex: commonAgentSettingsSchema,
-	gemini: commonAgentSettingsSchema,
+	claude: apiKeyAgentSettingsSchema,
+	codex: apiKeyAgentSettingsSchema,
+	gemini: apiKeyAgentSettingsSchema,
 	opencode: commonAgentSettingsSchema,
 	customAgents: z.array(commonAgentSettingsSchema),
 	defaultAgentId: z.string().min(1),
@@ -108,6 +111,7 @@ export const createDefaultSettings = (): AgentClientPluginSettings => ({
 	claude: {
 		id: "claude-code-acp",
 		displayName: "Claude Code",
+		apiKeySecretId: "obsius-claude-api-key",
 		command: "",
 		args: [],
 		env: [],
@@ -115,6 +119,7 @@ export const createDefaultSettings = (): AgentClientPluginSettings => ({
 	codex: {
 		id: "codex-acp",
 		displayName: "Codex",
+		apiKeySecretId: "obsius-codex-api-key",
 		command: "",
 		args: [],
 		env: [],
@@ -122,6 +127,7 @@ export const createDefaultSettings = (): AgentClientPluginSettings => ({
 	gemini: {
 		id: "gemini-cli",
 		displayName: "Gemini CLI",
+		apiKeySecretId: "obsius-gemini-api-key",
 		command: "",
 		args: ["--experimental-acp"],
 		env: [],

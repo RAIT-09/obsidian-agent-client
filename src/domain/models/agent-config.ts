@@ -56,23 +56,35 @@ export interface BaseAgentSettings {
 /**
  * Configuration for Gemini CLI agent.
  *
- * API key is stored in Obsidian SecretStorage, not plugin settings.
+ * API key value is stored in Obsidian SecretStorage.
+ * Plugin settings only persist the secret ID.
  */
-export type GeminiAgentSettings = BaseAgentSettings;
+export interface GeminiAgentSettings extends BaseAgentSettings {
+	/** SecretStorage ID for GEMINI_API_KEY */
+	apiKeySecretId: string;
+}
 
 /**
  * Configuration for Claude Code agent.
  *
- * API key is stored in Obsidian SecretStorage, not plugin settings.
+ * API key value is stored in Obsidian SecretStorage.
+ * Plugin settings only persist the secret ID.
  */
-export type ClaudeAgentSettings = BaseAgentSettings;
+export interface ClaudeAgentSettings extends BaseAgentSettings {
+	/** SecretStorage ID for ANTHROPIC_API_KEY */
+	apiKeySecretId: string;
+}
 
 /**
  * Configuration for Codex CLI agent.
  *
- * API key is stored in Obsidian SecretStorage, not plugin settings.
+ * API key value is stored in Obsidian SecretStorage.
+ * Plugin settings only persist the secret ID.
  */
-export type CodexAgentSettings = BaseAgentSettings;
+export interface CodexAgentSettings extends BaseAgentSettings {
+	/** SecretStorage ID for OPENAI_API_KEY */
+	apiKeySecretId: string;
+}
 
 /**
  * Configuration for OpenCode agent.

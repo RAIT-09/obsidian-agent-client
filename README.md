@@ -20,8 +20,9 @@ Built-in agent API keys (Claude, Codex, Gemini) are stored in Obsidian secure st
 
 1. Open `Settings` -> `Community plugins` -> `Obsius`.
 2. Go to each built-in agent section (`Claude Code`, `Codex`, `Gemini CLI`).
-3. Paste your API key into the `API key` field.
-4. Start a chat with that agent as usual.
+3. Enter a secret name in the `API key` field (for example, `obsius-claude-api-key`).
+4. Save the secret value for that name using Obsidian's secret storage UI (Keychain).
+5. Start a chat with that agent as usual.
 
 ### Notes
 

@@ -1,4 +1,4 @@
-import { Notice, Setting, type TextComponent } from "obsidian";
+import { Notice, SecretComponent, Setting, type TextComponent } from "obsidian";
 import type AgentClientPlugin from "../../../plugin";
 import type { AgentEnvVar } from "../../../plugin";
 import { normalizeEnvVars } from "../../../shared/settings-utils";
@@ -6,10 +6,7 @@ import {
 	BUILTIN_AGENT_DEFAULT_COMMANDS,
 	resolveCommandFromShell,
 } from "../../../shared/shell-utils";
-import {
-	getBuiltInApiKeySecret,
-	setBuiltInApiKeySecret,
-} from "../../../shared/secret-storage";
+import { getBuiltInApiKeySecretId } from "../../../shared/secret-storage";
 import { renderAgentSubHeading } from "../settings-ui-helpers";
 import { renderAgentModelSettings } from "./model-preferences";
 
@@ -115,16 +112,20 @@ function renderGeminiSettings(
 	new Setting(sectionEl)
 		.setName("API key")
 		.setDesc(
-			"Gemini API key. Required if not logging in with a Google account. Stored in Obsidian secure storage.",
+			"Gemini API key secret name. Required if not logging in with a Google account. Value is stored in Obsidian secure storage.",
 		)
-		.addText((text) => {
-			text
-				.setPlaceholder("Enter your Gemini API key")
-				.setValue(getBuiltInApiKeySecret(plugin.app.secretStorage, "gemini"))
+		.addComponent((el) => {
+			const secretId = getBuiltInApiKeySecretId(plugin.settings, "gemini");
+			return new SecretComponent(plugin.app, el)
+				.setValue(secretId)
 				.onChange((value) => {
-					setBuiltInApiKeySecret(plugin.app.secretStorage, "gemini", value);
+					void store.updateSettings({
+						gemini: {
+							...plugin.settings.gemini,
+							apiKeySecretId: value.trim(),
+						},
+					});
 				});
-			text.inputEl.type = "password";
 		});
 
 	renderPathSettingWithDetect(sectionEl, plugin, {
@@ -186,16 +187,20 @@ function renderClaudeSettings(
 	new Setting(sectionEl)
 		.setName("API key")
 		.setDesc(
-			"Anthropic API key. Required if not logging in with an Anthropic account. Stored in Obsidian secure storage.",
+			"Anthropic API key secret name. Required if not logging in with an Anthropic account. Value is stored in Obsidian secure storage.",
 		)
-		.addText((text) => {
-			text
-				.setPlaceholder("Enter your Anthropic API key")
-				.setValue(getBuiltInApiKeySecret(plugin.app.secretStorage, "claude"))
+		.addComponent((el) => {
+			const secretId = getBuiltInApiKeySecretId(plugin.settings, "claude");
+			return new SecretComponent(plugin.app, el)
+				.setValue(secretId)
 				.onChange((value) => {
-					setBuiltInApiKeySecret(plugin.app.secretStorage, "claude", value);
+					void store.updateSettings({
+						claude: {
+							...plugin.settings.claude,
+							apiKeySecretId: value.trim(),
+						},
+					});
 				});
-			text.inputEl.type = "password";
 		});
 
 	renderPathSettingWithDetect(sectionEl, plugin, {
@@ -319,16 +324,20 @@ function renderCodexSettings(
 	new Setting(sectionEl)
 		.setName("API key")
 		.setDesc(
-			"OpenAI API key. Required if not logging in with an OpenAI account. Stored in Obsidian secure storage.",
+			"OpenAI API key secret name. Required if not logging in with an OpenAI account. Value is stored in Obsidian secure storage.",
 		)
-		.addText((text) => {
-			text
-				.setPlaceholder("Enter your OpenAI API key")
-				.setValue(getBuiltInApiKeySecret(plugin.app.secretStorage, "codex"))
+		.addComponent((el) => {
+			const secretId = getBuiltInApiKeySecretId(plugin.settings, "codex");
+			return new SecretComponent(plugin.app, el)
+				.setValue(secretId)
 				.onChange((value) => {
-					setBuiltInApiKeySecret(plugin.app.secretStorage, "codex", value);
+					void store.updateSettings({
+						codex: {
+							...plugin.settings.codex,
+							apiKeySecretId: value.trim(),
+						},
+					});
 				});
-			text.inputEl.type = "password";
 		});
 
 	renderPathSettingWithDetect(sectionEl, plugin, {

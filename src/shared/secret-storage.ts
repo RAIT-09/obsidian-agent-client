@@ -3,25 +3,25 @@ import type { AgentClientPluginSettings } from "../plugin";
 
 type BuiltInApiKeyAgent = "claude" | "codex" | "gemini";
 
-const BUILTIN_API_KEY_SECRET_IDS: Record<BuiltInApiKeyAgent, string> = {
-	claude: "obsius-claude-api-key",
-	codex: "obsius-codex-api-key",
-	gemini: "obsius-gemini-api-key",
-};
-
-export function setBuiltInApiKeySecret(
-	secretStorage: SecretStorage,
-	agent: BuiltInApiKeyAgent,
-	apiKey: string,
-): void {
-	secretStorage.setSecret(BUILTIN_API_KEY_SECRET_IDS[agent], apiKey.trim());
-}
-
 export function getBuiltInApiKeySecret(
 	secretStorage: SecretStorage,
+	secretId: string,
+): string {
+	return secretStorage.getSecret(secretId) ?? "";
+}
+
+export function getBuiltInApiKeySecretId(
+	settings: AgentClientPluginSettings,
 	agent: BuiltInApiKeyAgent,
 ): string {
-	return secretStorage.getSecret(BUILTIN_API_KEY_SECRET_IDS[agent]) ?? "";
+	switch (agent) {
+		case "claude":
+			return settings.claude.apiKeySecretId;
+		case "codex":
+			return settings.codex.apiKeySecretId;
+		case "gemini":
+			return settings.gemini.apiKeySecretId;
+	}
 }
 
 export function getApiKeyForAgentId(
@@ -30,13 +30,19 @@ export function getApiKeyForAgentId(
 	agentId: string,
 ): string {
 	if (agentId === settings.claude.id) {
-		return getBuiltInApiKeySecret(secretStorage, "claude");
+		return getBuiltInApiKeySecret(
+			secretStorage,
+			settings.claude.apiKeySecretId,
+		);
 	}
 	if (agentId === settings.codex.id) {
-		return getBuiltInApiKeySecret(secretStorage, "codex");
+		return getBuiltInApiKeySecret(secretStorage, settings.codex.apiKeySecretId);
 	}
 	if (agentId === settings.gemini.id) {
-		return getBuiltInApiKeySecret(secretStorage, "gemini");
+		return getBuiltInApiKeySecret(
+			secretStorage,
+			settings.gemini.apiKeySecretId,
+		);
 	}
 	return "";
 }
