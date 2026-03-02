@@ -81,10 +81,10 @@ export function MessageContentRenderer({
 							>
 								<span className="obsius-message-plan-entry-icon" aria-hidden="true">
 									{entry.status === "completed"
-										? "✓"
-										: entry.status === "in_progress"
-											? "◉"
-											: "○"}
+											? "\u00A0"
+											: entry.status === "in_progress"
+												? "◉"
+												: "○"}
 								</span>
 								<span className="obsius-message-plan-entry-text">
 									{entry.content}

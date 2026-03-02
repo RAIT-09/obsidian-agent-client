@@ -536,12 +536,11 @@ If your plugin does not need CSS, delete this file.
 }
 
 .obsius-message-plan-entry.obsius-plan-status-completed {
-	text-decoration: line-through;
 	color: var(--text-muted);
 }
 
-.obsius-message-plan-entry.obsius-plan-status-completed .obsius-message-plan-entry-icon {
-	color: var(--color-green);
+.obsius-message-plan-entry.obsius-plan-status-completed .obsius-message-plan-entry-text {
+	text-decoration: line-through;
 }
 
 .obsius-message-plan-entry.obsius-plan-status-in_progress {
