@@ -27,12 +27,25 @@ export function renderAgentModelSettings(
 	const models = plugin.settings.cachedAgentModels?.[agentId];
 	if (!models || models.length === 0) return;
 
-	renderCandidateModelPicker(containerEl, plugin, agentId, models);
-
 	const modes = plugin.settings.cachedAgentModes?.[agentId];
-	if (modes && modes.length > 0) {
-		renderModeModelMapping(containerEl, plugin, agentId, modes, models);
-	}
+	let modeMappingContainer: HTMLElement | null = null;
+	const renderModeMapping = () => {
+		if (!modeMappingContainer) return;
+		modeMappingContainer.empty();
+		if (modes && modes.length > 0) {
+			renderModeModelMapping(modeMappingContainer, plugin, agentId, modes, models);
+		}
+	};
+
+	renderCandidateModelPicker(
+		containerEl,
+		plugin,
+		agentId,
+		models,
+		renderModeMapping,
+	);
+	modeMappingContainer = containerEl.createDiv();
+	renderModeMapping();
 }
 
 // ============================================================================
@@ -44,6 +57,7 @@ function renderCandidateModelPicker(
 	plugin: AgentClientPlugin,
 	agentId: string,
 	models: CachedModel[],
+	onCandidatesChange: () => void,
 ): void {
 	const wrapper = containerEl.createDiv({
 		cls: "obsius-model-prefs-agent",
@@ -66,7 +80,14 @@ function renderCandidateModelPicker(
 	});
 	if (candidates.length > 0) {
 		refreshChips(chipsEl, plugin, agentId, models, () =>
-			updateDescription(headerSetting, chipsEl, plugin, agentId, models),
+			updateDescription(
+				headerSetting,
+				chipsEl,
+				plugin,
+				agentId,
+				models,
+				onCandidatesChange,
+			),
 		);
 	}
 
@@ -74,7 +95,14 @@ function renderCandidateModelPicker(
 		btn.setIcon("plus").setTooltip("Add model");
 		btn.onClick(() => {
 			togglePicker(wrapper, plugin, agentId, models, () => {
-				updateDescription(headerSetting, chipsEl, plugin, agentId, models);
+				updateDescription(
+					headerSetting,
+					chipsEl,
+					plugin,
+					agentId,
+					models,
+					onCandidatesChange,
+				);
 			});
 		});
 	});
@@ -86,13 +114,21 @@ function updateDescription(
 	plugin: AgentClientPlugin,
 	agentId: string,
 	models: CachedModel[],
+	onCandidatesChange: () => void,
 ): void {
 	const updated = (plugin.settings.candidateModels?.[agentId] ?? []).filter(
 		(id) => models.some((m) => m.modelId === id),
 	);
 
 	refreshChips(chipsEl, plugin, agentId, models, () =>
-		updateDescription(headerSetting, chipsEl, plugin, agentId, models),
+		updateDescription(
+			headerSetting,
+			chipsEl,
+			plugin,
+			agentId,
+			models,
+			onCandidatesChange,
+		),
 	);
 
 	if (updated.length > 0) {
@@ -104,6 +140,8 @@ function updateDescription(
 			`All ${models.length} models are available. Add candidates to filter the chat selector.`,
 		);
 	}
+
+	onCandidatesChange();
 }
 
 function refreshChips(
@@ -131,14 +169,16 @@ function refreshChips(
 			attr: { "aria-label": `Remove ${model?.name ?? modelId}` },
 		});
 		removeBtn.addEventListener("click", () => {
-			const current = plugin.settings.candidateModels?.[agentId] ?? [];
-			void plugin.settingsStore.updateSettings({
-				candidateModels: {
-					...plugin.settings.candidateModels,
-					[agentId]: current.filter((id) => id !== modelId),
-				},
-			});
-			onUpdate();
+			void (async () => {
+				const current = plugin.settings.candidateModels?.[agentId] ?? [];
+				await plugin.settingsStore.updateSettings({
+					candidateModels: {
+						...plugin.settings.candidateModels,
+						[agentId]: current.filter((id) => id !== modelId),
+					},
+				});
+				onUpdate();
+			})();
 		});
 	}
 }
@@ -300,18 +340,20 @@ function togglePicker(
 			}
 
 			item.addEventListener("click", () => {
-				const current = plugin.settings.candidateModels?.[agentId] ?? [];
-				const next = isSelected
-					? current.filter((id) => id !== model.modelId)
-					: [...current, model.modelId];
-				void plugin.settingsStore.updateSettings({
-					candidateModels: {
-						...plugin.settings.candidateModels,
-						[agentId]: next,
-					},
-				});
-				renderModels(modelList, providerName);
-				onUpdate();
+				void (async () => {
+					const current = plugin.settings.candidateModels?.[agentId] ?? [];
+					const next = isSelected
+						? current.filter((id) => id !== model.modelId)
+						: [...current, model.modelId];
+					await plugin.settingsStore.updateSettings({
+						candidateModels: {
+							...plugin.settings.candidateModels,
+							[agentId]: next,
+						},
+					});
+					renderModels(modelList, providerName);
+					onUpdate();
+				})();
 			});
 		}
 	};
@@ -351,7 +393,7 @@ function renderModeModelMapping(
 	const dropdownModels =
 		candidates.length > 0
 			? allModels.filter((m) => candidates.includes(m.modelId))
-			: allModels;
+			: [];
 
 	const modeGroup = containerEl.createDiv({
 		cls: "obsius-mode-model-group",
@@ -362,7 +404,10 @@ function renderModeModelMapping(
 			.setName(mode.name)
 			.setDesc(mode.description ?? "")
 			.addDropdown((dropdown) => {
-				dropdown.addOption("", "(auto)");
+				dropdown.addOption(
+					"",
+					dropdownModels.length > 0 ? "(auto)" : "(empty)",
+				);
 				for (const model of dropdownModels) {
 					dropdown.addOption(model.modelId, model.name);
 				}

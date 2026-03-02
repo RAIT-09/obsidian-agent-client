@@ -324,7 +324,10 @@ export function useChatController(
 			const modeDefaults = settings.modeModelDefaults?.[agentId];
 			const lastModeModels = settings.lastModeModels?.[agentId];
 
-			const targetModelId = modeDefaults?.[modeId] ?? lastModeModels?.[modeId];
+			const targetModelId =
+				modeDefaults?.[modeId] ??
+				lastModeModels?.[modeId] ??
+				session.models.availableModels[0]?.modelId;
 
 			if (
 				targetModelId &&
