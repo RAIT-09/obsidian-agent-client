@@ -57,6 +57,68 @@ export function ChatMessages({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
 
+	const svgRef = useRef<SVGSVGElement>(null);
+	const isSpinning = !isSessionReady || isRestoringSession;
+	const prevIsSpinningRef = useRef(isSpinning);
+	const [spinState, setSpinState] = useState<'spinning' | 'stopping' | 'stopped'>(
+		isSpinning ? 'spinning' : 'stopped'
+	);
+
+	useEffect(() => {
+		let timeoutId: number;
+		const wasSpinning = prevIsSpinningRef.current;
+		prevIsSpinningRef.current = isSpinning;
+
+		if (isSpinning) {
+			setSpinState('spinning');
+			if (svgRef.current) {
+				svgRef.current.style.animation = '';
+				svgRef.current.style.transition = '';
+				svgRef.current.style.transform = '';
+			}
+		} else if (wasSpinning && !isSpinning) {
+			// Just stopped spinning
+			setSpinState('stopping');
+			if (svgRef.current) {
+				const computedStyle = window.getComputedStyle(svgRef.current);
+				const matrix = computedStyle.getPropertyValue('transform');
+				let currentAngle = 0;
+				if (matrix && matrix !== 'none') {
+					const values = matrix.split('(')[1].split(')')[0].split(',');
+					const a = parseFloat(values[0]);
+					const b = parseFloat(values[1]);
+					currentAngle = Math.round(Math.atan2(b, a) * (180 / Math.PI));
+					if (currentAngle < 0) currentAngle += 360;
+				}
+
+				svgRef.current.style.animation = 'none';
+				svgRef.current.style.transition = 'none';
+				svgRef.current.style.transform = `rotate(${currentAngle}deg)`;
+
+				// Force reflow
+				void svgRef.current.getBoundingClientRect();
+
+				// Calculate target angle to ensure a smooth deceleration (at least 180 deg to go)
+				let targetAngle = 360;
+				if (currentAngle > 180) {
+					targetAngle = 720;
+				}
+				const distance = targetAngle - currentAngle;
+				const duration = Math.max(0.8, distance / 260); // Roughly match velocity
+
+				svgRef.current.style.transition = `transform ${duration}s cubic-bezier(0.25, 1, 0.5, 1)`;
+				svgRef.current.style.transform = `rotate(${targetAngle}deg)`;
+
+				timeoutId = window.setTimeout(() => {
+					setSpinState('stopped');
+				}, duration * 1000);
+			}
+		}
+		return () => {
+			if (timeoutId) window.clearTimeout(timeoutId);
+		};
+	}, [isSpinning]);
+
 	/**
 	 * Check if the scroll position is near the bottom.
 	 */
@@ -112,7 +174,8 @@ export function ChatMessages({
 			{messages.length === 0 ? (
 				<div className="obsius-chat-empty-state">
 					<svg
-						className={`obsius-empty-state-icon${!isSessionReady || isRestoringSession ? " obsius-empty-state-icon--spinning" : ""}`}
+						ref={svgRef}
+						className={`obsius-empty-state-icon${spinState === 'spinning' ? " obsius-empty-state-icon--spinning" : ""}`}
 						xmlns="http://www.w3.org/2000/svg"
 						viewBox="0 0 100 100"
 					>
