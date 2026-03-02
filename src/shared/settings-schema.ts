@@ -6,7 +6,7 @@ import type {
 } from "../plugin";
 import { hasMigrationPath, migrateSettings } from "./settings-migrations";
 
-export const SETTINGS_SCHEMA_VERSION = 4;
+export const SETTINGS_SCHEMA_VERSION = 5;
 
 const sendMessageShortcutSchema = z.union([
 	z.literal("enter"),
@@ -33,10 +33,6 @@ const commonAgentSettingsSchema = z.object({
 	env: z.array(envVarSchema),
 });
 
-const apiKeyAgentSettingsSchema = commonAgentSettingsSchema.extend({
-	apiKey: z.string(),
-});
-
 const displaySettingsSchema = z.object({
 	autoCollapseDiffs: z.boolean(),
 	diffCollapseThreshold: z.number().int().positive(),
@@ -57,9 +53,9 @@ const savedSessionSchema = z.object({
 
 const settingsSchema = z.object({
 	schemaVersion: z.literal(SETTINGS_SCHEMA_VERSION),
-	claude: apiKeyAgentSettingsSchema,
-	codex: apiKeyAgentSettingsSchema,
-	gemini: apiKeyAgentSettingsSchema,
+	claude: commonAgentSettingsSchema,
+	codex: commonAgentSettingsSchema,
+	gemini: commonAgentSettingsSchema,
 	opencode: commonAgentSettingsSchema,
 	customAgents: z.array(commonAgentSettingsSchema),
 	defaultAgentId: z.string().min(1),
@@ -112,7 +108,6 @@ export const createDefaultSettings = (): AgentClientPluginSettings => ({
 	claude: {
 		id: "claude-code-acp",
 		displayName: "Claude Code",
-		apiKey: "",
 		command: "",
 		args: [],
 		env: [],
@@ -120,7 +115,6 @@ export const createDefaultSettings = (): AgentClientPluginSettings => ({
 	codex: {
 		id: "codex-acp",
 		displayName: "Codex",
-		apiKey: "",
 		command: "",
 		args: [],
 		env: [],
@@ -128,7 +122,6 @@ export const createDefaultSettings = (): AgentClientPluginSettings => ({
 	gemini: {
 		id: "gemini-cli",
 		displayName: "Gemini CLI",
-		apiKey: "",
 		command: "",
 		args: ["--experimental-acp"],
 		env: [],

@@ -9,8 +9,29 @@ Bring AI agents into your Obsidian vault with fine-grained context controls.
 
 ## Requirements
 
-- Obsidian `1.5.0` or later
+- Obsidian `1.11.5` or later
 - Desktop only (not supported on mobile)
+
+## Secure API Keys
+
+Built-in agent API keys (Claude, Codex, Gemini) are stored in Obsidian secure storage, not in this plugin's settings JSON.
+
+### How to use
+
+1. Open `Settings` -> `Community plugins` -> `Obsius`.
+2. Go to each built-in agent section (`Claude Code`, `Codex`, `Gemini CLI`).
+3. Paste your API key into the `API key` field.
+4. Start a chat with that agent as usual.
+
+### Notes
+
+- Keys are stored via Obsidian's secure storage on desktop.
+- Keys are device-local and are not synced through your vault files.
+- If you use multiple devices, enter the key once on each device.
+
+### Recommendation
+
+For desktop users, we recommend [cc-switch](https://github.com/farion1231/cc-switch), a GUI tool that makes it easier to customize and switch agent configurations.
 
 ## Acknowledgments
 

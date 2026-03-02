@@ -1,10 +1,4 @@
-import {
-	useState,
-	useRef,
-	useEffect,
-	useMemo,
-	useCallback,
-} from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 
 import type { AttachedImage } from "../components/chat/ImagePreviewStrip";
 import { pluginNotice } from "../shared/plugin-notice";
@@ -13,6 +7,7 @@ import { NoteMentionService } from "../adapters/obsidian/mention-service";
 import { getLogger } from "../shared/logger";
 import { ObsidianVaultAdapter } from "../adapters/obsidian/vault.adapter";
 import { resolveAgentDisplayName } from "../shared/agent-display-name";
+import { getApiKeyForAgentId } from "../shared/secret-storage";
 import { resolveVaultBasePath } from "../shared/vault-path";
 import { useModelFiltering } from "./useModelFiltering";
 
@@ -70,11 +65,20 @@ export function useChatController(
 	}, [plugin, noteMentionService]);
 
 	const settings = useSettings(plugin);
+	const resolveApiKeyForAgent = useCallback(
+		(
+			currentSettings: ReturnType<(typeof plugin.settingsStore)["getSnapshot"]>,
+			agentId: string,
+		): string =>
+			getApiKeyForAgentId(plugin.app.secretStorage, currentSettings, agentId),
+		[plugin],
+	);
 
 	const agentSession = useAgentSession(
 		acpAdapter,
 		plugin.settingsStore,
 		vaultPath,
+		resolveApiKeyForAgent,
 		initialAgentId,
 	);
 
@@ -225,11 +229,7 @@ export function useChatController(
 
 			const hasInput = inputValue.trim() !== "" || attachedImages.length > 0;
 
-			if (
-				messagesRef.current.length === 0 &&
-				!isAgentSwitch &&
-				!hasInput
-			) {
+			if (messagesRef.current.length === 0 && !isAgentSwitch && !hasInput) {
 				pluginNotice("Already a new session");
 				return;
 			}

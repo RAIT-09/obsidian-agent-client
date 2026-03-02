@@ -1,10 +1,5 @@
 import type { AgentClientPluginSettings } from "../../plugin";
-import type {
-	BaseAgentSettings,
-	ClaudeAgentSettings,
-	GeminiAgentSettings,
-	CodexAgentSettings,
-} from "../../domain/models/agent-config";
+import type { BaseAgentSettings } from "../../domain/models/agent-config";
 import { toAgentConfig } from "../../shared/settings-utils";
 import type {
 	SessionState,
@@ -105,36 +100,34 @@ export function buildAgentConfigWithApiKey(
 	agentSettings: BaseAgentSettings,
 	agentId: string,
 	workingDirectory: string,
+	apiKey: string,
 ) {
 	const baseConfig = toAgentConfig(agentSettings, workingDirectory);
 
 	if (agentId === settings.claude.id) {
-		const claudeSettings = agentSettings as ClaudeAgentSettings;
 		return {
 			...baseConfig,
 			env: {
 				...baseConfig.env,
-				ANTHROPIC_API_KEY: claudeSettings.apiKey,
+				ANTHROPIC_API_KEY: apiKey,
 			},
 		};
 	}
 	if (agentId === settings.codex.id) {
-		const codexSettings = agentSettings as CodexAgentSettings;
 		return {
 			...baseConfig,
 			env: {
 				...baseConfig.env,
-				OPENAI_API_KEY: codexSettings.apiKey,
+				OPENAI_API_KEY: apiKey,
 			},
 		};
 	}
 	if (agentId === settings.gemini.id) {
-		const geminiSettings = agentSettings as GeminiAgentSettings;
 		return {
 			...baseConfig,
 			env: {
 				...baseConfig.env,
-				GEMINI_API_KEY: geminiSettings.apiKey,
+				GEMINI_API_KEY: apiKey,
 			},
 		};
 	}

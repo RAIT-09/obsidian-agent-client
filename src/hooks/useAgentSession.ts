@@ -32,6 +32,10 @@ export function useAgentSession(
 	agentClient: IAgentClient,
 	settingsAccess: ISettingsAccess,
 	workingDirectory: string,
+	getApiKeyForAgentId: (
+		settings: ReturnType<ISettingsAccess["getSnapshot"]>,
+		agentId: string,
+	) => string,
 	initialAgentId?: string,
 ): UseAgentSessionReturn {
 	const initialSettings = settingsAccess.getSnapshot();
@@ -120,6 +124,7 @@ export function useAgentSession(
 					agentSettings,
 					agentId,
 					workingDirectory,
+					getApiKeyForAgentId(settings, agentId),
 				);
 
 				const needsInitialize =
@@ -251,7 +256,7 @@ export function useAgentSession(
 				});
 			}
 		},
-		[agentClient, settingsAccess, workingDirectory],
+		[agentClient, settingsAccess, workingDirectory, getApiKeyForAgentId],
 	);
 
 	const loadSession = useCallback(
@@ -296,6 +301,7 @@ export function useAgentSession(
 					agentSettings,
 					defaultAgentId,
 					workingDirectory,
+					getApiKeyForAgentId(settings, defaultAgentId),
 				);
 
 				const needsInitialize =
@@ -395,7 +401,7 @@ export function useAgentSession(
 				});
 			}
 		},
-		[agentClient, settingsAccess, workingDirectory],
+		[agentClient, settingsAccess, workingDirectory, getApiKeyForAgentId],
 	);
 
 	const restartSession = useCallback(

@@ -6,6 +6,10 @@ import {
 	BUILTIN_AGENT_DEFAULT_COMMANDS,
 	resolveCommandFromShell,
 } from "../../../shared/shell-utils";
+import {
+	getBuiltInApiKeySecret,
+	setBuiltInApiKeySecret,
+} from "../../../shared/secret-storage";
 import { renderAgentSubHeading } from "../settings-ui-helpers";
 import { renderAgentModelSettings } from "./model-preferences";
 
@@ -111,16 +115,14 @@ function renderGeminiSettings(
 	new Setting(sectionEl)
 		.setName("API key")
 		.setDesc(
-			"Gemini API key. Required if not logging in with a Google account. (stored as plain text)",
+			"Gemini API key. Required if not logging in with a Google account. Stored in Obsidian secure storage.",
 		)
 		.addText((text) => {
 			text
 				.setPlaceholder("Enter your Gemini API key")
-				.setValue(gemini.apiKey)
-				.onChange(async (value) => {
-					await store.updateSettings({
-						gemini: { ...plugin.settings.gemini, apiKey: value.trim() },
-					});
+				.setValue(getBuiltInApiKeySecret(plugin.app.secretStorage, "gemini"))
+				.onChange((value) => {
+					setBuiltInApiKeySecret(plugin.app.secretStorage, "gemini", value);
 				});
 			text.inputEl.type = "password";
 		});
@@ -155,7 +157,7 @@ function renderGeminiSettings(
 	new Setting(sectionEl)
 		.setName("Environment variables")
 		.setDesc(
-			"Enter KEY=VALUE pairs, one per line. Required to authenticate with Vertex AI. GEMINI_API_KEY is derived from the field above. (stored as plain text)", // eslint-disable-line obsidianmd/ui/sentence-case
+			"Enter KEY=VALUE pairs, one per line. Required to authenticate with Vertex AI. GEMINI_API_KEY is derived from the field above.", // eslint-disable-line obsidianmd/ui/sentence-case
 		)
 		.addTextArea((text) => {
 			text
@@ -184,16 +186,14 @@ function renderClaudeSettings(
 	new Setting(sectionEl)
 		.setName("API key")
 		.setDesc(
-			"Anthropic API key. Required if not logging in with an Anthropic account. (stored as plain text)",
+			"Anthropic API key. Required if not logging in with an Anthropic account. Stored in Obsidian secure storage.",
 		)
 		.addText((text) => {
 			text
 				.setPlaceholder("Enter your Anthropic API key")
-				.setValue(claude.apiKey)
-				.onChange(async (value) => {
-					await store.updateSettings({
-						claude: { ...plugin.settings.claude, apiKey: value.trim() },
-					});
+				.setValue(getBuiltInApiKeySecret(plugin.app.secretStorage, "claude"))
+				.onChange((value) => {
+					setBuiltInApiKeySecret(plugin.app.secretStorage, "claude", value);
 				});
 			text.inputEl.type = "password";
 		});
@@ -319,16 +319,14 @@ function renderCodexSettings(
 	new Setting(sectionEl)
 		.setName("API key")
 		.setDesc(
-			"OpenAI API key. Required if not logging in with an OpenAI account. (stored as plain text)",
+			"OpenAI API key. Required if not logging in with an OpenAI account. Stored in Obsidian secure storage.",
 		)
 		.addText((text) => {
 			text
 				.setPlaceholder("Enter your OpenAI API key")
-				.setValue(codex.apiKey)
-				.onChange(async (value) => {
-					await store.updateSettings({
-						codex: { ...plugin.settings.codex, apiKey: value.trim() },
-					});
+				.setValue(getBuiltInApiKeySecret(plugin.app.secretStorage, "codex"))
+				.onChange((value) => {
+					setBuiltInApiKeySecret(plugin.app.secretStorage, "codex", value);
 				});
 			text.inputEl.type = "password";
 		});
@@ -432,4 +430,3 @@ function renderPathSettingWithDetect(
 		});
 	}
 }
-

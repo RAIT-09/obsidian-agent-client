@@ -2,7 +2,7 @@
 	"id": "obsius",
 	"name": "Obsius",
 	"version": "0.2.0",
-	"minAppVersion": "1.5.0",
+	"minAppVersion": "1.11.5",
 	"description": "Bring AI agents into your Obsidian vault with fine-grained context controls.",
 	"author": "shuuul",
 	"authorUrl": "https://github.com/shuuul",
