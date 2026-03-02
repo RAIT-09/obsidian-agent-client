@@ -91,11 +91,8 @@ function PickerItemRow({
 			)}
 			<span className="obsius-picker-item-label">{item.label}</span>
 			{item.sublabel && (
-				<span className="obsius-picker-item-desc">{item.sublabel}</span>
-			)}
-			{item.description && !item.sublabel && (
 				<span className="obsius-picker-item-desc">
-					{item.description}
+					{item.sublabel}
 				</span>
 			)}
 		</div>

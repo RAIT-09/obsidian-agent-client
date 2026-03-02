@@ -373,8 +373,8 @@ export function ChatInput({
 	const sendButtonState: SendButtonState = isSending
 		? "sending"
 		: isSessionReady &&
-				!isRestoringSession &&
-				(inputValue.trim() !== "" || attachedImages.length > 0)
+			!isRestoringSession &&
+			(inputValue.trim() !== "" || attachedImages.length > 0)
 			? "ready"
 			: "disabled";
 

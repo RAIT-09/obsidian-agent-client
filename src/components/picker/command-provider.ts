@@ -46,7 +46,6 @@ export class CommandPickerProvider implements PickerProvider {
 			id: `${this.category}:${cmd.name}`,
 			label: `/${cmd.name}`,
 			description: cmd.description || undefined,
-			sublabel: cmd.hint || undefined,
 			icon: this.icon,
 			badge: this.badge,
 			category: this.category,

@@ -23,6 +23,7 @@ const TOOL_TITLE_ICONS: Record<string, string> = {
 	EditFile: "file-pen",
 	MultiEdit: "file-pen",
 	StrReplace: "file-pen",
+	ApplyPatch: "file-pen",
 	NotebookEdit: "file-pen",
 	EditNotebook: "file-pen",
 
@@ -111,6 +112,8 @@ Object.assign(TOOL_TITLE_NORMALIZED, {
 	editfile: "file-pen",
 	apply_diff: "file-pen",
 	applydiff: "file-pen",
+	apply_patch: "file-pen",
+	applypatch: "file-pen",
 	replace_in_file: "file-pen",
 	replaceinfile: "file-pen",
 	delete_file: "trash-2",
