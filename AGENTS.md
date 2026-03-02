@@ -9,7 +9,7 @@ Obsidian desktop plugin for AI chat (OpenCode, Claude Code, Codex, Gemini CLI, c
 ```
 src/
 ├── main.ts                   # Re-exports plugin.ts
-├── plugin.ts                 # Obsidian plugin lifecycle composition root (~458 lines)
+├── plugin.ts                 # Obsidian plugin lifecycle (~480 LOC), owns `AgentRuntimeManager`
 ├── plugin/                   # Extracted plugin modules
 │   ├── agent-ops.ts          # Agent CRUD commands + broadcast helpers (~238 lines)
 │   ├── editor-context.ts     # Editor/file context menus + context reference handling (~342 lines)
@@ -19,8 +19,7 @@ src/
 ├── domain/                   # Pure types + interfaces — ZERO external deps
 │   ├── models/               # ChatMessage, SessionUpdate, AgentConfig, etc. (8 files, ~1056 lines)
 │   └── ports/                # IAgentClient, IVaultAccess, ISettingsAccess, IChatViewContainer (4 files, ~771 lines)
-├── adapters/
-│   ├── acp/                  # ACP protocol modules: lifecycle, runtime ops, routing, terminal, permissions (9 files)
+│   ├── acp/                  # ACP: lifecycle, runtime manager, multiplexer, routing (11 files)
 │   └── obsidian/             # VaultAdapter, SettingsStore, MentionService (3 files)
 ├── hooks/                    # React custom hooks (16 hooks + 5 state modules + 5 extracted modules)
 │   ├── state/                # Pure reducer/action modules for deterministic state transitions
@@ -180,10 +179,11 @@ npm run docs:build       # VitePress build
 - **CollapsibleSection**: New `collapsible` prop — pass `false` for static (non-expandable) tool call headers when no details exist
 - **Model preferences**: `components/settings/sections/model-preferences.ts` provides per-agent model preference configuration
 - **Current decomposition state**:
-  - `src/plugin.ts` (~458 LOC) is thin orchestrator; command/update/view/context/inline-edit helpers in `src/plugin/`
-  - `src/adapters/acp/acp.adapter.ts` (~505 LOC) is composition root; concern modules under `src/adapters/acp/`
+  - `src/plugin.ts` (~480 LOC) is thin orchestrator; owns `AgentRuntimeManager`; helpers in `src/plugin/`
+  - `src/adapters/acp/acp.adapter.ts` (~515 LOC) delegates to shared `AgentRuntime`; concern modules in `src/adapters/acp/`
   - `ChatView.tsx` (~531 LOC), `ChatInput.tsx` (~619 LOC) — input logic extracted to `chat-input/` (12 files)
   - `SessionHistoryContent.tsx` (~498 LOC) — largest React component
+- **Shared runtime**: Multiple tabs using the same agent share one ACP process via `AgentRuntimeManager` + `RuntimeMultiplexer`
 - **Undocumented API**: `vault.adapter.ts` uses `editor.cm` (CodeMirror 6 internal) for selection tracking
 - **ACP SDK**: `@agentclientprotocol/sdk ^0.14.1` — protocol may evolve
 - **External deps**: `react ^19.2.0`, `diff ^8.0.2`, `semver ^7.7.3`, `zod ^3.24.1`, `@codemirror/state`, `@codemirror/view`

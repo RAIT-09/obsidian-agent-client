@@ -280,13 +280,14 @@ export function useChatController(
 		chat.clearMessages();
 
 		try {
+			acpAdapter.forceDisconnectRuntime();
 			await agentSession.forceRestartAgent();
 			pluginNotice("Agent restarted");
 		} catch (error) {
 			pluginNotice("Failed to restart agent");
 			logger.error("Restart error:", error);
 		}
-	}, [logger, chat, agentSession]);
+	}, [logger, chat, acpAdapter, agentSession]);
 
 	const handleClearError = useCallback(() => {
 		chat.clearError();

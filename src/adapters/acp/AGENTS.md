@@ -6,15 +6,17 @@ ACP bridge modules implementing the Agent Client Protocol between domain ports a
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `acp.adapter.ts` | 505 | `AcpAdapter` composition root implementing `IAgentClient` + `IAcpClient` |
-| `process-lifecycle.ts` | 315 | Spawn/bootstrap/initialize ACP connection and process lifecycle wiring |
-| `runtime-ops.ts` | 309 | newSession/auth/sendPrompt/cancel/disconnect/set-mode/set-model operations |
+| `acp.adapter.ts` | ~515 | `AcpAdapter` composition root — delegates to shared `AgentRuntime` |
+| `agent-runtime-manager.ts` | 205 | Shared runtime management with reference counting |
+| `runtime-multiplexer.ts` | 168 | Routes ACP callbacks to correct tab adapter by sessionId |
+| `process-lifecycle.ts` | 315 | Spawn/bootstrap/initialize ACP connection and process lifecycle |
+| `runtime-ops.ts` | 309 | newSession/auth/sendPrompt/cancel/disconnect/set-mode/set-model |
 | `permission-queue.ts` | 219 | Serialized permission queue and response/cancel flow |
-| `session-ops.ts` | 195 | list/load/resume/fork session operations with WSL-aware cwd handling |
-| `update-routing.ts` | 113 | Pure ACP session update -> domain `SessionUpdate` mapping |
-| `acp-type-converter.ts` | 80 | `AcpTypeConverter` — bidirectional type mapping (ACP SDK <-> domain types) |
+| `session-ops.ts` | 195 | list/load/resume/fork session operations with WSL-aware cwd |
+| `update-routing.ts` | 113 | ACP session update -> domain `SessionUpdate` mapping |
+| `acp-type-converter.ts` | 80 | `AcpTypeConverter` — SDK <-> domain type conversion |
 | `terminal-bridge.ts` | 69 | Terminal RPC bridge wrappers |
-| `error-diagnostics.ts` | 54 | Stderr hint extraction and startup diagnostics helpers |
+| `error-diagnostics.ts` | 54 | Stderr hint extraction and startup diagnostics |
 
 ## AcpAdapter Class
 
@@ -37,12 +39,39 @@ Adds ACP-specific operations beyond domain `IAgentClient`:
 - `terminalOutput(params)` — poll terminal output for `TerminalRenderer`
 - `setUpdateMessageCallback(cb)` — wire message update function from `useChat`
 
-### Platform Handling
+## Shared Runtime Architecture
 
-- Process command wrapping and environment logic live in `process-lifecycle.ts`
-- WSL cwd conversion for session operations lives in `session-ops.ts`
-- Login shell resolution on macOS/Linux via `shell-utils.ts`
-- Windows PATH enhancement via `windows-env.ts`
+Multiple tabs using the same agent share a single ACP process + connection.
+
+### AgentRuntimeManager (`agent-runtime-manager.ts`)
+
+Manages one `AgentRuntime` per agent with reference counting:
+- `acquireRuntime(config, initArgs)` — spawns process or reuses existing (increments refcount)
+- `releaseRuntime(agentId)` — decrements refcount, tears down when zero
+- `forceDisconnectRuntime(agentId)` — force-kill for "restart agent"
+- `disconnectAll()` — cleanup on plugin unload
+
+### RuntimeMultiplexer (`runtime-multiplexer.ts`)
+
+Routes ACP callbacks to the correct tab adapter by `sessionId`:
+- Implements `acp.Client` interface for the shared connection
+- Each tab adapter registers itself via `registerSession(sessionId, handler)`
+- Broadcasts process errors and stderr to all tabs sharing the runtime
+
+### AcpAdapter Changes
+
+Per-tab adapter now:
+- Delegates process/connection lifecycle to `AgentRuntimeManager`
+- Owns session-scoped state (permissions, terminals, message callbacks)
+- Registers with `RuntimeMultiplexer` on `newSession`/`loadSession`/`resumeSession`
+- Calls `forceDisconnectRuntime()` on agent restart to ensure fresh process
+
+### Plugin Integration
+
+`plugin.ts` owns the singleton `AgentRuntimeManager`:
+- `runtimeManager` property initialized on plugin load
+- `disconnectAll()` called on Obsidian quit
+- Each tab's adapter receives the manager via constructor
 
 ## AcpTypeConverter
 

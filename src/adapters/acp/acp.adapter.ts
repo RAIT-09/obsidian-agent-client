@@ -1,4 +1,3 @@
-import { ChildProcess } from "child_process";
 import * as acp from "@agentclientprotocol/sdk";
 
 import type {
@@ -24,22 +23,16 @@ import { TerminalManager } from "../../shared/terminal-manager";
 import { getLogger, Logger } from "../../shared/logger";
 import type AgentClientPlugin from "../../plugin";
 import { routeSessionUpdate } from "./update-routing";
-import {
-	extractStderrErrorHint,
-	getCommandNotFoundSuggestion,
-	getSpawnErrorInfo,
-} from "./error-diagnostics";
+import { extractStderrErrorHint } from "./error-diagnostics";
 import {
 	authenticateOperation,
 	cancelOperation,
-	disconnectOperation,
 	newSessionOperation,
 	sendPromptOperation,
 	setSessionModeOperation,
 	setSessionModelOperation,
 } from "./runtime-ops";
 import {
-	activateNextPermissionOperation,
 	cancelPendingPermissionRequestsOperation,
 	handlePermissionResponseOperation,
 	requestPermissionOperation,
@@ -57,20 +50,37 @@ import {
 	loadSessionOperation,
 	resumeSessionOperation,
 } from "./session-ops";
-import { initializeOperation } from "./process-lifecycle";
+import type {
+	AgentRuntime,
+	AgentRuntimeManager,
+} from "./agent-runtime-manager";
+import type { SessionHandler } from "./runtime-multiplexer";
 
-export interface IAcpClient extends acp.Client {
+export interface IAcpClient {
 	handlePermissionResponse(requestId: string, optionId: string): void;
 	cancelAllOperations(): void;
 	resetCurrentMessage(): void;
 	terminalOutput(
 		params: acp.TerminalOutputRequest,
 	): Promise<acp.TerminalOutputResponse>;
+	setUpdateMessageCallback(
+		updateMessage: (toolCallId: string, content: MessageContent) => void,
+	): void;
 }
 
-export class AcpAdapter implements IAgentClient, IAcpClient {
-	private connection: acp.ClientSideConnection | null = null;
-	private agentProcess: ChildProcess | null = null;
+/**
+ * Per-tab ACP adapter.
+ *
+ * Owns session-scoped state (permissions, terminals, callbacks) but
+ * delegates process/connection lifecycle to a shared {@link AgentRuntime}
+ * managed by {@link AgentRuntimeManager}.
+ *
+ * Implements {@link SessionHandler} so the runtime's multiplexer can
+ * route ACP events to this adapter by sessionId.
+ */
+export class AcpAdapter implements IAgentClient, IAcpClient, SessionHandler {
+	private runtime: AgentRuntime | null = null;
+	private runtimeManager: AgentRuntimeManager;
 	private logger: Logger;
 
 	private sessionUpdateCallback: ((update: SessionUpdate) => void) | null =
@@ -83,6 +93,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	private currentConfig: AgentConfig | null = null;
 	private isInitializedFlag = false;
 	private currentAgentId: string | null = null;
+	private currentSessionId: string | null = null;
 	private autoAllowPermissions = false;
 
 	private terminalManager: TerminalManager;
@@ -107,9 +118,17 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	constructor(private plugin: AgentClientPlugin) {
 		this.logger = getLogger();
 		this.updateMessage = () => {};
-
+		this.runtimeManager = plugin.runtimeManager;
 		this.terminalManager = new TerminalManager(plugin);
 	}
+
+	// ── Convenience accessors for the shared connection ────────────────
+
+	private get connection(): acp.ClientSideConnection | null {
+		return this.runtime?.connection ?? null;
+	}
+
+	// ── IAgentClient implementation ───────────────────────────────────
 
 	setUpdateMessageCallback(
 		updateMessage: (toolCallId: string, content: MessageContent) => void,
@@ -122,73 +141,55 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			"[AcpAdapter] Starting initialization with config:",
 			config,
 		);
-		this.logger.log(
-			`[AcpAdapter] Current state - process: ${!!this.agentProcess}, PID: ${this.agentProcess?.pid}`,
-		);
 
-		if (this.agentProcess) {
-			this.logger.log(
-				`[AcpAdapter] Killing existing process (PID: ${this.agentProcess.pid})`,
-			);
-			this.agentProcess.kill();
-			this.agentProcess = null;
+		if (this.runtime && this.currentSessionId) {
+			this.runtime.multiplexer.unregisterSession(this.currentSessionId);
+			this.currentSessionId = null;
 		}
 
-		if (this.connection) {
-			this.logger.log("[AcpAdapter] Cleaning up existing connection");
-			this.connection = null;
+		if (this.runtime && this.currentAgentId) {
+			this.runtimeManager.releaseRuntime(this.currentAgentId);
+			this.runtime = null;
 		}
 
 		this.currentConfig = config;
-
 		this.autoAllowPermissions = this.plugin.settings.autoAllowPermissions;
 
 		try {
-			const initialized = await initializeOperation({
-				config,
-				logger: this.logger,
+			const runtime = await this.runtimeManager.acquireRuntime(config, {
 				pluginVersion: this.plugin.manifest.version,
 				windowsWslMode: this.plugin.settings.windowsWslMode,
-				windowsWslDistribution: this.plugin.settings.windowsWslDistribution,
+				windowsWslDistribution:
+					this.plugin.settings.windowsWslDistribution,
 				nodePath: this.plugin.settings.nodePath,
-				onError: (error) => {
-					this.errorCallback?.(error);
-				},
-				clientFactory: (stream) =>
-					new acp.ClientSideConnection(() => this, stream),
-				onStderrData: (chunk) => {
-					this.recentStderr += chunk;
-					if (this.recentStderr.length > 8192) {
-						this.recentStderr = this.recentStderr.slice(-4096);
-					}
-				},
-				getErrorInfo: (error, command, agentLabel) =>
-					this.getErrorInfo(error, command, agentLabel),
-				getCommandNotFoundSuggestion: (command) =>
-					this.getCommandNotFoundSuggestion(command),
 			});
-			this.connection = initialized.connection;
-			this.agentProcess = initialized.agentProcess;
+			this.runtime = runtime;
 			this.isInitializedFlag = true;
 			this.currentAgentId = config.id;
-			return initialized.initializeResult;
+			return runtime.initResult;
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Initialization Error:", error);
-
 			this.isInitializedFlag = false;
 			this.currentAgentId = null;
-
 			throw error;
 		}
 	}
 
 	async newSession(workingDirectory: string): Promise<NewSessionResult> {
-		return await newSessionOperation({
+		const result = await newSessionOperation({
 			connection: this.connection,
 			logger: this.logger,
 			workingDirectory,
 			windowsWslMode: this.plugin.settings.windowsWslMode,
 		});
+
+		if (this.currentSessionId && this.runtime) {
+			this.runtime.multiplexer.unregisterSession(this.currentSessionId);
+		}
+		this.currentSessionId = result.sessionId;
+		this.runtime?.multiplexer.registerSession(result.sessionId, this);
+
+		return result;
 	}
 
 	async authenticate(methodId: string): Promise<boolean> {
@@ -199,7 +200,10 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		});
 	}
 
-	async sendPrompt(sessionId: string, content: PromptContent[]): Promise<void> {
+	async sendPrompt(
+		sessionId: string,
+		content: PromptContent[],
+	): Promise<void> {
 		await sendPromptOperation({
 			connection: this.connection,
 			logger: this.logger,
@@ -229,27 +233,44 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	disconnect(): Promise<void> {
-		disconnectOperation({
-			logger: this.logger,
-			agentProcessPid: this.agentProcess?.pid,
-			killAgentProcess: () => {
-				this.agentProcess?.kill();
-				this.agentProcess = null;
-			},
-			cancelAllOperations: () => this.cancelAllOperations(),
-		});
-		this.connection = null;
+		this.logger.log("[AcpAdapter] Disconnecting...");
+		this.cancelAllOperations();
+
+		if (this.currentSessionId && this.runtime) {
+			this.runtime.multiplexer.unregisterSession(this.currentSessionId);
+		}
+
+		if (this.runtime && this.currentAgentId) {
+			this.runtimeManager.releaseRuntime(this.currentAgentId);
+			this.runtime = null;
+		}
+
 		this.currentConfig = null;
 		this.isInitializedFlag = false;
 		this.currentAgentId = null;
+		this.currentSessionId = null;
 		return Promise.resolve();
+	}
+
+	/**
+	 * Force-disconnect the shared runtime (kills the agent process).
+	 * Other tabs sharing this runtime will receive error callbacks.
+	 */
+	forceDisconnectRuntime(): void {
+		if (this.currentAgentId) {
+			this.runtimeManager.forceDisconnectRuntime(this.currentAgentId);
+		}
+		this.runtime = null;
+		this.isInitializedFlag = false;
+		this.currentSessionId = null;
 	}
 
 	isInitialized(): boolean {
 		return (
 			this.isInitializedFlag &&
-			this.connection !== null &&
-			this.agentProcess !== null
+			this.runtime !== null &&
+			this.runtime.connection !== null &&
+			this.runtime.process !== null
 		);
 	}
 
@@ -300,21 +321,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		return Promise.resolve();
 	}
 
-	private getErrorInfo(
-		error: Error,
-		command: string,
-		agentLabel: string,
-	): { title: string; message: string; suggestion: string } {
-		return getSpawnErrorInfo(error, command, agentLabel);
-	}
-
-	private getCommandNotFoundSuggestion(command: string): string {
-		return getCommandNotFoundSuggestion(command);
-	}
-
-	private extractStderrErrorHint(): string | null {
-		return extractStderrErrorHint(this.recentStderr);
-	}
+	// ── SessionHandler implementation (called by RuntimeMultiplexer) ──
 
 	sessionUpdate(params: acp.SessionNotification): Promise<void> {
 		const update = params.update;
@@ -326,38 +333,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			routeSessionUpdate(update, sessionId, this.sessionUpdateCallback);
 		}
 		return Promise.resolve();
-	}
-
-	resetCurrentMessage(): void {
-		this.currentMessageId = null;
-	}
-
-	handlePermissionResponse(requestId: string, optionId: string): void {
-		handlePermissionResponseOperation({
-			state: {
-				pendingPermissionRequests: this.pendingPermissionRequests,
-				pendingPermissionQueue: this.pendingPermissionQueue,
-			},
-			requestId,
-			optionId,
-			updateMessage: this.updateMessage,
-		});
-	}
-
-	cancelAllOperations(): void {
-		this.cancelPendingPermissionRequests();
-
-		this.terminalManager.killAllTerminals();
-	}
-
-	private activateNextPermission(): void {
-		activateNextPermissionOperation({
-			state: {
-				pendingPermissionRequests: this.pendingPermissionRequests,
-				pendingPermissionQueue: this.pendingPermissionQueue,
-			},
-			updateMessage: this.updateMessage,
-		});
 	}
 
 	async requestPermission(
@@ -374,25 +349,6 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			updateMessage: this.updateMessage,
 			sessionUpdateCallback: this.sessionUpdateCallback,
 		});
-	}
-
-	private cancelPendingPermissionRequests(): void {
-		cancelPendingPermissionRequestsOperation({
-			state: {
-				pendingPermissionRequests: this.pendingPermissionRequests,
-				pendingPermissionQueue: this.pendingPermissionQueue,
-			},
-			logger: this.logger,
-			updateMessage: this.updateMessage,
-		});
-	}
-
-	readTextFile(params: acp.ReadTextFileRequest) {
-		return Promise.resolve({ content: "" });
-	}
-
-	writeTextFile(params: acp.WriteTextFileRequest) {
-		return Promise.resolve({});
 	}
 
 	createTerminal(
@@ -451,6 +407,59 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		);
 	}
 
+	handleProcessError(error: ProcessError): void {
+		this.errorCallback?.(error);
+	}
+
+	handleStderrData(chunk: string): void {
+		this.recentStderr += chunk;
+		if (this.recentStderr.length > 8192) {
+			this.recentStderr = this.recentStderr.slice(-4096);
+		}
+	}
+
+	// ── IAcpClient methods ────────────────────────────────────────────
+
+	resetCurrentMessage(): void {
+		this.currentMessageId = null;
+	}
+
+	handlePermissionResponse(requestId: string, optionId: string): void {
+		handlePermissionResponseOperation({
+			state: {
+				pendingPermissionRequests: this.pendingPermissionRequests,
+				pendingPermissionQueue: this.pendingPermissionQueue,
+			},
+			requestId,
+			optionId,
+			updateMessage: this.updateMessage,
+		});
+	}
+
+	cancelAllOperations(): void {
+		this.cancelPendingPermissionRequests();
+		this.terminalManager.killAllTerminals();
+	}
+
+	// ── Private helpers ───────────────────────────────────────────────
+
+	private extractStderrErrorHint(): string | null {
+		return extractStderrErrorHint(this.recentStderr);
+	}
+
+	private cancelPendingPermissionRequests(): void {
+		cancelPendingPermissionRequestsOperation({
+			state: {
+				pendingPermissionRequests: this.pendingPermissionRequests,
+				pendingPermissionQueue: this.pendingPermissionQueue,
+			},
+			logger: this.logger,
+			updateMessage: this.updateMessage,
+		});
+	}
+
+	// ── Session management ────────────────────────────────────────────
+
 	async listSessions(
 		cwd?: string,
 		cursor?: string,
@@ -468,6 +477,12 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		sessionId: string,
 		cwd: string,
 	): Promise<LoadSessionResult> {
+		if (this.currentSessionId && this.runtime) {
+			this.runtime.multiplexer.unregisterSession(this.currentSessionId);
+		}
+		this.currentSessionId = sessionId;
+		this.runtime?.multiplexer.registerSession(sessionId, this);
+
 		return await loadSessionOperation({
 			connection: this.connection,
 			logger: this.logger,
@@ -481,6 +496,12 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		sessionId: string,
 		cwd: string,
 	): Promise<ResumeSessionResult> {
+		if (this.currentSessionId && this.runtime) {
+			this.runtime.multiplexer.unregisterSession(this.currentSessionId);
+		}
+		this.currentSessionId = sessionId;
+		this.runtime?.multiplexer.registerSession(sessionId, this);
+
 		return await resumeSessionOperation({
 			connection: this.connection,
 			logger: this.logger,
@@ -494,12 +515,20 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		sessionId: string,
 		cwd: string,
 	): Promise<ForkSessionResult> {
-		return await forkSessionOperation({
+		const result = await forkSessionOperation({
 			connection: this.connection,
 			logger: this.logger,
 			windowsWslMode: this.plugin.settings.windowsWslMode,
 			sessionId,
 			cwd,
 		});
+
+		if (this.currentSessionId && this.runtime) {
+			this.runtime.multiplexer.unregisterSession(this.currentSessionId);
+		}
+		this.currentSessionId = result.sessionId;
+		this.runtime?.multiplexer.registerSession(result.sessionId, this);
+
+		return result;
 	}
 }

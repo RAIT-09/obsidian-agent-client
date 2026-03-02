@@ -87,12 +87,11 @@ ChatComponent (ChatView.tsx)
 
 **Agent ID resolution**: `resolveExistingAgentId` (in `agent-session/helpers.ts`) and `resolveTabAgentId` (in `useTabs.ts`) guard against using a stale/removed agent ID by falling back to the default or first available agent. Used in `useAgentSession.init`, `useAgentSession.createSession`, and `useTabs` initial state + new tab creation.
 
-## Key Callbacks Wired in useChatController
-
 - `handleSessionUpdate`: Routes `SessionUpdate` union to `useChat.handleSessionUpdate()` (messages) and `useAgentSession` (commands, modes)
 - `handleSendMessage`: Orchestrates `useChat.sendMessage()` with autoMention state, images, vault path
 - `handleNewChat`: Calls `useAgentSession.createSession()`, clears messages and input state
 - `handleLoadSession`: Coordinates `useSessionHistory` + `useChat.setMessagesFromLocal()`
+- `handleRestartAgent`: Calls `acpAdapter.forceDisconnectRuntime()` then `agentSession.forceRestartAgent()` to ensure fresh process
 
 ## Adding a New Hook
 

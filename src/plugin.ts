@@ -13,6 +13,7 @@ import {
 } from "./adapters/obsidian/settings-store.adapter";
 import { AgentClientSettingTab } from "./components/settings/AgentClientSettingTab";
 import { AcpAdapter } from "./adapters/acp/acp.adapter";
+import { AgentRuntimeManager } from "./adapters/acp/agent-runtime-manager";
 import {
 	AgentEnvVar,
 	GeminiAgentSettings,
@@ -133,6 +134,9 @@ export default class AgentClientPlugin extends Plugin {
 	/** Registry for all chat view containers */
 	viewRegistry = new ChatViewRegistry();
 
+	/** Shared ACP runtimes — one process/connection per agent, reused across tabs */
+	runtimeManager = new AgentRuntimeManager();
+
 	/** Map of sessionKey (tab ID) to AcpAdapter — each tab owns one ACP session */
 	private _sessionAdapters: Map<string, AcpAdapter> = new Map();
 
@@ -215,20 +219,11 @@ export default class AgentClientPlugin extends Plugin {
 
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
 
-		// Clean up all ACP sessions when Obsidian quits
-		// Note: We don't wait for disconnect to complete to avoid blocking quit
+		// Clean up all ACP sessions and runtimes when Obsidian quits
 		this.registerEvent(
 			this.app.workspace.on("quit", () => {
-				// Fire and forget - don't block Obsidian from quitting
-				for (const [sessionKey, adapter] of this._sessionAdapters) {
-					adapter.disconnect().catch((error) => {
-						console.warn(
-							`[AgentClient] Quit cleanup error for session ${sessionKey}:`,
-							error,
-						);
-					});
-				}
 				this._sessionAdapters.clear();
+				this.runtimeManager.disconnectAll();
 			}),
 		);
 	}
@@ -254,6 +249,10 @@ export default class AgentClientPlugin extends Plugin {
 	/**
 	 * Remove and disconnect the adapter for a session key.
 	 * Called when a chat tab or view is closed.
+	 *
+	 * The adapter's `disconnect()` unregisters from the shared runtime
+	 * and decrements the refcount. The runtime process is only killed
+	 * when the last tab using that agent disconnects.
 	 */
 	async removeSessionAdapter(sessionKey: string): Promise<void> {
 		const adapter = this._sessionAdapters.get(sessionKey);

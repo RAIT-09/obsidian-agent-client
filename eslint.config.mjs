@@ -27,7 +27,6 @@ export default defineConfig([
 			parserOptions: { project: "./tsconfig.json" },
 		},
 		rules: {
-			// Preserve existing rules
 			"@typescript-eslint/no-unused-vars": ["error", { args: "none" }],
 			"@typescript-eslint/ban-ts-comment": "off",
 			"@typescript-eslint/no-empty-function": "off",
@@ -59,6 +58,12 @@ export default defineConfig([
 					enforceCamelCaseLower: true,
 				},
 			],
+		},
+	},
+	{
+		files: ["test/**/*.ts", "test/**/*.tsx"],
+		rules: {
+			"@typescript-eslint/unbound-method": "off",
 		},
 	},
 ]);
