@@ -1,6 +1,6 @@
 import * as React from "react";
 
-const { useRef, useEffect, useCallback, useState } = React;
+const { useRef, useEffect, useCallback } = React;
 
 import { TFile, Notice } from "obsidian";
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
@@ -11,11 +11,11 @@ import { useChatController } from "../../hooks/useChatController";
 import { useSessionRestore } from "../../hooks/useSessionRestore";
 import type AgentClientPlugin from "../../plugin";
 import { appendChatContextToken } from "../../shared/chat-context-token";
+import { getLastAssistantMessage } from "../../shared/session-file-restoration";
 import { ChatInput } from "./ChatInput";
 import { ChatMessages } from "./ChatMessages";
 import { SessionHistoryPopover } from "./SessionHistoryPopover";
 import { RestoredSessionToolbar } from "./RestoredSessionToolbar";
-import { SessionChangesModal } from "./SessionChangesModal";
 import type { ChatView } from "./ChatView";
 
 export interface TabContentActions {
@@ -99,26 +99,14 @@ export function TabContent({
 	} = controller;
 
 	const sessionRestore = useSessionRestore();
-	const [showChangesModal, setShowChangesModal] = useState(false);
-
-	const prevSessionId = useRef<string | null>(null);
-	useEffect(() => {
-		if (
-			session.sessionId &&
-			prevSessionId.current !== null &&
-			prevSessionId.current !== session.sessionId &&
-			messages.length > 0
-		) {
-			sessionRestore.activateRestore(messages);
-		}
-		prevSessionId.current = session.sessionId;
-	}, [session.sessionId, messages, sessionRestore]);
 
 	const writeFile = useCallback(
 		async (path: string, content: string) => {
 			const file = plugin.app.vault.getAbstractFileByPath(path);
 			if (file instanceof TFile) {
 				await plugin.app.vault.modify(file, content);
+			} else {
+				await plugin.app.vault.create(path, content);
 			}
 		},
 		[plugin],
@@ -133,40 +121,53 @@ export function TabContent({
 		[plugin],
 	);
 
-	const handleRevert = useCallback(async () => {
-		const { reverted, conflicts } = await sessionRestore.revertChanges(
-			writeFile,
-			readFile,
-		);
+	const deleteFile = useCallback(
+		async (path: string) => {
+			const file = plugin.app.vault.getAbstractFileByPath(path);
+			if (file instanceof TFile) {
+				await plugin.app.vault.delete(file);
+			}
+		},
+		[plugin],
+	);
+
+	const fileIo = { writeFile, readFile, deleteFile };
+
+	useEffect(() => {
+		if (messages.length === 0) {
+			sessionRestore.dismiss();
+			return;
+		}
+		void sessionRestore.refreshChanges(messages, vaultPath, readFile);
+	}, [
+		messages,
+		vaultPath,
+		readFile,
+		sessionRestore.dismiss,
+		sessionRestore.refreshChanges,
+	]);
+
+	const handleUndoAll = useCallback(async () => {
+		const { reverted, conflicts } = await sessionRestore.revertChanges(fileIo);
 		if (reverted.length > 0) {
 			new Notice(`Reverted ${reverted.length} file(s)`);
 		}
 		if (conflicts.length > 0) {
 			new Notice(`${conflicts.length} file(s) had conflicts and were skipped`);
 		}
-		setShowChangesModal(false);
-	}, [sessionRestore, writeFile, readFile]);
+	}, [sessionRestore, fileIo]);
 
-	const handleUndo = useCallback(async () => {
-		await sessionRestore.undoRevert(writeFile);
-		new Notice("Undo complete");
-	}, [sessionRestore, writeFile]);
-
-	const handleCopyBack = useCallback(() => {
-		if (sessionRestore.copyLastAssistantMessage(messages)) {
-			new Notice("Copied to clipboard");
-		} else {
-			new Notice("No assistant message found");
-		}
-	}, [sessionRestore, messages]);
-
-	const handleInsertAtCursor = useCallback(() => {
-		if (sessionRestore.insertLastAssistantMessage(plugin.app, messages)) {
-			new Notice("Inserted at cursor");
-		} else {
-			new Notice("No active editor or no assistant message");
-		}
-	}, [sessionRestore, plugin.app, messages]);
+	const handleRevertFile = useCallback(
+		async (changePath: string) => {
+			const result = await sessionRestore.revertFile(changePath, fileIo);
+			if (result.reverted) {
+				new Notice("File reverted");
+			} else if (result.conflict) {
+				new Notice("Could not revert: file has been modified externally");
+			}
+		},
+		[sessionRestore, fileIo],
+	);
 
 	const prevIsSendingRef = useRef(false);
 	useEffect(() => {
@@ -240,16 +241,7 @@ export function TabContent({
 			if (isSending) await handleStopGeneration();
 		},
 		getLastAssistantText: () => {
-			for (let i = messages.length - 1; i >= 0; i--) {
-				const msg = messages[i];
-				if (msg.role !== "assistant") continue;
-				for (const content of msg.content) {
-					if (content.type === "text" && content.text.trim()) {
-						return content.text;
-					}
-				}
-			}
-			return null;
+			return getLastAssistantMessage(messages);
 		},
 	};
 
@@ -305,27 +297,6 @@ export function TabContent({
 				/>
 			)}
 
-			{sessionRestore.isRestored && sessionRestore.changeSet && (
-				<RestoredSessionToolbar
-					changesCount={sessionRestore.changeSet.changes.length}
-					canUndo={sessionRestore.canUndo}
-					onShowChanges={() => setShowChangesModal(true)}
-					onRevert={() => void handleRevert()}
-					onUndo={() => void handleUndo()}
-					onCopyBack={handleCopyBack}
-					onInsertAtCursor={handleInsertAtCursor}
-					onDismiss={sessionRestore.dismiss}
-				/>
-			)}
-
-			{showChangesModal && sessionRestore.changeSet && (
-				<SessionChangesModal
-					changes={sessionRestore.changeSet.changes}
-					onClose={() => setShowChangesModal(false)}
-					onRevert={() => void handleRevert()}
-				/>
-			)}
-
 			<ChatMessages
 				messages={messages}
 				isSending={isSending}
@@ -337,6 +308,18 @@ export function TabContent({
 				acpClient={acpClientRef.current}
 				onApprovePermission={permission.approvePermission}
 			/>
+
+			{sessionRestore.changeSet &&
+				sessionRestore.changeSet.changes.length > 0 && (
+					<RestoredSessionToolbar
+						changes={sessionRestore.changeSet.changes}
+						plugin={plugin}
+						onUndoAll={() => void handleUndoAll()}
+						onKeepAll={sessionRestore.dismiss}
+						onRevertFile={handleRevertFile}
+						onKeepFile={sessionRestore.keepFile}
+					/>
+				)}
 
 			<ChatInput
 				isSending={isSending}

@@ -168,7 +168,7 @@ npm run docs:build       # VitePress build
 - **Context references**: Editor context menus (selection, file, folder) inject `ChatContextReference` tokens into chat input via `chat-context-token.ts`
 - **Picker system**: `components/picker/` provides unified `UnifiedPickerPanel` for @mentions and /commands with pluggable providers
 - **Inline edit**: `plugin/inline-edit.ts` enables selection-based editing via agent prompt with diff viewer
-- **Session restore**: `useSessionRestore` + `session-file-restoration.ts` detect and restore orphaned session files from disk
+- **Session restore**: `useSessionRestore` (thin React wrapper) delegates to `SnapshotManager` (`shared/snapshot-manager.ts`); captures original file state on first sighting (from diff `oldText` or disk read), detects changes via disk comparison; `discoverModifiedFiles` in `session-file-restoration.ts` scans all tool call sources (diffs, rawInput, locations) for file paths
 - **Settings migrations**: `settings-migrations.ts` handles schema version upgrades with typed migration functions
 - **Slash command tokens**: `slash-command-token.ts` encodes/decodes slash commands as inline tokens in message text
 - **Context usage meter**: `ContextUsageMeter.tsx` displays context window usage as a visual meter in the input area

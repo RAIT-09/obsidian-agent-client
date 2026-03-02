@@ -1,5 +1,5 @@
 import * as React from "react";
-const { useRef, useState, useEffect, useCallback, useId } = React;
+const { useRef, useState, useEffect, useCallback, useId, useMemo } = React;
 
 import type { ChatMessage } from "../../domain/models/chat-message";
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
@@ -172,6 +172,41 @@ export function ChatMessages({
 		checkIfAtBottom();
 	}, [view, checkIfAtBottom]);
 
+	const latestRunningToolCall = useMemo(() => {
+		for (let m = messages.length - 1; m >= 0; m--) {
+			const message = messages[m];
+			for (let c = message.content.length - 1; c >= 0; c--) {
+				const content = message.content[c];
+				if (
+					content.type === "tool_call" &&
+					(content.status === "pending" || content.status === "in_progress")
+				) {
+					const normalized = (content.title ?? "")
+						.replace(/[\s_-]+/g, "")
+						.toLowerCase();
+					const isFileEdit =
+						content.kind === "edit" ||
+						/write|createfile|editfile|applypatch|applydiff|replaceinfile/.test(
+							normalized,
+						);
+					return {
+						messageId: message.id,
+						contentIndex: c,
+						isFileEdit,
+					};
+				}
+			}
+		}
+		return null;
+	}, [messages]);
+
+	const latestRunningToolCallTarget =
+		latestRunningToolCall && !latestRunningToolCall.isFileEdit
+			? latestRunningToolCall
+			: null;
+	const showInlineToolCallIndicator = isSending && !!latestRunningToolCallTarget;
+	const hasRunningFileEditTool = isSending && !!latestRunningToolCall?.isFileEdit;
+
 	return (
 		<div ref={containerRef} className="obsius-chat-view-messages">
 			{messages.length === 0 ? (
@@ -215,9 +250,10 @@ export function ChatMessages({
 							plugin={plugin}
 							acpClient={acpClient}
 							onApprovePermission={onApprovePermission}
+							activeSendingToolCallTarget={showInlineToolCallIndicator ? latestRunningToolCallTarget : null}
 						/>
 					))}
-					{isSending && (
+					{isSending && !showInlineToolCallIndicator && !hasRunningFileEditTool && (
 						<div className="ac-loading">
 							<svg className="ac-loading__spinner" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
 								<line className="ac-sq-line-0" x1="15" y1="15" x2="85" y2="15" />

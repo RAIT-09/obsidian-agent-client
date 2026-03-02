@@ -460,6 +460,7 @@ export function getStatusDisplayClass(
 	status: string | null | undefined,
 ): string {
 	switch (status) {
+		case "pending":
 		case "in_progress":
 		case "running":
 			return "running";
@@ -479,6 +480,10 @@ export function getStatusDisplayClass(
  */
 export function getStatusIconName(status: string | null | undefined): string {
 	switch (status) {
+		case "pending":
+		case "in_progress":
+		case "running":
+			return "loader-2";
 		case "completed":
 			return "check";
 		case "failed":

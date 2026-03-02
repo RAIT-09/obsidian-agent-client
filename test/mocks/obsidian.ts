@@ -8,6 +8,18 @@ export function setIcon(el: HTMLElement, icon: string): void {
 	el.setAttribute("data-icon", icon);
 }
 
+export class FileSystemAdapter {
+	private readonly basePath: string;
+
+	constructor(basePath = "") {
+		this.basePath = basePath;
+	}
+
+	getBasePath(): string {
+		return this.basePath;
+	}
+}
+
 interface DropdownComponent {
 	addOption: (value: string, label: string) => DropdownComponent;
 	setValue: (value: string) => DropdownComponent;

@@ -1,29 +1,36 @@
 import { useState, useCallback, useRef } from "react";
 import { type App, MarkdownView } from "obsidian";
 import type { ChatMessage } from "../domain/models/chat-message";
-import {
-	extractSessionChangeSet,
-	getLastAssistantMessage,
-	type FileChange,
-	type SessionChangeSet,
-} from "../shared/session-file-restoration";
+import { getLastAssistantMessage } from "../shared/session-file-restoration";
+import type { SessionChangeSet } from "../shared/session-file-restoration";
+import { SnapshotManager, type FileIo } from "../shared/snapshot-manager";
+
+export type { FileIo as RevertFileIo };
+
+export interface RevertFileResult {
+	reverted: boolean;
+	conflict: boolean;
+}
 
 export interface UseSessionRestoreReturn {
 	isRestored: boolean;
 	changeSet: SessionChangeSet | null;
-	canUndo: boolean;
 
-	activateRestore: (messages: ChatMessage[]) => void;
-	dismiss: () => void;
-
-	showChanges: () => FileChange[];
-	revertChanges: (
-		writeFile: (path: string, content: string) => Promise<void>,
-		readFile: (path: string) => Promise<string>,
-	) => Promise<{ reverted: string[]; conflicts: string[] }>;
-	undoRevert: (
-		writeFile: (path: string, content: string) => Promise<void>,
+	refreshChanges: (
+		messages: ChatMessage[],
+		vaultBasePath?: string,
+		readFile?: (path: string) => Promise<string>,
 	) => Promise<void>;
+	dismiss: () => void;
+	keepFile: (changePath: string) => void;
+
+	revertFile: (
+		changePath: string,
+		io: FileIo,
+	) => Promise<RevertFileResult>;
+	revertChanges: (
+		io: FileIo,
+	) => Promise<{ reverted: string[]; conflicts: string[] }>;
 
 	copyLastAssistantMessage: (messages: ChatMessage[]) => boolean;
 	insertLastAssistantMessage: (app: App, messages: ChatMessage[]) => boolean;
@@ -32,79 +39,114 @@ export interface UseSessionRestoreReturn {
 export function useSessionRestore(): UseSessionRestoreReturn {
 	const [isRestored, setIsRestored] = useState(false);
 	const [changeSet, setChangeSet] = useState<SessionChangeSet | null>(null);
-	const [canUndo, setCanUndo] = useState(false);
+	const managerRef = useRef(new SnapshotManager());
 
-	const preRevertSnapshotRef = useRef<Map<string, string>>(new Map());
-
-	const activateRestore = useCallback((messages: ChatMessage[]) => {
-		const cs = extractSessionChangeSet(messages);
+	const syncState = useCallback((cs: SessionChangeSet | null) => {
 		setChangeSet(cs);
-		setIsRestored(cs.changes.length > 0);
-		setCanUndo(false);
-		preRevertSnapshotRef.current.clear();
+		setIsRestored(cs !== null);
 	}, []);
+
+	const refreshChanges = useCallback(
+		async (
+			messages: ChatMessage[],
+			vaultBasePath?: string,
+			readFile?: (path: string) => Promise<string>,
+		) => {
+			if (!readFile) return;
+			const manager = managerRef.current;
+			syncState(
+				await manager.computeChanges(messages, vaultBasePath, readFile),
+			);
+		},
+		[syncState],
+	);
 
 	const dismiss = useCallback(() => {
-		setIsRestored(false);
-		setChangeSet(null);
-		setCanUndo(false);
-		preRevertSnapshotRef.current.clear();
-	}, []);
+		const manager = managerRef.current;
+		if (changeSet) {
+			manager.dismissAll(changeSet.changes);
+		}
+		syncState(null);
+	}, [changeSet, syncState]);
 
-	const showChanges = useCallback((): FileChange[] => {
-		return changeSet?.changes ?? [];
-	}, [changeSet]);
-
-	const revertChanges = useCallback(
-		async (
-			writeFile: (path: string, content: string) => Promise<void>,
-			readFile: (path: string) => Promise<string>,
-		): Promise<{ reverted: string[]; conflicts: string[] }> => {
-			if (!changeSet) return { reverted: [], conflicts: [] };
-
-			const reverted: string[] = [];
-			const conflicts: string[] = [];
-			const snapshot = new Map<string, string>();
-
-			for (const change of changeSet.changes) {
-				if (change.originalText === null) continue;
-
-				try {
-					const currentContent = await readFile(change.path);
-					snapshot.set(change.path, currentContent);
-
-					if (currentContent === change.finalText) {
-						await writeFile(change.path, change.originalText);
-						reverted.push(change.path);
-					} else {
-						conflicts.push(change.path);
-					}
-				} catch {
-					conflicts.push(change.path);
+	const keepFile = useCallback(
+		(changePath: string) => {
+			if (!changeSet) return;
+			const change = changeSet.changes.find(
+				(item) => item.path === changePath,
+			);
+			if (change) {
+				managerRef.current.keepFile(change);
+			}
+			setChangeSet((prev) => {
+				if (!prev) return null;
+				const remaining = prev.changes.filter(
+					(item) => item.path !== changePath,
+				);
+				if (remaining.length === 0) {
+					setIsRestored(false);
+					return null;
 				}
-			}
-
-			preRevertSnapshotRef.current = snapshot;
-			if (reverted.length > 0) {
-				setCanUndo(true);
-			}
-
-			return { reverted, conflicts };
+				return { changes: remaining };
+			});
 		},
 		[changeSet],
 	);
 
-	const undoRevert = useCallback(
+	const revertFile = useCallback(
 		async (
-			writeFile: (path: string, content: string) => Promise<void>,
-		): Promise<void> => {
-			for (const [path, content] of preRevertSnapshotRef.current) {
-				await writeFile(path, content);
+			changePath: string,
+			io: FileIo,
+		): Promise<RevertFileResult> => {
+			if (!changeSet) return { reverted: false, conflict: false };
+			const change = changeSet.changes.find(
+				(item) => item.path === changePath,
+			);
+			if (!change) return { reverted: false, conflict: false };
+
+			const result = await managerRef.current.revertFile(change, io);
+			if (result.reverted) {
+				setChangeSet((prev) => {
+					if (!prev) return null;
+					const remaining = prev.changes.filter(
+						(item) => item.path !== changePath,
+					);
+					if (remaining.length === 0) {
+						setIsRestored(false);
+						return null;
+					}
+					return { changes: remaining };
+				});
 			}
-			preRevertSnapshotRef.current.clear();
-			setCanUndo(false);
+			return result;
 		},
-		[],
+		[changeSet],
+	);
+
+	const revertChanges = useCallback(
+		async (
+			io: FileIo,
+		): Promise<{ reverted: string[]; conflicts: string[] }> => {
+			if (!changeSet) return { reverted: [], conflicts: [] };
+
+			const { reverted, conflicts } = await managerRef.current.revertAll(
+				changeSet.changes,
+				io,
+			);
+
+			if (reverted.length > 0) {
+				const revertedSet = new Set(reverted);
+				const remaining = changeSet.changes.filter(
+					(c) => !revertedSet.has(c.path),
+				);
+				syncState(
+					remaining.length > 0 ? { changes: remaining } : null,
+				);
+			}
+
+			return { reverted, conflicts };
+		},
+		[changeSet, syncState],
 	);
 
 	const copyLastAssistantMessage = useCallback(
@@ -135,12 +177,11 @@ export function useSessionRestore(): UseSessionRestoreReturn {
 	return {
 		isRestored,
 		changeSet,
-		canUndo,
-		activateRestore,
+		refreshChanges,
 		dismiss,
-		showChanges,
+		keepFile,
+		revertFile,
 		revertChanges,
-		undoRevert,
 		copyLastAssistantMessage,
 		insertLastAssistantMessage,
 	};

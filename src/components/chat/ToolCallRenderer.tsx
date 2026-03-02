@@ -37,6 +37,7 @@ interface ToolCallRendererProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
 	plugin: AgentClientPlugin;
 	hasPlanContent?: boolean;
+	showLiveIndicator?: boolean;
 	acpClient?: IAcpClient;
 	onApprovePermission?: (requestId: string, optionId: string) => Promise<void>;
 }
@@ -169,6 +170,7 @@ export function ToolCallRenderer({
 	content,
 	plugin,
 	hasPlanContent = false,
+	showLiveIndicator = false,
 	acpClient,
 	onApprovePermission,
 }: ToolCallRendererProps) {
@@ -233,6 +235,7 @@ export function ToolCallRenderer({
 
 	const statusClass = getStatusDisplayClass(status);
 	const statusIcon = getStatusIconName(status);
+	const showRightStatusIcon = !showLiveIndicator || statusClass !== "running";
 
 	const hasDiffContent = toolContent?.some((item) => item.type === "diff") ?? false;
 	const rawPatchText = useMemo(
@@ -331,7 +334,22 @@ export function ToolCallRenderer({
 
 	const header = (
 		<>
-			<ObsidianIcon name={iconName} className="ac-tool-icon" />
+			{showLiveIndicator ? (
+				<span className="ac-tool-icon ac-tool-icon--spinner" aria-hidden="true">
+					<svg className="ac-loading__spinner ac-loading__spinner--inline" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+						<line className="ac-sq-line-0" x1="15" y1="15" x2="85" y2="15" />
+						<line className="ac-sq-line-1" x1="85" y1="15" x2="85" y2="85" />
+						<line className="ac-sq-line-2" x1="85" y1="85" x2="15" y2="85" />
+						<line className="ac-sq-line-3" x1="15" y1="85" x2="15" y2="15" />
+						<circle className="ac-sq-dot-0" r="6" cx="15" cy="15" />
+						<circle className="ac-sq-dot-1" r="6" cx="85" cy="15" />
+						<circle className="ac-sq-dot-2" r="6" cx="85" cy="85" />
+						<circle className="ac-sq-dot-3" r="6" cx="15" cy="85" />
+					</svg>
+				</span>
+			) : (
+				<ObsidianIcon name={iconName} className="ac-tool-icon" />
+			)}
 			{isFileTool ? (
 				<>
 					{isFileReadTool && (
@@ -379,7 +397,9 @@ export function ToolCallRenderer({
 			<span
 				className={`ac-tool-status ${statusClass ? `ac-tool-status--${statusClass}` : ""}`}
 			>
-				{statusIcon && <ObsidianIcon name={statusIcon} size={14} />}
+				{showRightStatusIcon && statusIcon && (
+					<ObsidianIcon name={statusIcon} size={14} />
+				)}
 			</span>
 		</>
 	);

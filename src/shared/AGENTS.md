@@ -26,7 +26,8 @@ Pure utility modules with no React dependencies. Business logic extracted from h
 | `command-classification.ts` | 69 | Classify slash commands by category (mode, model, action, etc.) | `usePicker`, `command-provider` |
 | `settings-migrations.ts` | 66 | Schema version migration functions for settings upgrades | `SettingsStore` |
 | `path-utils.ts` | 63 | `resolveCommandDirectory`, `toRelativePath`, `buildFileUri` | `AcpAdapter`, `ToolCallRenderer` |
-| `session-file-restoration.ts` | 54 | Detect and restore orphaned session files from disk | `useSessionRestore` |
+| `snapshot-manager.ts` | ~220 | `SnapshotManager` class: captures original file state on first sighting, detects changes via disk comparison, revert/keep/dismiss lifecycle | `useSessionRestore` |
+| `session-file-restoration.ts` | ~130 | `discoverModifiedFiles` (scans all tool calls for file paths), `FileChange`/`SessionChangeSet` types, `toVaultRelativePath`, `getLastAssistantMessage` | `SnapshotManager`, `useSessionRestore` |
 | `logger.ts` | 44 | `Logger` class + `getLogger` singleton — debug-mode gated logging | everywhere |
 | `completion-sound.ts` | 42 | `playCompletionSound` — two-tone chime via Web Audio API | `useChatController` |
 | `session-capability-utils.ts` | 42 | `getSessionCapabilityFlags` — boolean flags from `AgentCapabilities` | `useSessionHistory` |
@@ -71,9 +72,19 @@ Pure utility modules with no React dependencies. Business logic extracted from h
 - Encodes slash commands (e.g., `/compact`) as inline tokens in message text before sending
 - Decoded by prompt preparation to apply command effects during send
 
+**snapshot-manager.ts**:
+- `SnapshotManager` class: pure (no React/Obsidian deps), all I/O via injected `FileIo` interface
+- Captures original file state on first sighting via `captureSnapshots` (from diff `oldText` or disk read)
+- Detects changes via pure disk comparison in `computeChanges` (compares original snapshot with current disk content)
+- Tracks all files mentioned in the conversation (diffs, rawInput, tool call locations — excluding search results)
+- NFC/NFD fallback read + NFC write normalization for CJK filename compatibility
+- `useSessionRestore` is a thin React wrapper holding a `useRef<SnapshotManager>`
+
 **session-file-restoration.ts**:
-- Scans session directory for orphaned `.json` files not tracked in settings
-- Returns restorable sessions for `useSessionRestore` to offer to the user
+- `discoverModifiedFiles`: scans all tool calls for file paths (diffs, rawInput path keys, tool call locations)
+- `FileChange` / `SessionChangeSet` types define the change tracking model
+- `toVaultRelativePath`: normalizes absolute/relative paths into vault-relative format
+- `getLastAssistantMessage`: extracts last non-empty assistant text for clipboard/insert features
 
 **chat-view-registry.ts**:
 - Views self-register on mount, unregister on close

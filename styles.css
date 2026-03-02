@@ -89,13 +89,29 @@ If your plugin does not need CSS, delete this file.
 .ac-loading {
 	display: flex;
 	align-items: center;
-	padding: 4px 0;
+	padding: 4px 0 4px 10px;
 }
 
 .ac-loading__spinner {
 	width: 16px;
 	height: 16px;
 	display: block;
+}
+
+.ac-loading__spinner--inline {
+	width: 14px;
+	height: 14px;
+	color: var(--text-accent);
+}
+
+.ac-loading__spinner--inline line {
+	stroke: currentColor;
+	opacity: 0.45;
+}
+
+.ac-loading__spinner--inline circle {
+	fill: currentColor;
+	opacity: 0.95;
 }
 
 .ac-loading__spinner line {
@@ -843,6 +859,27 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* Tool icon in header */
+.ac-tool-icon--spinner {
+	color: var(--text-accent);
+}
+
+.ac-tool-live-indicator {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 0;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--text-accent);
+	transition: width 0.15s ease, min-width 0.15s ease;
+}
+
+.ac-tool-live-indicator--active {
+	width: 14px;
+	min-width: 14px;
+}
+
 .ac-tool-icon {
 	display: flex;
 	align-items: center;
@@ -863,6 +900,10 @@ If your plugin does not need CSS, delete this file.
 	margin-inline-start: auto;
 }
 
+.ac-tool-status--live {
+	min-width: 14px;
+}
+
 .ac-tool-status svg {
 	width: 14px;
 	height: 14px;
@@ -872,12 +913,25 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-accent);
 }
 
+.ac-tool-status--running svg {
+	animation: obsius-tool-status-spin 0.9s linear infinite;
+}
+
 .ac-tool-status--completed {
 	color: var(--color-green);
 }
 
 .ac-tool-status--error {
 	color: var(--color-red);
+}
+
+@keyframes obsius-tool-status-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 /* Diff stats in header (+N -M) */
@@ -3551,202 +3605,227 @@ If your plugin does not need CSS, delete this file.
 
 
 /* ============================================================
-   Session Restore Toolbar (Notion-like)
+   Session Changes Panel (Codex-style)
    ============================================================ */
 
-.obsius-restore-toolbar {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding: 6px 12px;
-	background-color: var(--background-secondary);
-	border-bottom: 1px solid var(--background-modifier-border);
-	font-size: var(--font-ui-small);
-	color: var(--text-muted);
+.obsius-changes-panel {
+	margin: 8px 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	overflow: hidden;
+	background: var(--background-primary);
 }
 
-.obsius-restore-toolbar-label {
-	flex: 1;
+.obsius-changes-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 14px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+}
+
+.obsius-changes-title {
+	font-size: var(--font-ui-small);
+	font-weight: 700;
+	color: var(--text-normal);
+	white-space: nowrap;
+}
+
+.obsius-changes-stat {
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
 	font-weight: 500;
 }
 
-.obsius-restore-toolbar-btn {
+.obsius-changes-stat--add {
+	color: var(--color-green);
+}
+
+.obsius-changes-stat--remove {
+	color: var(--color-red);
+}
+
+.obsius-changes-actions {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	padding: 3px 8px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
-	background: var(--background-primary);
-	color: var(--text-normal);
-	font-size: var(--font-ui-smaller);
-	cursor: pointer;
+	margin-left: auto;
 }
 
-.obsius-restore-toolbar-btn:hover {
-	background-color: var(--background-modifier-hover);
-}
-
-.obsius-restore-toolbar-btn--danger {
-	color: var(--text-error);
-	border-color: var(--text-error);
-}
-
-.obsius-restore-toolbar-btn--danger:hover {
-	background-color: var(--background-modifier-error);
-}
-
-/* ============================================================
-   Session Changes Modal
-   ============================================================ */
-
-.obsius-modal-overlay {
-	position: fixed;
-	inset: 0;
-	background: rgba(0, 0, 0, 0.5);
-	display: flex;
+.obsius-changes-btn {
+	display: inline-flex;
 	align-items: center;
-	justify-content: center;
-	z-index: var(--layer-modal);
-}
-
-.obsius-modal-content {
-	background: var(--background-primary);
-	border-radius: 10px;
-	box-shadow: var(--shadow-l);
-	max-width: 700px;
-	width: 90%;
-	max-height: 80vh;
-	display: flex;
-	flex-direction: column;
-	overflow: hidden;
-}
-
-.obsius-modal-header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	padding: 12px 16px;
-	border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.obsius-modal-header h3 {
-	margin: 0;
-	font-size: var(--font-ui-medium);
-}
-
-.obsius-modal-close {
-	background: none;
-	border: none;
-	cursor: pointer;
-	color: var(--text-muted);
-	padding: 4px;
-	border-radius: 4px;
-}
-
-.obsius-modal-close:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
-}
-
-.obsius-modal-body {
-	flex: 1;
-	overflow-y: auto;
-	padding: 8px 0;
-}
-
-.obsius-modal-footer {
-	display: flex;
-	justify-content: flex-end;
-	gap: 8px;
-	padding: 12px 16px;
-	border-top: 1px solid var(--background-modifier-border);
-}
-
-.obsius-modal-btn {
-	padding: 6px 14px;
+	gap: 4px;
+	padding: 4px 10px;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
 	background: var(--background-primary);
-	color: var(--text-normal);
-	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
 	cursor: pointer;
+	transition: background-color 0.1s ease, color 0.1s ease;
 }
 
-.obsius-modal-btn:hover {
+.obsius-changes-btn:hover:not(:disabled) {
 	background: var(--background-modifier-hover);
+	color: var(--text-normal);
 }
 
-.obsius-modal-btn--danger {
-	color: var(--text-on-accent);
-	background: var(--interactive-accent);
-	border-color: var(--interactive-accent);
+.obsius-changes-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
 }
 
-.obsius-modal-btn--danger:hover {
-	opacity: 0.9;
+.obsius-changes-btn--danger {
+	border-color: var(--color-red);
+	color: var(--color-red);
 }
 
-.obsius-change-file {
-	border-bottom: 1px solid var(--background-modifier-border);
+.obsius-changes-btn--danger:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--color-red) 10%, transparent);
 }
 
-.obsius-change-file:last-child {
-	border-bottom: none;
+.obsius-changes-btn--icon {
+	padding: 4px;
 }
 
-.obsius-change-file-header {
+.obsius-changes-files {
+	display: flex;
+	flex-direction: column;
+}
+
+.obsius-changes-file-row {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	padding: 8px 16px;
+	gap: 8px;
+	padding: 7px 14px;
 	cursor: pointer;
-	font-size: var(--font-ui-small);
+	transition: background-color 0.1s ease;
 }
 
-.obsius-change-file-header:hover {
+.obsius-changes-file-row:hover {
 	background: var(--background-modifier-hover);
 }
 
-.obsius-change-file-path {
-	flex: 1;
-	font-family: var(--font-monospace);
-	font-size: var(--font-ui-smaller);
+.obsius-changes-file + .obsius-changes-file {
+	border-top: 1px solid
+		color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
 }
 
-.obsius-change-badge {
+.obsius-changes-file-name {
+	flex: 1;
+	min-width: 0;
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-small);
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	direction: rtl;
+	text-align: left;
+}
+
+.obsius-changes-file-name--link {
+	cursor: pointer;
+}
+
+.obsius-changes-file-name--link:hover {
+	color: var(--text-accent);
+	text-decoration: underline;
+}
+
+.obsius-changes-badge {
+	flex-shrink: 0;
 	padding: 1px 6px;
 	border-radius: 4px;
 	font-size: 10px;
-	font-weight: 600;
+	font-weight: 700;
 	text-transform: uppercase;
+	letter-spacing: 0.3px;
+	color: var(--color-green);
+	background: color-mix(in srgb, var(--color-green) 16%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-green) 30%, transparent);
 }
 
-.obsius-change-badge--new {
-	background: var(--color-green);
-	color: var(--text-on-accent);
+.obsius-changes-badge--muted {
+	background: var(--background-modifier-hover);
+	color: var(--text-faint);
+	border-color: var(--background-modifier-border);
 }
 
-.obsius-change-diff {
-	padding: 0 16px 8px;
-}
-
-.obsius-change-diff-content {
-	margin: 0;
-	padding: 8px;
-	background: var(--background-secondary);
-	border-radius: 4px;
+.obsius-changes-file-stats {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex-shrink: 0;
 	font-family: var(--font-monospace);
 	font-size: var(--font-ui-smaller);
-	line-height: 1.5;
-	overflow-x: auto;
-	white-space: pre;
-	max-height: 300px;
-	overflow-y: auto;
 }
 
-.obsius-change-diff--added {
+.obsius-changes-file-stat--add {
 	color: var(--color-green);
+}
+
+.obsius-changes-file-stat--remove {
+	color: var(--color-red);
+}
+
+.obsius-changes-file-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	flex-shrink: 0;
+}
+
+.obsius-changes-file-action {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0 !important;
+	margin: 0 !important;
+	border: none !important;
+	border-radius: 4px !important;
+	background: transparent !important;
+	cursor: pointer;
+	color: var(--text-faint);
+	box-shadow: none !important;
+	min-width: unset !important;
+	min-height: unset !important;
+	transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.obsius-changes-file-action:disabled {
+	opacity: 0.3;
+	cursor: default;
+}
+
+.obsius-changes-file-action--reject:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--color-red) 15%, transparent) !important;
+	color: var(--color-red);
+}
+
+.obsius-changes-file-action--accept:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--color-green) 15%, transparent) !important;
+	color: var(--color-green);
+}
+
+.obsius-changes-file-chevron {
+	flex-shrink: 0;
+	color: var(--text-faint);
+	transition: transform 0.15s ease;
+}
+
+.obsius-changes-file-row--expanded .obsius-changes-file-chevron {
+	color: var(--text-muted);
+}
+
+.obsius-changes-file-diff {
+	border-top: 1px solid var(--background-modifier-border);
+	max-height: 400px;
+	overflow-y: auto;
 }
 
 /* ============================================================

@@ -12,8 +12,10 @@ interface MessageContentRendererProps {
 	content: MessageContent;
 	plugin: AgentClientPlugin;
 	messageId?: string;
+	contentIndex?: number;
 	messageRole?: "user" | "assistant";
 	hasPlanContent?: boolean;
+	activeSendingToolCallTarget?: { messageId: string; contentIndex: number } | null;
 	acpClient?: IAcpClient;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (requestId: string, optionId: string) => Promise<void>;
@@ -23,8 +25,10 @@ export function MessageContentRenderer({
 	content,
 	plugin,
 	messageId,
+	contentIndex,
 	messageRole,
 	hasPlanContent = false,
+	activeSendingToolCallTarget,
 	acpClient,
 	onApprovePermission,
 }: MessageContentRendererProps): React.ReactElement | null {
@@ -66,6 +70,11 @@ export function MessageContentRenderer({
 					content={content}
 					plugin={plugin}
 					hasPlanContent={hasPlanContent}
+					showLiveIndicator={
+						!!activeSendingToolCallTarget &&
+						activeSendingToolCallTarget.messageId === messageId &&
+						activeSendingToolCallTarget.contentIndex === contentIndex
+					}
 					acpClient={acpClient}
 					onApprovePermission={onApprovePermission}
 				/>

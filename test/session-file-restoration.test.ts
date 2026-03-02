@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../src/domain/models/chat-message";
 import {
-	extractSessionChangeSet,
+	discoverModifiedFiles,
 	getLastAssistantMessage,
+	toVaultRelativePath,
 } from "../src/shared/session-file-restoration";
 
 function makeMessage(
@@ -17,8 +18,8 @@ function makeMessage(
 	};
 }
 
-describe("extractSessionChangeSet", () => {
-	it("extracts diffs from tool calls", () => {
+describe("discoverModifiedFiles", () => {
+	it("discovers files from diff content in any tool call", () => {
 		const messages: ChatMessage[] = [
 			makeMessage("assistant", [
 				{
@@ -28,23 +29,110 @@ describe("extractSessionChangeSet", () => {
 					content: [
 						{
 							type: "diff",
-							path: "src/foo.ts",
-							oldText: "old content",
-							newText: "new content",
+							path: "/vault/notes/summary.md",
+							oldText: null,
+							newText: "content",
 						},
 					],
 				},
 			]),
 		];
-
-		const cs = extractSessionChangeSet(messages);
-		expect(cs.changes).toHaveLength(1);
-		expect(cs.changes[0].path).toBe("src/foo.ts");
-		expect(cs.changes[0].originalText).toBe("old content");
-		expect(cs.changes[0].finalText).toBe("new content");
+		const files = discoverModifiedFiles(messages, "/vault");
+		expect(files).toHaveLength(1);
+		expect(files[0].vaultPath).toBe("notes/summary.md");
+		expect(files[0].firstOldText).toBeNull();
 	});
 
-	it("tracks latest change per file", () => {
+	it("discovers files from rawInput path keys", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc1",
+					status: "in_progress",
+					kind: "other",
+					rawInput: { filePath: "/vault/a.md", content: "x" },
+				},
+			]),
+		];
+		const files = discoverModifiedFiles(messages, "/vault");
+		expect(files).toHaveLength(1);
+		expect(files[0].vaultPath).toBe("a.md");
+		expect(files[0].firstOldText).toBeUndefined();
+	});
+
+	it("discovers files from tool call locations", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc1",
+					status: "completed",
+					kind: "other",
+					locations: [{ path: "notes/摘要.md" }],
+				},
+			]),
+		];
+		const files = discoverModifiedFiles(messages);
+		expect(files).toHaveLength(1);
+		expect(files[0].vaultPath).toBe("notes/摘要.md");
+		expect(files[0].firstOldText).toBeUndefined();
+	});
+
+	it("includes locations for read tools (captures before write)", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc1",
+					status: "completed",
+					kind: "read",
+					locations: [{ path: "notes/a.md" }],
+				},
+			]),
+		];
+		const files = discoverModifiedFiles(messages);
+		expect(files).toHaveLength(1);
+		expect(files[0].vaultPath).toBe("notes/a.md");
+	});
+
+	it("skips locations for search tools", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc1",
+					status: "completed",
+					kind: "search",
+					locations: [{ path: "a.md" }, { path: "b.md" }, { path: "c.md" }],
+				},
+			]),
+		];
+		const files = discoverModifiedFiles(messages);
+		expect(files).toHaveLength(0);
+	});
+
+	it("discovers files from locations when kind is undefined (custom MCP tools)", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc1",
+					status: "completed",
+					title: "obsidian-markdown",
+					locations: [
+						{ path: "notes/doc.md" },
+						{ path: "notes/doc.md" },
+					],
+				},
+			]),
+		];
+		const files = discoverModifiedFiles(messages);
+		expect(files).toHaveLength(1);
+		expect(files[0].vaultPath).toBe("notes/doc.md");
+	});
+
+	it("prefers diff-based discovery over location-based", () => {
 		const messages: ChatMessage[] = [
 			makeMessage("assistant", [
 				{
@@ -52,12 +140,26 @@ describe("extractSessionChangeSet", () => {
 					toolCallId: "tc1",
 					status: "completed",
 					content: [
-						{
-							type: "diff",
-							path: "src/foo.ts",
-							oldText: "v1",
-							newText: "v2",
-						},
+						{ type: "diff", path: "a.ts", oldText: "old", newText: "new" },
+					],
+					locations: [{ path: "a.ts" }],
+				},
+			]),
+		];
+		const files = discoverModifiedFiles(messages);
+		expect(files).toHaveLength(1);
+		expect(files[0].firstOldText).toBe("old");
+	});
+
+	it("keeps only first oldText per path", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc1",
+					status: "completed",
+					content: [
+						{ type: "diff", path: "a.ts", oldText: "v1", newText: "v2" },
 					],
 				},
 			]),
@@ -67,31 +169,37 @@ describe("extractSessionChangeSet", () => {
 					toolCallId: "tc2",
 					status: "completed",
 					content: [
-						{
-							type: "diff",
-							path: "src/foo.ts",
-							oldText: "v2",
-							newText: "v3",
-						},
+						{ type: "diff", path: "a.ts", oldText: "v2", newText: "v3" },
 					],
 				},
 			]),
 		];
-
-		const cs = extractSessionChangeSet(messages);
-		expect(cs.changes).toHaveLength(1);
-		expect(cs.changes[0].originalText).toBe("v1");
-		expect(cs.changes[0].finalText).toBe("v3");
+		const files = discoverModifiedFiles(messages);
+		expect(files).toHaveLength(1);
+		expect(files[0].firstOldText).toBe("v1");
 	});
 
-	it("returns empty for messages without diffs", () => {
+	it("normalizes undefined oldText from diff to null", () => {
 		const messages: ChatMessage[] = [
-			makeMessage("user", [{ type: "text", text: "hello" }]),
-			makeMessage("assistant", [{ type: "text", text: "hi" }]),
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc1",
+					status: "completed",
+					content: [
+						{ type: "diff", path: "new.ts", oldText: undefined, newText: "content" },
+					],
+				},
+			]),
 		];
+		const files = discoverModifiedFiles(messages);
+		expect(files[0].firstOldText).toBeNull();
+	});
+});
 
-		const cs = extractSessionChangeSet(messages);
-		expect(cs.changes).toHaveLength(0);
+describe("toVaultRelativePath", () => {
+	it("returns null for absolute path outside vault", () => {
+		expect(toVaultRelativePath("/other/file.ts", "/vault")).toBeNull();
 	});
 });
 

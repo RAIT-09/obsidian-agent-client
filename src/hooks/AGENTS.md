@@ -15,7 +15,7 @@ State transitions are reducer-backed in `src/hooks/state/` for deterministic upd
 | `usePicker` | 268 | Picker panel open/selection state | `PickerProvider[]` | `ChatInput` (×2) |
 | `usePermission` | 234 | `activePermission`, approval queue | `IAgentClient` | `useChatController` |
 | `useSlashCommands` | 150 | Suggestions dropdown + token handling | `SlashCommand[]` | `useChatController` |
-| `useSessionRestore` | 147 | Session file restoration state | `ISettingsAccess`, session files | `TabContent` |
+| `useSessionRestore` | ~190 | Thin React wrapper around `SnapshotManager`; exposes change set state + revert/keep/dismiss; triggers disk comparison on every messages update | `SnapshotManager` | `TabContent` |
 | `useTabs` | ~185 | `tabs[]`, `activeTabId` (max 4); inherits active tab's agent when opening new tabs | `ChatTab`, agent info | `ChatComponent` |
 | `useInputHistory` | 139 | History index (ref-based) | `ChatMessage[]` | `ChatInput` |
 | `useMentions` | 130 | Suggestions dropdown state | `IVaultAccess`, `mention-utils` | `useChatController` |

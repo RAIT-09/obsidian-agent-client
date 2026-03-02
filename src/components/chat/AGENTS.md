@@ -26,7 +26,6 @@ ChatView (ItemView, ~531 lines) ─── Obsidian sidebar leaf
               │                 ├── CollapsibleThought    — agent reasoning toggle
               │                 └── CollapsibleSection    — generic collapsible wrapper; `collapsible={false}` renders static (non-clickable) header (~55 lines)
               ├── RestoredSessionToolbar ─ session restore accept/discard bar (~87 lines)
-              ├── SessionChangesModal   ─ modal showing session file changes (~114 lines)
               ├── DiffViewer            ─ side-by-side diff display for inline edits (~74 lines)
               ├── SuggestionDropdown  ─ @mention + /command dropdown (~140 lines)
               └── ChatInput           ─ input orchestrator (~619 lines)
@@ -88,7 +87,7 @@ Note: hooks in `chat-input/` use `kebab-case` naming (not `usePascalCase`) since
 
 ## Session Restore
 
-`RestoredSessionToolbar` renders an accept/discard bar when `useSessionRestore` detects orphaned session files on disk. `SessionChangesModal` shows the detailed file changes. `DiffViewer` displays side-by-side diffs for inline edit results.
+`RestoredSessionToolbar` renders an accept/discard bar when `useSessionRestore` detects file changes. `useSessionRestore` is a thin React wrapper around `SnapshotManager` (in `shared/snapshot-manager.ts`). The manager captures original file state on first sighting (from diff `oldText` or disk read) and detects changes by comparing each snapshot with current disk content. Works with standard edit tools (via diffs), custom MCP tools (via tool call locations), and any tool with rawInput path keys. `DiffViewer` displays side-by-side diffs for inline edit results.
 
 **Loading spinner**: `ChatMessages` renders an SVG square-dots spinner (`.ac-loading__spinner` with 4 circles + 4 lines) while `isSending` is true. CSS-animated via keyframes in `styles.css`; replaces the former three-dot pulse indicator.
 

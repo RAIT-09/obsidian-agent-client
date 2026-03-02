@@ -11,6 +11,7 @@ interface MessageRendererProps {
 	message: ChatMessage;
 	plugin: AgentClientPlugin;
 	acpClient?: IAcpClient;
+	activeSendingToolCallTarget?: { messageId: string; contentIndex: number } | null;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (requestId: string, optionId: string) => Promise<void>;
 }
@@ -22,26 +23,27 @@ interface MessageRendererProps {
 function groupContent(
 	contents: MessageContent[],
 ): Array<
-	| { type: "images"; items: MessageContent[] }
-	| { type: "single"; item: MessageContent }
+	| { type: "images"; items: Array<{ content: MessageContent; index: number }> }
+	| { type: "single"; item: MessageContent; index: number }
 > {
 	const groups: Array<
-		| { type: "images"; items: MessageContent[] }
-		| { type: "single"; item: MessageContent }
+		| { type: "images"; items: Array<{ content: MessageContent; index: number }> }
+		| { type: "single"; item: MessageContent; index: number }
 	> = [];
 
-	let currentImageGroup: MessageContent[] = [];
+	let currentImageGroup: Array<{ content: MessageContent; index: number }> = [];
 
-	for (const content of contents) {
+	for (let i = 0; i < contents.length; i++) {
+		const content = contents[i];
 		if (content.type === "image") {
-			currentImageGroup.push(content);
+			currentImageGroup.push({ content, index: i });
 		} else {
 			// Flush any pending image group
 			if (currentImageGroup.length > 0) {
 				groups.push({ type: "images", items: currentImageGroup });
 				currentImageGroup = [];
 			}
-			groups.push({ type: "single", item: content });
+			groups.push({ type: "single", item: content, index: i });
 		}
 	}
 
@@ -57,6 +59,7 @@ export function MessageRenderer({
 	message,
 	plugin,
 	acpClient,
+	activeSendingToolCallTarget,
 	onApprovePermission,
 }: MessageRendererProps) {
 	const groups = groupContent(message.content);
@@ -75,14 +78,16 @@ export function MessageRenderer({
 					return (
 						<div key={idx} className="obsius-message-content-item">
 							<div className="obsius-message-images-strip">
-								{group.items.map((content, imgIdx) => (
+								{group.items.map((item, imgIdx) => (
 									<MessageContentRenderer
 										key={imgIdx}
-										content={content}
+										content={item.content}
 										plugin={plugin}
 										messageId={message.id}
+										contentIndex={item.index}
 										messageRole={message.role}
-									hasPlanContent={hasPlanContent}
+										hasPlanContent={hasPlanContent}
+										activeSendingToolCallTarget={activeSendingToolCallTarget}
 										acpClient={acpClient}
 										onApprovePermission={onApprovePermission}
 									/>
@@ -98,8 +103,10 @@ export function MessageRenderer({
 								content={group.item}
 								plugin={plugin}
 								messageId={message.id}
+								contentIndex={group.index}
 								messageRole={message.role}
 								hasPlanContent={hasPlanContent}
+								activeSendingToolCallTarget={activeSendingToolCallTarget}
 								acpClient={acpClient}
 								onApprovePermission={onApprovePermission}
 							/>
