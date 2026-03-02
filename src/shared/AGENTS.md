@@ -6,33 +6,33 @@ Pure utility modules with no React dependencies. Business logic extracted from h
 
 | File | Lines | Purpose | Consumers |
 |------|-------|---------|-----------|
-| `message-service.ts` | 12 | Facade re-export for message-service modules | `useChat` |
-| `message-service/prompt-preparation.ts` | 351 | Prompt preparation: mention processing, auto-mention, WSL path conversion | `useChat` |
+| `message-service.ts` | 8 | Facade re-export for message-service modules | `useChat` |
+| `message-service/prompt-preparation.ts` | 599 | Prompt preparation: mention processing, auto-mention, WSL path conversion | `useChat` |
 | `message-service/prompt-sending.ts` | 113 | Prompt send path + auth retry + content type mapping | `useChat` |
-| `message-service/types.ts` | 53 | Message-service shared types | `useChat` |
+| `message-service/types.ts` | 51 | Message-service shared types | `useChat` |
+| `tool-icons.ts` | 490 | Tool title/kind -> Obsidian Lucide icon name mapping | `ToolCallRenderer` |
+| `chat-context-token.ts` | 299 | Context reference token parsing, creation, extraction, badge formatting | `ChatInput`, `TextWithMentions`, `editor-context` |
 | `terminal-manager.ts` | 277 | Spawn terminal processes, poll output, platform shell wrapping | `AcpAdapter` |
-| `chat-view-registry.ts` | 214 | Multi-view management: register/unregister/focus/broadcast/navigate | `plugin.ts` |
-| `chat-context-token.ts` | ~299 | Context reference token parsing, creation, extraction, badge formatting | `ChatInput`, `TextWithMentions`, `editor-context` |
-| `acp-error-utils.ts` | 205 | ACP JSON-RPC error extraction, user-friendly `ErrorInfo` generation | `useChat`, `useAgentSession` |
 | `settings-schema.ts` | 220 | Zod-based settings validation with schema versioning (v4) | `SettingsStore` |
-| `tool-icons.ts` | 221 | Tool title/kind -> Obsidian Lucide icon name mapping | `ToolCallRenderer` |
+| `chat-view-registry.ts` | 214 | Multi-view management: register/unregister/focus/broadcast/navigate | `plugin.ts` |
+| `acp-error-utils.ts` | 205 | ACP JSON-RPC error extraction, user-friendly `ErrorInfo` generation | `useChat`, `useAgentSession` |
 | `settings-utils.ts` | 164 | `sanitizeArgs`, `normalizeEnvVars`, `toAgentConfig` conversion | `useAgentSession`, `AgentClientSettingTab` |
 | `mention-utils.ts` | 138 | `detectMention`, `replaceMention`, `extractMentionedNotes` parsing | `useMentions`, `message-service` |
-| `completion-sound.ts` | ~20 | `playCompletionSound` — two-tone chime via Web Audio API | `useChatController` |
 | `windows-env.ts` | 129 | `getFullWindowsPath`, `getEnhancedWindowsEnv` — registry PATH query | `AcpAdapter`, `TerminalManager` |
-| `wsl-utils.ts` | ~98 | `convertWindowsPathToWsl`, `wrapCommandForWsl` | `AcpAdapter`, `message-service` |
-| `path-utils.ts` | ~63 | `resolveCommandDirectory`, `toRelativePath`, `buildFileUri` | `AcpAdapter`, `ToolCallRenderer` |
-| `session-capability-utils.ts` | ~42 | `getSessionCapabilityFlags` — boolean flags from `AgentCapabilities` | `useSessionHistory` |
-| `shell-utils.ts` | ~36 | `escapeShellArgWindows`, `getLoginShell`, `resolveCommandFromShell` | `AcpAdapter`, `TerminalManager` |
-| `display-settings.ts` | ~36 | `parseChatFontSize` — clamped integer parse (10-30) | `plugin.ts` |
-| `plugin-notice.ts` | 10 | `pluginNotice` — prefixed `Notice` wrapper | hooks, plugin, components |
-| `agent-display-name.ts` | 20 | Agent display name resolution from config | Settings UI, headers |
+| `wsl-utils.ts` | 98 | `convertWindowsPathToWsl`, `wrapCommandForWsl` | `AcpAdapter`, `message-service` |
+| `shell-utils.ts` | 91 | `escapeShellArgWindows`, `getLoginShell`, `resolveCommandFromShell` | `AcpAdapter`, `TerminalManager` |
 | `command-classification.ts` | 69 | Classify slash commands by category (mode, model, action, etc.) | `usePicker`, `command-provider` |
-| `session-file-restoration.ts` | 54 | Detect and restore orphaned session files from disk | `useSessionRestore` |
 | `settings-migrations.ts` | 66 | Schema version migration functions for settings upgrades | `SettingsStore` |
-| `slash-command-token.ts` | 36 | Encode/decode slash commands as inline tokens in message text | `useSlashCommands`, `prompt-preparation` |
-| `vault-path.ts` | 9 | Vault path resolution helper | `plugin.ts`, hooks |
+| `path-utils.ts` | 63 | `resolveCommandDirectory`, `toRelativePath`, `buildFileUri` | `AcpAdapter`, `ToolCallRenderer` |
+| `session-file-restoration.ts` | 54 | Detect and restore orphaned session files from disk | `useSessionRestore` |
 | `logger.ts` | 44 | `Logger` class + `getLogger` singleton — debug-mode gated logging | everywhere |
+| `completion-sound.ts` | 42 | `playCompletionSound` — two-tone chime via Web Audio API | `useChatController` |
+| `session-capability-utils.ts` | 42 | `getSessionCapabilityFlags` — boolean flags from `AgentCapabilities` | `useSessionHistory` |
+| `slash-command-token.ts` | 36 | Encode/decode slash commands as inline tokens in message text | `useSlashCommands`, `prompt-preparation` |
+| `display-settings.ts` | 36 | `parseChatFontSize` — clamped integer parse (10-30) | `plugin.ts` |
+| `agent-display-name.ts` | 20 | Agent display name resolution from config | Settings UI, headers |
+| `plugin-notice.ts` | 10 | `pluginNotice` — prefixed `Notice` wrapper | hooks, plugin, components |
+| `vault-path.ts` | 9 | Vault path resolution helper | `plugin.ts`, hooks |
 
 ## Key Patterns
 

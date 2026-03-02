@@ -1,26 +1,26 @@
 # Chat Components Guide
 
-32 components for the chat UI. Entry point: `ChatView` (sidebar/Obsidian leaf). Includes `chat-input/` subdirectory with 11 files for input-related components and hooks. Picker panel in `components/picker/` (4 files).
+41 files for the chat UI. Entry point: `ChatView` (sidebar/Obsidian leaf). Includes `chat-input/` subdirectory with 12 files for input-related components and hooks. Picker panel in `components/picker/` (4 files).
 
 ## Component Tree
 
 ```
 ChatView (ItemView, ~531 lines) ─── Obsidian sidebar leaf
   └── ChatComponent (React)
-        ├── ChatHeader          ─ agent dropdown, session controls, update badge (~178 lines)
-        │     ├── TabBar              ─ numbered tab badges (1,2,3…) (~59 lines)
+        ├── ChatHeader          ─ agent dropdown, session controls, update badge (~167 lines)
+        │     ├── TabBar              ─ numbered tab badges (1,2,3…) (~61 lines)
         │     └── HeaderButton × 4    ─ new tab / new session / history / settings
-        └── TabContent          ─ per-tab chat view container (~373 lines)
+        └── TabContent          ─ per-tab chat view container (~374 lines)
               ├── SessionHistoryPopover ─ floating session list panel
               │     └── SessionHistoryContent ─ session list + restore/fork/delete (~498 lines)
               │           └── ConfirmDeleteModal (Obsidian Modal)
-              ├── ChatMessages        ─ scrollable message list (~157 lines)
+              ├── ChatMessages        ─ scrollable message list (~262 lines)
               │     └── MessageRenderer (per message)
               │           └── MessageContentRenderer (per content block)
               │                 ├── MarkdownTextRenderer  ─ markdown → Obsidian renderMarkdown
-              │                 ├── TextWithMentions      ─ @[[note]] + context token rendering
-              │                 ├── ToolCallRenderer      ─ tool call accordion (~263 lines)
-              │                 │     ├── DiffRenderer       ─ unified diff view (~324 lines)
+              │                 ├── TextWithMentions      ─ @[[note]] + context token rendering (~244 lines)
+              │                 ├── ToolCallRenderer      ─ tool call accordion (~458 lines)
+              │                 │     ├── DiffRenderer       ─ unified diff view (~387 lines)
               │                 │     ├── TerminalRenderer   ─ polling terminal output (~143 lines)
               │                 │     └── PermissionRequestSection ─ approve/deny buttons
               │                 ├── CollapsibleThought    ─ agent reasoning toggle
@@ -29,28 +29,29 @@ ChatView (ItemView, ~531 lines) ─── Obsidian sidebar leaf
               ├── SessionChangesModal   ─ modal showing session file changes (~114 lines)
               ├── DiffViewer            ─ side-by-side diff display for inline edits (~74 lines)
               ├── SuggestionDropdown  ─ @mention + /command dropdown (~140 lines)
-              └── ChatInput           ─ input orchestrator (~552 lines)
+              └── ChatInput           ─ input orchestrator (~619 lines)
                     ├── ErrorOverlay        ─ error banner above input
                     ├── SuggestionDropdown  ─ (mentions + slash commands, 2 instances)
                     ├── ContextBadgeStrip   ─ auto-mention + context reference badges
                     ├── RichTextarea        ─ contenteditable input (~550 lines)
                     ├── ImagePreviewStrip   ─ attached image thumbnails
-                    └── InputActions        ─ mode/model selectors + send/stop (~106 lines)
-                          ├── SelectorButton (mode) ─ portal-based popover (~164 lines)
+                    ├── ContextUsageMeter   ─ context window usage meter (~93 lines)
+                    └── InputActions        ─ mode/model selectors + send/stop (~130 lines)
+                          ├── SelectorButton (mode) ─ portal-based popover (~174 lines)
                           ├── SelectorButton (model)
                           └── Send/Stop button
 
 Picker (components/picker/):
-  UnifiedPickerPanel  ─ unified picker for mentions + commands (~296 lines)
+  UnifiedPickerPanel  ─ unified picker for mentions + commands (~207 lines)
   mention-provider.ts ─ @mention picker provider (~178 lines)
-  command-provider.ts ─ /command picker provider (~71 lines)
-  types.ts            ─ PickerProvider, PickerItem interfaces (~78 lines)
+  command-provider.ts ─ /command picker provider (~70 lines)
+  types.ts            ─ PickerProvider, PickerItem interfaces (~80 lines)
 
 Standalone:
   HeaderButton        ─ reusable icon button for header
   ObsidianIcon        ─ Obsidian Lucide icon wrapper (~29 lines)
-  ProviderLogo        ─ CDN SVG brand icons (~35 lines)
-  MentionBadgeStrip   ─ attached note badges (~106 lines)
+  ProviderLogo        ─ CDN SVG brand icons (~56 lines)
+  MentionBadgeStrip   ─ attached note badges (~105 lines)
   AutoMentionBadge    ─ active note indicator (~68 lines)
 ```
 
@@ -58,15 +59,15 @@ Standalone:
 
 **ChatView**: Extends `ItemView`. Manages Obsidian leaf lifecycle, view state persistence (agent ID), `IChatViewContainer` implementation for registry. Creates React root in `onOpen()`, destroys in `onClose()`. Workspace event handling delegated to `useWorkspaceEvents` hook.
 
-`ChatComponent` calls `useChatController()` — all logic lives in hooks.
+`ChatComponent` calls `useTabs()`, `useUpdateCheck()`, and `useWorkspaceEvents()` at the view level. Each tab's `TabContent` calls `useChatController()` — all per-tab logic lives in hooks.
 
 ## Picker System
 
-`UnifiedPickerPanel` (in `components/picker/`) provides a unified autocomplete panel triggered by `@` (mentions) or `/` (slash commands) in the input. Pluggable via `PickerProvider` interface — each provider defines trigger character, search logic, and item rendering. `usePicker` hook manages panel open/close and selection state.
+`UnifiedPickerPanel` (in `components/picker/`) provides a unified autocomplete panel triggered by `@` (mentions) or `/` (slash commands) in the input. Pluggable via `PickerProvider` interface — each provider defines trigger character, search logic, and item rendering. `usePicker` hook (called twice in `ChatInput` — once per provider) manages panel open/close and selection state.
 
 ## Tab System
 
-`TabBar` renders tab headers; `TabContent` renders per-tab chat. Each tab has its own `useChatController` instance with independent agent session, messages, and state. `useTabs` hook manages tab lifecycle (max 4 tabs).
+`TabBar` renders tab headers; `TabContent` renders per-tab chat. Each tab has its own `useChatController` instance with independent agent session, messages, and state. `useTabs` hook manages tab lifecycle (max 4 tabs), composed in `ChatComponent`.
 
 ## Session History
 
@@ -80,7 +81,7 @@ Components that need DOM event cleanup depend on `IChatViewHost` (not `ChatView`
 
 Input-related components extracted from `ChatInput.tsx`. Contains:
 - **3 hooks**: `use-chat-input-behavior` (keydown/submit), `use-image-attachments` (paste/drop), `use-obsidian-dropdown` (native Obsidian dropdown bridge)
-- **5 components**: `RichTextarea`, `InputActions`, `SelectorButton`, `ProviderLogo`, `ContextBadgeStrip` (via parent), `MentionBadgeStrip`, `AutoMentionBadge`
+- **6 components**: `RichTextarea`, `InputActions`, `SelectorButton`, `ProviderLogo`, `ContextUsageMeter`, `MentionBadgeStrip`, `AutoMentionBadge`
 - **2 icon maps**: `mode-icons.ts`, `file-icons.ts`
 
 Note: hooks in `chat-input/` use `kebab-case` naming (not `usePascalCase`) since they're input-specific, not controller-level.
@@ -102,6 +103,8 @@ Note: hooks in `chat-input/` use `kebab-case` naming (not `usePascalCase`) since
 **Provider logos**: `ProviderLogo` loads SVGs from `@lobehub/icons-static-svg` CDN via CSS `mask-image` — inherits `currentColor` for theme compatibility.
 
 **Context badges**: `ContextBadgeStrip` renders auto-mention and context reference badges above the input. Uses `chat-context-token.ts` for token parsing/formatting.
+
+**Context usage**: `ContextUsageMeter` displays a visual meter showing how much of the agent's context window is consumed, rendered in the input area.
 
 ## Obsidian Integration Rules
 

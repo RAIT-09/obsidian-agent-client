@@ -6,20 +6,20 @@ Pure types and interfaces — **ZERO external dependencies**. No `obsidian`, no 
 
 ```
 domain/
-├── models/          # Data types (8 files, ~1042 lines)
+├── models/          # Data types (8 files, ~1056 lines)
 │   ├── chat-message.ts      # ChatMessage, MessageContent union, Role, ToolCallStatus, ToolKind (~203 lines)
-│   ├── session-update.ts    # SessionUpdate union (8 routed types) — agent → UI event stream (~167 lines)
+│   ├── session-update.ts    # SessionUpdate union (8 routed types) — agent → UI event stream (~181 lines)
 │   ├── chat-session.ts      # ChatSession state, SessionState, SlashCommand, AuthenticationMethod, modes, models (~266 lines)
-│   ├── agent-config.ts      # BaseAgentSettings, ClaudeAgentSettings, GeminiAgentSettings, CodexAgentSettings, OpenCodeAgentSettings, CustomAgentSettings (~100 lines)
 │   ├── agent-error.ts       # AcpErrorCode constants, ErrorInfo, AcpError, ProcessError, ProcessErrorType (~122 lines)
+│   ├── agent-config.ts      # BaseAgentSettings, ClaudeAgentSettings, GeminiAgentSettings, CodexAgentSettings, OpenCodeAgentSettings, CustomAgentSettings (~100 lines)
 │   ├── session-info.ts      # SessionInfo, ListSessionsResult, LoadSessionResult, ResumeSessionResult, ForkSessionResult, SavedSessionInfo (~92 lines)
 │   ├── prompt-content.ts    # PromptContent union (text, image, resource), ResourceAnnotations (~72 lines)
 │   └── chat-input-state.ts  # ChatInputState, AttachedImage (for broadcast) (~20 lines)
-└── ports/           # Interface contracts (4 files, ~749 lines)
+└── ports/           # Interface contracts (4 files, ~771 lines)
     ├── agent-client.port.ts    # IAgentClient — 423 lines, full agent communication contract
-    ├── vault-access.port.ts    # IVaultAccess — note search, read, active file tracking (~94 lines)
     ├── settings-access.port.ts # ISettingsAccess — settings CRUD + session persistence (~131 lines)
-    └── chat-view-container.port.ts # IChatViewContainer + ChatViewContextReference — view registration, focus, broadcast, context (~123 lines)
+    ├── chat-view-container.port.ts # IChatViewContainer + ChatViewContextReference — view registration, focus, broadcast, context (~123 lines)
+    └── vault-access.port.ts    # IVaultAccess — note search, read, active file tracking (~94 lines)
 ```
 
 ## Critical Types

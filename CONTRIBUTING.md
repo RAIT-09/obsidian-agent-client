@@ -32,7 +32,9 @@ graph TB
 
     subgraph Hooks["Hook Composition Layer"]
         Controller["useChatController<br/>Central coordinator"]
-        SubHooks["useAgentSession · useChat<br/>usePermission · useMentions<br/>useSlashCommands · useAutoMention<br/>useSessionHistory · useTabs<br/>useSettings"]
+        SubHooks["useAgentSession · useChat<br/>usePermission · useMentions<br/>useSlashCommands · useAutoMention<br/>useSessionHistory · useModelFiltering"]
+        ViewHooks["useTabs · useUpdateCheck<br/>useWorkspaceEvents"]
+        InputHooks["usePicker · useInputHistory"]
         State["hooks/state/<br/>Reducers + Actions"]
     end
 
@@ -47,7 +49,7 @@ graph TB
     end
 
     subgraph Shared["Shared Utilities"]
-        Utils["message-service, terminal-manager,<br/>chat-view-registry, settings-schema,<br/>chat-context-token, ..."]
+        Utils["message-service, terminal-manager,<br/>chat-view-registry, settings-schema,<br/>chat-context-token, tool-icons, ..."]
     end
 
     subgraph External["External Processes"]
@@ -59,6 +61,8 @@ graph TB
     Plugin --> EditorCtx
     ChatView --> Components
     Components --> Controller
+    Components --> ViewHooks
+    Components --> InputHooks
     Controller --> SubHooks
     SubHooks --> State
     SubHooks --> Ports
@@ -118,6 +122,10 @@ stateDiagram-v2
 
 ```mermaid
 graph LR
+    CV[ChatComponent] --> T[useTabs]
+    CV --> UC[useUpdateCheck]
+    CV --> WE[useWorkspaceEvents]
+
     CC[useChatController] --> S[useSettings]
     CC --> AS[useAgentSession]
     CC --> C[useChat]
@@ -125,10 +133,15 @@ graph LR
     CC --> M[useMentions]
     CC --> SC[useSlashCommands]
     CC --> AM[useAutoMention]
+    CC --> MF[useModelFiltering]
     CC --> SH[useSessionHistory]
-    CC --> T[useTabs]
 
-    AS --> SR[session.reducer]
+    CI[ChatInput] --> PK[usePicker x2]
+    CI --> IH[useInputHistory]
+
+    TC[TabContent] --> SR[useSessionRestore]
+
+    AS --> SRd[session.reducer]
     C --> CR[chat.reducer]
     P --> PR[permission.reducer]
 
@@ -231,6 +244,10 @@ graph LR
 │  │ │ [🖼 img1.png ✕] [🖼 img2.png ✕] │   ││
 │  │ └─────────────────────────────────┘   ││
 │  │                                         ││
+│  │ ┌─ ContextUsageMeter ─────────────┐   ││
+│  │ │ ████████░░░░ 67% context used   │   ││
+│  │ └─────────────────────────────────┘   ││
+│  │                                         ││
 │  │ ┌─ InputActions ───────────────────┐   ││
 │  │ │ [💬 Code] [🤖 claude-4]  [Send ▶]│   ││
 │  │ └─────────────────────────────────┘   ││
@@ -283,6 +300,9 @@ graph LR
 │  ▶ Codex      [command] [args] [API key]    │
 │  ▶ Gemini     [command] [args] [API key]    │
 │                                             │
+│  ── Model Preferences ───────────────     │
+│  Per-agent model preference config          │
+│                                             │
 │  ── Custom Agents ─────────────────────     │
 │  [+ Add Agent]                              │
 │  ▶ My Agent   [command] [args] [env]        │
@@ -300,9 +320,14 @@ ACP is a JSON-RPC protocol over stdin/stdout. Obsius spawns an agent process, es
 
 Session updates stream back as typed events: message chunks, tool calls, plans, permission requests, mode/command updates.
 
-### Hook Composition Pattern
+### Distributed Hook Composition
 
-All state and logic live in hooks, composed by `useChatController`. Components are pure renderers that receive props from the controller. No ViewModel or UseCase classes.
+Hooks are composed at three levels:
+1. **View level** (`ChatComponent`): `useTabs`, `useUpdateCheck`, `useWorkspaceEvents`
+2. **Tab level** (`useChatController`): 10 hooks for session, chat, permissions, mentions, commands, history, model filtering
+3. **Input level** (`ChatInput`): `usePicker` (×2), `useInputHistory`
+
+Components are pure renderers that receive props from the controller. No ViewModel or UseCase classes.
 
 ### Domain Zero-Dep Rule
 

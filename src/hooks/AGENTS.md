@@ -1,57 +1,65 @@
 # Hooks Layer Guide
 
-Central coordinator pattern: `useChatController` composes 13 specialized hooks + creates adapters via `useMemo`. View-level concerns extracted to `useWorkspaceEvents`.
+Distributed composition pattern: `useChatController` composes 10 specialized hooks + creates adapters via `useMemo`. View-level hooks (`useTabs`, `useUpdateCheck`, `useWorkspaceEvents`) live in `ChatComponent`. Input-level hooks (`usePicker`, `useInputHistory`) live in `ChatInput`. `useSessionRestore` lives in `TabContent`.
 
 State transitions are reducer-backed in `src/hooks/state/` for deterministic updates and easier test coverage.
 
 ## Hook Inventory
 
-| Hook | Lines | State Owned | Key Deps |
-|------|-------|-------------|----------|
-| `useChatController` | 524 | Combines all below | All hooks + adapters |
-| `useAgentSession` | 628 | `ChatSession`, connection lifecycle | `IAgentClient`, `ISettingsAccess` |
-| `useChat` | 552 | `messages[]`, `isSending`, streaming | `IAgentClient`, `IVaultAccess` |
-| `useSessionHistory` | 577 | Session list, load/resume/fork | `IAgentClient`, `ISettingsAccess` |
-| `usePermission` | 234 | `activePermission`, approval queue | `IAgentClient` |
-| `useMentions` | 130 | Suggestions dropdown state | `IVaultAccess`, `mention-utils` |
-| `useSlashCommands` | 150 | Suggestions dropdown + token handling | `SlashCommand[]` |
-| `useAutoMention` | ~90 | `activeNote`, `isDisabled` | `IVaultAccess` |
-| `useInputHistory` | 139 | History index (ref-based) | `ChatMessage[]` |
-| `useTabs` | 114 | `tabs[]`, `activeTabId` (max 4) | `ChatTab`, agent info |
-| `useSettings` | ~30 | None — delegates to `useSyncExternalStore` | `plugin.settingsStore` |
-| `usePicker` | 160 | Picker panel open/selection state | `PickerProvider[]` |
-| `useModelFiltering` | 98 | Model search/filter state | `SessionModelState` |
-| `useSessionRestore` | 147 | Session file restoration state | `ISettingsAccess`, session files |
-| `useUpdateCheck` | 19 | Update available flag | Plugin version |
-| `useWorkspaceEvents` | 127 | None (effect-only) | `Workspace` events |
+| Hook | Lines | State Owned | Key Deps | Composed In |
+|------|-------|-------------|----------|-------------|
+| `useChatController` | 536 | Combines 10 hooks below | All hooks + adapters | `TabContent` |
+| `useAgentSession` | 628 | `ChatSession`, connection lifecycle | `IAgentClient`, `ISettingsAccess` | `useChatController` |
+| `useChat` | 553 | `messages[]`, `isSending`, streaming | `IAgentClient`, `IVaultAccess` | `useChatController` |
+| `useSessionHistory` | 577 | Session list, load/resume/fork | `IAgentClient`, `ISettingsAccess` | `useChatController` |
+| `usePicker` | 268 | Picker panel open/selection state | `PickerProvider[]` | `ChatInput` (×2) |
+| `usePermission` | 234 | `activePermission`, approval queue | `IAgentClient` | `useChatController` |
+| `useSlashCommands` | 150 | Suggestions dropdown + token handling | `SlashCommand[]` | `useChatController` |
+| `useSessionRestore` | 147 | Session file restoration state | `ISettingsAccess`, session files | `TabContent` |
+| `useTabs` | 140 | `tabs[]`, `activeTabId` (max 4) | `ChatTab`, agent info | `ChatComponent` |
+| `useInputHistory` | 139 | History index (ref-based) | `ChatMessage[]` | `ChatInput` |
+| `useMentions` | 130 | Suggestions dropdown state | `IVaultAccess`, `mention-utils` | `useChatController` |
+| `useWorkspaceEvents` | 127 | None (effect-only) | `Workspace` events | `ChatComponent` |
+| `useModelFiltering` | 98 | Model search/filter state | `SessionModelState` | `useChatController` |
+| `useAutoMention` | 76 | `activeNote`, `isDisabled` | `IVaultAccess` | `useChatController` |
+| `useSettings` | 19 | None — delegates to `useSyncExternalStore` | `plugin.settingsStore` | `useChatController` |
+| `useUpdateCheck` | 19 | Update available flag | Plugin version | `ChatComponent` |
 
 ## Composition Flow
 
 ```
-useChatController(plugin, viewId, workingDir, initialAgentId)
-  ├── useMemo: AcpAdapter (from plugin.chatViewRegistry)
-  ├── useMemo: ObsidianVaultAdapter
-  ├── useMemo: NoteMentionService
-  ├── useSettings(plugin)
+ChatComponent (ChatView.tsx)
   ├── useTabs(initialAgentId, defaultAgentId, availableAgents, onTabClose)
-  ├── useAgentSession(acpAdapter, settingsAccess, config)
-  ├── useChat(acpAdapter, vaultAccess, mentionService, session)
-  ├── usePermission(acpAdapter)
-  ├── useMentions(vaultAccess, plugin)
-  ├── useSlashCommands(session.availableCommands, autoMention.toggle)
-  ├── useAutoMention(vaultAccess)
-  ├── usePicker(mentionProvider, commandProvider)
-  ├── useModelFiltering(session.availableModels)
-  ├── useSessionRestore(settingsAccess, sessionFiles)
   ├── useUpdateCheck(plugin)
-  ├── useSessionHistory(acpAdapter, session, settingsAccess, cwd, callbacks)
-  └── useSessionHistoryHandlers(app, sessionHistory, logger, vaultPath, clearMessages)
+  └── useWorkspaceEvents({ workspace, handlers })
+
+  per tab → TabContent.tsx
+    ├── useSessionRestore()
+    └── useChatController(options: UseChatControllerOptions)
+          ├── useMemo: AcpAdapter (from plugin.getOrCreateSessionAdapter)
+          ├── useMemo: ObsidianVaultAdapter
+          ├── useMemo: NoteMentionService
+          ├── useSettings(plugin)
+          ├── useAgentSession(acpAdapter, settingsAccess, vaultPath, initialAgentId)
+          ├── useChat(acpAdapter, vaultAccess, mentionService, sessionConfig, displayConfig)
+          ├── usePermission(acpAdapter, messages)
+          ├── useMentions(vaultAccess, plugin)
+          ├── useSlashCommands(session.availableCommands)
+          ├── useAutoMention(vaultAccess)
+          ├── useModelFiltering(session.availableModels)
+          ├── useSessionHistory({ agentClient, session, settingsAccess, cwd, callbacks })
+          └── useSessionHistoryHandlers(app, sessionHistory, logger, vaultPath, clearMessages)
+
+  ChatInput.tsx
+    ├── usePicker(mentionProvider)
+    ├── usePicker(commandProvider)
+    └── useInputHistory(messages)
 ```
 
 ## Extracted Hook Modules
 
-- `chat-controller/types.ts` (82): exported `UseChatController` interfaces to keep the coordinator lean
-- `chat-controller/session-history-handlers.ts` (184): isolated history restore/fork/delete/open handler orchestration (popover state)
+- `chat-controller/types.ts` (85): exported `UseChatControllerOptions` + `UseChatControllerReturn` interfaces
+- `chat-controller/session-history-handlers.ts` (132): isolated history restore/fork/delete/open handler orchestration (popover state)
 - `agent-session/helpers.ts` (141) + `agent-session/types.ts` (39): normalization and shared type contracts
 - `session-history/session-history-ops.ts` (221): pure history list/load/restore/fork helpers
 
@@ -64,10 +72,6 @@ useChatController(plugin, viewId, workingDir, initialAgentId)
 | `session.reducer.ts` | 28 | Session state reducer |
 | `session.actions.ts` | 22 | Action creators for session state transitions |
 | `permission.reducer.ts` | 35 | Permission request queue reducer |
-
-## View-Level Hooks (used directly by ChatView, not via useChatController)
-
-- `useWorkspaceEvents`: Subscribes to workspace hotkey events (toggle-auto-mention, new-chat-requested, approve/reject permission, cancel-message).
 
 ## Race Condition Patterns
 
@@ -83,15 +87,15 @@ useChatController(plugin, viewId, workingDir, initialAgentId)
 
 - `handleSessionUpdate`: Routes `SessionUpdate` union to `useChat.handleSessionUpdate()` (messages) and `useAgentSession` (commands, modes)
 - `handleSendMessage`: Orchestrates `useChat.sendMessage()` with autoMention state, images, vault path
-- `handleNewSession`: Calls `useAgentSession.createSession()`
-- `handleLoadSession`: Coordinates `useSessionHistory` + `useChat.setInitialMessages()`
+- `handleNewChat`: Calls `useAgentSession.createSession()`, clears messages and input state
+- `handleLoadSession`: Coordinates `useSessionHistory` + `useChat.setMessagesFromLocal()`
 
 ## Adding a New Hook
 
 1. Create `src/hooks/useFeature.ts` — own its state, export typed return interface
 2. Wire into `useChatController.ts` — add to composition, expose in return object
 3. Access in components via `useChatController()` return value
-4. Never import hooks directly in components — always go through the controller
+4. Never import hooks directly in components — always go through the controller (exception: view-level hooks like `useTabs`, input-level hooks like `usePicker`)
 
 ## Anti-Patterns
 
