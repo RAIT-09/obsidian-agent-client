@@ -1,5 +1,5 @@
 import * as React from "react";
-import { TFolder } from "obsidian";
+import { TFile, TFolder } from "obsidian";
 import type AgentClientPlugin from "../../plugin";
 import { getFileIcon } from "./chat-input/file-icons";
 import { ObsidianIcon } from "./ObsidianIcon";
@@ -10,6 +10,28 @@ import {
 	type ChatContextReference,
 } from "../../shared/chat-context-token";
 import { parseSlashCommandToken } from "../../shared/slash-command-token";
+import { isMentionableExtension } from "../../shared/mentionable-files";
+
+function isMentionableFile(file: TFile): boolean {
+	return isMentionableExtension(file.extension);
+}
+
+function resolveMentionedFile(
+	plugin: AgentClientPlugin,
+	mentionTarget: string,
+): TFile | null {
+	const direct = plugin.app.vault.getAbstractFileByPath(mentionTarget);
+	if (direct instanceof TFile && isMentionableFile(direct)) {
+		return direct;
+	}
+
+	return (
+		plugin.app.vault
+			.getFiles()
+			.filter((f) => isMentionableFile(f))
+			.find((f) => f.basename === mentionTarget) ?? null
+	);
+}
 
 interface TextWithMentionsProps {
 	text: string;
@@ -172,11 +194,9 @@ export function TextWithMentions({
 				parts.push(token);
 			}
 		} else {
-			const noteName = match[2];
+			const mentionTarget = match[2];
 
-			const file = plugin.app.vault
-				.getMarkdownFiles()
-				.find((f) => f.basename === noteName);
+			const file = resolveMentionedFile(plugin, mentionTarget);
 
 			if (file) {
 				parts.push(
@@ -202,13 +222,13 @@ export function TextWithMentions({
 							size={12}
 						/>
 						<span className="obsius-inline-mention-name">
-							{noteName}
+							{file.basename}
 						</span>
 					</span>,
 				);
 			} else {
 				const abstractFile =
-					plugin.app.vault.getAbstractFileByPath(noteName);
+					plugin.app.vault.getAbstractFileByPath(mentionTarget);
 				if (abstractFile instanceof TFolder) {
 					parts.push(
 						<span
@@ -222,12 +242,12 @@ export function TextWithMentions({
 								size={12}
 							/>
 							<span className="obsius-inline-mention-name">
-								{noteName}
+								{mentionTarget}
 							</span>
 						</span>,
 					);
 				} else {
-					parts.push(`@${noteName}`);
+					parts.push(`@${mentionTarget}`);
 				}
 			}
 		}

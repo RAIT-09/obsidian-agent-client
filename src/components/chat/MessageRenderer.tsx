@@ -60,6 +60,7 @@ export function MessageRenderer({
 	onApprovePermission,
 }: MessageRendererProps) {
 	const groups = groupContent(message.content);
+	const hasPlanContent = message.content.some((content) => content.type === "plan");
 
 	return (
 		<div
@@ -81,6 +82,7 @@ export function MessageRenderer({
 										plugin={plugin}
 										messageId={message.id}
 										messageRole={message.role}
+									hasPlanContent={hasPlanContent}
 										acpClient={acpClient}
 										onApprovePermission={onApprovePermission}
 									/>
@@ -97,6 +99,7 @@ export function MessageRenderer({
 								plugin={plugin}
 								messageId={message.id}
 								messageRole={message.role}
+								hasPlanContent={hasPlanContent}
 								acpClient={acpClient}
 								onApprovePermission={onApprovePermission}
 							/>

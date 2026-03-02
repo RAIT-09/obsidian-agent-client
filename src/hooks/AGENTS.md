@@ -16,7 +16,7 @@ State transitions are reducer-backed in `src/hooks/state/` for deterministic upd
 | `usePermission` | 234 | `activePermission`, approval queue | `IAgentClient` | `useChatController` |
 | `useSlashCommands` | 150 | Suggestions dropdown + token handling | `SlashCommand[]` | `useChatController` |
 | `useSessionRestore` | 147 | Session file restoration state | `ISettingsAccess`, session files | `TabContent` |
-| `useTabs` | 140 | `tabs[]`, `activeTabId` (max 4) | `ChatTab`, agent info | `ChatComponent` |
+| `useTabs` | ~185 | `tabs[]`, `activeTabId` (max 4); inherits active tab's agent when opening new tabs | `ChatTab`, agent info | `ChatComponent` |
 | `useInputHistory` | 139 | History index (ref-based) | `ChatMessage[]` | `ChatInput` |
 | `useMentions` | 130 | Suggestions dropdown state | `IVaultAccess`, `mention-utils` | `useChatController` |
 | `useWorkspaceEvents` | 127 | None (effect-only) | `Workspace` events | `ChatComponent` |
@@ -60,7 +60,7 @@ ChatComponent (ChatView.tsx)
 
 - `chat-controller/types.ts` (85): exported `UseChatControllerOptions` + `UseChatControllerReturn` interfaces
 - `chat-controller/session-history-handlers.ts` (132): isolated history restore/fork/delete/open handler orchestration (popover state)
-- `agent-session/helpers.ts` (141) + `agent-session/types.ts` (39): normalization and shared type contracts
+- `agent-session/helpers.ts` (~160) + `agent-session/types.ts` (39): normalization and shared type contracts; includes `resolveExistingAgentId` for safe agent ID resolution against available agents list
 - `session-history/session-history-ops.ts` (221): pure history list/load/restore/fork helpers
 
 ## State Modules (`hooks/state/`)
@@ -82,6 +82,10 @@ ChatComponent (ChatView.tsx)
 **mergeToolCallContent**: When merging tool call updates, preserve existing values when update fields are `undefined`. Treat content arrays as replace-all (not append).
 
 **Session load history replay**: During `session/load`, the agent replays history as `user_message_chunk` + `agent_message_chunk` events. `useChat` has `isLoadingRef` flag to batch these without triggering intermediate re-renders.
+
+**Stale closure in handleNewChat**: `useChatController.handleNewChat` is stored in a tab-actions map that may hold an older closure. A `messagesRef` (updated on every render) is used instead of the raw `messages` array to avoid checking a stale value when deciding whether to show "Already a new session".
+
+**Agent ID resolution**: `resolveExistingAgentId` (in `agent-session/helpers.ts`) and `resolveTabAgentId` (in `useTabs.ts`) guard against using a stale/removed agent ID by falling back to the default or first available agent. Used in `useAgentSession.init`, `useAgentSession.createSession`, and `useTabs` initial state + new tab creation.
 
 ## Key Callbacks Wired in useChatController
 

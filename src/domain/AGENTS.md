@@ -19,7 +19,7 @@ domain/
     ├── agent-client.port.ts    # IAgentClient — 423 lines, full agent communication contract
     ├── settings-access.port.ts # ISettingsAccess — settings CRUD + session persistence (~131 lines)
     ├── chat-view-container.port.ts # IChatViewContainer + ChatViewContextReference — view registration, focus, broadcast, context (~123 lines)
-    └── vault-access.port.ts    # IVaultAccess — note search, read, active file tracking (~94 lines)
+    └── vault-access.port.ts    # IVaultAccess — note search, read, binary read, active file tracking (~110 lines)
 ```
 
 ## Critical Types
@@ -54,9 +54,18 @@ domain/
 
 **Only exception**: `settings-access.port.ts` imports `AgentClientPluginSettings` from `../../plugin` — pragmatic coupling to the plugin's settings type, not an external library.
 
+## Key Port Methods
+
+**IVaultAccess** (`vault-access.port.ts`):
+- `readNote(path)` — read text file content
+- `readBinaryFile(path)` — read binary file bytes as `Uint8Array` (used for image attachments)
+- `searchNotes(query)` — fuzzy search
+- `getActiveFile()` / `getActiveFileSelection()` — active editor state tracking
+
 ## Adding a New Domain Type
 
 1. Create/extend in `models/` — pure TypeScript interfaces/types only
-2. If it represents an agent event -> add variant to `SessionUpdate` union
-3. If it needs adapter conversion -> update `AcpTypeConverter` in `adapters/acp/`
-4. If it's a new capability -> extend `IAgentClient` port, then implement in `AcpAdapter`
+2. If it represents an agent event → add variant to `SessionUpdate` union
+3. If it needs adapter conversion → update `AcpTypeConverter` in `adapters/acp/`
+4. If it's a new capability → extend `IAgentClient` port, then implement in `AcpAdapter`
+5. If it's a new vault operation → extend `IVaultAccess` port, then implement in `ObsidianVaultAdapter`

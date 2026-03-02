@@ -13,6 +13,7 @@ interface MessageContentRendererProps {
 	plugin: AgentClientPlugin;
 	messageId?: string;
 	messageRole?: "user" | "assistant";
+	hasPlanContent?: boolean;
 	acpClient?: IAcpClient;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (requestId: string, optionId: string) => Promise<void>;
@@ -23,6 +24,7 @@ export function MessageContentRenderer({
 	plugin,
 	messageId,
 	messageRole,
+	hasPlanContent = false,
 	acpClient,
 	onApprovePermission,
 }: MessageContentRendererProps): React.ReactElement | null {
@@ -63,6 +65,7 @@ export function MessageContentRenderer({
 				<ToolCallRenderer
 					content={content}
 					plugin={plugin}
+					hasPlanContent={hasPlanContent}
 					acpClient={acpClient}
 					onApprovePermission={onApprovePermission}
 				/>

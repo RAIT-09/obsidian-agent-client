@@ -129,7 +129,7 @@ export function extractMentionedNotes(
 		// Find the file by basename
 		const file = noteMentionService
 			.getAllFiles()
-			.find((f: TFile) => f.basename === noteTitle);
+			.find((f: TFile) => f.path === noteTitle || f.basename === noteTitle);
 
 		result.push({ noteTitle, file });
 	}

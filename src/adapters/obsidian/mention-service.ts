@@ -1,6 +1,11 @@
 import { TFile, prepareFuzzySearch } from "obsidian";
 import type AgentClientPlugin from "../../plugin";
 import { getLogger, Logger } from "../../shared/logger";
+import { isMentionableExtension } from "../../shared/mentionable-files";
+
+function isMentionableFile(file: TFile): boolean {
+	return isMentionableExtension(file.extension);
+}
 
 // Note mention service for @-mention functionality
 export class NoteMentionService {
@@ -18,7 +23,7 @@ export class NoteMentionService {
 		// Listen for vault changes to keep index up to date
 		this.eventRefs.push(
 			this.plugin.app.vault.on("create", (file) => {
-				if (file instanceof TFile && file.extension === "md") {
+				if (file instanceof TFile && isMentionableFile(file)) {
 					this.rebuildIndex();
 				}
 			}),
@@ -28,7 +33,7 @@ export class NoteMentionService {
 		);
 		this.eventRefs.push(
 			this.plugin.app.vault.on("rename", (file) => {
-				if (file instanceof TFile && file.extension === "md") {
+				if (file instanceof TFile && isMentionableFile(file)) {
 					this.rebuildIndex();
 				}
 			}),
@@ -46,7 +51,9 @@ export class NoteMentionService {
 	}
 
 	private rebuildIndex() {
-		this.files = this.plugin.app.vault.getMarkdownFiles();
+		this.files = this.plugin.app.vault
+			.getFiles()
+			.filter((file) => isMentionableFile(file));
 		this.lastBuild = Date.now();
 		this.logger.log(
 			`[NoteMentionService] Rebuilt index with ${this.files.length} files`,

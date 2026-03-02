@@ -67,6 +67,15 @@ export interface IVaultAccess {
 	readNote(path: string): Promise<string>;
 
 	/**
+	 * Read binary file bytes from the vault.
+	 *
+	 * @param path - Path to the file within the vault
+	 * @returns Promise resolving to file bytes
+	 * @throws Error if file doesn't exist or cannot be read
+	 */
+	readBinaryFile(path: string): Promise<Uint8Array>;
+
+	/**
 	 * Search for notes matching a query.
 	 *
 	 * Uses fuzzy search against note names, paths, and aliases.

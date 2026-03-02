@@ -1,5 +1,5 @@
 import * as React from "react";
-const { useRef, useState, useEffect, useCallback } = React;
+const { useRef, useState, useEffect, useCallback, useId } = React;
 
 import type { ChatMessage } from "../../domain/models/chat-message";
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
@@ -56,6 +56,7 @@ export function ChatMessages({
 }: ChatMessagesProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
+	const emptyStateMaskId = useId().replace(/:/g, "-");
 
 	const svgRef = useRef<SVGSVGElement>(null);
 	const isSpinning = !isSessionReady || isRestoringSession;
@@ -72,9 +73,10 @@ export function ChatMessages({
 		if (isSpinning) {
 			setSpinState('spinning');
 			if (svgRef.current) {
-				svgRef.current.style.animation = '';
-				svgRef.current.style.transition = '';
-				svgRef.current.style.transform = '';
+				const style = svgRef.current.style;
+				style.removeProperty("animation");
+				style.removeProperty("transition");
+				style.removeProperty("transform");
 			}
 		} else if (wasSpinning && !isSpinning) {
 			// Just stopped spinning
@@ -91,9 +93,10 @@ export function ChatMessages({
 					if (currentAngle < 0) currentAngle += 360;
 				}
 
-				svgRef.current.style.animation = 'none';
-				svgRef.current.style.transition = 'none';
-				svgRef.current.style.transform = `rotate(${currentAngle}deg)`;
+				const style = svgRef.current.style;
+				style.setProperty("animation", "none");
+				style.setProperty("transition", "none");
+				style.setProperty("transform", `rotate(${currentAngle}deg)`);
 
 				// Force reflow
 				void svgRef.current.getBoundingClientRect();
@@ -106,8 +109,8 @@ export function ChatMessages({
 				const distance = targetAngle - currentAngle;
 				const duration = Math.max(0.8, distance / 260); // Roughly match velocity
 
-				svgRef.current.style.transition = `transform ${duration}s cubic-bezier(0.25, 1, 0.5, 1)`;
-				svgRef.current.style.transform = `rotate(${targetAngle}deg)`;
+				style.setProperty("transition", `transform ${duration}s cubic-bezier(0.25, 1, 0.5, 1)`);
+				style.setProperty("transform", `rotate(${targetAngle}deg)`);
 
 				timeoutId = window.setTimeout(() => {
 					setSpinState('stopped');
@@ -180,7 +183,7 @@ export function ChatMessages({
 						viewBox="0 0 100 100"
 					>
 						<defs>
-							<mask id="obsius-empty-o-mask">
+							<mask id={emptyStateMaskId}>
 								<rect width="100" height="100" fill="black" />
 								<g transform="rotate(18 50 50)">
 									<ellipse cx="50" cy="50" rx="41" ry="34" fill="white" />
@@ -194,7 +197,7 @@ export function ChatMessages({
 							width="100"
 							height="100"
 							fill="currentColor"
-							mask="url(#obsius-empty-o-mask)"
+							mask={`url(#${emptyStateMaskId})`}
 						/>
 					</svg>
 					<div className="obsius-empty-state-ready">
@@ -216,9 +219,16 @@ export function ChatMessages({
 					))}
 					{isSending && (
 						<div className="ac-loading">
-							<span className="ac-loading__dot" />
-							<span className="ac-loading__dot" />
-							<span className="ac-loading__dot" />
+							<svg className="ac-loading__spinner" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+								<line className="ac-sq-line-0" x1="15" y1="15" x2="85" y2="15" />
+								<line className="ac-sq-line-1" x1="85" y1="15" x2="85" y2="85" />
+								<line className="ac-sq-line-2" x1="85" y1="85" x2="15" y2="85" />
+								<line className="ac-sq-line-3" x1="15" y1="85" x2="15" y2="15" />
+								<circle className="ac-sq-dot-0" r="6" cx="15" cy="15" />
+								<circle className="ac-sq-dot-1" r="6" cx="85" cy="15" />
+								<circle className="ac-sq-dot-2" r="6" cx="85" cy="85" />
+								<circle className="ac-sq-dot-3" r="6" cx="15" cy="85" />
+							</svg>
 						</div>
 					)}
 					{!isSending && messages.length > 0 && (

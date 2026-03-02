@@ -14,6 +14,7 @@ export interface PreparePromptInput {
 	isAutoMentionDisabled?: boolean;
 	convertToWsl?: boolean;
 	supportsEmbeddedContext?: boolean;
+	supportsImage?: boolean;
 	maxNoteLength?: number;
 	maxSelectionLength?: number;
 }

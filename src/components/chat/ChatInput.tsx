@@ -113,10 +113,12 @@ export function ChatInput({
 	const fileProvider = React.useMemo(
 		() =>
 			new FilePickerProvider(vaultAccess, (note) => {
+				const mentionTarget =
+					note.extension.toLowerCase() === "md" ? note.name : note.path;
 				const ctx = mentions.context;
 				if (ctx) {
 					richTextareaRef.current?.insertMentionAtContext(
-						note.name,
+						mentionTarget,
 						ctx.start,
 						ctx.end,
 					);
@@ -453,6 +455,12 @@ export function ChatInput({
 			setIcon(sendButtonRef.current, iconMap[sendButtonState]);
 		}
 	}, [sendButtonState]);
+
+	useEffect(() => {
+		if (inputValue === "") {
+			richTextareaRef.current?.clear();
+		}
+	}, [inputValue]);
 
 	useEffect(() => {
 		window.setTimeout(() => {

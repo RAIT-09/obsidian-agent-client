@@ -85,39 +85,573 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 8px;
 }
 
-/* ===== Loading Indicator ===== */
+/* ===== Loading Indicator (square-dots spinner) ===== */
 .ac-loading {
 	display: flex;
 	align-items: center;
-	gap: 4px;
 	padding: 4px 0;
 }
 
-.ac-loading__dot {
-	width: 4px;
-	height: 4px;
-	border-radius: 50%;
-	background-color: var(--text-faint);
-	animation: ac-dot-pulse 1.2s ease-in-out infinite;
+.ac-loading__spinner {
+	width: 16px;
+	height: 16px;
+	display: block;
 }
 
-.ac-loading__dot:nth-child(2) {
-	animation-delay: 0.2s;
+.ac-loading__spinner line {
+	stroke: var(--text-faint);
+	stroke-width: 1;
+	opacity: 0.3;
 }
 
-.ac-loading__dot:nth-child(3) {
-	animation-delay: 0.4s;
+.ac-loading__spinner circle {
+	fill: var(--text-faint);
+	opacity: 0.7;
 }
 
-@keyframes ac-dot-pulse {
+/* Dot 0: TL → TR → BR → BL */
+.ac-sq-dot-0 {
+	animation: ac-sq-dot0-cx 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-dot0-cy 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+/* Dot 1: TR → BR → BL → TL */
+.ac-sq-dot-1 {
+	animation: ac-sq-dot1-cx 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-dot1-cy 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+/* Dot 2: BR → BL → TL → TR */
+.ac-sq-dot-2 {
+	animation: ac-sq-dot2-cx 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-dot2-cy 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+/* Dot 3: BL → TL → TR → BR */
+.ac-sq-dot-3 {
+	animation: ac-sq-dot3-cx 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-dot3-cy 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+/* Line 0: dot0 → dot1 */
+.ac-sq-line-0 {
+	animation: ac-sq-line0-x1 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-line0-y1 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-line0-x2 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-line0-y2 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+/* Line 1: dot1 → dot2 */
+.ac-sq-line-1 {
+	animation: ac-sq-line1-x1 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-line1-y1 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-line1-x2 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-line1-y2 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+/* Line 2: dot2 → dot3 */
+.ac-sq-line-2 {
+	animation: ac-sq-line2-x1 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-line2-x2 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-line2-y1 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-line2-y2 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+/* Line 3: dot3 → dot0 */
+.ac-sq-line-3 {
+	animation: ac-sq-line3-x1 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-line3-y1 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-line3-x2 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+		ac-sq-line3-y2 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+/* ---- Dot keyframes (cx/cy) ---- */
+/* Dot 0: TL(15,15) → TR(85,15) → BR(85,85) → BL(15,85) → TL */
+@keyframes ac-sq-dot0-cx {
 
 	0%,
 	100% {
-		opacity: 0.3;
+		cx: 15;
+	}
+
+	25% {
+		cx: 85;
 	}
 
 	50% {
-		opacity: 1;
+		cx: 85;
+	}
+
+	75% {
+		cx: 15;
+	}
+}
+
+@keyframes ac-sq-dot0-cy {
+
+	0%,
+	100% {
+		cy: 15;
+	}
+
+	25% {
+		cy: 15;
+	}
+
+	50% {
+		cy: 85;
+	}
+
+	75% {
+		cy: 85;
+	}
+}
+
+/* Dot 1: TR(85,15) → BR(85,85) → BL(15,85) → TL(15,15) → TR */
+@keyframes ac-sq-dot1-cx {
+
+	0%,
+	100% {
+		cx: 85;
+	}
+
+	25% {
+		cx: 85;
+	}
+
+	50% {
+		cx: 15;
+	}
+
+	75% {
+		cx: 15;
+	}
+}
+
+@keyframes ac-sq-dot1-cy {
+
+	0%,
+	100% {
+		cy: 15;
+	}
+
+	25% {
+		cy: 85;
+	}
+
+	50% {
+		cy: 85;
+	}
+
+	75% {
+		cy: 15;
+	}
+}
+
+/* Dot 2: BR(85,85) → BL(15,85) → TL(15,15) → TR(85,15) → BR */
+@keyframes ac-sq-dot2-cx {
+
+	0%,
+	100% {
+		cx: 85;
+	}
+
+	25% {
+		cx: 15;
+	}
+
+	50% {
+		cx: 15;
+	}
+
+	75% {
+		cx: 85;
+	}
+}
+
+@keyframes ac-sq-dot2-cy {
+
+	0%,
+	100% {
+		cy: 85;
+	}
+
+	25% {
+		cy: 85;
+	}
+
+	50% {
+		cy: 15;
+	}
+
+	75% {
+		cy: 15;
+	}
+}
+
+/* Dot 3: BL(15,85) → TL(15,15) → TR(85,15) → BR(85,85) → BL */
+@keyframes ac-sq-dot3-cx {
+
+	0%,
+	100% {
+		cx: 15;
+	}
+
+	25% {
+		cx: 15;
+	}
+
+	50% {
+		cx: 85;
+	}
+
+	75% {
+		cx: 85;
+	}
+}
+
+@keyframes ac-sq-dot3-cy {
+
+	0%,
+	100% {
+		cy: 85;
+	}
+
+	25% {
+		cy: 15;
+	}
+
+	50% {
+		cy: 15;
+	}
+
+	75% {
+		cy: 85;
+	}
+}
+
+/* ---- Line keyframes (x1/y1/x2/y2) — each line connects dot N to dot N+1 ---- */
+/* Line 0: dot0(TL) → dot1(TR) */
+@keyframes ac-sq-line0-x1 {
+
+	0%,
+	100% {
+		x1: 15;
+	}
+
+	25% {
+		x1: 85;
+	}
+
+	50% {
+		x1: 85;
+	}
+
+	75% {
+		x1: 15;
+	}
+}
+
+@keyframes ac-sq-line0-y1 {
+
+	0%,
+	100% {
+		y1: 15;
+	}
+
+	25% {
+		y1: 15;
+	}
+
+	50% {
+		y1: 85;
+	}
+
+	75% {
+		y1: 85;
+	}
+}
+
+@keyframes ac-sq-line0-x2 {
+
+	0%,
+	100% {
+		x2: 85;
+	}
+
+	25% {
+		x2: 85;
+	}
+
+	50% {
+		x2: 15;
+	}
+
+	75% {
+		x2: 15;
+	}
+}
+
+@keyframes ac-sq-line0-y2 {
+
+	0%,
+	100% {
+		y2: 15;
+	}
+
+	25% {
+		y2: 85;
+	}
+
+	50% {
+		y2: 85;
+	}
+
+	75% {
+		y2: 15;
+	}
+}
+
+/* Line 1: dot1(TR) → dot2(BR) */
+@keyframes ac-sq-line1-x1 {
+
+	0%,
+	100% {
+		x1: 85;
+	}
+
+	25% {
+		x1: 85;
+	}
+
+	50% {
+		x1: 15;
+	}
+
+	75% {
+		x1: 15;
+	}
+}
+
+@keyframes ac-sq-line1-y1 {
+
+	0%,
+	100% {
+		y1: 15;
+	}
+
+	25% {
+		y1: 85;
+	}
+
+	50% {
+		y1: 85;
+	}
+
+	75% {
+		y1: 15;
+	}
+}
+
+@keyframes ac-sq-line1-x2 {
+
+	0%,
+	100% {
+		x2: 85;
+	}
+
+	25% {
+		x2: 15;
+	}
+
+	50% {
+		x2: 15;
+	}
+
+	75% {
+		x2: 85;
+	}
+}
+
+@keyframes ac-sq-line1-y2 {
+
+	0%,
+	100% {
+		y2: 85;
+	}
+
+	25% {
+		y2: 85;
+	}
+
+	50% {
+		y2: 15;
+	}
+
+	75% {
+		y2: 15;
+	}
+}
+
+/* Line 2: dot2(BR) → dot3(BL) */
+@keyframes ac-sq-line2-x1 {
+
+	0%,
+	100% {
+		x1: 85;
+	}
+
+	25% {
+		x1: 15;
+	}
+
+	50% {
+		x1: 15;
+	}
+
+	75% {
+		x1: 85;
+	}
+}
+
+@keyframes ac-sq-line2-y1 {
+
+	0%,
+	100% {
+		y1: 85;
+	}
+
+	25% {
+		y1: 85;
+	}
+
+	50% {
+		y1: 15;
+	}
+
+	75% {
+		y1: 15;
+	}
+}
+
+@keyframes ac-sq-line2-x2 {
+
+	0%,
+	100% {
+		x2: 15;
+	}
+
+	25% {
+		x2: 15;
+	}
+
+	50% {
+		x2: 85;
+	}
+
+	75% {
+		x2: 85;
+	}
+}
+
+@keyframes ac-sq-line2-y2 {
+
+	0%,
+	100% {
+		y2: 85;
+	}
+
+	25% {
+		y2: 15;
+	}
+
+	50% {
+		y2: 15;
+	}
+
+	75% {
+		y2: 85;
+	}
+}
+
+/* Line 3: dot3(BL) → dot0(TL) */
+@keyframes ac-sq-line3-x1 {
+
+	0%,
+	100% {
+		x1: 15;
+	}
+
+	25% {
+		x1: 15;
+	}
+
+	50% {
+		x1: 85;
+	}
+
+	75% {
+		x1: 85;
+	}
+}
+
+@keyframes ac-sq-line3-y1 {
+
+	0%,
+	100% {
+		y1: 85;
+	}
+
+	25% {
+		y1: 15;
+	}
+
+	50% {
+		y1: 15;
+	}
+
+	75% {
+		y1: 85;
+	}
+}
+
+@keyframes ac-sq-line3-x2 {
+
+	0%,
+	100% {
+		x2: 15;
+	}
+
+	25% {
+		x2: 85;
+	}
+
+	50% {
+		x2: 85;
+	}
+
+	75% {
+		x2: 15;
+	}
+}
+
+@keyframes ac-sq-line3-y2 {
+
+	0%,
+	100% {
+		y2: 15;
+	}
+
+	25% {
+		y2: 15;
+	}
+
+	50% {
+		y2: 85;
+	}
+
+	75% {
+		y2: 85;
 	}
 }
 
@@ -237,6 +771,14 @@ If your plugin does not need CSS, delete this file.
 
 .ac-collapsible__header:hover {
 	opacity: 0.85;
+}
+
+.ac-collapsible--static .ac-collapsible__header {
+	cursor: default;
+}
+
+.ac-collapsible--static .ac-collapsible__header:hover {
+	opacity: 1;
 }
 
 .ac-collapsible__body {

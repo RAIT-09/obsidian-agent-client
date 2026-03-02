@@ -19,6 +19,7 @@ import {
 	getAvailableAgentsFromSettings,
 	getCurrentAgent,
 	getDefaultAgentId,
+	resolveExistingAgentId,
 } from "./agent-session/helpers";
 import { createInitialSessionState } from "./state/session.actions";
 import { sessionReducer } from "./state/session.reducer";
@@ -34,8 +35,10 @@ export function useAgentSession(
 	initialAgentId?: string,
 ): UseAgentSessionReturn {
 	const initialSettings = settingsAccess.getSnapshot();
-	const effectiveInitialAgentId =
-		initialAgentId || getDefaultAgentId(initialSettings);
+	const effectiveInitialAgentId = resolveExistingAgentId(
+		initialSettings,
+		initialAgentId,
+	);
 	const initialAgent = getCurrentAgent(
 		initialSettings,
 		effectiveInitialAgentId,
@@ -77,7 +80,7 @@ export function useAgentSession(
 		async (overrideAgentId?: string) => {
 			const creationId = ++creationCounterRef.current;
 			const settings = settingsAccess.getSnapshot();
-			const agentId = overrideAgentId || getDefaultAgentId(settings);
+			const agentId = resolveExistingAgentId(settings, overrideAgentId);
 			const currentAgent = getCurrentAgent(settings, agentId);
 
 			setSession((prev) => ({

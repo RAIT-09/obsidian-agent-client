@@ -36,6 +36,7 @@ const SHELL_TITLES = new Set([
 interface ToolCallRendererProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
 	plugin: AgentClientPlugin;
+	hasPlanContent?: boolean;
 	acpClient?: IAcpClient;
 	onApprovePermission?: (requestId: string, optionId: string) => Promise<void>;
 }
@@ -167,6 +168,7 @@ function RawPatchView({
 export function ToolCallRenderer({
 	content,
 	plugin,
+	hasPlanContent = false,
 	acpClient,
 	onApprovePermission,
 }: ToolCallRendererProps) {
@@ -206,10 +208,28 @@ export function ToolCallRenderer({
 		[title, kind],
 	);
 
+	const genericToolName = useMemo(() => {
+		if (!rawInput) return "";
+		const name = rawInput.name;
+		if (typeof name === "string" && name.trim().length > 0) {
+			return name.trim();
+		}
+		return "";
+	}, [rawInput]);
+
 	const summary = useMemo(
 		() => getToolSummary(title, kind, rawInput, locations, vaultPath),
 		[title, kind, rawInput, locations, vaultPath],
 	);
+
+	const displaySummary = summary;
+
+	const unknownToolName = useMemo(() => {
+		if (displayName === "Tool" && genericToolName) {
+			return genericToolName;
+		}
+		return "";
+	}, [displayName, genericToolName]);
 
 	const statusClass = getStatusDisplayClass(status);
 	const statusIcon = getStatusIconName(status);
@@ -229,6 +249,24 @@ export function ToolCallRenderer({
 	const isFileEditTool = kind === "edit" || FILE_EDIT_TITLES.has(normalizedTitle);
 	const isFileReadTool = kind === "read" || FILE_READ_TITLES.has(normalizedTitle);
 	const isFileTool = isFileEditTool || isFileReadTool;
+	const isTodoTool = normalizedTitle === "todowrite" || normalizedTitle === "todoread";
+
+	const hasCommandDetails =
+		(kind === "execute" || SHELL_TITLES.has(normalizedTitle)) &&
+		!!rawInput &&
+		typeof rawInput.command === "string";
+	const hasLocationDetails = !isFileTool && !!locations && locations.length > 0;
+	const hasToolContentDetails =
+		toolContent?.some((item) => item.type === "terminal" || item.type === "diff") ??
+		false;
+	const hasTodoPlanRendered = isTodoTool && hasPlanContent;
+	const hasRenderableDetails =
+		!hasTodoPlanRendered &&
+		(hasCommandDetails ||
+			hasLocationDetails ||
+			hasToolContentDetails ||
+			!!rawPatchText ||
+			!!permissionRequest);
 
 	const fileTitle = useMemo(() => {
 		if (!isFileTool) return "";
@@ -315,7 +353,10 @@ export function ToolCallRenderer({
 			) : (
 				<>
 					<span className="ac-row__title">{displayName}</span>
-					{summary && (
+					{unknownToolName && (
+						<span className="ac-row__summary">{unknownToolName}</span>
+					)}
+					{displaySummary && (
 						<span
 							className={`ac-row__summary ${summaryIsFile ? "ac-row__summary--link" : ""}`}
 							onClick={
@@ -324,7 +365,7 @@ export function ToolCallRenderer({
 									: undefined
 							}
 						>
-							{summary}
+							{displaySummary}
 						</span>
 					)}
 				</>
@@ -347,9 +388,10 @@ export function ToolCallRenderer({
 		<CollapsibleSection
 			className={`ac-toolcall ${isFileEditTool ? "ac-toolcall--file-edit" : ""}`}
 			defaultExpanded={!!permissionRequest}
+			collapsible={hasRenderableDetails}
 			header={header}
 		>
-			{(kind === "execute" || SHELL_TITLES.has(normalizedTitle)) &&
+			{hasCommandDetails &&
 				rawInput &&
 				typeof rawInput.command === "string" && (
 					<div className="ac-tree__item">
@@ -362,7 +404,7 @@ export function ToolCallRenderer({
 					</div>
 				)}
 
-			{!isFileTool && locations && locations.length > 0 && (
+			{hasLocationDetails && locations && (
 				<div className="ac-tree__item ac-tree__locations">
 					{locations.map((loc, idx) => {
 						const rel = toRelativePath(loc.path, vaultPath);

@@ -21,6 +21,25 @@ interface UseTabsOptions {
 	onTabClose?: (tabId: string) => void;
 }
 
+function resolveTabAgentId(
+	availableAgents: AgentInfo[],
+	defaultAgentId: string,
+	preferredAgentId?: string,
+): string {
+	if (
+		preferredAgentId &&
+		availableAgents.some((agent) => agent.id === preferredAgentId)
+	) {
+		return preferredAgentId;
+	}
+
+	if (availableAgents.some((agent) => agent.id === defaultAgentId)) {
+		return defaultAgentId;
+	}
+
+	return availableAgents[0]?.id ?? defaultAgentId;
+}
+
 export interface UseTabsReturn {
 	tabs: ChatTab[];
 	tabsWithLabels: TabItem[];
@@ -42,8 +61,14 @@ export function useTabs({
 	availableAgents,
 	onTabClose,
 }: UseTabsOptions): UseTabsReturn {
+	const initialTabAgentId = resolveTabAgentId(
+		availableAgents,
+		defaultAgentId,
+		initialAgentId,
+	);
+
 	const [tabs, setTabs] = useState<ChatTab[]>(() => [
-		{ id: crypto.randomUUID(), agentId: initialAgentId },
+		{ id: crypto.randomUUID(), agentId: initialTabAgentId },
 	]);
 	const [activeTabId, setActiveTabId] = useState(() => tabs[0].id);
 	const [completedTabIds, setCompletedTabIds] = useState<ReadonlySet<string>>(
@@ -106,13 +131,22 @@ export function useTabs({
 
 	const handleNewTab = useCallback(() => {
 		if (tabs.length >= MAX_TABS) return;
+
+		const sourceAgentId =
+			tabs.find((tab) => tab.id === activeTabId)?.agentId ?? defaultAgentId;
+		const nextAgentId = resolveTabAgentId(
+			availableAgents,
+			defaultAgentId,
+			sourceAgentId,
+		);
+
 		const newTab: ChatTab = {
 			id: crypto.randomUUID(),
-			agentId: defaultAgentId,
+			agentId: nextAgentId,
 		};
 		setTabs((prev) => [...prev, newTab]);
 		setActiveTabId(newTab.id);
-	}, [tabs.length, defaultAgentId]);
+	}, [tabs, activeTabId, availableAgents, defaultAgentId]);
 
 	const handleAgentChangeForTab = useCallback(
 		(agentId: string) => {

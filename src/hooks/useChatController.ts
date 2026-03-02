@@ -1,4 +1,10 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import {
+	useState,
+	useRef,
+	useEffect,
+	useMemo,
+	useCallback,
+} from "react";
 
 import type { AttachedImage } from "../components/chat/ImagePreviewStrip";
 import { pluginNotice } from "../shared/plugin-notice";
@@ -95,6 +101,11 @@ export function useChatController(
 	);
 
 	const { messages, isSending } = chat;
+
+	// Ref to always read current messages (avoids stale closure in handleNewChat
+	// when called via the tab-actions map, which may hold an older callback)
+	const messagesRef = useRef(messages);
+	messagesRef.current = messages;
 
 	const [contextUsage, setContextUsage] = useState<{
 		size: number;
@@ -214,7 +225,11 @@ export function useChatController(
 
 			const hasInput = inputValue.trim() !== "" || attachedImages.length > 0;
 
-			if (messages.length === 0 && !isAgentSwitch && !hasInput) {
+			if (
+				messagesRef.current.length === 0 &&
+				!isAgentSwitch &&
+				!hasInput
+			) {
 				pluginNotice("Already a new session");
 				return;
 			}
@@ -239,7 +254,6 @@ export function useChatController(
 			sessionHistory.invalidateCache();
 		},
 		[
-			messages,
 			session,
 			logger,
 			autoMention,

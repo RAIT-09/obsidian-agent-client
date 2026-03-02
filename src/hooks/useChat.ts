@@ -433,6 +433,7 @@ export function useChat(
 					convertToWsl: shouldConvertToWsl,
 					supportsEmbeddedContext:
 						sessionContext.promptCapabilities?.embeddedContext ?? false,
+					supportsImage: sessionContext.promptCapabilities?.image ?? false,
 					maxNoteLength: settingsContext.maxNoteLength,
 					maxSelectionLength: settingsContext.maxSelectionLength,
 				},

@@ -22,6 +22,10 @@ function iconForExtension(ext: string): string {
 			return "image";
 		case "pdf":
 			return "file-type";
+		case "canvas":
+			return "layout-dashboard";
+		case "excalidraw":
+			return "pencil-ruler";
 		case "json":
 		case "yaml":
 		case "yml":
@@ -102,9 +106,13 @@ export class FilePickerProvider implements PickerProvider {
 			const parentDir = note.path.includes("/")
 				? note.path.slice(0, note.path.lastIndexOf("/"))
 				: "";
+			const label =
+				note.extension.toLowerCase() === "md"
+					? note.name
+					: `${note.name}.${note.extension}`;
 			return {
 				id: `file:${note.path}`,
-				label: note.name,
+				label,
 				sublabel: parentDir || "/",
 				icon: iconForExtension(note.extension),
 				category: "file" as const,

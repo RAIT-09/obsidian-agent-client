@@ -57,6 +57,27 @@ export function getCurrentAgent(
 	);
 }
 
+export function resolveExistingAgentId(
+	settings: AgentClientPluginSettings,
+	preferredAgentId?: string,
+): string {
+	const agents = getAvailableAgentsFromSettings(settings);
+
+	if (
+		preferredAgentId &&
+		agents.some((agent) => agent.id === preferredAgentId)
+	) {
+		return preferredAgentId;
+	}
+
+	const defaultAgentId = getDefaultAgentId(settings);
+	if (agents.some((agent) => agent.id === defaultAgentId)) {
+		return defaultAgentId;
+	}
+
+	return agents[0]?.id ?? defaultAgentId;
+}
+
 export function findAgentSettings(
 	settings: AgentClientPluginSettings,
 	agentId: string,

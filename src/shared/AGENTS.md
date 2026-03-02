@@ -7,9 +7,10 @@ Pure utility modules with no React dependencies. Business logic extracted from h
 | File | Lines | Purpose | Consumers |
 |------|-------|---------|-----------|
 | `message-service.ts` | 8 | Facade re-export for message-service modules | `useChat` |
-| `message-service/prompt-preparation.ts` | 599 | Prompt preparation: mention processing, auto-mention, WSL path conversion | `useChat` |
+| `message-service/prompt-preparation.ts` | ~230 | Prompt preparation entry point: mention/image processing, orchestrates context builders | `useChat` |
+| `message-service/prompt-context-builders.ts` | ~250 | Extracted context builder functions: explicit context, auto-mention resource/text builders | `prompt-preparation` |
 | `message-service/prompt-sending.ts` | 113 | Prompt send path + auth retry + content type mapping | `useChat` |
-| `message-service/types.ts` | 51 | Message-service shared types | `useChat` |
+| `message-service/types.ts` | 51 | Message-service shared types (incl. `supportsImage` flag) | `useChat` |
 | `tool-icons.ts` | 490 | Tool title/kind -> Obsidian Lucide icon name mapping | `ToolCallRenderer` |
 | `chat-context-token.ts` | 299 | Context reference token parsing, creation, extraction, badge formatting | `ChatInput`, `TextWithMentions`, `editor-context` |
 | `terminal-manager.ts` | 277 | Spawn terminal processes, poll output, platform shell wrapping | `AcpAdapter` |
@@ -17,7 +18,8 @@ Pure utility modules with no React dependencies. Business logic extracted from h
 | `chat-view-registry.ts` | 214 | Multi-view management: register/unregister/focus/broadcast/navigate | `plugin.ts` |
 | `acp-error-utils.ts` | 205 | ACP JSON-RPC error extraction, user-friendly `ErrorInfo` generation | `useChat`, `useAgentSession` |
 | `settings-utils.ts` | 164 | `sanitizeArgs`, `normalizeEnvVars`, `toAgentConfig` conversion | `useAgentSession`, `AgentClientSettingTab` |
-| `mention-utils.ts` | 138 | `detectMention`, `replaceMention`, `extractMentionedNotes` parsing | `useMentions`, `message-service` |
+| `mentionable-files.ts` | ~40 | `MENTIONABLE_FILE_EXTENSIONS` set, `isMentionableExtension`, `getImageMimeTypeForExtension`, `getPathExtension` | `mention-service`, `TextWithMentions`, `mention-provider` |
+| `mention-utils.ts` | 138 | `detectMention`, `replaceMention`, `extractMentionedNotes` parsing; resolves by full path or basename | `useMentions`, `message-service` |
 | `windows-env.ts` | 129 | `getFullWindowsPath`, `getEnhancedWindowsEnv` — registry PATH query | `AcpAdapter`, `TerminalManager` |
 | `wsl-utils.ts` | 98 | `convertWindowsPathToWsl`, `wrapCommandForWsl` | `AcpAdapter`, `message-service` |
 | `shell-utils.ts` | 91 | `escapeShellArgWindows`, `getLoginShell`, `resolveCommandFromShell` | `AcpAdapter`, `TerminalManager` |
@@ -37,10 +39,17 @@ Pure utility modules with no React dependencies. Business logic extracted from h
 ## Key Patterns
 
 **message-service modules** (`preparePrompt` + `sendPreparedPrompt`):
-- Separates display content (original text + images) from agent content (processed mentions -> file paths/URIs)
+- Separates display content (original text + images) from agent content (processed mentions → file paths/URIs)
 - Supports `embeddedContext` capability: attaches note content as `resource` type instead of text
+- Supports `supportsImage` capability: attaches image files as `image` prompt content (binary read via `IVaultAccess.readBinaryFile`)
 - Auth retry: catches `AUTHENTICATION_REQUIRED` error, invokes `authenticate()`, retries once
 - WSL mode: converts Windows paths to `/mnt/c/...` format when `convertToWsl` flag set
+- Context builder functions (`buildExplicitContextResources`, `buildAutoMentionResource`, etc.) extracted to `prompt-context-builders.ts`
+
+**mentionable-files.ts**:
+- `MENTIONABLE_FILE_EXTENSIONS`: `md`, `canvas`, `excalidraw`, `png`, `jpg`, `jpeg`, `gif`, `webp`
+- Used by `NoteMentionService`, `TextWithMentions`, and `FilePickerProvider` to consistently determine which files are mentionable
+- `getImageMimeTypeForExtension()` returns MIME type string for image files (used when attaching images to prompt)
 
 **chat-context-token.ts**:
 - Encodes `ChatContextReference` (selection, file, folder) as inline tokens in message text

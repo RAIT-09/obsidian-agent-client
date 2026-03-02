@@ -63,6 +63,15 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 		return await this.plugin.app.vault.read(file);
 	}
 
+	async readBinaryFile(path: string): Promise<Uint8Array> {
+		const file = this.plugin.app.vault.getAbstractFileByPath(path);
+		if (!(file instanceof TFile)) {
+			throw new Error(`File not found: ${path}`);
+		}
+		const buffer = await this.plugin.app.vault.readBinary(file);
+		return new Uint8Array(buffer);
+	}
+
 	/**
 	 * Search for notes matching a query.
 	 *

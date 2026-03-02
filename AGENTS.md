@@ -1,6 +1,6 @@
 # Obsius - LLM Developer Guide
 
-**Generated:** 2026-03-02 | **Commit:** b5d8a06 | **Branch:** master
+**Generated:** 2026-03-02 | **Branch:** master
 
 ## Overview
 Obsidian desktop plugin for AI chat (OpenCode, Claude Code, Codex, Gemini CLI, custom agents). React 19 + TypeScript, communicating via Agent Client Protocol (ACP) over JSON-RPC stdin/stdout. Multi-tab chat sessions in a sidebar view.
@@ -31,7 +31,8 @@ src/
 │   ├── chat/                 # ChatView + sub-components (29 top-level + 12 in chat-input/)
 │   ├── picker/               # Unified picker panel for mentions + slash commands (4 files)
 │   └── settings/             # Thin tab coordinator + 4 section renderers + helpers
-└── shared/                   # Pure utility functions (24 files + message-service/ subdir)
+└── shared/                   # Pure utility functions (25 files + message-service/ subdir)
+    └── message-service/          # 4 files: prompt-preparation, prompt-context-builders, prompt-sending, types
 ```
 
 ## Where To Look
@@ -162,7 +163,7 @@ npm run docs:build       # VitePress build
 - **Tests exist**: Vitest with coverage gates for reducer/routing/schema modules (test/ directory, 8 test files + setup + mocks/)
 - **CI**: PR workflow enforces typecheck, lint, tests with coverage, plugin build, and docs build
 - **Multi-session**: `ChatViewRegistry` manages sidebar views with independent ACP sessions
-- **Multi-tab**: `useTabs` hook supports up to 4 concurrent chat tabs per view, each with its own agent/session
+- **Multi-tab**: `useTabs` hook supports up to 4 concurrent chat tabs per view, each with its own agent/session; new tabs inherit the active tab's agent ID
 - **Session history**: Agent-side (`listSessions`) + local persistence (`sessions/{id}.json`)
 - **Settings validation**: `settings-schema.ts` uses Zod for runtime validation with schema versioning (v4)
 - **Context references**: Editor context menus (selection, file, folder) inject `ChatContextReference` tokens into chat input via `chat-context-token.ts`
@@ -172,6 +173,11 @@ npm run docs:build       # VitePress build
 - **Settings migrations**: `settings-migrations.ts` handles schema version upgrades with typed migration functions
 - **Slash command tokens**: `slash-command-token.ts` encodes/decodes slash commands as inline tokens in message text
 - **Context usage meter**: `ContextUsageMeter.tsx` displays context window usage as a visual meter in the input area
+- **Multi-file mentions**: `@[[...]]` mentions now support `.md`, `.canvas`, `.excalidraw`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`; resolved by full path then basename via `mentionable-files.ts`
+- **Image prompt support**: `supportsImage` capability flag; image files are read as binary (`IVaultAccess.readBinaryFile`) and attached as `image` prompt content
+- **Agent ID safety**: `resolveExistingAgentId` / `resolveTabAgentId` guard against stale/removed agent IDs at session init and tab creation
+- **Loading spinner**: SVG square-dots spinner replaces three-dot pulse in `ChatMessages` while `isSending`
+- **CollapsibleSection**: New `collapsible` prop — pass `false` for static (non-expandable) tool call headers when no details exist
 - **Model preferences**: `components/settings/sections/model-preferences.ts` provides per-agent model preference configuration
 - **Current decomposition state**:
   - `src/plugin.ts` (~458 LOC) is thin orchestrator; command/update/view/context/inline-edit helpers in `src/plugin/`

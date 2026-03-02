@@ -17,14 +17,14 @@ ChatView (ItemView, ~531 lines) ─── Obsidian sidebar leaf
               ├── ChatMessages        ─ scrollable message list (~262 lines)
               │     └── MessageRenderer (per message)
               │           └── MessageContentRenderer (per content block)
-              │                 ├── MarkdownTextRenderer  ─ markdown → Obsidian renderMarkdown
-              │                 ├── TextWithMentions      ─ @[[note]] + context token rendering (~244 lines)
-              │                 ├── ToolCallRenderer      ─ tool call accordion (~458 lines)
-              │                 │     ├── DiffRenderer       ─ unified diff view (~387 lines)
-              │                 │     ├── TerminalRenderer   ─ polling terminal output (~143 lines)
-              │                 │     └── PermissionRequestSection ─ approve/deny buttons
-              │                 ├── CollapsibleThought    ─ agent reasoning toggle
-              │                 └── CollapsibleSection    ─ generic collapsible wrapper (~41 lines)
+              │                 ├── MarkdownTextRenderer  — markdown → Obsidian renderMarkdown
+              │                 ├── TextWithMentions      — @[[note]] + context token rendering; resolves md/canvas/excalidraw/image files (~270 lines)
+              │                 ├── ToolCallRenderer      — tool call accordion (~480 lines)
+              │                 │     ├── DiffRenderer       — unified diff view (~387 lines)
+              │                 │     ├── TerminalRenderer   — polling terminal output (~143 lines)
+              │                 │     └── PermissionRequestSection — approve/deny buttons
+              │                 ├── CollapsibleThought    — agent reasoning toggle
+              │                 └── CollapsibleSection    — generic collapsible wrapper; `collapsible={false}` renders static (non-clickable) header (~55 lines)
               ├── RestoredSessionToolbar ─ session restore accept/discard bar (~87 lines)
               ├── SessionChangesModal   ─ modal showing session file changes (~114 lines)
               ├── DiffViewer            ─ side-by-side diff display for inline edits (~74 lines)
@@ -90,7 +90,7 @@ Note: hooks in `chat-input/` use `kebab-case` naming (not `usePascalCase`) since
 
 `RestoredSessionToolbar` renders an accept/discard bar when `useSessionRestore` detects orphaned session files on disk. `SessionChangesModal` shows the detailed file changes. `DiffViewer` displays side-by-side diffs for inline edit results.
 
-## Rendering Patterns
+**Loading spinner**: `ChatMessages` renders an SVG square-dots spinner (`.ac-loading__spinner` with 4 circles + 4 lines) while `isSending` is true. CSS-animated via keyframes in `styles.css`; replaces the former three-dot pulse indicator.
 
 **Markdown**: `MarkdownTextRenderer` calls Obsidian's `MarkdownRenderer.render()` into a `<div ref>`. Must handle async rendering and cleanup.
 
@@ -105,6 +105,15 @@ Note: hooks in `chat-input/` use `kebab-case` naming (not `usePascalCase`) since
 **Context badges**: `ContextBadgeStrip` renders auto-mention and context reference badges above the input. Uses `chat-context-token.ts` for token parsing/formatting.
 
 **Context usage**: `ContextUsageMeter` displays a visual meter showing how much of the agent's context window is consumed, rendered in the input area.
+
+**CollapsibleSection non-collapsible mode**: Pass `collapsible={false}` to render a static header with no click/expand behaviour (adds `.ac-collapsible--static` CSS class). Used by `ToolCallRenderer` when the tool call has no renderable details (no command, no locations, no terminal/diff content, no patch).
+
+**ToolCallRenderer enhancements**: 
+- Unknown/generic tool names are shown as `.ac-row__summary` next to the "Tool" display name.
+- `hasPlanContent` prop (threaded from `MessageRenderer` via `MessageContentRenderer`): suppresses collapsible expand for TodoWrite/TodoRead tool calls when a plan block is already rendered in the message.
+- `hasRenderableDetails` computed boolean controls whether `CollapsibleSection` is in collapsible mode.
+
+**TextWithMentions multi-file support**: Resolves `@[[mention]]` targets by full path first (for non-markdown files like images), then falls back to basename. Uses `isMentionableExtension` from `mentionable-files.ts` to filter candidate files.
 
 ## Obsidian Integration Rules
 
