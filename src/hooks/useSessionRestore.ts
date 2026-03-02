@@ -40,6 +40,7 @@ export function useSessionRestore(): UseSessionRestoreReturn {
 	const [isRestored, setIsRestored] = useState(false);
 	const [changeSet, setChangeSet] = useState<SessionChangeSet | null>(null);
 	const managerRef = useRef(new SnapshotManager());
+	const refreshCallIdRef = useRef(0);
 
 	const syncState = useCallback((cs: SessionChangeSet | null) => {
 		setChangeSet(cs);
@@ -53,10 +54,15 @@ export function useSessionRestore(): UseSessionRestoreReturn {
 			readFile?: (path: string) => Promise<string>,
 		) => {
 			if (!readFile) return;
+			const callId = ++refreshCallIdRef.current;
 			const manager = managerRef.current;
-			syncState(
-				await manager.computeChanges(messages, vaultBasePath, readFile),
+			const result = await manager.computeChanges(
+				messages,
+				vaultBasePath,
+				readFile,
 			);
+			if (callId !== refreshCallIdRef.current) return;
+			syncState(result);
 		},
 		[syncState],
 	);

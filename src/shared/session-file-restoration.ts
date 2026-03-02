@@ -96,6 +96,9 @@ export function discoverModifiedFiles(
 		const existing = found.get(vaultPath);
 		if (existing) {
 			if (kind === "delete") existing.wasDeleted = true;
+			if (existing.firstOldText === undefined && oldText !== undefined) {
+				existing.firstOldText = oldText;
+			}
 			return;
 		}
 

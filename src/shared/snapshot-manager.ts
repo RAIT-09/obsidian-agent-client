@@ -22,6 +22,8 @@ interface OriginalFileState {
 	/** A tool call with `kind: "delete"` targeted this path */
 	wasDeletedByAgent: boolean;
 	rawPath: string;
+	/** True when original was captured from diff `oldText`, false for disk fallback */
+	fromDiff: boolean;
 }
 
 /**
@@ -70,6 +72,14 @@ export class SnapshotManager {
 				if (file.wasDeleted && !existing.wasDeletedByAgent) {
 					existing.wasDeletedByAgent = true;
 				}
+				if (!existing.fromDiff && file.firstOldText !== undefined) {
+					existing.content =
+						typeof file.firstOldText === "string"
+							? file.firstOldText
+							: null;
+					existing.isNew = file.firstOldText === null;
+					existing.fromDiff = true;
+				}
 				continue;
 			}
 
@@ -79,6 +89,7 @@ export class SnapshotManager {
 					isNew: false,
 					wasDeletedByAgent: file.wasDeleted,
 					rawPath: file.rawPath,
+					fromDiff: true,
 				});
 				continue;
 			}
@@ -89,6 +100,7 @@ export class SnapshotManager {
 					isNew: true,
 					wasDeletedByAgent: file.wasDeleted,
 					rawPath: file.rawPath,
+					fromDiff: true,
 				});
 				continue;
 			}
@@ -102,6 +114,7 @@ export class SnapshotManager {
 				isNew: file.wasDeleted ? false : content == null,
 				wasDeletedByAgent: file.wasDeleted,
 				rawPath: file.rawPath,
+				fromDiff: false,
 			});
 		}
 	}

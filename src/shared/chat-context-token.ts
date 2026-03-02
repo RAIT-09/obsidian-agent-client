@@ -270,6 +270,19 @@ export function extractChatContextTokensFromMessage(message: string): {
 	};
 }
 
+export function removeChatContextTokensForPaths(
+	message: string,
+	paths: string[],
+): string {
+	const pathSet = new Set(paths);
+	const { contexts, messageWithoutContextTokens } =
+		extractChatContextTokensFromMessage(message);
+	const remaining = contexts.filter((ctx) => !pathSet.has(ctx.notePath));
+	if (remaining.length === contexts.length) return message;
+	const tokens = remaining.map((ctx) => createChatContextToken(ctx));
+	return buildMessageWithContextTokens(messageWithoutContextTokens, tokens);
+}
+
 export function formatChatContextBadgeLabel(
 	reference: ChatContextReference,
 ): string {

@@ -10,7 +10,10 @@ import type { ChatViewContextReference } from "../../domain/ports/chat-view-cont
 import { useChatController } from "../../hooks/useChatController";
 import { useSessionRestore } from "../../hooks/useSessionRestore";
 import type AgentClientPlugin from "../../plugin";
-import { appendChatContextToken } from "../../shared/chat-context-token";
+import {
+	appendChatContextToken,
+	removeChatContextTokensForPaths,
+} from "../../shared/chat-context-token";
 import { getLastAssistantMessage } from "../../shared/session-file-restoration";
 import { ChatInput } from "./ChatInput";
 import { ChatMessages } from "./ChatMessages";
@@ -148,25 +151,47 @@ export function TabContent({
 	]);
 
 	const handleUndoAll = useCallback(async () => {
+		const changesToRevert = sessionRestore.changeSet?.changes ?? [];
 		const { reverted, conflicts } = await sessionRestore.revertChanges(fileIo);
 		if (reverted.length > 0) {
 			new Notice(`Reverted ${reverted.length} file(s)`);
+			const revertedSet = new Set(reverted);
+			const revertedVaultPaths = changesToRevert
+				.filter((c) => revertedSet.has(c.path) && c.vaultPath)
+				.map((c) => c.vaultPath!);
+			if (revertedVaultPaths.length > 0) {
+				setInputValue((prev) =>
+					removeChatContextTokensForPaths(prev, revertedVaultPaths),
+				);
+			}
+			void autoMention.updateActiveNote();
 		}
 		if (conflicts.length > 0) {
 			new Notice(`${conflicts.length} file(s) had conflicts and were skipped`);
 		}
-	}, [sessionRestore, fileIo]);
+	}, [sessionRestore, fileIo, setInputValue, autoMention]);
 
 	const handleRevertFile = useCallback(
 		async (changePath: string) => {
+			const change = sessionRestore.changeSet?.changes.find(
+				(c) => c.path === changePath,
+			);
 			const result = await sessionRestore.revertFile(changePath, fileIo);
 			if (result.reverted) {
 				new Notice("File reverted");
+				if (change?.vaultPath) {
+					setInputValue((prev) =>
+						removeChatContextTokensForPaths(prev, [
+							change.vaultPath!,
+						]),
+					);
+				}
+				void autoMention.updateActiveNote();
 			} else if (result.conflict) {
 				new Notice("Could not revert: file has been modified externally");
 			}
 		},
-		[sessionRestore, fileIo],
+		[sessionRestore, fileIo, setInputValue, autoMention],
 	);
 
 	const prevIsSendingRef = useRef(false);
