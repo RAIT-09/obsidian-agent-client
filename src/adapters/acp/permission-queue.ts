@@ -7,6 +7,7 @@ import type {
 import type { SessionUpdate } from "../../domain/models/session-update";
 import { AcpTypeConverter } from "./acp-type-converter";
 import type { Logger } from "../../shared/logger";
+import { extractBaseCommands } from "./terminal-command-policy";
 
 export interface PendingPermissionRequest {
 	resolve: (response: acp.RequestPermissionResponse) => void;
@@ -24,6 +25,12 @@ export interface PermissionQueueState {
 	pendingPermissionRequests: Map<string, PendingPermissionRequest>;
 	pendingPermissionQueue: PendingPermissionQueueItem[];
 }
+
+export type TerminalPermissionMode =
+	| "disabled"
+	| "prompt_once"
+	| "always_allow"
+	| "always_deny";
 
 function normalizePermissionKind(
 	kind: unknown,
@@ -53,7 +60,7 @@ function isTerminalPermissionRequest(
 		(toolCall.rawInput as Record<string, unknown> | undefined) || {};
 	if (
 		typeof rawInput.command === "string" &&
-		rawInput.command.trim().length > 0
+		extractBaseCommands(rawInput.command).length > 0
 	) {
 		return true;
 	}
@@ -70,6 +77,41 @@ function removeQueueItemByRequestId(
 	if (index >= 0) {
 		queue.splice(index, 1);
 	}
+}
+
+function selectAllowOptionPreferAlways(
+	options: acp.PermissionOption[],
+): acp.PermissionOption {
+	const option =
+		options.find((option) => option.kind === "allow_always") ||
+		options.find((option) => option.kind === "allow_once") ||
+		options.find((option) => option.name.toLowerCase().includes("allow")) ||
+		options[0];
+
+	if (!option) {
+		throw new Error("Permission request has no options");
+	}
+
+	return option;
+}
+
+function selectRejectOption(
+	options: acp.PermissionOption[],
+): acp.PermissionOption {
+	const option =
+		options.find((option) => option.kind === "reject_always") ||
+		options.find((option) => option.kind === "reject_once") ||
+		options.find((option) => {
+			const name = option.name.toLowerCase();
+			return name.includes("reject") || name.includes("deny");
+		}) ||
+		options[0];
+
+	if (!option) {
+		throw new Error("Permission request has no options");
+	}
+
+	return option;
 }
 
 export function activateNextPermissionOperation(args: {
@@ -114,6 +156,7 @@ export function handlePermissionResponseOperation(args: {
 	updateMessage(toolCallId, {
 		type: "tool_call",
 		toolCallId,
+		status: "completed",
 		permissionRequest: {
 			requestId,
 			options,
@@ -172,31 +215,63 @@ export function cancelPendingPermissionRequestsOperation(args: {
 export async function requestPermissionOperation(args: {
 	params: acp.RequestPermissionRequest;
 	logger: Logger;
-	autoAllowPermissions: boolean;
+	terminalPermissionMode: TerminalPermissionMode;
 	state: PermissionQueueState;
 	updateMessage: (toolCallId: string, content: MessageContent) => void;
 	sessionUpdateCallback: ((update: SessionUpdate) => void) | null;
 }): Promise<acp.RequestPermissionResponse> {
-	const { params, logger, autoAllowPermissions, state, sessionUpdateCallback } =
-		args;
+	const {
+		params,
+		logger,
+		terminalPermissionMode,
+		state,
+		sessionUpdateCallback,
+	} = args;
 
 	logger.log("[AcpAdapter] Permission request received:", params);
-	if (autoAllowPermissions && !isTerminalPermissionRequest(params)) {
-		const allowOption =
-			params.options.find((option) => option.kind === "allow_once") ||
-			params.options.find((option) => option.kind === "allow_always") ||
-			params.options.find((option) =>
-				option.name.toLowerCase().includes("allow"),
-			) ||
-			params.options[0];
+	const isTerminalRequest = isTerminalPermissionRequest(params);
+	if (isTerminalRequest) {
+		if (terminalPermissionMode === "disabled") {
+			const rejectOption = selectRejectOption(params.options);
+			logger.log(
+				"[AcpAdapter] Auto-denying terminal permission request because terminal mode is disabled:",
+				rejectOption,
+			);
+			return {
+				outcome: {
+					outcome: "selected",
+					optionId: rejectOption.optionId,
+				},
+			};
+		}
 
-		logger.log("[AcpAdapter] Auto-allowing permission request:", allowOption);
-		return {
-			outcome: {
-				outcome: "selected",
-				optionId: allowOption.optionId,
-			},
-		};
+		if (terminalPermissionMode === "always_allow") {
+			const allowOption = selectAllowOptionPreferAlways(params.options);
+			logger.log(
+				"[AcpAdapter] Auto-allowing terminal permission request by settings:",
+				allowOption,
+			);
+			return {
+				outcome: {
+					outcome: "selected",
+					optionId: allowOption.optionId,
+				},
+			};
+		}
+
+		if (terminalPermissionMode === "always_deny") {
+			const rejectOption = selectRejectOption(params.options);
+			logger.log(
+				"[AcpAdapter] Auto-denying terminal permission request by settings:",
+				rejectOption,
+			);
+			return {
+				outcome: {
+					outcome: "selected",
+					optionId: rejectOption.optionId,
+				},
+			};
+		}
 	}
 
 	const requestId = crypto.randomUUID();

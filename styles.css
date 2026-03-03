@@ -1189,15 +1189,31 @@ If your plugin does not need CSS, delete this file.
 }
 
 .obsius-message-permission-request-result {
-	padding: 8px;
+	display: inline-flex;
+	align-items: center;
+	padding: 8px 14px;
+	border-radius: 6px;
+	border: none;
 	background-color: var(--background-primary);
-	border-radius: 4px;
 	font-size: 13px;
+	font-weight: 600;
 	user-select: text;
 }
 
 .obsius-message-permission-request-result.obsius-selected {
-	color: var(--text-accent);
+	color: var(--text-normal);
+}
+
+.obsius-message-permission-request-result.obsius-selected.obsius-result-allow {
+	background-color: color-mix(in srgb, var(--color-green) 36%, var(--background-secondary)) !important;
+	color: white;
+	border: none;
+}
+
+.obsius-message-permission-request-result.obsius-selected.obsius-result-deny {
+	background-color: color-mix(in srgb, var(--color-red) 34%, var(--background-secondary)) !important;
+	color: white;
+	border: none;
 }
 
 .obsius-message-permission-request-result.obsius-cancelled {
@@ -1207,17 +1223,18 @@ If your plugin does not need CSS, delete this file.
 /* ===== Permission Request Buttons ===== */
 .obsius-permission-option {
 	padding: 8px 16px !important;
-	border: 1px solid var(--background-modifier-border) !important;
+	border: none !important;
 	border-radius: 6px !important;
 	background-color: var(--background-primary) !important;
 	color: var(--text-normal) !important;
 	cursor: pointer;
 	font-size: 13px;
-	font-weight: 500;
-	transition: all 0.2s ease;
+	font-weight: 600;
+	transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 	min-width: 80px;
 	text-align: center;
 	opacity: 1;
+	box-shadow: none !important;
 }
 
 .obsius-permission-option.obsius-selected {
@@ -1237,26 +1254,32 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* Special kinds */
-.obsius-permission-option.obsius-permission-kind-allow_always:not(.obsius-selected):not(.obsius-disabled) {
-	background-color: var(--color-green) !important;
-	color: white !important;
-	border-color: var(--color-green) !important;
-}
-
-.obsius-permission-option.obsius-permission-kind-reject_once:not(.obsius-selected):not(.obsius-disabled) {
-	background-color: var(--color-red) !important;
-	color: white !important;
-	border-color: var(--color-red) !important;
-}
-
+.obsius-permission-option.obsius-permission-kind-allow_always:not(.obsius-selected):not(.obsius-disabled),
 .obsius-permission-option.obsius-permission-kind-allow_once:not(.obsius-selected):not(.obsius-disabled) {
-	background-color: var(--color-orange) !important;
+	background-color: color-mix(in srgb, var(--color-green) 36%, var(--background-secondary)) !important;
 	color: white !important;
-	border-color: var(--color-orange) !important;
+	border: none !important;
+}
+
+.obsius-permission-option.obsius-permission-kind-reject_once:not(.obsius-selected):not(.obsius-disabled),
+.obsius-permission-option.obsius-permission-kind-reject_always:not(.obsius-selected):not(.obsius-disabled) {
+	background-color: color-mix(in srgb, var(--color-red) 34%, var(--background-secondary)) !important;
+	color: white !important;
+	border: none !important;
+}
+
+.obsius-permission-option.obsius-permission-kind-allow_always:not(.obsius-selected):not(.obsius-disabled):hover,
+.obsius-permission-option.obsius-permission-kind-allow_once:not(.obsius-selected):not(.obsius-disabled):hover {
+	background-color: color-mix(in srgb, var(--color-green) 44%, var(--background-secondary)) !important;
+}
+
+.obsius-permission-option.obsius-permission-kind-reject_once:not(.obsius-selected):not(.obsius-disabled):hover,
+.obsius-permission-option.obsius-permission-kind-reject_always:not(.obsius-selected):not(.obsius-disabled):hover {
+	background-color: color-mix(in srgb, var(--color-red) 42%, var(--background-secondary)) !important;
 }
 
 /* Normal option button hover (no kind specified) */
-.obsius-permission-option:not(.obsius-permission-kind-allow_always):not(.obsius-permission-kind-reject_once):not(.obsius-permission-kind-allow_once):not(.obsius-disabled):not(.obsius-selected):hover {
+.obsius-permission-option:not(.obsius-permission-kind-allow_always):not(.obsius-permission-kind-allow_once):not(.obsius-permission-kind-reject_once):not(.obsius-permission-kind-reject_always):not(.obsius-disabled):not(.obsius-selected):hover {
 	background-color: var(--background-modifier-hover) !important;
 }
 

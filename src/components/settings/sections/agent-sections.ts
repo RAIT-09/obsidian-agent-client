@@ -389,7 +389,7 @@ function renderCodexSettings(
 
 function renderPathSettingWithDetect(
 	containerEl: HTMLElement,
-	_plugin: AgentClientPlugin,
+	plugin: AgentClientPlugin,
 	opts: {
 		agentId: string;
 		getValue: () => string;
@@ -398,6 +398,27 @@ function renderPathSettingWithDetect(
 ): void {
 	const defaultCommand = BUILTIN_AGENT_DEFAULT_COMMANDS[opts.agentId] ?? "";
 	let textRef: TextComponent | null = null;
+	let refreshTimer: number | null = null;
+	const scheduleCatalogRefresh = (command: string) => {
+		const runtimePlugin = plugin as AgentClientPlugin & {
+			refreshAgentCatalog?: (
+				targetAgentId: string,
+				options?: { force?: boolean },
+			) => Promise<boolean>;
+		};
+		if (typeof runtimePlugin.refreshAgentCatalog !== "function") {
+			return;
+		}
+		if (refreshTimer !== null) {
+			window.clearTimeout(refreshTimer);
+		}
+		if (!command.trim()) {
+			return;
+		}
+		refreshTimer = window.setTimeout(() => {
+			void runtimePlugin.refreshAgentCatalog?.(opts.agentId, { force: true });
+		}, 500);
+	};
 
 	const setting = new Setting(containerEl)
 		.setName("Command")
@@ -412,7 +433,9 @@ function renderPathSettingWithDetect(
 				.setPlaceholder(defaultCommand || "Command name or path")
 				.setValue(opts.getValue())
 				.onChange(async (value) => {
-					await opts.setValue(value.trim());
+					const next = value.trim();
+					await opts.setValue(next);
+					scheduleCatalogRefresh(next);
 				});
 		});
 
@@ -428,6 +451,7 @@ function renderPathSettingWithDetect(
 						if (resolved) {
 							textRef?.setValue(resolved);
 							await opts.setValue(resolved);
+							scheduleCatalogRefresh(resolved);
 							new Notice(`Found: ${resolved}`);
 						} else {
 							new Notice(`"${defaultCommand}" not found in shell PATH.`);

@@ -25,19 +25,58 @@ export function PermissionRequestSection({
 	onOptionSelected,
 }: PermissionRequestSectionProps) {
 	const logger = getLogger();
+	const getOptionLabel = (option: acp.PermissionOption): string => {
+		if (option.kind === "allow_once" || option.kind === "allow_always") {
+			return "Allow";
+		}
+		if (option.kind === "reject_once" || option.kind === "reject_always") {
+			return "Deny";
+		}
+		return option.name;
+	};
 
 	const isSelected = permissionRequest.selectedOptionId !== undefined;
 	const isCancelled = permissionRequest.isCancelled === true;
 	const isActive = permissionRequest.isActive !== false;
+	const hasAllowOnce = permissionRequest.options.some(
+		(option) => option.kind === "allow_once",
+	);
+	const hasRejectOnce = permissionRequest.options.some(
+		(option) => option.kind === "reject_once",
+	);
+	const visibleOptions = permissionRequest.options.filter((option) => {
+		if (option.kind === "allow_always" && hasAllowOnce) {
+			return false;
+		}
+		if (option.kind === "reject_always" && hasRejectOnce) {
+			return false;
+		}
+		return true;
+	});
 	const selectedOption = permissionRequest.options.find(
 		(opt) => opt.optionId === permissionRequest.selectedOptionId,
 	);
+	const selectedKind = selectedOption?.kind;
+	const selectedResultLabel =
+		selectedKind === "allow_once" || selectedKind === "allow_always"
+			? "Allowed"
+			: selectedKind === "reject_once" || selectedKind === "reject_always"
+				? "Denied"
+				: selectedOption
+					? getOptionLabel(selectedOption)
+					: "";
+	const selectedResultClass =
+		selectedKind === "allow_once" || selectedKind === "allow_always"
+			? "obsius-result-allow"
+			: selectedKind === "reject_once" || selectedKind === "reject_always"
+				? "obsius-result-deny"
+				: "";
 
 	return (
 		<div className="obsius-message-permission-request">
 			{isActive && !isSelected && !isCancelled && (
 				<div className="obsius-message-permission-request-options">
-					{permissionRequest.options.map((option) => (
+					{visibleOptions.map((option) => (
 						<button
 							key={option.optionId}
 							className={`obsius-permission-option ${option.kind ? `obsius-permission-kind-${option.kind}` : ""}`}
@@ -60,14 +99,16 @@ export function PermissionRequestSection({
 								}
 							}}
 						>
-							{option.name}
+							{getOptionLabel(option)}
 						</button>
 					))}
 				</div>
 			)}
 			{isSelected && selectedOption && (
-				<div className="obsius-message-permission-request-result obsius-selected">
-					Selected: {selectedOption.name}
+				<div
+					className={`obsius-message-permission-request-result obsius-selected ${selectedResultClass}`}
+				>
+					{selectedResultLabel}
 				</div>
 			)}
 			{isCancelled && (

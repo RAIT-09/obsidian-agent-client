@@ -36,6 +36,10 @@ export function useAgentSession(
 		settings: ReturnType<ISettingsAccess["getSnapshot"]>,
 		agentId: string,
 	) => string,
+	getSecretBindingEnvForAgentId: (
+		settings: ReturnType<ISettingsAccess["getSnapshot"]>,
+		agentId: string,
+	) => Record<string, string>,
 	initialAgentId?: string,
 ): UseAgentSessionReturn {
 	const initialSettings = settingsAccess.getSnapshot();
@@ -125,6 +129,7 @@ export function useAgentSession(
 					agentId,
 					workingDirectory,
 					getApiKeyForAgentId(settings, agentId),
+					getSecretBindingEnvForAgentId(settings, agentId),
 				);
 
 				const needsInitialize =
@@ -256,7 +261,13 @@ export function useAgentSession(
 				});
 			}
 		},
-		[agentClient, settingsAccess, workingDirectory, getApiKeyForAgentId],
+		[
+			agentClient,
+			settingsAccess,
+			workingDirectory,
+			getApiKeyForAgentId,
+			getSecretBindingEnvForAgentId,
+		],
 	);
 
 	const loadSession = useCallback(
@@ -302,6 +313,7 @@ export function useAgentSession(
 					defaultAgentId,
 					workingDirectory,
 					getApiKeyForAgentId(settings, defaultAgentId),
+					getSecretBindingEnvForAgentId(settings, defaultAgentId),
 				);
 
 				const needsInitialize =
@@ -401,7 +413,13 @@ export function useAgentSession(
 				});
 			}
 		},
-		[agentClient, settingsAccess, workingDirectory, getApiKeyForAgentId],
+		[
+			agentClient,
+			settingsAccess,
+			workingDirectory,
+			getApiKeyForAgentId,
+			getSecretBindingEnvForAgentId,
+		],
 	);
 
 	const restartSession = useCallback(

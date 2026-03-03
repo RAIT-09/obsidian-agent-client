@@ -7,7 +7,10 @@ import { NoteMentionService } from "../adapters/obsidian/mention-service";
 import { getLogger } from "../shared/logger";
 import { ObsidianVaultAdapter } from "../adapters/obsidian/vault.adapter";
 import { resolveAgentDisplayName } from "../shared/agent-display-name";
-import { getApiKeyForAgentId } from "../shared/secret-storage";
+import {
+	getApiKeyForAgentId,
+	getSecretBindingEnvForAgentId,
+} from "../shared/secret-storage";
 import { resolveVaultBasePath } from "../shared/vault-path";
 import { useModelFiltering } from "./useModelFiltering";
 
@@ -73,12 +76,25 @@ export function useChatController(
 			getApiKeyForAgentId(plugin.app.secretStorage, currentSettings, agentId),
 		[plugin],
 	);
+	const resolveSecretBindingEnvForAgent = useCallback(
+		(
+			currentSettings: ReturnType<(typeof plugin.settingsStore)["getSnapshot"]>,
+			agentId: string,
+		): Record<string, string> =>
+			getSecretBindingEnvForAgentId(
+				plugin.app.secretStorage,
+				currentSettings,
+				agentId,
+			),
+		[plugin],
+	);
 
 	const agentSession = useAgentSession(
 		acpAdapter,
 		plugin.settingsStore,
 		vaultPath,
 		resolveApiKeyForAgent,
+		resolveSecretBindingEnvForAgent,
 		initialAgentId,
 	);
 
@@ -406,7 +422,12 @@ export function useChatController(
 	const initialModeModelAppliedSessionRef = useRef<string | null>(null);
 
 	useEffect(() => {
-		if (!isSessionReady || !session.sessionId || !session.models || !session.agentId) {
+		if (
+			!isSessionReady ||
+			!session.sessionId ||
+			!session.models ||
+			!session.agentId
+		) {
 			return;
 		}
 		if (initialModeModelAppliedSessionRef.current === session.sessionId) {

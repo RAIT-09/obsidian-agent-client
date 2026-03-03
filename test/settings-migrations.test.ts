@@ -24,7 +24,7 @@ describe("settings migrations", () => {
 		const data = { schemaVersion: 0, foo: "bar" };
 		const result = parseStoredSettings(data);
 
-		expect(result.resetReason).toContain("no migration path");
+		expect(result.resetReason).toContain("schema version mismatch");
 		expect(result.settings.schemaVersion).toBe(SETTINGS_SCHEMA_VERSION);
 	});
 

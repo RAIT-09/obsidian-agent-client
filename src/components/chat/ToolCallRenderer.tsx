@@ -234,8 +234,9 @@ export function ToolCallRenderer({
 	}, [displayName, genericToolName]);
 
 	const statusClass = getStatusDisplayClass(status);
-	const statusIcon = getStatusIconName(status);
-	const showRightStatusIcon = !showLiveIndicator || statusClass !== "running";
+	const isRunning = statusClass === "running";
+	const showSpinnerIcon = showLiveIndicator || isRunning;
+	const statusIcon = isRunning ? "" : getStatusIconName(status);
 
 	const hasDiffContent = toolContent?.some((item) => item.type === "diff") ?? false;
 	const rawPatchText = useMemo(
@@ -334,7 +335,7 @@ export function ToolCallRenderer({
 
 	const header = (
 		<>
-			{showLiveIndicator ? (
+			{showSpinnerIcon ? (
 				<span className="ac-tool-icon ac-tool-icon--spinner" aria-hidden="true">
 					<svg className="ac-loading__spinner ac-loading__spinner--inline" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
 						<line className="ac-sq-line-0" x1="15" y1="15" x2="85" y2="15" />
@@ -397,7 +398,7 @@ export function ToolCallRenderer({
 			<span
 				className={`ac-tool-status ${statusClass ? `ac-tool-status--${statusClass}` : ""}`}
 			>
-				{showRightStatusIcon && statusIcon && (
+				{statusIcon && (
 					<ObsidianIcon name={statusIcon} size={14} />
 				)}
 			</span>

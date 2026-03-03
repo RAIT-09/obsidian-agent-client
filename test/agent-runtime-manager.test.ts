@@ -48,7 +48,7 @@ const defaultInitArgs = {
 	pluginVersion: "0.1.0",
 	windowsWslMode: false,
 	nodePath: "",
-	allowTerminalCommands: false,
+	terminalCapabilityEnabled: false,
 };
 
 // ── RuntimeMultiplexer ─────────────────────────────────────────────────

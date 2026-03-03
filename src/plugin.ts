@@ -14,13 +14,16 @@ import {
 import { AgentClientSettingTab } from "./components/settings/AgentClientSettingTab";
 import { AcpAdapter } from "./adapters/acp/acp.adapter";
 import { AgentRuntimeManager } from "./adapters/acp/agent-runtime-manager";
+import type { AgentConfig } from "./domain/ports/agent-client.port";
 import {
 	AgentEnvVar,
+	AgentSecretBinding,
 	GeminiAgentSettings,
 	ClaudeAgentSettings,
 	CodexAgentSettings,
 	OpenCodeAgentSettings,
 	CustomAgentSettings,
+	type BaseAgentSettings,
 } from "./domain/models/agent-config";
 import type { SavedSessionInfo } from "./domain/models/session-info";
 import { initializeLogger } from "./shared/logger";
@@ -49,8 +52,15 @@ import { checkForUpdates } from "./plugin/update-check";
 import { createNewChatLeaf, focusChatTextarea } from "./plugin/view-helpers";
 import { registerInlineEditCommand } from "./plugin/inline-edit";
 import type { ChatContextReference } from "./shared/chat-context-token";
+import {
+	getApiKeyForAgentId,
+	getSecretBindingEnvForAgentId,
+} from "./shared/secret-storage";
+import { resolveVaultBasePath } from "./shared/vault-path";
+import { toAgentConfig } from "./shared/settings-utils";
+import { resolveShellEnvironment } from "./shared/shell-utils";
 
-export type { AgentEnvVar, CustomAgentSettings };
+export type { AgentEnvVar, AgentSecretBinding, CustomAgentSettings };
 
 /**
  * Send message shortcut configuration.
@@ -72,6 +82,31 @@ export type ChatViewLocation =
 	| "editor-tab"
 	| "editor-split";
 
+export type TerminalPermissionMode =
+	| "disabled"
+	| "prompt_once"
+	| "always_allow"
+	| "always_deny";
+
+const KEYCHAIN_ONLY_ENV_KEYS = new Set([
+	"ANTHROPIC_API_KEY",
+	"OPENAI_API_KEY",
+	"GEMINI_API_KEY",
+]);
+
+function removeKeychainOnlyEnv(
+	env: Record<string, string>,
+): Record<string, string> {
+	const cleaned: Record<string, string> = {};
+	for (const [key, value] of Object.entries(env)) {
+		if (KEYCHAIN_ONLY_ENV_KEYS.has(key)) {
+			continue;
+		}
+		cleaned[key] = value;
+	}
+	return cleaned;
+}
+
 export interface AgentClientPluginSettings {
 	schemaVersion: number;
 	gemini: GeminiAgentSettings;
@@ -81,8 +116,9 @@ export interface AgentClientPluginSettings {
 	customAgents: CustomAgentSettings[];
 	/** Default agent ID for new views (renamed from activeAgentId for multi-session) */
 	defaultAgentId: string;
-	autoAllowPermissions: boolean;
-	allowTerminalCommands: boolean;
+	/** Global environment-variable to keychain binding */
+	secretBindings: AgentSecretBinding[];
+	terminalPermissionMode: TerminalPermissionMode;
 	autoMentionActiveNote: boolean;
 	debugMode: boolean;
 	nodePath: string;
@@ -131,6 +167,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 export default class AgentClientPlugin extends Plugin {
 	settings: AgentClientPluginSettings;
 	settingsStore!: SettingsStore;
+	private agentCatalogRefreshInFlight = new Map<string, Promise<boolean>>();
 
 	/** Registry for all chat view containers */
 	viewRegistry = new ChatViewRegistry();
@@ -143,6 +180,7 @@ export default class AgentClientPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+		void resolveShellEnvironment();
 
 		initializeLogger(this.settings);
 
@@ -472,5 +510,152 @@ export default class AgentClientPlugin extends Plugin {
 
 	ensureDefaultAgentId(): void {
 		ensureDefaultAgentId(this.settings, DEFAULT_SETTINGS.claude.id);
+	}
+
+	private getAgentSettingsById(agentId: string): BaseAgentSettings | null {
+		if (agentId === this.settings.claude.id) {
+			return this.settings.claude;
+		}
+		if (agentId === this.settings.opencode.id) {
+			return this.settings.opencode;
+		}
+		if (agentId === this.settings.codex.id) {
+			return this.settings.codex;
+		}
+		if (agentId === this.settings.gemini.id) {
+			return this.settings.gemini;
+		}
+		return (
+			this.settings.customAgents.find((agent) => agent.id === agentId) || null
+		);
+	}
+
+	private buildAgentConfigForCatalog(agentId: string): AgentConfig | null {
+		const agentSettings = this.getAgentSettingsById(agentId);
+		if (!agentSettings) {
+			return null;
+		}
+		const workingDirectory = resolveVaultBasePath(this.app);
+		const baseConfig = toAgentConfig(agentSettings, workingDirectory);
+		const apiKey = getApiKeyForAgentId(
+			this.app.secretStorage,
+			this.settings,
+			agentId,
+		);
+		const secretBindingEnv = getSecretBindingEnvForAgentId(
+			this.app.secretStorage,
+			this.settings,
+			agentId,
+		);
+		const mergedEnv = {
+			...removeKeychainOnlyEnv(baseConfig.env || {}),
+			...secretBindingEnv,
+		};
+
+		if (agentId === this.settings.claude.id) {
+			return {
+				...baseConfig,
+				env: {
+					...mergedEnv,
+					ANTHROPIC_API_KEY: apiKey,
+				},
+			};
+		}
+		if (agentId === this.settings.codex.id) {
+			return {
+				...baseConfig,
+				env: {
+					...mergedEnv,
+					OPENAI_API_KEY: apiKey,
+				},
+			};
+		}
+		if (agentId === this.settings.gemini.id) {
+			return {
+				...baseConfig,
+				env: {
+					...mergedEnv,
+					GEMINI_API_KEY: apiKey,
+				},
+			};
+		}
+
+		return {
+			...baseConfig,
+			env: mergedEnv,
+		};
+	}
+
+	async refreshAgentCatalog(
+		agentId: string,
+		options?: { force?: boolean },
+	): Promise<boolean> {
+		const existingModels = this.settings.cachedAgentModels?.[agentId];
+		const existingModes = this.settings.cachedAgentModes?.[agentId];
+		if (
+			!options?.force &&
+			(existingModels?.length ?? 0) > 0 &&
+			(existingModes?.length ?? 0) > 0
+		) {
+			return true;
+		}
+
+		const inFlight = this.agentCatalogRefreshInFlight.get(agentId);
+		if (inFlight) {
+			return inFlight;
+		}
+
+		const task = (async (): Promise<boolean> => {
+			const config = this.buildAgentConfigForCatalog(agentId);
+			if (!config) {
+				return false;
+			}
+
+			const adapter = new AcpAdapter(this);
+			try {
+				await adapter.initialize(config);
+				const session = await adapter.newSession(config.workingDirectory);
+				await this.settingsStore.updateSettings({
+					cachedAgentModels: {
+						...this.settings.cachedAgentModels,
+						[agentId]: session.models
+							? session.models.availableModels.map((model) => ({
+									modelId: model.modelId,
+									name: model.name,
+									description: model.description,
+								}))
+							: [],
+					},
+					cachedAgentModes: {
+						...this.settings.cachedAgentModes,
+						[agentId]: session.modes
+							? session.modes.availableModes.map((mode) => ({
+									id: mode.id,
+									name: mode.name,
+									description: mode.description,
+								}))
+							: [],
+					},
+				});
+				return true;
+			} catch (error) {
+				console.warn(
+					`[AgentClient] Failed to refresh model/mode catalog for agent "${agentId}":`,
+					error,
+				);
+				return false;
+			} finally {
+				try {
+					await adapter.disconnect();
+				} catch {
+					void 0;
+				}
+			}
+		})().finally(() => {
+			this.agentCatalogRefreshInFlight.delete(agentId);
+		});
+
+		this.agentCatalogRefreshInFlight.set(agentId, task);
+		return await task;
 	}
 }

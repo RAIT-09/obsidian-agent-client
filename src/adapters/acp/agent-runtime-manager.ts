@@ -29,7 +29,7 @@ export interface RuntimeInitArgs {
 	windowsWslMode: boolean;
 	windowsWslDistribution?: string;
 	nodePath: string;
-	allowTerminalCommands: boolean;
+	terminalCapabilityEnabled: boolean;
 }
 
 /**
@@ -167,7 +167,7 @@ export class AgentRuntimeManager {
 			windowsWslMode: initArgs.windowsWslMode,
 			windowsWslDistribution: initArgs.windowsWslDistribution,
 			nodePath: initArgs.nodePath,
-			allowTerminalCommands: initArgs.allowTerminalCommands,
+			terminalCapabilityEnabled: initArgs.terminalCapabilityEnabled,
 			onError: (error: ProcessError) => {
 				multiplexer.broadcastError(error);
 			},

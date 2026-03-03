@@ -6,7 +6,12 @@ import { Platform } from "obsidian";
 import { wrapCommandForWsl } from "./wsl-utils";
 import { resolveCommandDirectory } from "./path-utils";
 import { getEnhancedWindowsEnv } from "./windows-env";
-import { escapeShellArgWindows, getLoginShell } from "./shell-utils";
+import {
+	escapeShellArgWindows,
+	getCachedShellEnvironment,
+	getLoginShell,
+	resolveShellEnvironment,
+} from "./shell-utils";
 
 interface TerminalProcess {
 	id: string;
@@ -41,6 +46,15 @@ export class TerminalManager {
 		// Set up environment variables
 		// Desktop-only: Node.js process environment for terminal operations
 		let env: NodeJS.ProcessEnv = { ...process.env };
+		if (Platform.isMacOS || Platform.isLinux) {
+			const shellEnv = getCachedShellEnvironment();
+			if (shellEnv) {
+				env = { ...env, ...shellEnv };
+			} else {
+				// Warm cache for subsequent terminal calls.
+				void resolveShellEnvironment();
+			}
+		}
 
 		// On Windows (non-WSL mode), enhance PATH with full system/user PATH from registry.
 		// Electron apps launched from shortcuts don't inherit the full PATH.

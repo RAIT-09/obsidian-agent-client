@@ -3,10 +3,10 @@ import type {
 	AgentClientPluginSettings,
 	ChatViewLocation,
 	SendMessageShortcut,
+	TerminalPermissionMode,
 } from "../plugin";
-import { hasMigrationPath, migrateSettings } from "./settings-migrations";
 
-export const SETTINGS_SCHEMA_VERSION = 6;
+export const SETTINGS_SCHEMA_VERSION = 8;
 
 const sendMessageShortcutSchema = z.union([
 	z.literal("enter"),
@@ -20,9 +20,21 @@ const chatViewLocationSchema = z.union([
 	z.literal("editor-split"),
 ]) satisfies z.ZodType<ChatViewLocation>;
 
+const terminalPermissionModeSchema = z.union([
+	z.literal("disabled"),
+	z.literal("prompt_once"),
+	z.literal("always_allow"),
+	z.literal("always_deny"),
+]) satisfies z.ZodType<TerminalPermissionMode>;
+
 const envVarSchema = z.object({
 	key: z.string().min(1),
 	value: z.string(),
+});
+
+const secretBindingSchema = z.object({
+	envKey: z.string().min(1),
+	secretId: z.string().regex(/^[a-z0-9-]+$/),
 });
 
 const commonAgentSettingsSchema = z.object({
@@ -31,6 +43,7 @@ const commonAgentSettingsSchema = z.object({
 	command: z.string(),
 	args: z.array(z.string()),
 	env: z.array(envVarSchema),
+	secretBindings: z.array(secretBindingSchema),
 });
 const apiKeyAgentSettingsSchema = commonAgentSettingsSchema.extend({
 	apiKeySecretId: z.string().regex(/^[a-z0-9-]+$/),
@@ -62,8 +75,8 @@ const settingsSchema = z.object({
 	opencode: commonAgentSettingsSchema,
 	customAgents: z.array(commonAgentSettingsSchema),
 	defaultAgentId: z.string().min(1),
-	autoAllowPermissions: z.boolean(),
-	allowTerminalCommands: z.boolean(),
+	secretBindings: z.array(secretBindingSchema),
+	terminalPermissionMode: terminalPermissionModeSchema,
 	autoMentionActiveNote: z.boolean(),
 	debugMode: z.boolean(),
 	nodePath: z.string(),
@@ -116,6 +129,7 @@ export const createDefaultSettings = (): AgentClientPluginSettings => ({
 		command: "",
 		args: [],
 		env: [],
+		secretBindings: [],
 	},
 	codex: {
 		id: "codex-acp",
@@ -124,6 +138,7 @@ export const createDefaultSettings = (): AgentClientPluginSettings => ({
 		command: "",
 		args: [],
 		env: [],
+		secretBindings: [],
 	},
 	gemini: {
 		id: "gemini-cli",
@@ -132,6 +147,7 @@ export const createDefaultSettings = (): AgentClientPluginSettings => ({
 		command: "",
 		args: ["--experimental-acp"],
 		env: [],
+		secretBindings: [],
 	},
 	opencode: {
 		id: "opencode",
@@ -139,11 +155,12 @@ export const createDefaultSettings = (): AgentClientPluginSettings => ({
 		command: "",
 		args: ["acp"],
 		env: [],
+		secretBindings: [],
 	},
 	customAgents: [],
 	defaultAgentId: "opencode",
-	autoAllowPermissions: false,
-	allowTerminalCommands: false,
+	secretBindings: [],
+	terminalPermissionMode: "disabled",
 	autoMentionActiveNote: true,
 	debugMode: false,
 	nodePath: "",
@@ -173,6 +190,16 @@ export function parseStoredSettings(raw: unknown): {
 	resetReason?: string;
 	migrated?: boolean;
 } {
+	const ensureSecretBindings = (agent: unknown): void => {
+		if (!agent || typeof agent !== "object") {
+			return;
+		}
+		const candidate = agent as Record<string, unknown>;
+		if (!Array.isArray(candidate.secretBindings)) {
+			candidate.secretBindings = [];
+		}
+	};
+
 	if (!raw || typeof raw !== "object") {
 		return {
 			settings: createDefaultSettings(),
@@ -180,21 +207,13 @@ export function parseStoredSettings(raw: unknown): {
 		};
 	}
 
-	let candidate = raw as Record<string, unknown>;
+	const candidate = raw as Record<string, unknown>;
 	const storedVersion = (candidate.schemaVersion as number) ?? 0;
-	let migrated = false;
-
 	if (storedVersion !== SETTINGS_SCHEMA_VERSION) {
-		if (hasMigrationPath(storedVersion, SETTINGS_SCHEMA_VERSION)) {
-			const result = migrateSettings(candidate, SETTINGS_SCHEMA_VERSION);
-			candidate = result.data;
-			migrated = result.migrated;
-		} else {
-			return {
-				settings: createDefaultSettings(),
-				resetReason: `no migration path from schema v${storedVersion} to v${SETTINGS_SCHEMA_VERSION}`,
-			};
-		}
+		return {
+			settings: createDefaultSettings(),
+			resetReason: `schema version mismatch: expected v${SETTINGS_SCHEMA_VERSION}, got v${storedVersion}`,
+		};
 	}
 
 	if (
@@ -206,9 +225,17 @@ export function parseStoredSettings(raw: unknown): {
 			ds.completionSound = true;
 		}
 	}
-
-	if (candidate.allowTerminalCommands === undefined) {
-		candidate.allowTerminalCommands = false;
+	ensureSecretBindings(candidate.claude);
+	ensureSecretBindings(candidate.codex);
+	ensureSecretBindings(candidate.gemini);
+	ensureSecretBindings(candidate.opencode);
+	if (!Array.isArray(candidate.secretBindings)) {
+		candidate.secretBindings = [];
+	}
+	if (Array.isArray(candidate.customAgents)) {
+		for (const agent of candidate.customAgents) {
+			ensureSecretBindings(agent);
+		}
 	}
 
 	const parsed = settingsSchema.safeParse(candidate);
@@ -221,5 +248,5 @@ export function parseStoredSettings(raw: unknown): {
 		};
 	}
 
-	return { settings: parsed.data, migrated };
+	return { settings: parsed.data };
 }

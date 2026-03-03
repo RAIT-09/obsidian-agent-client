@@ -15,7 +15,14 @@ import {
 	BUILTIN_AGENT_DEFAULT_COMMANDS,
 	escapeShellArgWindows,
 	getLoginShell,
+	resolveShellEnvironment,
 } from "../../shared/shell-utils";
+
+const KEYCHAIN_ONLY_ENV_KEYS = [
+	"ANTHROPIC_API_KEY",
+	"OPENAI_API_KEY",
+	"GEMINI_API_KEY",
+] as const;
 
 export interface InitializeOperationResult {
 	connection: acp.ClientSideConnection;
@@ -30,7 +37,7 @@ export async function initializeOperation(args: {
 	windowsWslMode: boolean;
 	windowsWslDistribution?: string;
 	nodePath: string;
-	allowTerminalCommands: boolean;
+	terminalCapabilityEnabled: boolean;
 	onError: (error: ProcessError) => void;
 	clientFactory: (
 		stream: ReturnType<typeof acp.ndJsonStream>,
@@ -50,7 +57,7 @@ export async function initializeOperation(args: {
 		windowsWslMode,
 		windowsWslDistribution,
 		nodePath,
-		allowTerminalCommands,
+		terminalCapabilityEnabled,
 		onError,
 		clientFactory,
 		onStderrData,
@@ -81,7 +88,17 @@ export async function initializeOperation(args: {
 		commandArgs.length > 0 ? commandArgs.join(" ") : "(none)",
 	);
 
-	let baseEnv: NodeJS.ProcessEnv = { ...process.env, ...(config.env || {}) };
+	let baseEnv: NodeJS.ProcessEnv = { ...process.env };
+	if (Platform.isMacOS || Platform.isLinux) {
+		const shellEnv = await resolveShellEnvironment();
+		if (shellEnv) {
+			baseEnv = { ...baseEnv, ...shellEnv };
+		}
+	}
+	for (const key of KEYCHAIN_ONLY_ENV_KEYS) {
+		delete baseEnv[key];
+	}
+	baseEnv = { ...baseEnv, ...(config.env || {}) };
 	if (Platform.isWin && !windowsWslMode) {
 		baseEnv = getEnhancedWindowsEnv(baseEnv);
 	}
@@ -255,7 +272,7 @@ export async function initializeOperation(args: {
 				readTextFile: false,
 				writeTextFile: false,
 			},
-			terminal: allowTerminalCommands,
+			terminal: terminalCapabilityEnabled,
 		},
 		clientInfo: {
 			name: "obsius",

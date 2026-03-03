@@ -25,6 +25,21 @@ export interface AgentEnvVar {
 	value: string;
 }
 
+/**
+ * Environment variable mapping to a SecretStorage entry.
+ *
+ * Example:
+ * - envKey: "GEMINI_API_KEY"
+ * - secretId: "nano-banana-api"
+ */
+export interface AgentSecretBinding {
+	/** Environment variable name injected at runtime */
+	envKey: string;
+
+	/** Obsidian SecretStorage key name (lowercase / kebab-case) */
+	secretId: string;
+}
+
 // ============================================================================
 // Agent Configuration
 // ============================================================================
@@ -51,6 +66,9 @@ export interface BaseAgentSettings {
 
 	/** Environment variables for the agent process */
 	env: AgentEnvVar[];
+
+	/** SecretStorage-backed environment variables injected at runtime */
+	secretBindings: AgentSecretBinding[];
 }
 
 /**

@@ -1,7 +1,7 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatMessage } from "../src/domain/models/chat-message";
 import type { FileChange } from "../src/shared/session-file-restoration";
-import { SnapshotManager, type FileIo } from "../src/shared/snapshot-manager";
+import { type FileIo, SnapshotManager } from "../src/shared/snapshot-manager";
 
 function makeMessage(
 	role: "user" | "assistant",
@@ -719,9 +719,7 @@ describe("SnapshotManager", () => {
 
 		it("kept full-file rewrite becomes baseline for later modifications", async () => {
 			const io = mockFileIo({ "note.md": "rewritten content" });
-			const messages = [
-				makeDiffMessage("note.md", "", "rewritten content"),
-			];
+			const messages = [makeDiffMessage("note.md", "", "rewritten content")];
 
 			let cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).not.toBeNull();

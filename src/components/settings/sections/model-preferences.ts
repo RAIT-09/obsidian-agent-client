@@ -47,28 +47,78 @@ export function renderAgentModelSettings(
 	plugin: AgentClientPlugin,
 	agentId: string,
 ): void {
-	const models = plugin.settings.cachedAgentModels?.[agentId];
-	if (!models || models.length === 0) return;
+	const root = containerEl.createDiv({ cls: "obsius-model-prefs-root" });
 
-	const modes = plugin.settings.cachedAgentModes?.[agentId];
-	let modeMappingContainer: HTMLElement | null = null;
-	const renderModeMapping = () => {
-		if (!modeMappingContainer) return;
-		modeMappingContainer.empty();
-		if (modes && modes.length > 0) {
-			renderModeModelMapping(modeMappingContainer, plugin, agentId, modes, models);
+	const renderReadyState = (): void => {
+		root.empty();
+		const models = plugin.settings.cachedAgentModels?.[agentId];
+		if (!models || models.length === 0) {
+			return;
 		}
+		const modes = plugin.settings.cachedAgentModes?.[agentId];
+		let modeMappingContainer: HTMLElement | null = null;
+		const renderModeMapping = () => {
+			if (!modeMappingContainer) return;
+			modeMappingContainer.empty();
+			if (modes && modes.length > 0) {
+				renderModeModelMapping(
+					modeMappingContainer,
+					plugin,
+					agentId,
+					modes,
+					models,
+				);
+			}
+		};
+
+		renderCandidateModelPicker(root, plugin, agentId, models, renderModeMapping);
+		modeMappingContainer = root.createDiv();
+		renderModeMapping();
 	};
 
-	renderCandidateModelPicker(
-		containerEl,
-		plugin,
-		agentId,
-		models,
-		renderModeMapping,
-	);
-	modeMappingContainer = containerEl.createDiv();
-	renderModeMapping();
+	const renderLoadingState = (message: string): HTMLButtonElement => {
+		root.empty();
+		const loading = new Setting(root)
+			.setName("Model preferences")
+			.setDesc(message)
+			.addButton((button) => {
+				button.setButtonText("Retry");
+				button.onClick(() => {
+					void loadCatalog(true);
+				});
+			});
+		return loading.controlEl.querySelector("button") as HTMLButtonElement;
+	};
+
+	const loadCatalog = async (force: boolean): Promise<void> => {
+		const settingsPlugin = plugin as AgentClientPlugin & {
+			refreshAgentCatalog?: (
+				targetAgentId: string,
+				options?: { force?: boolean },
+			) => Promise<boolean>;
+		};
+		if (typeof settingsPlugin.refreshAgentCatalog !== "function") {
+			return;
+		}
+
+		const retryButton = renderLoadingState("Loading models and modes...");
+		retryButton.disabled = true;
+		const loaded = await settingsPlugin.refreshAgentCatalog(agentId, { force });
+		if (loaded && (plugin.settings.cachedAgentModels?.[agentId]?.length ?? 0) > 0) {
+			renderReadyState();
+			return;
+		}
+		renderLoadingState(
+			"No models found yet. Verify the command and authentication, then retry.",
+		);
+	};
+
+	const models = plugin.settings.cachedAgentModels?.[agentId];
+	if (models && models.length > 0) {
+		renderReadyState();
+		return;
+	}
+	void loadCatalog(false);
 }
 
 // ============================================================================
@@ -173,7 +223,7 @@ function refreshCandidateOrderList(
 ): void {
 	listEl.empty();
 	const candidates = getValidCandidates(plugin, agentId, models);
-	listEl.toggleClass("is-hidden", candidates.length === 0);
+	listEl.classList.toggle("is-hidden", candidates.length === 0);
 	let dragIndex: number | null = null;
 
 	for (const [index, modelId] of candidates.entries()) {

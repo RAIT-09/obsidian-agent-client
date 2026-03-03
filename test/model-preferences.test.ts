@@ -15,11 +15,9 @@ function installObsidianElementHelpers(): void {
 	};
 
 	if (!proto.createDiv) {
-		proto.createDiv = function (options) {
+		proto.createDiv = function (this: HTMLElement, options?: unknown) {
 			const el = this.ownerDocument.createElement("div");
-			const opts = options as
-				| { cls?: string; text?: string }
-				| undefined;
+			const opts = options as { cls?: string; text?: string } | undefined;
 			if (opts?.cls) el.className = opts.cls;
 			if (opts?.text) el.textContent = opts.text;
 			this.appendChild(el);
@@ -28,7 +26,7 @@ function installObsidianElementHelpers(): void {
 	}
 
 	if (!proto.createSpan) {
-		proto.createSpan = function (options) {
+		proto.createSpan = function (this: HTMLElement, options?: unknown) {
 			const el = this.ownerDocument.createElement("span");
 			const opts = options as
 				| { cls?: string; text?: string; attr?: Record<string, string> }
@@ -46,19 +44,19 @@ function installObsidianElementHelpers(): void {
 	}
 
 	if (!proto.empty) {
-		proto.empty = function () {
+		proto.empty = function (this: HTMLElement) {
 			this.textContent = "";
 		};
 	}
 
 	if (!proto.addClass) {
-		proto.addClass = function (cls: string) {
+		proto.addClass = function (this: HTMLElement, cls: string) {
 			this.classList.add(cls);
 		};
 	}
 
 	if (!proto.removeClass) {
-		proto.removeClass = function (cls: string) {
+		proto.removeClass = function (this: HTMLElement, cls: string) {
 			this.classList.remove(cls);
 		};
 	}
@@ -99,26 +97,22 @@ describe("model preferences settings", () => {
 			},
 		};
 
-		renderAgentModelSettings(
-			containerEl,
-			plugin as never,
-			agentId,
-		);
+		renderAgentModelSettings(containerEl, plugin as never, agentId);
 
 		let modeSelect = Array.from(containerEl.querySelectorAll("select")).at(-1);
 		expect(modeSelect).toBeTruthy();
 		expect(modeSelect?.options).toHaveLength(1);
 		expect(modeSelect?.options[0]?.textContent).toBe("(empty)");
 
-		const addButton = containerEl.querySelector(
+		const addButton = containerEl.querySelector<HTMLButtonElement>(
 			'button[aria-label="Add model"]',
-		) as HTMLButtonElement | null;
+		);
 		expect(addButton).toBeTruthy();
 		addButton?.click();
 
-		const firstModelItem = containerEl.querySelector(
+		const firstModelItem = containerEl.querySelector<HTMLElement>(
 			".obsius-model-picker-item",
-		) as HTMLElement | null;
+		);
 		expect(firstModelItem).toBeTruthy();
 		firstModelItem?.click();
 		await flush();

@@ -51,6 +51,28 @@ function renderToolCall(showLiveIndicator: boolean) {
 	);
 }
 
+function renderToolCallWithStatus(
+	status: "pending" | "in_progress" | "completed" | "failed",
+	showLiveIndicator = false,
+) {
+	return render(
+		<ToolCallRenderer
+			content={{
+				type: "tool_call",
+				toolCallId: "tool-1",
+				title: "Bash",
+				kind: "execute",
+				status,
+				rawInput: {
+					command: "echo test",
+				},
+			}}
+			plugin={mockPlugin}
+			showLiveIndicator={showLiveIndicator}
+		/>,
+	);
+}
+
 describe("ToolCallRenderer live spinner placement", () => {
 	it("replaces the tool icon with the spinner when live indicator is active", () => {
 		const { container } = renderToolCall(true);
@@ -67,15 +89,30 @@ describe("ToolCallRenderer live spinner placement", () => {
 		expect(header?.querySelector("[data-icon='terminal']")).toBeNull();
 	});
 
-	it("shows tool icon (no spinner) when live indicator is off", () => {
-		const { container } = renderToolCall(false);
+	it("uses spinner-only for running state even when live indicator is off", () => {
+		const { container } = renderToolCallWithStatus("in_progress", false);
+
+		expect(container.querySelector(".ac-tool-icon--spinner")).not.toBeNull();
+		expect(
+			container.querySelector(".ac-loading__spinner--inline"),
+		).not.toBeNull();
+		expect(
+			container.querySelector(".ac-tool-icon[data-icon='terminal']"),
+		).toBeNull();
+		expect(
+			container.querySelector(".ac-tool-status [data-icon='loader-2']"),
+		).toBeNull();
+	});
+
+	it("shows completion checkmark after tool call finishes", () => {
+		const { container } = renderToolCallWithStatus("completed");
 
 		expect(container.querySelector(".ac-tool-icon--spinner")).toBeNull();
 		expect(
-			container.querySelector(".ac-loading__spinner--inline"),
-		).toBeNull();
-
-		expect(container.querySelector(".ac-tool-icon[data-icon]")).not.toBeNull();
-		expect(container.querySelector(".ac-tool-status [data-icon='loader-2']")).not.toBeNull();
+			container.querySelector(".ac-tool-icon[data-icon='terminal']"),
+		).not.toBeNull();
+		expect(
+			container.querySelector(".ac-tool-status [data-icon='check']"),
+		).not.toBeNull();
 	});
 });

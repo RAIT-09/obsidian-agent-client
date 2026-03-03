@@ -1,21 +1,23 @@
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChatMessage } from "../src/domain/models/chat-message";
 import { ChatMessages } from "../src/components/chat/ChatMessages";
+import type { ChatMessage } from "../src/domain/models/chat-message";
 
 interface MockMessageRendererProps {
 	message: { id: string };
-	activeSendingToolCallTarget?: { messageId: string; contentIndex: number } | null;
+	activeSendingToolCallTarget?: {
+		messageId: string;
+		contentIndex: number;
+	} | null;
 }
 
-const mockMessageRenderer = vi.fn(
-	({ message }: MockMessageRendererProps) => (
-		<div data-testid={`message-${message.id}`} />
-	),
-);
+const mockMessageRenderer = vi.fn(({ message }: MockMessageRendererProps) => (
+	<div data-testid={`message-${message.id}`} />
+));
 
 vi.mock("../src/components/chat/MessageRenderer", () => ({
-	MessageRenderer: (props: MockMessageRendererProps) => mockMessageRenderer(props),
+	MessageRenderer: (props: MockMessageRendererProps) =>
+		mockMessageRenderer(props),
 }));
 
 const mockPlugin = {} as Parameters<typeof ChatMessages>[0]["plugin"];

@@ -128,7 +128,7 @@ export function TabContent({
 		async (path: string) => {
 			const file = plugin.app.vault.getAbstractFileByPath(path);
 			if (file instanceof TFile) {
-				await plugin.app.vault.delete(file);
+				await plugin.app.fileManager.trashFile(file);
 			}
 		},
 		[plugin],
@@ -181,9 +181,7 @@ export function TabContent({
 				new Notice("File reverted");
 				if (change?.vaultPath) {
 					setInputValue((prev) =>
-						removeChatContextTokensForPaths(prev, [
-							change.vaultPath!,
-						]),
+						removeChatContextTokensForPaths(prev, [change.vaultPath!]),
 					);
 				}
 				void autoMention.updateActiveNote();

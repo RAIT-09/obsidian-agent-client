@@ -1,6 +1,25 @@
 import type { AgentClientPluginSettings } from "../../plugin";
 import type { BaseAgentSettings } from "../../domain/models/agent-config";
 import { toAgentConfig } from "../../shared/settings-utils";
+
+const KEYCHAIN_ONLY_ENV_KEYS = new Set([
+	"ANTHROPIC_API_KEY",
+	"OPENAI_API_KEY",
+	"GEMINI_API_KEY",
+]);
+
+function removeKeychainOnlyEnv(
+	env: Record<string, string>,
+): Record<string, string> {
+	const cleaned: Record<string, string> = {};
+	for (const [key, value] of Object.entries(env)) {
+		if (KEYCHAIN_ONLY_ENV_KEYS.has(key)) {
+			continue;
+		}
+		cleaned[key] = value;
+	}
+	return cleaned;
+}
 import type {
 	SessionState,
 	ChatSession,
@@ -101,14 +120,20 @@ export function buildAgentConfigWithApiKey(
 	agentId: string,
 	workingDirectory: string,
 	apiKey: string,
+	secretBindingEnv: Record<string, string>,
 ) {
 	const baseConfig = toAgentConfig(agentSettings, workingDirectory);
+	const cleanedBaseEnv = removeKeychainOnlyEnv(baseConfig.env || {});
+	const mergedEnv = {
+		...cleanedBaseEnv,
+		...secretBindingEnv,
+	};
 
 	if (agentId === settings.claude.id) {
 		return {
 			...baseConfig,
 			env: {
-				...baseConfig.env,
+				...mergedEnv,
 				ANTHROPIC_API_KEY: apiKey,
 			},
 		};
@@ -117,7 +142,7 @@ export function buildAgentConfigWithApiKey(
 		return {
 			...baseConfig,
 			env: {
-				...baseConfig.env,
+				...mergedEnv,
 				OPENAI_API_KEY: apiKey,
 			},
 		};
@@ -126,12 +151,15 @@ export function buildAgentConfigWithApiKey(
 		return {
 			...baseConfig,
 			env: {
-				...baseConfig.env,
+				...mergedEnv,
 				GEMINI_API_KEY: apiKey,
 			},
 		};
 	}
-	return baseConfig;
+	return {
+		...baseConfig,
+		env: mergedEnv,
+	};
 }
 
 export function createInitialSession(

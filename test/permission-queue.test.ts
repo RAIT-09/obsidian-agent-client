@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
 	handlePermissionResponseOperation,
-	requestPermissionOperation,
 	type PermissionQueueState,
+	requestPermissionOperation,
 } from "../src/adapters/acp/permission-queue";
+import type { SessionUpdate } from "../src/domain/models/session-update";
 
 function createState(): PermissionQueueState {
 	return {
@@ -19,10 +20,10 @@ const logger = {
 } as const;
 
 describe("permission-queue terminal policy", () => {
-	it("auto-allows non-terminal permission requests when enabled", async () => {
+	it("queues non-terminal permission requests for manual selection", async () => {
 		const state = createState();
-
-		const response = await requestPermissionOperation({
+		const updateMessage = vi.fn();
+		const promise = requestPermissionOperation({
 			params: {
 				sessionId: "s1",
 				toolCall: {
@@ -37,53 +38,31 @@ describe("permission-queue terminal policy", () => {
 				],
 			} as never,
 			logger: logger as never,
-			autoAllowPermissions: true,
+			terminalPermissionMode: "prompt_once",
 			state,
-			updateMessage: vi.fn(),
+			updateMessage,
 			sessionUpdateCallback: null,
 		});
 
+		await Promise.resolve();
+		expect(state.pendingPermissionRequests.size).toBe(1);
+
+		const requestId = [...state.pendingPermissionRequests.keys()][0];
+		handlePermissionResponseOperation({
+			state,
+			requestId,
+			optionId: "allow",
+			updateMessage,
+		});
+
+		const response = await promise;
 		expect(response.outcome).toEqual({
 			outcome: "selected",
 			optionId: "allow",
 		});
 	});
 
-	it("auto-allow prefers allow_once when allow_always appears first", async () => {
-		const state = createState();
-		const response = await requestPermissionOperation({
-			params: {
-				sessionId: "s1",
-				toolCall: {
-					toolCallId: "tc-pref",
-					kind: "read",
-					title: "Read note",
-					rawInput: { path: "notes/a.md" },
-				},
-				options: [
-					{
-						optionId: "allow-always",
-						name: "Allow always",
-						kind: "allow_always",
-					},
-					{ optionId: "allow-once", name: "Allow once", kind: "allow_once" },
-					{ optionId: "reject", name: "Reject once", kind: "reject_once" },
-				],
-			} as never,
-			logger: logger as never,
-			autoAllowPermissions: true,
-			state,
-			updateMessage: vi.fn(),
-			sessionUpdateCallback: null,
-		});
-
-		expect(response.outcome).toEqual({
-			outcome: "selected",
-			optionId: "allow-once",
-		});
-	});
-
-	it("does not auto-allow terminal-like permission requests", async () => {
+	it("keeps terminal permission requests pending in prompt_once mode", async () => {
 		const state = createState();
 		const updateMessage = vi.fn();
 		const sessionUpdateCallback = vi.fn();
@@ -102,7 +81,7 @@ describe("permission-queue terminal policy", () => {
 				],
 			} as never,
 			logger: logger as never,
-			autoAllowPermissions: true,
+			terminalPermissionMode: "prompt_once",
 			state,
 			updateMessage,
 			sessionUpdateCallback,
@@ -131,9 +110,39 @@ describe("permission-queue terminal policy", () => {
 		});
 	});
 
+	it("auto-denies terminal permission requests when mode is disabled", async () => {
+		const state = createState();
+		const response = await requestPermissionOperation({
+			params: {
+				sessionId: "s1",
+				toolCall: {
+					toolCallId: "tc-exec",
+					kind: "execute",
+					title: "Run command",
+					rawInput: { command: "rm notes/a.md" },
+				},
+				options: [
+					{ optionId: "allow", name: "Allow once", kind: "allow_once" },
+					{ optionId: "reject", name: "Reject once", kind: "reject_once" },
+				],
+			} as never,
+			logger: logger as never,
+			terminalPermissionMode: "disabled",
+			state,
+			updateMessage: vi.fn(),
+			sessionUpdateCallback: null,
+		});
+
+		expect(response.outcome).toEqual({
+			outcome: "selected",
+			optionId: "reject",
+		});
+		expect(state.pendingPermissionRequests.size).toBe(0);
+	});
+
 	it("preserves reject_always option kind in emitted permission request", async () => {
 		const state = createState();
-		const sessionUpdateCallback = vi.fn();
+		let capturedUpdate: SessionUpdate | undefined;
 		const promise = requestPermissionOperation({
 			params: {
 				sessionId: "s1",
@@ -153,15 +162,26 @@ describe("permission-queue terminal policy", () => {
 				],
 			} as never,
 			logger: logger as never,
-			autoAllowPermissions: false,
+			terminalPermissionMode: "prompt_once",
 			state,
 			updateMessage: vi.fn(),
-			sessionUpdateCallback,
+			sessionUpdateCallback: (update) => {
+				capturedUpdate = update;
+			},
 		});
 
 		await Promise.resolve();
-		const update = sessionUpdateCallback.mock.calls[0][0];
-		expect(update.permissionRequest.options).toEqual([
+		expect(capturedUpdate).toBeDefined();
+		if (!capturedUpdate) {
+			throw new Error("Expected session update callback payload");
+		}
+		if (
+			capturedUpdate.type !== "tool_call" ||
+			!capturedUpdate.permissionRequest
+		) {
+			throw new Error("Expected tool_call update with permissionRequest");
+		}
+		expect(capturedUpdate.permissionRequest.options).toEqual([
 			{
 				optionId: "reject-always",
 				name: "Reject always",
@@ -187,5 +207,133 @@ describe("permission-queue terminal policy", () => {
 			outcome: "selected",
 			optionId: "reject-always",
 		});
+	});
+
+	it("auto-selects allow for terminal permission requests when mode is always_allow", async () => {
+		const state = createState();
+		const response = await requestPermissionOperation({
+			params: {
+				sessionId: "s1",
+				toolCall: {
+					toolCallId: "tc-exec-allow",
+					kind: "execute",
+					title: "Run command",
+					rawInput: { command: "echo hi" },
+				},
+				options: [
+					{
+						optionId: "allow-always",
+						name: "Allow always",
+						kind: "allow_always",
+					},
+					{ optionId: "allow-once", name: "Allow once", kind: "allow_once" },
+					{
+						optionId: "reject-once",
+						name: "Reject once",
+						kind: "reject_once",
+					},
+				],
+			} as never,
+			logger: logger as never,
+			terminalPermissionMode: "always_allow",
+			state,
+			updateMessage: vi.fn(),
+			sessionUpdateCallback: null,
+		});
+
+		expect(response.outcome).toEqual({
+			outcome: "selected",
+			optionId: "allow-always",
+		});
+		expect(state.pendingPermissionRequests.size).toBe(0);
+	});
+
+	it("auto-selects reject for terminal permission requests when mode is always_deny", async () => {
+		const state = createState();
+		const response = await requestPermissionOperation({
+			params: {
+				sessionId: "s1",
+				toolCall: {
+					toolCallId: "tc-exec-deny",
+					kind: "execute",
+					title: "Run command",
+					rawInput: { command: "echo hi" },
+				},
+				options: [
+					{
+						optionId: "allow-once",
+						name: "Allow once",
+						kind: "allow_once",
+					},
+					{
+						optionId: "reject-always",
+						name: "Reject always",
+						kind: "reject_always",
+					},
+					{
+						optionId: "reject-once",
+						name: "Reject once",
+						kind: "reject_once",
+					},
+				],
+			} as never,
+			logger: logger as never,
+			terminalPermissionMode: "always_deny",
+			state,
+			updateMessage: vi.fn(),
+			sessionUpdateCallback: null,
+		});
+
+		expect(response.outcome).toEqual({
+			outcome: "selected",
+			optionId: "reject-always",
+		});
+		expect(state.pendingPermissionRequests.size).toBe(0);
+	});
+
+	it("passes selected optionId through unchanged for all ACP kinds", async () => {
+		const kinds = [
+			"allow_once",
+			"allow_always",
+			"reject_once",
+			"reject_always",
+		] as const;
+
+		for (const kind of kinds) {
+			const state = createState();
+			const optionId = `option-${kind}`;
+			const promise = requestPermissionOperation({
+				params: {
+					sessionId: "s1",
+					toolCall: {
+						toolCallId: `tc-${kind}`,
+						kind: "read",
+						title: "Read note",
+						rawInput: { path: "notes/a.md" },
+					},
+					options: [{ optionId, name: kind, kind }],
+				} as never,
+				logger: logger as never,
+				terminalPermissionMode: "prompt_once",
+				state,
+				updateMessage: vi.fn(),
+				sessionUpdateCallback: vi.fn(),
+			});
+
+			await Promise.resolve();
+			const requestId = [...state.pendingPermissionRequests.keys()][0];
+			handlePermissionResponseOperation({
+				state,
+				requestId,
+				optionId,
+				updateMessage: vi.fn(),
+			});
+
+			const response = await promise;
+			expect(response.outcome).toEqual({
+				outcome: "selected",
+				optionId,
+			});
+		}
 	});
 });

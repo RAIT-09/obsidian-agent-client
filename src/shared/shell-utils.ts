@@ -17,6 +17,11 @@ export const BUILTIN_AGENT_DEFAULT_COMMANDS: Record<string, string> = {
 	opencode: "opencode",
 };
 
+const SHELL_ENV_CACHE_TTL_MS = 5 * 60 * 1000;
+let cachedShellEnvironment: NodeJS.ProcessEnv | null = null;
+let cachedShellEnvironmentAt = 0;
+let shellEnvironmentPromise: Promise<NodeJS.ProcessEnv | null> | null = null;
+
 /**
  * Escape a shell argument for Windows cmd.exe.
  * Only wraps in double quotes if the argument contains spaces or special characters.
@@ -46,6 +51,85 @@ export function getLoginShell(): string {
 		return process.env.SHELL;
 	}
 	return Platform.isMacOS ? "/bin/zsh" : "/bin/sh";
+}
+
+function parseNullDelimitedEnvironment(payload: string): NodeJS.ProcessEnv {
+	const env: NodeJS.ProcessEnv = {};
+	const entries = payload.split("\u0000");
+	for (const entry of entries) {
+		if (!entry) continue;
+		const separatorIndex = entry.indexOf("=");
+		if (separatorIndex <= 0) continue;
+		const key = entry.slice(0, separatorIndex).trim();
+		if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
+		const value = entry.slice(separatorIndex + 1);
+		env[key] = value;
+	}
+	return env;
+}
+
+function getShellEnvArgs(shell: string): string[] {
+	const lower = shell.toLowerCase();
+	if (lower.includes("zsh") || lower.includes("bash")) {
+		return ["-ilc", "env -0"];
+	}
+	return ["-lc", "env -0"];
+}
+
+export function getCachedShellEnvironment(): NodeJS.ProcessEnv | null {
+	if (!cachedShellEnvironment) {
+		return null;
+	}
+	if (Date.now() - cachedShellEnvironmentAt > SHELL_ENV_CACHE_TTL_MS) {
+		return null;
+	}
+	return { ...cachedShellEnvironment };
+}
+
+export async function resolveShellEnvironment(
+	forceRefresh = false,
+): Promise<NodeJS.ProcessEnv | null> {
+	if (!Platform.isMacOS && !Platform.isLinux) {
+		return null;
+	}
+
+	if (!forceRefresh) {
+		const cached = getCachedShellEnvironment();
+		if (cached) {
+			return cached;
+		}
+	}
+
+	if (shellEnvironmentPromise) {
+		return await shellEnvironmentPromise;
+	}
+
+	const shell = getLoginShell();
+	shellEnvironmentPromise = new Promise<NodeJS.ProcessEnv | null>((resolve) => {
+		execFile(
+			shell,
+			getShellEnvArgs(shell),
+			{ timeout: 5000, maxBuffer: 1024 * 1024 * 4 },
+			(error, stdout) => {
+				if (error || !stdout) {
+					resolve(null);
+					return;
+				}
+				const parsed = parseNullDelimitedEnvironment(stdout);
+				if (Object.keys(parsed).length === 0) {
+					resolve(null);
+					return;
+				}
+				cachedShellEnvironment = parsed;
+				cachedShellEnvironmentAt = Date.now();
+				resolve({ ...parsed });
+			},
+		);
+	}).finally(() => {
+		shellEnvironmentPromise = null;
+	});
+
+	return await shellEnvironmentPromise;
 }
 
 /**

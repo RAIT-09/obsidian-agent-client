@@ -1,11 +1,20 @@
 import { z } from "zod";
 import type { BaseAgentSettings } from "../domain/models/agent-config";
 import type { AgentConfig } from "../domain/ports/agent-client.port";
-import type { AgentEnvVar, CustomAgentSettings } from "../plugin";
+import type {
+	AgentEnvVar,
+	AgentSecretBinding,
+	CustomAgentSettings,
+} from "../plugin";
 
 const envVarSchema = z.object({
 	key: z.string().min(1),
 	value: z.string(),
+});
+
+const secretBindingSchema = z.object({
+	envKey: z.string().min(1),
+	secretId: z.string().regex(/^[a-z0-9-]+$/),
 });
 
 const baseAgentSettingsSchema = z.object({
@@ -14,6 +23,7 @@ const baseAgentSettingsSchema = z.object({
 	command: z.string(),
 	args: z.array(z.string()),
 	env: z.array(envVarSchema),
+	secretBindings: z.array(secretBindingSchema),
 });
 
 export const sanitizeArgs = (value: unknown): string[] => {
@@ -74,6 +84,41 @@ export const normalizeEnvVars = (value: unknown): AgentEnvVar[] => {
 	});
 };
 
+export const normalizeSecretBindings = (
+	value: unknown,
+): AgentSecretBinding[] => {
+	const pairs: AgentSecretBinding[] = [];
+	if (!value) {
+		return pairs;
+	}
+
+	if (Array.isArray(value)) {
+		for (const entry of value) {
+			if (!entry || typeof entry !== "object") {
+				continue;
+			}
+			const entryObj = entry as Record<string, unknown>;
+			const envKey =
+				typeof entryObj.envKey === "string" ? entryObj.envKey.trim() : "";
+			const secretId =
+				typeof entryObj.secretId === "string" ? entryObj.secretId.trim() : "";
+			if (!envKey || !secretId || !/^[a-z0-9-]+$/.test(secretId)) {
+				continue;
+			}
+			pairs.push({ envKey, secretId });
+		}
+	}
+
+	const seen = new Set<string>();
+	return pairs.filter((pair) => {
+		if (seen.has(pair.envKey)) {
+			return false;
+		}
+		seen.add(pair.envKey);
+		return true;
+	});
+};
+
 // Rebuild a custom agent entry with defaults and cleaned values
 export const normalizeCustomAgent = (
 	agent: Record<string, unknown>,
@@ -99,6 +144,7 @@ export const normalizeCustomAgent = (
 				: "",
 		args: sanitizeArgs(agent?.args),
 		env: normalizeEnvVars(agent?.env),
+		secretBindings: normalizeSecretBindings(agent?.secretBindings),
 	};
 };
 

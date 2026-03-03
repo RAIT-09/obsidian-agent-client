@@ -88,6 +88,7 @@ export const renderCustomAgents = (
 							command: "",
 							args: [],
 							env: [],
+							secretBindings: [],
 						},
 					],
 				});
@@ -105,6 +106,27 @@ function renderCustomAgent(
 	options: { onRefreshDropdown: () => void; onRedisplay: () => void },
 ): void {
 	const store = plugin.settingsStore;
+	let refreshTimer: number | null = null;
+	const scheduleCatalogRefresh = (agentId: string, command: string) => {
+		const runtimePlugin = plugin as AgentClientPlugin & {
+			refreshAgentCatalog?: (
+				targetAgentId: string,
+				options?: { force?: boolean },
+			) => Promise<boolean>;
+		};
+		if (typeof runtimePlugin.refreshAgentCatalog !== "function") {
+			return;
+		}
+		if (refreshTimer !== null) {
+			window.clearTimeout(refreshTimer);
+		}
+		if (!command.trim()) {
+			return;
+		}
+		refreshTimer = window.setTimeout(() => {
+			void runtimePlugin.refreshAgentCatalog?.(agentId, { force: true });
+		}, 500);
+	};
 	const blockEl = containerEl.createDiv({
 		cls: "obsius-custom-agent",
 	});
@@ -181,9 +203,12 @@ function renderCustomAgent(
 				.setPlaceholder("Command name or path")
 				.setValue(agent.command)
 				.onChange(async (value) => {
+					const command = value.trim();
 					await updateCustomAgent(plugin, index, {
-						command: value.trim(),
+						command,
 					});
+					const currentId = plugin.settings.customAgents[index]?.id ?? agent.id;
+					scheduleCatalogRefresh(currentId, command);
 				});
 		});
 
