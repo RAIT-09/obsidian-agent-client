@@ -195,14 +195,14 @@ export function RestoredSessionToolbar({
 						onClick={() => void onUndoAll()}
 						title="Revert all file changes"
 					>
-						Undo All
+						Undo
 					</button>
 					<button
 						className="obsius-changes-btn"
 						onClick={onKeepAll}
 						title="Accept all changes and dismiss"
 					>
-						Keep All
+						Keep
 					</button>
 				</div>
 			</div>

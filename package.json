@@ -1,6 +1,6 @@
 {
 	"name": "obsius",
-	"version": "0.4.2",
+	"version": "0.4.3",
 	"description": "Bring AI agents into your Obsidian vault with fine-grained context controls.",
 	"main": "main.js",
 	"engines": {
