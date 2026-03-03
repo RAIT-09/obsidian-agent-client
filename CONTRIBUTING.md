@@ -48,8 +48,13 @@ graph TB
         ObsAdapters["adapters/obsidian/<br/>VaultAdapter, SettingsStore,<br/>MentionService"]
     end
 
+    subgraph Application["Application Layer"]
+        AppSvc["services/<br/>chat-view-registry,<br/>session-restore"]
+        AppUseCases["use-cases/prompt/<br/>prepare/send prompt"]
+    end
+
     subgraph Shared["Shared Utilities"]
-        Utils["message-service, terminal-manager,<br/>chat-view-registry, settings-schema,<br/>chat-context-token, tool-icons, ..."]
+        Utils["settings-schema, chat-context-token,<br/>tool-icons, path-utils, mention-utils, ..."]
     end
 
     subgraph External["External Processes"]
@@ -66,6 +71,8 @@ graph TB
     Controller --> SubHooks
     SubHooks --> State
     SubHooks --> Ports
+    Controller --> AppSvc
+    Controller --> AppUseCases
     Controller --> Utils
     ACP -.->|implements| Ports
     ObsAdapters -.->|implements| Ports
@@ -80,17 +87,17 @@ sequenceDiagram
     participant ChatInput
     participant Controller as useChatController
     participant Chat as useChat
-    participant MsgSvc as message-service
+    participant PromptUC as application/use-cases/prompt
     participant Adapter as AcpAdapter
     participant Agent as AI Agent
 
     User->>ChatInput: Type message + Enter
     ChatInput->>Controller: handleSendMessage(text, images)
     Controller->>Chat: sendMessage(text, images, context)
-    Chat->>MsgSvc: preparePrompt(text, mentions, autoMention)
-    MsgSvc-->>Chat: PreparePromptResult (display + agent content)
-    Chat->>MsgSvc: sendPreparedPrompt(content)
-    MsgSvc->>Adapter: agentClient.sendPrompt(sessionId, content)
+    Chat->>PromptUC: preparePrompt(text, mentions, autoMention)
+    PromptUC-->>Chat: PreparePromptResult (display + agent content)
+    Chat->>PromptUC: sendPreparedPrompt(content)
+    PromptUC->>Adapter: agentClient.sendPrompt(sessionId, content)
     Adapter->>Agent: JSON-RPC prompt
 
     loop Streaming response
@@ -145,9 +152,10 @@ graph LR
     C --> CR[chat.reducer]
     P --> PR[permission.reducer]
 
-    CC -.->|creates| ACP[AcpAdapter]
-    CC -.->|creates| VA[VaultAdapter]
-    CC -.->|creates| MS[MentionService]
+    PluginFactory[plugin.createChatSessionDependencies] -.-> CC
+    PluginFactory -.-> ACP[AcpAdapter]
+    PluginFactory -.-> VA[VaultAdapter]
+    PluginFactory -.-> MS[MentionService]
 ```
 
 ### Port / Adapter Mapping

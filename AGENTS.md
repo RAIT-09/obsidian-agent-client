@@ -1,6 +1,6 @@
 # Obsius - LLM Developer Guide
 
-**Generated:** 2026-03-02 | **Branch:** master
+**Generated:** 2026-03-04 | **Branch:** codex/cleanup-wave-00-guardrails
 
 ## Overview
 Obsidian desktop plugin for AI chat (OpenCode, Claude Code, Codex, Gemini CLI, custom agents). React 19 + TypeScript, communicating via Agent Client Protocol (ACP) over JSON-RPC stdin/stdout. Multi-tab chat sessions in a sidebar view.
@@ -9,29 +9,28 @@ Obsidian desktop plugin for AI chat (OpenCode, Claude Code, Codex, Gemini CLI, c
 ```
 src/
 ├── main.ts                   # Re-exports plugin.ts
-├── plugin.ts                 # Obsidian plugin lifecycle (~480 LOC), owns `AgentRuntimeManager`
+├── plugin.ts                 # Obsidian plugin lifecycle, owns `AgentRuntimeManager`
 ├── plugin/                   # Extracted plugin modules
-│   ├── agent-ops.ts          # Agent CRUD commands + broadcast helpers (~238 lines)
-│   ├── editor-context.ts     # Editor/file context menus + context reference handling (~342 lines)
-│   ├── inline-edit.ts        # Inline edit: selection → agent prompt flow (~185 lines)
-│   ├── update-check.ts       # GitHub release version check (~56 lines)
-│   └── view-helpers.ts       # View creation/focus helpers (~66 lines)
 ├── domain/                   # Pure types + interfaces — ZERO external deps
-│   ├── models/               # ChatMessage, SessionUpdate, AgentConfig, etc. (8 files, ~1056 lines)
-│   └── ports/                # IAgentClient, IVaultAccess, ISettingsAccess, IChatViewContainer (4 files, ~771 lines)
-│   ├── acp/                  # ACP: lifecycle, runtime manager, multiplexer, routing (11 files)
-│   └── obsidian/             # VaultAdapter, SettingsStore, MentionService (3 files)
-├── hooks/                    # React custom hooks (16 hooks + 5 state modules + 5 extracted modules)
-│   ├── state/                # Pure reducer/action modules for deterministic state transitions
-│   ├── chat-controller/      # Extracted coordinator helpers (types + session-history-handlers)
-│   ├── agent-session/        # Session normalization helpers
-│   └── session-history/      # History list/load/restore/fork helpers
+│   ├── models/               # ChatMessage, SessionUpdate, AgentConfig, terminal output, etc.
+│   └── ports/                # IAgentClient, IVaultAccess, ISettingsAccess, IChatViewContainer
+├── adapters/
+│   ├── acp/                  # ACP protocol bridge + runtime/process/terminal modules
+│   └── obsidian/             # VaultAdapter, SettingsStore, MentionService, SecretStorage adapter
+├── application/
+│   ├── services/             # chat-view registry + session restore services
+│   └── use-cases/            # prompt preparation/sending use case
+├── hooks/                    # React custom hooks + reducer-backed state modules
+│   ├── state/
+│   ├── chat-controller/
+│   ├── agent-session/
+│   ├── chat/
+│   └── session-history/
 ├── components/
-│   ├── chat/                 # ChatView + sub-components (29 top-level + 12 in chat-input/)
-│   ├── picker/               # Unified picker panel for mentions + slash commands (4 files)
-│   └── settings/             # Thin tab coordinator + 4 section renderers + helpers
-└── shared/                   # Pure utility functions (25 files + message-service/ subdir)
-    └── message-service/          # 4 files: prompt-preparation, prompt-context-builders, prompt-sending, types
+│   ├── chat/
+│   ├── picker/
+│   └── settings/
+└── shared/                   # Pure/stateless utility helpers only
 ```
 
 ## Where To Look
@@ -61,10 +60,8 @@ ChatView.tsx (ChatComponent)
     └── per tab → TabContent.tsx
           ├── useSessionRestore()  → session file restoration from disk
           ├── useChatController()  ← Central coordinator (10 hooks)
-          │     ├── Creates adapters via useMemo:
-          │     │   ├── AcpAdapter (from plugin registry)
-          │     │   ├── ObsidianVaultAdapter
-          │     │   └── NoteMentionService
+          │     ├── Gets dependencies from plugin factory:
+          │     │   └── plugin.createChatSessionDependencies()
           │     └── Composes hooks:
           │           ├── useSettings()          → useSyncExternalStore subscription
           │           ├── useAgentSession()      → session lifecycle, agent switching
@@ -86,7 +83,7 @@ ChatView.tsx (ChatComponent)
 ## Data Flow
 ```
 User input → ChatInput → useChatController.handleSendMessage()
-  → useChat.sendMessage() → preparePrompt() (shared/message-service/prompt-preparation.ts)
+  → useChat.sendMessage() → preparePrompt() (application/use-cases/prompt/prompt-preparation.ts)
     → sendPreparedPrompt() → agentClient.sendPrompt() → ACP JSON-RPC → agent process
 
 Agent response → AcpAdapter.sessionUpdate() → onSessionUpdate callback
@@ -104,7 +101,7 @@ Context references → editor-context.ts → addContextToCurrentChat()
 
 ### Architecture Rules
 1. **Hooks own state + logic** — no ViewModel/UseCase classes
-2. **Pure functions in shared/** — non-React business logic (e.g., `message-service.ts`)
+2. **Pure functions in shared/** — non-React stateless utility logic only
 3. **Domain has ZERO deps** — no `obsidian`, no `@agentclientprotocol/sdk` imports in `domain/`
 4. **Ports isolate protocol** — `IAgentClient` interface means ACP changes stay in `adapters/acp/`
 5. **Unified callbacks** — single `onSessionUpdate` for all agent events, not multiple callbacks
@@ -164,7 +161,7 @@ grep -rn 'from.*adapters/' src/components/ src/hooks/ src/application/ 2>/dev/nu
 | Adapters | `*.adapter.ts` | `acp.adapter.ts` |
 | Hooks | `use*.ts` (camelCase) | `useChat.ts` |
 | Components | `PascalCase.tsx` | `ChatView.tsx` |
-| Utils/Models | `kebab-case.ts` | `message-service.ts` |
+| Utils/Models | `kebab-case.ts` | `path-utils.ts` |
 | Input hooks | `use-kebab-case.ts` | `use-chat-input-behavior.ts` |
 
 ### Formatting
@@ -218,7 +215,7 @@ npm run version          # Bump manifest.json + versions.json
 npm run docs:dev         # VitePress dev server
 
 # Architecture boundary check (should return empty)
-grep -rn 'from.*adapters/' src/components/ src/hooks/ 2>/dev/null | grep -v AGENTS.md
+grep -rn 'from.*adapters/' src/components/ src/hooks/ src/application/ 2>/dev/null | grep -v AGENTS.md
 npm run docs:build       # VitePress build
 ```
 
@@ -232,7 +229,7 @@ npm run docs:build       # VitePress build
 - **Context references**: Editor context menus (selection, file, folder) inject `ChatContextReference` tokens into chat input via `chat-context-token.ts`
 - **Picker system**: `components/picker/` provides unified `UnifiedPickerPanel` for @mentions and /commands with pluggable providers
 - **Inline edit**: `plugin/inline-edit.ts` enables selection-based editing via agent prompt with diff viewer
-- **Session restore**: `useSessionRestore` (thin React wrapper) delegates to `SnapshotManager` (`shared/snapshot-manager.ts`); captures original file state on first sighting (from diff `oldText` or disk read), detects changes via disk comparison; `discoverModifiedFiles` in `session-file-restoration.ts` scans all tool call sources (diffs, rawInput, locations) for file paths
+- **Session restore**: `useSessionRestore` (thin React wrapper) delegates to `SnapshotManager` in `application/services/session-restore/`; captures original file state on first sighting (from diff `oldText` or disk read), detects changes via disk comparison; `discoverModifiedFiles` scans tool call sources (diffs, rawInput, locations) for file paths
 - **Settings migrations**: `settings-migrations.ts` handles schema version upgrades with typed migration functions
 - **Slash command tokens**: `slash-command-token.ts` encodes/decodes slash commands as inline tokens in message text
 - **Context usage meter**: `ContextUsageMeter.tsx` displays context window usage as a visual meter in the input area
@@ -243,10 +240,10 @@ npm run docs:build       # VitePress build
 - **CollapsibleSection**: New `collapsible` prop — pass `false` for static (non-expandable) tool call headers when no details exist
 - **Model preferences**: `components/settings/sections/model-preferences.ts` provides per-agent model preference configuration
 - **Current decomposition state**:
-  - `src/plugin.ts` (~480 LOC) is thin orchestrator; owns `AgentRuntimeManager`; helpers in `src/plugin/`
-  - `src/adapters/acp/acp.adapter.ts` (~515 LOC) delegates to shared `AgentRuntime`; concern modules in `src/adapters/acp/`
-  - `ChatView.tsx` (~531 LOC), `ChatInput.tsx` (~619 LOC) — input logic extracted to `chat-input/` (12 files)
-  - `SessionHistoryContent.tsx` (~498 LOC) — largest React component
+  - `src/plugin.ts` is thin orchestrator; helpers in `src/plugin/`
+  - `src/adapters/acp/acp.adapter.ts` is a thin entry delegating to `acp.adapter-base.ts` + delegate modules
+  - Prompt orchestration moved to `src/application/use-cases/prompt/`
+  - Session restore moved to `src/application/services/session-restore/`
 - **Shared runtime**: Multiple tabs using the same agent share one ACP process via `AgentRuntimeManager` + `RuntimeMultiplexer`
 - **Undocumented API**: `vault.adapter.ts` uses `editor.cm` (CodeMirror 6 internal) for selection tracking
 - **ACP SDK**: `@agentclientprotocol/sdk ^0.14.1` — protocol may evolve

@@ -1,6 +1,6 @@
 # Hooks Layer Guide
 
-Distributed composition pattern: `useChatController` composes 10 specialized hooks + creates adapters via `useMemo`. View-level hooks (`useTabs`, `useUpdateCheck`, `useWorkspaceEvents`) live in `ChatComponent`. Input-level hooks (`usePicker`, `useInputHistory`) live in `ChatInput`. `useSessionRestore` lives in `TabContent`.
+Distributed composition pattern: `useChatController` composes specialized hooks and obtains per-tab dependencies via `plugin.createChatSessionDependencies(sessionKey)`. View-level hooks (`useTabs`, `useUpdateCheck`, `useWorkspaceEvents`) live in `ChatComponent`. Input-level hooks (`usePicker`, `useInputHistory`) live in `ChatInput`. `useSessionRestore` lives in `TabContent`.
 
 State transitions are reducer-backed in `src/hooks/state/` for deterministic updates and easier test coverage.
 
@@ -14,7 +14,6 @@ State transitions are reducer-backed in `src/hooks/state/` for deterministic upd
 
 **Hooks MUST NOT import from:**
 - `adapters/` — **NEVER** import concrete adapter classes (`AcpAdapter`, `ObsidianVaultAdapter`, `NoteMentionService`)
-- `adapters/acp/acp.adapter.ts` — **NEVER** import `IAcpClient` (use `IAgentClient` from `domain/ports/` instead)
 
 **If a hook needs a method not on `IAgentClient`:** The correct fix is to promote that method to the `IAgentClient` Port interface in `domain/ports/agent-client.port.ts`, NOT to import the adapter type.
 
@@ -23,7 +22,7 @@ State transitions are reducer-backed in `src/hooks/state/` for deterministic upd
 grep -rn 'from.*adapters/' src/hooks/ | grep -v AGENTS.md  # MUST return 0 results
 ```
 
-> **KNOWN VIOLATIONS (to be fixed):** `chat-controller/types.ts` and `useChatController.ts` currently import `IAcpClient`, `ObsidianVaultAdapter`, and `NoteMentionService` from adapters. These are tracked for refactoring — do NOT add new violations.
+There are currently no known adapter-boundary violations in `src/hooks/`.
 
 ## Hook Inventory
 
@@ -57,13 +56,14 @@ ChatComponent (ChatView.tsx)
   per tab → TabContent.tsx
     ├── useSessionRestore()
     └── useChatController(options: UseChatControllerOptions)
-          ├── useMemo: AcpAdapter (from plugin.getOrCreateSessionAdapter)
-          ├── useMemo: ObsidianVaultAdapter
-          ├── useMemo: NoteMentionService
+          ├── plugin.createChatSessionDependencies(sessionKey)
+          │    ├── agentClient: IAgentClient
+          │    ├── vaultAccess: IVaultAccess
+          │    └── mentionService: IMentionService
           ├── useSettings(plugin)
-          ├── useAgentSession(acpAdapter, settingsAccess, vaultPath, initialAgentId)
-          ├── useChat(acpAdapter, vaultAccess, mentionService, sessionConfig, displayConfig)
-          ├── usePermission(acpAdapter, messages)
+          ├── useAgentSession(agentClient, settingsAccess, vaultPath, initialAgentId)
+          ├── useChat(agentClient, vaultAccess, mentionService, sessionConfig, displayConfig)
+          ├── usePermission(agentClient, messages)
           ├── useMentions(vaultAccess, plugin)
           ├── useSlashCommands(session.availableCommands)
           ├── useAutoMention(vaultAccess)
@@ -120,7 +120,7 @@ ChatComponent (ChatView.tsx)
 - `handleSendMessage`: Orchestrates `useChat.sendMessage()` with autoMention state, images, vault path
 - `handleNewChat`: Calls `useAgentSession.createSession()`, clears messages and input state
 - `handleLoadSession`: Coordinates `useSessionHistory` + `useChat.setMessagesFromLocal()`
-- `handleRestartAgent`: Calls `acpAdapter.forceDisconnectRuntime()` then `agentSession.forceRestartAgent()` to ensure fresh process
+- `handleRestartAgent`: Calls `agentSession.forceRestartAgent()` to ensure a fresh process
 
 ## Adding a New Hook
 
@@ -136,6 +136,6 @@ ChatComponent (ChatView.tsx)
 - **Don't call `agentClient` directly from components** — route through hooks
 - **Don't add new callback-style mutation paths** when a typed action in `src/hooks/state/` is appropriate
 - **Don't import from `adapters/`** — use Port interfaces from `domain/ports/` (see Dependency Rules above)
-- **Don't expose adapter-specific types in return interfaces** — `UseChatControllerReturn` should reference `IAgentClient`, not `IAcpClient`
+- **Don't expose adapter-specific types in return interfaces** — `UseChatControllerReturn` should reference domain Port types only
 - **Don't add `isXxx: boolean` flags for new phases** — extend `SessionState` enum instead
 - **Don't create new reducers without exhaustive `never` checks** — this is a compile-time safety net against unhandled actions

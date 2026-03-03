@@ -14,14 +14,14 @@
 - `adapters/` — **NEVER** import `IAcpClient`, `AcpAdapter`, `ObsidianVaultAdapter`, etc.
 - `hooks/` directly (except view-level hooks like `useTabs`, input-level hooks like `usePicker`)
 
-**If a component needs a method from `IAcpClient`:** The correct fix is to promote that method to `IAgentClient` in `domain/ports/agent-client.port.ts`, NOT to import from `adapters/acp/`.
+**If a component needs a new agent capability:** promote it to `IAgentClient` in `domain/ports/agent-client.port.ts`, then implement it in the adapter.
 
 **Verification:**
 ```bash
 grep -rn 'from.*adapters/' src/components/ | grep -v AGENTS.md  # MUST return 0 results
 ```
 
-> **KNOWN VIOLATIONS (to be fixed):** `TerminalRenderer.tsx`, `TabContent.tsx`, `ChatMessages.tsx`, `ToolCallRenderer.tsx`, `MessageRenderer.tsx`, and `MessageContentRenderer.tsx` currently import `IAcpClient` from `adapters/acp/acp.adapter.ts`. These are tracked for refactoring — do NOT add new violations.
+There are currently no known adapter-boundary violations in `src/components/chat/`.
 
 ## Component Tree
 
@@ -108,13 +108,13 @@ Note: hooks in `chat-input/` use `kebab-case` naming (not `usePascalCase`) since
 
 ## Session Restore
 
-`RestoredSessionToolbar` renders an accept/discard bar when `useSessionRestore` detects file changes. `useSessionRestore` is a thin React wrapper around `SnapshotManager` (in `shared/snapshot-manager.ts`). The manager captures original file state on first sighting (from diff `oldText` or disk read) and detects changes by comparing each snapshot with current disk content. Works with standard edit tools (via diffs), custom MCP tools (via tool call locations), and any tool with rawInput path keys. `DiffViewer` displays side-by-side diffs for inline edit results.
+`RestoredSessionToolbar` renders an accept/discard bar when `useSessionRestore` detects file changes. `useSessionRestore` is a thin React wrapper around `SnapshotManager` in `application/services/session-restore/`. The manager captures original file state on first sighting (from diff `oldText` or disk read) and detects changes by comparing each snapshot with current disk content. Works with standard edit tools (via diffs), custom MCP tools (via tool call locations), and any tool with rawInput path keys. `DiffViewer` displays side-by-side diffs for inline edit results.
 
 **Loading spinner**: `ChatMessages` renders an SVG square-dots spinner (`.ac-loading__spinner` with 4 circles + 4 lines) while `isSending` is true. CSS-animated via keyframes in `styles.css`; replaces the former three-dot pulse indicator.
 
 **Markdown**: `MarkdownTextRenderer` calls Obsidian's `MarkdownRenderer.render()` into a `<div ref>`. Must handle async rendering and cleanup.
 
-**Terminal output**: `TerminalRenderer` polls `acpClient.terminalOutput()` on interval. Shows live output + exit status.
+**Terminal output**: `TerminalRenderer` polls `agentClient.getTerminalOutput(terminalId)` on interval. Shows live output + exit status.
 
 **Diff display**: `DiffRenderer` uses `diff` library to generate unified diff view with word-level highlighting. Computes relative paths via `toRelativePath()`.
 

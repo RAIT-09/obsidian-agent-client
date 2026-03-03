@@ -6,7 +6,7 @@ Pure types and interfaces — **ZERO external dependencies**. No `obsidian`, no 
 
 ```
 domain/
-├── models/          # Data types (8 files, ~1056 lines)
+├── models/          # Data types (9 files)
 │   ├── chat-message.ts      # ChatMessage, MessageContent union, Role, ToolCallStatus, ToolKind (~203 lines)
 │   ├── session-update.ts    # SessionUpdate union (8 routed types) — agent → UI event stream (~181 lines)
 │   ├── chat-session.ts      # ChatSession state, SessionState, SlashCommand, AuthenticationMethod, modes, models (~266 lines)
@@ -14,7 +14,8 @@ domain/
 │   ├── agent-config.ts      # BaseAgentSettings, ClaudeAgentSettings, GeminiAgentSettings, CodexAgentSettings, OpenCodeAgentSettings, CustomAgentSettings (~100 lines)
 │   ├── session-info.ts      # SessionInfo, ListSessionsResult, LoadSessionResult, ResumeSessionResult, ForkSessionResult, SavedSessionInfo (~92 lines)
 │   ├── prompt-content.ts    # PromptContent union (text, image, resource), ResourceAnnotations (~72 lines)
-│   └── chat-input-state.ts  # ChatInputState, AttachedImage (for broadcast) (~20 lines)
+│   ├── chat-input-state.ts  # ChatInputState, AttachedImage (for broadcast) (~20 lines)
+│   └── terminal-output.ts   # TerminalOutputSnapshot, TerminalExitStatus
 └── ports/           # Interface contracts (4 files, ~771 lines)
     ├── agent-client.port.ts    # IAgentClient — 423 lines, full agent communication contract
     ├── settings-access.port.ts # ISettingsAccess — settings CRUD + session persistence (~131 lines)
@@ -33,6 +34,8 @@ domain/
 **ChatSession** (`chat-session.ts`): Full session state including `SessionState`, available modes/models (`SessionModeState`, `SessionModelState`), agent capabilities, slash commands.
 
 **ChatViewContextReference** (`chat-view-container.port.ts`): Context reference types (`selection` | `file` | `folder`) for editor context menu integration.
+
+**TerminalOutputSnapshot** (`terminal-output.ts`): Domain terminal polling result used by `IAgentClient.getTerminalOutput()`.
 
 ## Ports -> Implementations
 
