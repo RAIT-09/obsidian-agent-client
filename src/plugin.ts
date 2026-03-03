@@ -33,14 +33,10 @@ import {
 	SETTINGS_SCHEMA_VERSION,
 } from "./shared/settings-schema";
 import {
-	broadcastCancel,
-	broadcastPrompt,
-	broadcastSend,
 	ensureDefaultAgentId,
 	getAvailableAgents,
 	openChatWithAgent,
 	registerAgentCommands,
-	registerBroadcastCommands,
 	registerPermissionCommands,
 } from "./plugin/agent-ops";
 import {
@@ -252,7 +248,6 @@ export default class AgentClientPlugin extends Plugin {
 		// Register agent-specific commands
 		this.registerAgentCommands();
 		this.registerPermissionCommands();
-		this.registerBroadcastCommands();
 		registerEditorContextMenus(this);
 		registerInlineEditCommand(this);
 
@@ -424,13 +419,6 @@ export default class AgentClientPlugin extends Plugin {
 		registerPermissionCommands(this);
 	}
 
-	/**
-	 * Register broadcast commands for multi-view operations
-	 */
-	private registerBroadcastCommands(): void {
-		registerBroadcastCommands(this);
-	}
-
 	async addContextReferenceToCurrentChat(
 		reference: ChatContextReference,
 	): Promise<boolean> {
@@ -439,27 +427,6 @@ export default class AgentClientPlugin extends Plugin {
 
 	async openContextReference(reference: ChatContextReference): Promise<void> {
 		await openContextReferenceInEditor(this.app, reference);
-	}
-
-	/**
-	 * Copy prompt from active view to all other views
-	 */
-	private broadcastPrompt(): void {
-		broadcastPrompt(this);
-	}
-
-	/**
-	 * Send message in all views that can send
-	 */
-	private async broadcastSend(): Promise<void> {
-		await broadcastSend(this);
-	}
-
-	/**
-	 * Cancel operation in all views
-	 */
-	private async broadcastCancel(): Promise<void> {
-		await broadcastCancel(this);
 	}
 
 	async loadSettings() {

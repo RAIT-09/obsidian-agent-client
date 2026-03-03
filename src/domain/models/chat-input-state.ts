@@ -10,7 +10,7 @@ export interface AttachedImage {
 
 /**
  * ChatInput component state that can be shared between views.
- * Used for broadcast-prompt command.
+ * Used when transferring pending input between chat views.
  */
 export interface ChatInputState {
 	/** Text content in the input field */

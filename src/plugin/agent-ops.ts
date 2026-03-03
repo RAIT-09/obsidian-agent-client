@@ -1,4 +1,3 @@
-import { pluginNotice } from "../shared/plugin-notice";
 import type { AgentClientPluginSettings } from "../plugin";
 import type { IChatViewContainer } from "../domain/ports/chat-view-container.port";
 
@@ -152,87 +151,6 @@ export const registerPermissionCommands = (host: AgentOpsHost): void => {
 				"obsius:cancel-message" as "quit",
 				host.lastActiveChatViewId,
 			);
-		},
-	});
-};
-
-export const broadcastPrompt = (host: AgentOpsHost): void => {
-	const allViews = host.viewRegistry.getAll();
-	if (allViews.length === 0) {
-		pluginNotice("No chat views open");
-		return;
-	}
-
-	const inputState = host.viewRegistry.toFocused((v) => v.getInputState());
-	if (
-		!inputState ||
-		(inputState.text.trim() === "" && inputState.images.length === 0)
-	) {
-		pluginNotice("No prompt to broadcast");
-		return;
-	}
-
-	const focusedId = host.viewRegistry.getFocusedId();
-	const targetViews = allViews.filter((v) => v.viewId !== focusedId);
-	if (targetViews.length === 0) {
-		pluginNotice("No other chat views to broadcast to");
-		return;
-	}
-
-	for (const view of targetViews) {
-		view.setInputState(inputState);
-	}
-};
-
-export const broadcastSend = async (host: AgentOpsHost): Promise<void> => {
-	const allViews = host.viewRegistry.getAll();
-	if (allViews.length === 0) {
-		pluginNotice("No chat views open");
-		return;
-	}
-
-	const sendableViews = allViews.filter((v) => v.canSend());
-	if (sendableViews.length === 0) {
-		pluginNotice("No views ready to send");
-		return;
-	}
-
-	await Promise.allSettled(sendableViews.map((v) => v.sendMessage()));
-};
-
-export const broadcastCancel = async (host: AgentOpsHost): Promise<void> => {
-	const allViews = host.viewRegistry.getAll();
-	if (allViews.length === 0) {
-		pluginNotice("No chat views open");
-		return;
-	}
-
-	await Promise.allSettled(allViews.map((v) => v.cancelOperation()));
-	pluginNotice("Cancel broadcast to all views");
-};
-
-export const registerBroadcastCommands = (host: AgentOpsHost): void => {
-	host.addCommand({
-		id: "broadcast-prompt",
-		name: "Broadcast prompt",
-		callback: () => {
-			broadcastPrompt(host);
-		},
-	});
-
-	host.addCommand({
-		id: "broadcast-send",
-		name: "Broadcast send",
-		callback: () => {
-			void broadcastSend(host);
-		},
-	});
-
-	host.addCommand({
-		id: "broadcast-cancel",
-		name: "Broadcast cancel",
-		callback: () => {
-			void broadcastCancel(host);
 		},
 	});
 };
