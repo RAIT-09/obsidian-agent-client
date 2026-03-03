@@ -3216,6 +3216,74 @@ If your plugin does not need CSS, delete this file.
 	display: none;
 }
 
+.obsius-model-order-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 0 var(--size-4-4);
+	margin-bottom: 8px;
+}
+
+.obsius-model-order-list.is-hidden {
+	display: none;
+}
+
+.obsius-model-order-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background-color: var(--background-primary-alt, var(--background-secondary));
+}
+
+.obsius-model-order-item.is-dragging {
+	opacity: 0.65;
+}
+
+.obsius-model-order-item.is-drop-target {
+	border-color: var(--interactive-accent);
+	background-color: var(--background-modifier-hover);
+}
+
+.obsius-model-order-handle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	color: var(--text-faint);
+	cursor: grab;
+}
+
+.obsius-model-order-handle svg {
+	width: 14px;
+	height: 14px;
+}
+
+.obsius-model-order-label {
+	flex: 1;
+	min-width: 0;
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.obsius-model-order-remove {
+	cursor: pointer;
+	color: var(--text-faint);
+	font-size: 14px;
+	line-height: 1;
+	padding: 0 4px;
+}
+
+.obsius-model-order-remove:hover {
+	color: var(--text-error);
+}
+
 .obsius-model-chip {
 	display: inline-flex;
 	align-items: center;

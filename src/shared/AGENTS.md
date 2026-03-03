@@ -2,6 +2,32 @@
 
 Pure utility modules with no React dependencies. Business logic extracted from hooks/adapters for reuse and testability.
 
+## Purity Rules (CRITICAL)
+
+**`shared/` is for pure, stateless utility functions ONLY.** A module belongs here if and only if:
+
+1. ✅ It contains **pure functions** (same input → same output, no side effects)
+2. ✅ It has **no `async`/`await`** (exception: utility wrappers that are inherently async like path resolution)
+3. ✅ It has **no `new` class instantiation** with lifecycle management
+4. ✅ It does **not import from `adapters/`** or `hooks/`
+5. ✅ It does **not spawn processes, open files, or make network requests**
+
+**If a module has any of these characteristics, it does NOT belong in `shared/`:**
+- File system I/O (read/write) → move to `application/services/` or `adapters/`
+- Process spawning → move to `adapters/`
+- Complex state lifecycle management → move to `application/services/`
+- Dependency on adapter instances → move to `application/use-cases/`
+
+> **KNOWN VIOLATIONS (to be refactored):**
+> - `message-service/` (4 files) — contains application-layer prompt orchestration with Vault I/O; should migrate to `application/use-cases/`
+> - `snapshot-manager.ts` — manages file snapshots with I/O lifecycle; should be `application/services/`
+> - `terminal-manager.ts` — spawns child processes; should be `adapters/`
+> - `session-file-restoration.ts` — Vault file discovery with I/O; should be `application/services/`
+> - `chat-view-registry.ts` — manages view lifecycle registration; should be `application/services/`
+> - `secret-storage.ts` — wraps Obsidian SecretStorage; should be `adapters/obsidian/`
+>
+> Do NOT add new modules that follow these patterns. New side-effectful code should go in the correct layer from the start.
+
 ## Utility Catalog
 
 | File | Lines | Purpose | Consumers |
@@ -107,3 +133,11 @@ Pure utility modules with no React dependencies. Business logic extracted from h
 2. Export pure functions — no React hooks, no `obsidian` imports if possible
 3. Exception: `terminal-manager.ts`, `mention-utils.ts` import from `obsidian` — keep to minimum
 4. Document consumers in this table
+5. **Verify purity**: if your module uses `await`, `new SomeClass()`, or imports from `adapters/`, it does NOT belong here
+
+## Anti-Patterns (Shared Layer)
+
+- **Don't put business orchestration in `shared/`** — prompt preparation, session management, file restoration are application-layer concerns, not utilities
+- **Don't reference adapter types** — shared modules should depend on `domain/ports/` interfaces if they need service abstractions
+- **Don't add state management** — no `useState`, no `useReducer`, no mutable class instances with lifecycle
+- **Don't import from `hooks/` or `components/`** — shared is consumed by them, never the reverse

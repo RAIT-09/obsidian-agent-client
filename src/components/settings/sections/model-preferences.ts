@@ -15,6 +15,29 @@ interface CachedMode {
 
 const pickerCleanup = new WeakMap<HTMLElement, () => void>();
 
+function getValidCandidates(
+	plugin: AgentClientPlugin,
+	agentId: string,
+	models: CachedModel[],
+): string[] {
+	return (plugin.settings.candidateModels?.[agentId] ?? []).filter((id) =>
+		models.some((m) => m.modelId === id),
+	);
+}
+
+async function saveCandidates(
+	plugin: AgentClientPlugin,
+	agentId: string,
+	nextCandidates: string[],
+): Promise<void> {
+	await plugin.settingsStore.updateSettings({
+		candidateModels: {
+			...plugin.settings.candidateModels,
+			[agentId]: nextCandidates,
+		},
+	});
+}
+
 /**
  * Render candidate-model picker + mode-model mapping for a single agent.
  * Called from each agent's settings section (after env vars).
@@ -63,46 +86,34 @@ function renderCandidateModelPicker(
 		cls: "obsius-model-prefs-agent",
 	});
 
-	const candidates = (plugin.settings.candidateModels?.[agentId] ?? []).filter(
-		(id) => models.some((m) => m.modelId === id),
-	);
-
 	const headerSetting = new Setting(wrapper)
 		.setName("Candidate models")
 		.setDesc(
-			candidates.length > 0
-				? "Only these models appear in the chat selector."
-				: `All ${models.length} models are available. Add candidates to filter the chat selector.`,
+			`All ${models.length} models are available. Add candidates to filter the chat selector.`,
 		);
 
-	const chipsEl = wrapper.createDiv({
-		cls: `obsius-model-chips${candidates.length === 0 ? " is-hidden" : ""}`,
+	const orderedListEl = wrapper.createDiv({
+		cls: "obsius-model-order-list",
 	});
-	if (candidates.length > 0) {
-		refreshChips(chipsEl, plugin, agentId, models, () =>
-			updateDescription(
-				headerSetting,
-				chipsEl,
-				plugin,
-				agentId,
-				models,
-				onCandidatesChange,
-			),
+
+	const refresh = () => {
+		updateDescription(
+			headerSetting,
+			orderedListEl,
+			plugin,
+			agentId,
+			models,
+			onCandidatesChange,
 		);
-	}
+	};
+
+	refresh();
 
 	headerSetting.addExtraButton((btn) => {
 		btn.setIcon("plus").setTooltip("Add model");
 		btn.onClick(() => {
 			togglePicker(wrapper, plugin, agentId, models, () => {
-				updateDescription(
-					headerSetting,
-					chipsEl,
-					plugin,
-					agentId,
-					models,
-					onCandidatesChange,
-				);
+				refresh();
 			});
 		});
 	});
@@ -110,20 +121,18 @@ function renderCandidateModelPicker(
 
 function updateDescription(
 	headerSetting: Setting,
-	chipsEl: HTMLElement,
+	orderedListEl: HTMLElement,
 	plugin: AgentClientPlugin,
 	agentId: string,
 	models: CachedModel[],
 	onCandidatesChange: () => void,
 ): void {
-	const updated = (plugin.settings.candidateModels?.[agentId] ?? []).filter(
-		(id) => models.some((m) => m.modelId === id),
-	);
+	const updated = getValidCandidates(plugin, agentId, models);
 
-	refreshChips(chipsEl, plugin, agentId, models, () =>
+	refreshCandidateOrderList(orderedListEl, plugin, agentId, models, () =>
 		updateDescription(
 			headerSetting,
-			chipsEl,
+			orderedListEl,
 			plugin,
 			agentId,
 			models,
@@ -132,10 +141,10 @@ function updateDescription(
 	);
 
 	if (updated.length > 0) {
-		chipsEl.removeClass("is-hidden");
-		headerSetting.setDesc("Only these models appear in the chat selector.");
+		headerSetting.setDesc(
+			"Only these models appear in the chat selector. Drag to reorder.",
+		);
 	} else {
-		chipsEl.addClass("is-hidden");
 		headerSetting.setDesc(
 			`All ${models.length} models are available. Add candidates to filter the chat selector.`,
 		);
@@ -144,39 +153,96 @@ function updateDescription(
 	onCandidatesChange();
 }
 
-function refreshChips(
-	chipsEl: HTMLElement,
+function moveArrayItem<T>(
+	items: T[],
+	fromIndex: number,
+	toIndex: number,
+): T[] {
+	const next = [...items];
+	const [moved] = next.splice(fromIndex, 1);
+	next.splice(toIndex, 0, moved);
+	return next;
+}
+
+function refreshCandidateOrderList(
+	listEl: HTMLElement,
 	plugin: AgentClientPlugin,
 	agentId: string,
 	models: CachedModel[],
 	onUpdate: () => void,
 ): void {
-	chipsEl.empty();
-	const candidates = (plugin.settings.candidateModels?.[agentId] ?? []).filter(
-		(id) => models.some((m) => m.modelId === id),
-	);
+	listEl.empty();
+	const candidates = getValidCandidates(plugin, agentId, models);
+	listEl.toggleClass("is-hidden", candidates.length === 0);
+	let dragIndex: number | null = null;
 
-	for (const modelId of candidates) {
+	for (const [index, modelId] of candidates.entries()) {
 		const model = models.find((m) => m.modelId === modelId);
-		const chip = chipsEl.createDiv({ cls: "obsius-model-chip" });
-		chip.createSpan({
+		const row = listEl.createDiv({ cls: "obsius-model-order-item" });
+		row.draggable = true;
+
+		const dragHandle = row.createSpan({ cls: "obsius-model-order-handle" });
+		setIcon(dragHandle, "grip-vertical");
+
+		row.createSpan({
 			text: model?.name ?? modelId,
-			cls: "obsius-model-chip-label",
+			cls: "obsius-model-order-label",
 		});
-		const removeBtn = chip.createSpan({
+		const removeBtn = row.createSpan({
 			text: "\u00d7",
-			cls: "obsius-model-chip-remove",
+			cls: "obsius-model-order-remove",
 			attr: { "aria-label": `Remove ${model?.name ?? modelId}` },
 		});
+
+		row.addEventListener("dragstart", (e) => {
+			dragIndex = index;
+			row.addClass("is-dragging");
+			if (e.dataTransfer) {
+				e.dataTransfer.effectAllowed = "move";
+				e.dataTransfer.setData("text/plain", modelId);
+			}
+		});
+		row.addEventListener("dragover", (e) => {
+			e.preventDefault();
+			if (dragIndex !== index) {
+				row.addClass("is-drop-target");
+			}
+		});
+		row.addEventListener("dragleave", () => {
+			row.removeClass("is-drop-target");
+		});
+		row.addEventListener("drop", (e) => {
+			e.preventDefault();
+			row.removeClass("is-drop-target");
+			if (dragIndex === null || dragIndex === index) {
+				dragIndex = null;
+				return;
+			}
+			void (async () => {
+				const fromIndex = dragIndex;
+				const reordered = moveArrayItem(candidates, fromIndex, index);
+				await saveCandidates(plugin, agentId, reordered);
+				onUpdate();
+			})();
+			dragIndex = null;
+		});
+		row.addEventListener("dragend", () => {
+			dragIndex = null;
+			for (const child of Array.from(listEl.children)) {
+				const item = child as HTMLElement;
+				item.removeClass("is-dragging");
+				item.removeClass("is-drop-target");
+			}
+		});
+
 		removeBtn.addEventListener("click", () => {
 			void (async () => {
-				const current = plugin.settings.candidateModels?.[agentId] ?? [];
-				await plugin.settingsStore.updateSettings({
-					candidateModels: {
-						...plugin.settings.candidateModels,
-						[agentId]: current.filter((id) => id !== modelId),
-					},
-				});
+				const current = getValidCandidates(plugin, agentId, models);
+				await saveCandidates(
+					plugin,
+					agentId,
+					current.filter((id) => id !== modelId),
+				);
 				onUpdate();
 			})();
 		});
@@ -341,16 +407,11 @@ function togglePicker(
 
 			item.addEventListener("click", () => {
 				void (async () => {
-					const current = plugin.settings.candidateModels?.[agentId] ?? [];
+					const current = getValidCandidates(plugin, agentId, models);
 					const next = isSelected
 						? current.filter((id) => id !== model.modelId)
 						: [...current, model.modelId];
-					await plugin.settingsStore.updateSettings({
-						candidateModels: {
-							...plugin.settings.candidateModels,
-							[agentId]: next,
-						},
-					});
+					await saveCandidates(plugin, agentId, next);
 					renderModels(modelList, providerName);
 					onUpdate();
 				})();
@@ -389,10 +450,15 @@ function renderModeModelMapping(
 		);
 
 	const defaults = plugin.settings.modeModelDefaults?.[agentId] ?? {};
-	const candidates = plugin.settings.candidateModels?.[agentId] ?? [];
+	const candidates = getValidCandidates(plugin, agentId, allModels);
+	const modelMap = new Map(
+		allModels.map((model) => [model.modelId, model] as const),
+	);
 	const dropdownModels =
 		candidates.length > 0
-			? allModels.filter((m) => candidates.includes(m.modelId))
+			? candidates
+					.map((modelId) => modelMap.get(modelId))
+					.filter((model): model is CachedModel => model !== undefined)
 			: [];
 
 	const modeGroup = containerEl.createDiv({

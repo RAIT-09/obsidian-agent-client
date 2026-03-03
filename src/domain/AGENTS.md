@@ -49,10 +49,32 @@ domain/
 - `import { ... } from "obsidian"`
 - `import * as acp from "@agentclientprotocol/sdk"`
 - `import { ... } from "react"`
+- `import { ... } from "../../adapters/..."` — adapters depend on domain, never the reverse
+- `import { ... } from "../../hooks/..."` — hooks depend on domain, never the reverse
+- `import { ... } from "../../components/..."` — components depend on domain, never the reverse
 
 **Why**: Domain types flow everywhere (hooks, components, adapters, shared). If domain imports `obsidian`, the entire dependency graph tightens. ACP SDK evolves rapidly — isolation keeps domain stable across protocol changes.
 
+**For LLM-assisted coding**: When asked to add a new capability, the correct pattern is:
+1. Define the **interface** in `domain/ports/` (e.g., a new method on `IAgentClient`)
+2. Define any new **types** in `domain/models/`
+3. Implement the concrete behavior in `adapters/` (e.g., `AcpAdapter`)
+4. **Never** pull adapter logic into domain — if you need to reference an adapter type, you’re going the wrong direction
+
 **Only exception**: `settings-access.port.ts` imports `AgentClientPluginSettings` from `../../plugin` — pragmatic coupling to the plugin's settings type, not an external library.
+
+## Port Completeness
+
+All capabilities consumed by `hooks/` and `components/` MUST be exposed through a Port interface in this directory. If a hook needs a method that only exists on a concrete adapter class (e.g., `IAcpClient` in `adapters/acp/`), the correct response is to **promote that method to the Port interface**, not to import the adapter directly.
+
+Current ports and their adapter implementations:
+
+| Port | Adapter | Notes |
+|------|---------|---------|
+| `IAgentClient` | `AcpAdapter` | Core agent communication |
+| `IVaultAccess` | `ObsidianVaultAdapter` | Vault file operations |
+| `ISettingsAccess` | `SettingsStore` | Settings persistence |
+| `IChatViewContainer` | `ChatView` | View lifecycle management |
 
 ## Key Port Methods
 
@@ -69,3 +91,10 @@ domain/
 3. If it needs adapter conversion → update `AcpTypeConverter` in `adapters/acp/`
 4. If it's a new capability → extend `IAgentClient` port, then implement in `AcpAdapter`
 5. If it's a new vault operation → extend `IVaultAccess` port, then implement in `ObsidianVaultAdapter`
+
+## Anti-Patterns (Domain Layer)
+
+- **Don't define domain types that reference adapter-specific concepts** (e.g., `acp.TerminalOutputRequest` is an ACP SDK type and must not appear in any Port signature)
+- **Don't put business orchestration logic in domain** — domain is types + interfaces only; orchestration belongs in `hooks/` or `application/`
+- **Don't duplicate Port methods** across multiple Ports — each capability should have exactly one canonical Port owner
+- **Don't add optional methods to Ports without documenting when they're available** — consumers need to know if a method might be `undefined`

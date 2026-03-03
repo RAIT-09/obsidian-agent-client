@@ -111,6 +111,44 @@ Context references → editor-context.ts → addContextToCurrentChat()
 6. **Upsert pattern** — functional `setMessages((prev) => ...)` to avoid race conditions with streaming tool_call_update events
 7. **Reducer-backed state** — `hooks/state/` modules for deterministic transitions in `useChat`/`useAgentSession`/`usePermission`
 
+### Dependency Boundary Rules (CRITICAL — Enforced by Architecture)
+
+This project uses a **hexagonal (ports & adapters) architecture**. The dependency flow is strictly one-directional:
+
+```
+components/ ──→ domain/ports/    ←── adapters/
+hooks/      ──→ domain/models/   ←── adapters/
+                     ↑
+             application/ (use-cases, services)
+```
+
+**Hard rules — violations MUST be rejected in code review:**
+
+| From | May Import | MUST NOT Import |
+|------|-----------|----------------|
+| `components/` | `domain/ports/`, `domain/models/`, `shared/` (pure utils only) | `adapters/` ❌ |
+| `hooks/` | `domain/ports/`, `domain/models/`, `shared/`, `application/` | `adapters/` ❌ |
+| `application/` | `domain/ports/`, `domain/models/`, `shared/` | `adapters/` ❌, `components/` ❌, `hooks/` ❌ |
+| `shared/` | `domain/models/` (types only) | `adapters/` ❌, `hooks/` ❌, `components/` ❌ |
+| `domain/` | Nothing external | Everything ❌ (zero-dep) |
+| `adapters/` | `domain/ports/`, `domain/models/`, `shared/`, external SDKs | `components/` ❌, `hooks/` ❌ |
+
+**Verification command:**
+```bash
+# MUST return 0 results — run before every commit
+grep -rn 'from.*adapters/' src/components/ src/hooks/ src/application/ 2>/dev/null | grep -v AGENTS.md
+```
+
+**Why this matters for LLM-assisted coding:** LLMs lack persistent awareness of the global dependency graph. Without these boundaries, they will take the shortest path (e.g., importing `AcpAdapter` directly in a component) which introduces coupling that makes future changes exponentially harder. The Port interfaces act as **cognitive firewalls** — when an LLM modifies UI or hook logic, it can only "see" the abstract Port signatures, physically preventing it from generating protocol-specific code in the wrong layer.
+
+### State Management Rules
+
+1. **Session state is an enum** — `SessionState` in `domain/models/chat-session.ts` defines the canonical phases: `initializing | authenticating | ready | busy | error | disconnected`
+2. **State changes go through reducers** — use typed actions in `hooks/state/`, never raw `setState` for session phase changes
+3. **Derive, don't store** — boolean flags like `isReady` must be derived from the enum state (`session.state === "ready"`), not stored as separate state
+4. **No boolean flag combinations** — if you need to represent a new operational phase (e.g., "loading history"), add it to the `SessionState` enum rather than introducing a new `isLoadingX` boolean
+5. **Exhaustive switch** — all reducers must use `never` exhaustive check in default case
+
 ### Obsidian Plugin Rules (CRITICAL)
 1. **No innerHTML/outerHTML** — use `createEl`/`createDiv`/`createSpan`
 2. **NO detach leaves in onunload** — this is an antipattern
@@ -133,6 +171,25 @@ Context references → editor-context.ts → addContextToCurrentChat()
 - Tabs (width 4), double quotes, trailing commas, LF line endings
 - Biome: `npm run format` / ESLint + architecture guards: `npm run lint`
 
+### Version Synchronization (Release-Critical)
+1. **Obsidian UI version source** — Obsidian shows `manifest.json` `version`, not Git tag names.
+2. **Keep versions aligned** — `package.json` `version`, `manifest.json` `version`, and latest key in `versions.json` must match.
+3. **Tags/releases must match files** — create tag `vX.Y.Z` only after files are bumped to `X.Y.Z`.
+4. **Tags alone do not bump files** — pushing `v0.3.2` without bumping files still ships `manifest.json` `0.3.0` to Obsidian.
+5. **Pre-push consistency check**:
+```bash
+node -e 'const pkg=require("./package.json").version;const manifest=require("./manifest.json").version;const keys=Object.keys(require("./versions.json"));const latest=keys[keys.length-1];if(pkg!==manifest||manifest!==latest){console.error(`Version mismatch: package=${pkg}, manifest=${manifest}, versions.latest=${latest}`);process.exit(1)}console.log(`Version OK: ${pkg}`)'
+```
+6. **Release flow**:
+```bash
+npm version patch             # or minor/major (updates package.json)
+npm run version              # sync manifest.json + versions.json from package version
+git add package.json package-lock.json manifest.json versions.json
+git commit -m "chore: bump version to vX.Y.Z"
+git tag vX.Y.Z
+git push && git push --tags
+```
+
 ## Anti-Patterns (This Project)
 - **Don't add ViewModel/UseCase classes** — use hooks
 - **Don't import obsidian or ACP SDK in domain/** — zero-dep rule
@@ -141,6 +198,10 @@ Context references → editor-context.ts → addContextToCurrentChat()
 - **Don't detach leaves in `onunload`**
 - **Don't use `innerHTML`/`outerHTML`**
 - **Don't bypass reducers** — use typed actions in `hooks/state/` for state transitions
+- **Don't import from `adapters/` in components or hooks** — use `domain/ports/` interfaces instead (see Dependency Boundary Rules)
+- **Don't add boolean flags for new operational phases** — extend `SessionState` enum instead
+- **Don't put stateful/side-effectful modules in `shared/`** — `shared/` is for pure functions only; modules with I/O, process spawning, or lifecycle management belong in `application/` or `adapters/`
+- **Don't expose adapter-specific types in hook return interfaces** — use domain Port types (e.g., `IAgentClient` not `IAcpClient`)
 
 ## Commands
 ```bash
@@ -155,6 +216,9 @@ npm run format           # Biome write
 npm run format:check     # Biome check
 npm run version          # Bump manifest.json + versions.json
 npm run docs:dev         # VitePress dev server
+
+# Architecture boundary check (should return empty)
+grep -rn 'from.*adapters/' src/components/ src/hooks/ 2>/dev/null | grep -v AGENTS.md
 npm run docs:build       # VitePress build
 ```
 

@@ -42,9 +42,12 @@ export function useModelFiltering(
 			return sessionModels;
 		}
 
-		const filtered = available.filter((m) =>
-			validCandidates.includes(m.modelId),
+		const modelById = new Map(
+			available.map((model) => [model.modelId, model] as const),
 		);
+		const filtered = validCandidates
+			.map((modelId) => modelById.get(modelId))
+			.filter((model): model is (typeof available)[number] => model !== undefined);
 
 		const currentInFiltered = filtered.some(
 			(m) => m.modelId === sessionModels.currentModelId,

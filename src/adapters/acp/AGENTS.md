@@ -39,6 +39,8 @@ Adds ACP-specific operations beyond domain `IAgentClient`:
 - `terminalOutput(params)` — poll terminal output for `TerminalRenderer`
 - `setUpdateMessageCallback(cb)` — wire message update function from `useChat`
 
+> **ARCHITECTURAL DEBT:** `IAcpClient` is currently imported by 6 components and 2 hook files, violating the hexagonal architecture boundary. These methods should be promoted to `IAgentClient` in `domain/ports/agent-client.port.ts`. The `acp.TerminalOutputRequest` parameter type in `terminalOutput()` is a protocol leak — it must be replaced with a domain type before promotion.
+
 ## Shared Runtime Architecture
 
 Multiple tabs using the same agent share a single ACP process + connection.
@@ -90,9 +92,21 @@ Static methods for SDK <-> domain conversion:
 
 Domain layer (`domain/`) stays untouched unless new domain concepts are needed.
 
-## Anti-Patterns
+## Anti-Patterns (Adapter Layer)
 
-- Don't import `@agentclientprotocol/sdk` outside this directory (except `TerminalManager` which uses `acp.TerminalOutputRequest`)
-- Don't expose ACP SDK types to hooks/components — always convert to domain types first
-- Don't add multiple event callbacks — use unified `sessionUpdateCallback`
-- Don't re-grow `acp.adapter.ts` into a monolith; new behavior should land in concern modules first
+- **Don't import `@agentclientprotocol/sdk` outside this directory** (except `TerminalManager` which uses `acp.TerminalOutputRequest`)
+- **Don't expose ACP SDK types to hooks/components** — always convert to domain types first
+- **Don't add multiple event callbacks** — use unified `sessionUpdateCallback`
+- **Don't re-grow `acp.adapter.ts` into a monolith**; new behavior should land in concern modules first
+- **Don't let `IAcpClient` grow without a migration plan** — any new method on `IAcpClient` that is consumed by hooks/components should be a candidate for promotion to `IAgentClient` Port
+- **Don't use ACP SDK types in any Port interface signature** — replace with domain types (e.g., use `{ terminalId: string; output: string }` not `acp.TerminalOutputRequest`)
+
+## Outward Leakage Prevention
+
+**This directory is the ONLY place that may import `@agentclientprotocol/sdk`.** If you see ACP SDK types appearing in:
+- `domain/ports/` → Replace with domain types
+- `hooks/` → Convert in this adapter layer before passing to hooks
+- `components/` → Same — convert here, pass domain types outward
+- `shared/` → Should never happen — shared is pure utilities
+
+The adapter layer acts as the **protocol translation boundary**: raw ACP concepts come in, domain concepts go out.

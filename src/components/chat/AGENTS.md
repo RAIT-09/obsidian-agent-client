@@ -2,6 +2,27 @@
 
 41 files for the chat UI. Entry point: `ChatView` (sidebar/Obsidian leaf). Includes `chat-input/` subdirectory with 12 files for input-related components and hooks. Picker panel in `components/picker/` (4 files).
 
+## Dependency Rules (CRITICAL)
+
+**Components MUST only depend on:**
+- `domain/ports/` — interface types (e.g., `IAgentClient` for `TerminalRenderer`)
+- `domain/models/` — data types (`ChatMessage`, `MessageContent`, etc.)
+- `shared/` — pure utility functions (e.g., `path-utils`, `tool-icons`, `chat-context-token`)
+- Props from `useChatController` return value
+
+**Components MUST NOT import from:**
+- `adapters/` — **NEVER** import `IAcpClient`, `AcpAdapter`, `ObsidianVaultAdapter`, etc.
+- `hooks/` directly (except view-level hooks like `useTabs`, input-level hooks like `usePicker`)
+
+**If a component needs a method from `IAcpClient`:** The correct fix is to promote that method to `IAgentClient` in `domain/ports/agent-client.port.ts`, NOT to import from `adapters/acp/`.
+
+**Verification:**
+```bash
+grep -rn 'from.*adapters/' src/components/ | grep -v AGENTS.md  # MUST return 0 results
+```
+
+> **KNOWN VIOLATIONS (to be fixed):** `TerminalRenderer.tsx`, `TabContent.tsx`, `ChatMessages.tsx`, `ToolCallRenderer.tsx`, `MessageRenderer.tsx`, and `MessageContentRenderer.tsx` currently import `IAcpClient` from `adapters/acp/acp.adapter.ts`. These are tracked for refactoring — do NOT add new violations.
+
 ## Component Tree
 
 ```
@@ -127,3 +148,13 @@ Note: hooks in `chat-input/` use `kebab-case` naming (not `usePascalCase`) since
 2. Accept props from `useChatController` return — not raw plugin/adapter
 3. Register DOM events via `IChatViewHost.registerDomEvent` for cleanup
 4. Style in `styles.css` (root-level) — no CSS modules, no JS styles
+5. **Dependency check**: verify no imports from `adapters/` — use `domain/ports/` interfaces
+
+## Anti-Patterns (Component Layer)
+
+- **Don't import from `adapters/`** — use Port interfaces only (see Dependency Rules above)
+- **Don't call `agentClient` methods directly** — route through hooks via `useChatController`
+- **Don't store state that should be derived** — compute from props, don't duplicate hook state
+- **Don't use `innerHTML`/`outerHTML`** — use `createEl`/`createDiv`/`createSpan` for Obsidian APIs
+- **Don't add inline JS styles** — all styling goes in `styles.css` (except font size CSS var and ProviderLogo mask-image)
+- **Don't create new concrete adapter instances** — adapters are created in `useChatController` and passed as props through Port interfaces

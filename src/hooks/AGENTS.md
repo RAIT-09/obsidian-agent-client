@@ -4,6 +4,27 @@ Distributed composition pattern: `useChatController` composes 10 specialized hoo
 
 State transitions are reducer-backed in `src/hooks/state/` for deterministic updates and easier test coverage.
 
+## Dependency Rules (CRITICAL)
+
+**Hooks MUST only depend on:**
+- `domain/ports/` — interface types (`IAgentClient`, `IVaultAccess`, `ISettingsAccess`)
+- `domain/models/` — data types (`ChatMessage`, `SessionUpdate`, `ChatSession`, etc.)
+- `shared/` — pure utility functions only
+- Other hooks in this directory
+
+**Hooks MUST NOT import from:**
+- `adapters/` — **NEVER** import concrete adapter classes (`AcpAdapter`, `ObsidianVaultAdapter`, `NoteMentionService`)
+- `adapters/acp/acp.adapter.ts` — **NEVER** import `IAcpClient` (use `IAgentClient` from `domain/ports/` instead)
+
+**If a hook needs a method not on `IAgentClient`:** The correct fix is to promote that method to the `IAgentClient` Port interface in `domain/ports/agent-client.port.ts`, NOT to import the adapter type.
+
+**Verification:**
+```bash
+grep -rn 'from.*adapters/' src/hooks/ | grep -v AGENTS.md  # MUST return 0 results
+```
+
+> **KNOWN VIOLATIONS (to be fixed):** `chat-controller/types.ts` and `useChatController.ts` currently import `IAcpClient`, `ObsidianVaultAdapter`, and `NoteMentionService` from adapters. These are tracked for refactoring — do NOT add new violations.
+
 ## Hook Inventory
 
 | Hook | Lines | State Owned | Key Deps | Composed In |
@@ -73,6 +94,14 @@ ChatComponent (ChatView.tsx)
 | `session.actions.ts` | 22 | Action creators for session state transitions |
 | `permission.reducer.ts` | 35 | Permission request queue reducer |
 
+### State Management Constraints
+
+1. **All session phase changes must go through `SessionState` enum** — the canonical phases are: `initializing | authenticating | ready | busy | error | disconnected`. Do NOT invent new boolean flags to represent phases.
+2. **Derive booleans from enum state** — e.g., `const isReady = session.state === "ready"`. Never store `isReady` as separate state.
+3. **Exhaustive switch in every reducer** — the `default` case must use `const exhaustiveCheck: never = action` to catch unhandled actions at compile time.
+4. **No direct setState for phase-related fields** — always dispatch a typed action. This makes state transitions auditable and testable.
+5. **If a new operational phase is needed** (e.g., "loading_history", "forking_session"), add it to `SessionState` in `domain/models/chat-session.ts` and handle it in the reducer. Do NOT add `isLoadingHistory: boolean` alongside the enum.
+
 ## Race Condition Patterns
 
 **Agent switch staleness**: `useAgentSession.createSession` uses a `creationCounterRef` to discard stale async results when the user switches agents before the previous session is ready.
@@ -102,7 +131,11 @@ ChatComponent (ChatView.tsx)
 
 ## Anti-Patterns
 
-- Don't bypass reducers for state transitions in `useChat` / `useAgentSession` / `usePermission`
-- Don't store derived state — compute from `messages` or `session` in components
-- Don't call `agentClient` directly from components — route through hooks
-- Don't add new callback-style mutation paths when a typed action in `src/hooks/state/` is appropriate
+- **Don't bypass reducers** for state transitions in `useChat` / `useAgentSession` / `usePermission`
+- **Don't store derived state** — compute from `messages` or `session` in components
+- **Don't call `agentClient` directly from components** — route through hooks
+- **Don't add new callback-style mutation paths** when a typed action in `src/hooks/state/` is appropriate
+- **Don't import from `adapters/`** — use Port interfaces from `domain/ports/` (see Dependency Rules above)
+- **Don't expose adapter-specific types in return interfaces** — `UseChatControllerReturn` should reference `IAgentClient`, not `IAcpClient`
+- **Don't add `isXxx: boolean` flags for new phases** — extend `SessionState` enum instead
+- **Don't create new reducers without exhaustive `never` checks** — this is a compile-time safety net against unhandled actions

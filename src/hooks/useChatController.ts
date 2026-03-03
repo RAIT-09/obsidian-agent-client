@@ -403,6 +403,61 @@ export function useChatController(
 		logger,
 	]);
 
+	const initialModeModelAppliedSessionRef = useRef<string | null>(null);
+
+	useEffect(() => {
+		if (!isSessionReady || !session.sessionId || !session.models || !session.agentId) {
+			return;
+		}
+		if (initialModeModelAppliedSessionRef.current === session.sessionId) {
+			return;
+		}
+
+		if (config?.model) {
+			initialModeModelAppliedSessionRef.current = session.sessionId;
+			return;
+		}
+
+		if (!session.modes) {
+			initialModeModelAppliedSessionRef.current = session.sessionId;
+			return;
+		}
+
+		const currentModeId = session.modes.currentModeId;
+		if (!currentModeId) {
+			return;
+		}
+
+		const modeDefaults = settings.modeModelDefaults?.[session.agentId];
+		const lastModeModels = settings.lastModeModels?.[session.agentId];
+		const targetModelId =
+			modeDefaults?.[currentModeId] ?? lastModeModels?.[currentModeId];
+
+		initialModeModelAppliedSessionRef.current = session.sessionId;
+
+		if (
+			targetModelId &&
+			targetModelId !== session.models.currentModelId &&
+			session.models.availableModels.some((m) => m.modelId === targetModelId)
+		) {
+			logger.log(
+				`[useChatController] Initial mode → model: switching to ${targetModelId} for mode ${currentModeId}`,
+			);
+			void agentSession.setModel(targetModelId);
+		}
+	}, [
+		config?.model,
+		isSessionReady,
+		session.sessionId,
+		session.agentId,
+		session.modes,
+		session.models,
+		settings.modeModelDefaults,
+		settings.lastModeModels,
+		agentSession.setModel,
+		logger,
+	]);
+
 	const filteredModels = useModelFiltering({
 		sessionModels: session.models,
 		agentId: session.agentId,
