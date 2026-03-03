@@ -1,5 +1,5 @@
-import type { ChatMessage, ToolKind } from "../domain/models/chat-message";
-import { toRelativePath } from "./path-utils";
+import type { ChatMessage, ToolKind } from "../../../domain/models/chat-message";
+import { toRelativePath } from "../../../shared/path-utils";
 
 export interface FileChange {
 	path: string;
@@ -174,7 +174,7 @@ export function toVaultRelativePath(
 export interface DiscoveredFile {
 	vaultPath: string;
 	rawPath: string;
-	/** First oldText seen for this path — string for existing, null/undefined for new/unknown */
+	/** First oldText seen for this path — string for existing, null for explicit new-file, undefined for unknown */
 	firstOldText: string | null | undefined;
 	/** True when any tool call with `kind === "delete"` targeted this path */
 	wasDeleted: boolean;
@@ -188,7 +188,7 @@ export interface DiscoveredFile {
  *
  * Priority for `firstOldText`:
  * 1. Diff `oldText` (most reliable — no timing issues)
- * 2. `undefined` (caller must read from disk)
+ * 2. `undefined` (unknown — caller may fall back to disk snapshot)
  *
  * Search tool locations are excluded (they can list dozens of results).
  */
@@ -227,7 +227,7 @@ export function discoverModifiedFiles(
 			if (content.content) {
 				for (const item of content.content) {
 					if (item.type !== "diff") continue;
-					add(item.path, item.oldText ?? null, kind);
+					add(item.path, item.oldText, kind);
 				}
 			}
 

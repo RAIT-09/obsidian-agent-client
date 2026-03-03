@@ -40,6 +40,7 @@ export function MentionBadgeStrip({
 	const activeNoteAlreadyAdded =
 		autoMention.activeNote !== null &&
 		contextMentions.includes(autoMention.activeNote.name);
+	const activeNoteName = autoMention.activeNote?.name ?? "";
 
 	if (!showAddButton && contextMentions.length === 0) return null;
 
@@ -88,7 +89,7 @@ export function MentionBadgeStrip({
 					onClick={handleAddActiveNote}
 					role="button"
 					tabIndex={0}
-					title={`Add "${autoMention.activeNote!.name}" as context`}
+					title={`Add "${activeNoteName}" as context`}
 					onKeyDown={(e) => {
 						if (e.key === "Enter" || e.key === " ") {
 							e.preventDefault();

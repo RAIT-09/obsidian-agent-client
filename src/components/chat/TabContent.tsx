@@ -3,7 +3,6 @@ import * as React from "react";
 const { useRef, useEffect, useCallback } = React;
 
 import { TFile, Notice } from "obsidian";
-import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 import type { ChatInputState } from "../../domain/models/chat-input-state";
 import type { ImagePromptContent } from "../../domain/models/prompt-content";
 import type { ChatViewContextReference } from "../../domain/ports/chat-view-container.port";
@@ -14,7 +13,7 @@ import {
 	appendChatContextToken,
 	removeChatContextTokensForPaths,
 } from "../../shared/chat-context-token";
-import { getLastAssistantMessage } from "../../shared/session-file-restoration";
+import { getLastAssistantMessage } from "../../application/services/session-restore";
 import { ChatInput } from "./ChatInput";
 import { ChatMessages } from "./ChatMessages";
 import { SessionHistoryPopover } from "./SessionHistoryPopover";
@@ -64,7 +63,7 @@ export function TabContent({
 	});
 
 	const {
-		acpAdapter,
+		agentClient,
 		vaultPath,
 		settings,
 		session,
@@ -201,7 +200,6 @@ export function TabContent({
 		}
 	}, [isSending, messages.length, tabId, onSendComplete]);
 
-	const acpClientRef = useRef<IAcpClient>(acpAdapter);
 	const agentIdRef = useRef(agentId);
 
 	useEffect(() => {
@@ -328,7 +326,7 @@ export function TabContent({
 				agentLabel={activeAgentLabel}
 				plugin={plugin}
 				view={view}
-				acpClient={acpClientRef.current}
+				agentClient={agentClient}
 				onApprovePermission={permission.approvePermission}
 			/>
 
@@ -372,7 +370,7 @@ export function TabContent({
 				errorInfo={errorInfo}
 				onClearError={handleClearError}
 				messages={messages}
-				vaultAccess={controller.vaultAccessAdapter}
+				vaultAccess={controller.vaultAccess}
 				contextUsage={controller.contextUsage}
 			/>
 		</div>

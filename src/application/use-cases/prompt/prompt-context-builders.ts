@@ -2,14 +2,30 @@ import type {
 	IVaultAccess,
 	NoteMetadata,
 	EditorPosition,
-} from "../../domain/ports/vault-access.port";
+} from "../../../domain/ports/vault-access.port";
 import type {
 	PromptContent,
 	ResourcePromptContent,
-} from "../../domain/models/prompt-content";
-import { convertWindowsPathToWsl } from "../wsl-utils";
-import { buildFileUri } from "../path-utils";
-import type { ChatContextReference } from "../chat-context-token";
+} from "../../../domain/models/prompt-content";
+import { convertWindowsPathToWsl } from "../../../shared/wsl-utils";
+import { buildFileUri } from "../../../shared/path-utils";
+import type { ChatContextReference } from "../../../shared/chat-context-token";
+import {
+	getImageMimeTypeForExtension,
+	getPathExtension,
+} from "../../../shared/mentionable-files";
+
+function bytesToBase64(bytes: Uint8Array): string {
+	let binary = "";
+	const chunkSize = 0x8000;
+
+	for (let i = 0; i < bytes.length; i += chunkSize) {
+		const chunk = bytes.subarray(i, i + chunkSize);
+		binary += String.fromCharCode(...chunk);
+	}
+
+	return btoa(binary);
+}
 
 function buildAbsolutePath(
 	vaultPath: string,
@@ -102,6 +118,7 @@ export async function buildManualContextPromptContent(
 	vaultPath: string,
 	vaultAccess: IVaultAccess,
 	convertToWsl: boolean,
+	supportsImage: boolean,
 	maxNoteLength: number,
 	maxSelectionLength: number,
 ): Promise<{
@@ -127,6 +144,49 @@ export async function buildManualContextPromptContent(
 			text.push(
 				`<obsidian_explicit_context type="folder-path" ref="${absolutePath}">Folder path only (no file content attached).</obsidian_explicit_context>`,
 			);
+			continue;
+		}
+
+		const extension = getPathExtension(context.notePath);
+		const imageMimeType = getImageMimeTypeForExtension(extension);
+		if (imageMimeType) {
+			try {
+				if (supportsImage) {
+					const fileBytes = await vaultAccess.readBinaryFile(context.notePath);
+					embedded.push({
+						type: "image",
+						data: bytesToBase64(fileBytes),
+						mimeType: imageMimeType,
+					});
+					embedded.push({
+						type: "text",
+						text: `The user explicitly attached the image file ${uri} as context.`,
+					});
+					text.push(
+						`<obsidian_explicit_context type="image-file" ref="${absolutePath}">Image attached as prompt image content.</obsidian_explicit_context>`,
+					);
+				} else {
+					embedded.push({
+						type: "text",
+						text: `The user explicitly attached the image file ${uri}, but this agent does not support image prompt content.`,
+					});
+					text.push(
+						`<obsidian_explicit_context type="image-file" ref="${absolutePath}">Image could not be attached because this agent does not support image prompt content.</obsidian_explicit_context>`,
+					);
+				}
+			} catch (error) {
+				embedded.push({
+					type: "text",
+					text: `The user attached image file ${uri}, but it could not be read.`,
+				});
+				text.push(
+					`<obsidian_explicit_context type="image-file" ref="${absolutePath}">Image could not be read.</obsidian_explicit_context>`,
+				);
+				console.error(
+					`Failed to read explicit image context from ${context.notePath}:`,
+					error,
+				);
+			}
 			continue;
 		}
 

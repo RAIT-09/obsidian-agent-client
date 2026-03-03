@@ -1,9 +1,12 @@
 import { useState, useCallback, useRef } from "react";
 import { type App, MarkdownView } from "obsidian";
 import type { ChatMessage } from "../domain/models/chat-message";
-import { getLastAssistantMessage } from "../shared/session-file-restoration";
-import type { SessionChangeSet } from "../shared/session-file-restoration";
-import { SnapshotManager, type FileIo } from "../shared/snapshot-manager";
+import {
+	getLastAssistantMessage,
+	SnapshotManager,
+	type FileIo,
+	type SessionChangeSet,
+} from "../application/services/session-restore";
 
 export type { FileIo as RevertFileIo };
 

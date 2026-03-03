@@ -1,10 +1,10 @@
-import type { AcpError } from "../../domain/models/agent-error";
-import type { NoteMetadata } from "../../domain/ports/vault-access.port";
-import type { AuthenticationMethod } from "../../domain/models/chat-session";
+import type { AcpError } from "../../../domain/models/agent-error";
+import type { NoteMetadata } from "../../../domain/ports/vault-access.port";
+import type { AuthenticationMethod } from "../../../domain/models/chat-session";
 import type {
 	PromptContent,
 	ImagePromptContent,
-} from "../../domain/models/prompt-content";
+} from "../../../domain/models/prompt-content";
 
 export interface PreparePromptInput {
 	message: string;

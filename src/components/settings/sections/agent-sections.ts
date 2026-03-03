@@ -1,14 +1,26 @@
-import { Notice, SecretComponent, Setting, type TextComponent } from "obsidian";
+import { SecretComponent, Setting } from "obsidian";
 import type AgentClientPlugin from "../../../plugin";
 import type { AgentEnvVar } from "../../../plugin";
 import { normalizeEnvVars } from "../../../shared/settings-utils";
-import {
-	BUILTIN_AGENT_DEFAULT_COMMANDS,
-	resolveCommandFromShell,
-} from "../../../shared/shell-utils";
-import { getBuiltInApiKeySecretId } from "../../../shared/secret-storage";
 import { renderAgentSubHeading } from "../settings-ui-helpers";
+import { renderPathSettingWithDetect } from "./agent-command-setting";
 import { renderAgentModelSettings } from "./model-preferences";
+
+type BuiltInApiKeyAgent = "claude" | "codex" | "gemini";
+
+function getBuiltInApiKeySecretId(
+	plugin: AgentClientPlugin,
+	agent: BuiltInApiKeyAgent,
+): string {
+	switch (agent) {
+		case "claude":
+			return plugin.settings.claude.apiKeySecretId;
+		case "codex":
+			return plugin.settings.codex.apiKeySecretId;
+		case "gemini":
+			return plugin.settings.gemini.apiKeySecretId;
+	}
+}
 
 export const formatArgs = (args: string[]): string => args.join("\n");
 
@@ -115,7 +127,7 @@ function renderGeminiSettings(
 			"Gemini API key secret name. Required if not logging in with a Google account. Value is stored in Obsidian secure storage.",
 		)
 		.addComponent((el) => {
-			const secretId = getBuiltInApiKeySecretId(plugin.settings, "gemini");
+			const secretId = getBuiltInApiKeySecretId(plugin, "gemini");
 			return new SecretComponent(plugin.app, el)
 				.setValue(secretId)
 				.onChange((value) => {
@@ -190,7 +202,7 @@ function renderClaudeSettings(
 			"Anthropic API key secret name. Required if not logging in with an Anthropic account. Value is stored in Obsidian secure storage.",
 		)
 		.addComponent((el) => {
-			const secretId = getBuiltInApiKeySecretId(plugin.settings, "claude");
+			const secretId = getBuiltInApiKeySecretId(plugin, "claude");
 			return new SecretComponent(plugin.app, el)
 				.setValue(secretId)
 				.onChange((value) => {
@@ -327,7 +339,7 @@ function renderCodexSettings(
 			"OpenAI API key secret name. Required if not logging in with an OpenAI account. Value is stored in Obsidian secure storage.",
 		)
 		.addComponent((el) => {
-			const secretId = getBuiltInApiKeySecretId(plugin.settings, "codex");
+			const secretId = getBuiltInApiKeySecretId(plugin, "codex");
 			return new SecretComponent(plugin.app, el)
 				.setValue(secretId)
 				.onChange((value) => {
@@ -385,81 +397,4 @@ function renderCodexSettings(
 		});
 
 	renderAgentModelSettings(sectionEl, plugin, codex.id);
-}
-
-function renderPathSettingWithDetect(
-	containerEl: HTMLElement,
-	plugin: AgentClientPlugin,
-	opts: {
-		agentId: string;
-		getValue: () => string;
-		setValue: (value: string) => Promise<void>;
-	},
-): void {
-	const defaultCommand = BUILTIN_AGENT_DEFAULT_COMMANDS[opts.agentId] ?? "";
-	let textRef: TextComponent | null = null;
-	let refreshTimer: number | null = null;
-	const scheduleCatalogRefresh = (command: string) => {
-		const runtimePlugin = plugin as AgentClientPlugin & {
-			refreshAgentCatalog?: (
-				targetAgentId: string,
-				options?: { force?: boolean },
-			) => Promise<boolean>;
-		};
-		if (typeof runtimePlugin.refreshAgentCatalog !== "function") {
-			return;
-		}
-		if (refreshTimer !== null) {
-			window.clearTimeout(refreshTimer);
-		}
-		if (!command.trim()) {
-			return;
-		}
-		refreshTimer = window.setTimeout(() => {
-			void runtimePlugin.refreshAgentCatalog?.(opts.agentId, { force: true });
-		}, 500);
-	};
-
-	const setting = new Setting(containerEl)
-		.setName("Command")
-		.setDesc(
-			defaultCommand
-				? `Leave empty to use "${defaultCommand}" from your shell PATH, or enter a custom path.`
-				: "Command name or absolute path to the agent binary.",
-		)
-		.addText((text) => {
-			textRef = text;
-			text
-				.setPlaceholder(defaultCommand || "Command name or path")
-				.setValue(opts.getValue())
-				.onChange(async (value) => {
-					const next = value.trim();
-					await opts.setValue(next);
-					scheduleCatalogRefresh(next);
-				});
-		});
-
-	if (defaultCommand) {
-		setting.addExtraButton((button) => {
-			button
-				.setIcon("search")
-				.setTooltip("Detect from shell PATH") // eslint-disable-line obsidianmd/ui/sentence-case
-				.onClick(async () => {
-					button.setDisabled(true);
-					try {
-						const resolved = await resolveCommandFromShell(defaultCommand);
-						if (resolved) {
-							textRef?.setValue(resolved);
-							await opts.setValue(resolved);
-							scheduleCatalogRefresh(resolved);
-							new Notice(`Found: ${resolved}`);
-						} else {
-							new Notice(`"${defaultCommand}" not found in shell PATH.`);
-						}
-					} finally {
-						button.setDisabled(false);
-					}
-				});
-		});
-	}
 }

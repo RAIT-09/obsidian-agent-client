@@ -20,6 +20,7 @@ import type {
 import type { SessionUpdate } from "../models/session-update";
 import type { ProcessError } from "../models/agent-error";
 import type { PromptContent } from "../models/prompt-content";
+import type { TerminalOutputSnapshot } from "../models/terminal-output";
 import type {
 	ListSessionsResult,
 	LoadSessionResult,
@@ -367,6 +368,14 @@ export interface IAgentClient {
 	 * @param modelId - The model ID to set
 	 */
 	setSessionModel(sessionId: string, modelId: string): Promise<void>;
+
+	/**
+	 * Poll terminal output for a running or completed terminal command.
+	 *
+	 * @param terminalId - Terminal identifier from a prior terminal tool call
+	 * @returns Latest terminal output snapshot with optional exit status
+	 */
+	getTerminalOutput(terminalId: string): Promise<TerminalOutputSnapshot>;
 
 	// ========================================================================
 	// Session Management Methods

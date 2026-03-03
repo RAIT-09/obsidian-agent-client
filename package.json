@@ -20,7 +20,7 @@
 		"lint:biome": "biome check src/hooks/state src/shared/settings-schema.ts src/shared/settings-utils.ts src/adapters/acp/update-routing.ts src/adapters/acp/error-diagnostics.ts src/adapters/obsidian/settings-store.adapter.ts test scripts vite.config.ts vitest.config.ts",
 		"lint:eslint": "eslint .",
 		"lint:fix": "eslint . --fix",
-		"lint:arch": "node scripts/check-file-size.mjs && node scripts/check-domain-boundaries.mjs",
+		"lint:arch": "node scripts/check-file-size.mjs && node scripts/check-domain-boundaries.mjs && node scripts/check-layer-boundaries.mjs",
 		"docs:dev": "vitepress dev docs",
 		"docs:build": "vitepress build docs",
 		"docs:preview": "vitepress preview docs"

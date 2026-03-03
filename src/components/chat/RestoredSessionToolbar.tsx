@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as Diff from "diff";
 import { FileSystemAdapter } from "obsidian";
-import type { FileChange } from "../../shared/session-file-restoration";
+import type { FileChange } from "../../application/services/session-restore";
 import type AgentClientPlugin from "../../plugin";
 import { toRelativePath } from "../../shared/path-utils";
 import { DiffRenderer } from "./DiffRenderer";

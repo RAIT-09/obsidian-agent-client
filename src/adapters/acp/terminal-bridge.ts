@@ -1,7 +1,7 @@
 import * as acp from "@agentclientprotocol/sdk";
 
 import type { Logger } from "../../shared/logger";
-import type { TerminalManager } from "../../shared/terminal-manager";
+import type { TerminalManager } from "./terminal-manager";
 import type { AgentConfig } from "../../domain/ports/agent-client.port";
 
 export function createTerminalOperation(args: {

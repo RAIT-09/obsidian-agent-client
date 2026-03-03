@@ -18,8 +18,8 @@
 import type {
 	IChatViewContainer,
 	ChatViewType,
-} from "../domain/ports/chat-view-container.port";
-import { getLogger } from "./logger";
+} from "../../domain/ports/chat-view-container.port";
+import { getLogger } from "../../shared/logger";
 
 export class ChatViewRegistry {
 	private views = new Map<string, IChatViewContainer>();

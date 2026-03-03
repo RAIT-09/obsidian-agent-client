@@ -1,9 +1,6 @@
 import * as acp from "@agentclientprotocol/sdk";
 
-import type {
-	MessageContent,
-	PermissionOption,
-} from "../../domain/models/chat-message";
+import type { PermissionOption } from "../../domain/models/chat-message";
 import type { SessionUpdate } from "../../domain/models/session-update";
 import { AcpTypeConverter } from "./acp-type-converter";
 import type { Logger } from "../../shared/logger";
@@ -12,12 +9,14 @@ import { extractBaseCommands } from "./terminal-command-policy";
 export interface PendingPermissionRequest {
 	resolve: (response: acp.RequestPermissionResponse) => void;
 	toolCallId: string;
+	sessionId: string;
 	options: PermissionOption[];
 }
 
 export interface PendingPermissionQueueItem {
 	requestId: string;
 	toolCallId: string;
+	sessionId: string;
 	options: PermissionOption[];
 }
 
@@ -116,9 +115,9 @@ function selectRejectOption(
 
 export function activateNextPermissionOperation(args: {
 	state: PermissionQueueState;
-	updateMessage: (toolCallId: string, content: MessageContent) => void;
+	sessionUpdateCallback: ((update: SessionUpdate) => void) | null;
 }): void {
-	const { state, updateMessage } = args;
+	const { state, sessionUpdateCallback } = args;
 	if (state.pendingPermissionQueue.length === 0) {
 		return;
 	}
@@ -129,32 +128,34 @@ export function activateNextPermissionOperation(args: {
 		return;
 	}
 
-	updateMessage(next.toolCallId, {
-		type: "tool_call",
+	sessionUpdateCallback?.({
+		type: "tool_call_update",
+		sessionId: next.sessionId,
 		toolCallId: next.toolCallId,
 		permissionRequest: {
 			requestId: next.requestId,
 			options: pending.options,
 			isActive: true,
 		},
-	} as MessageContent);
+	});
 }
 
 export function handlePermissionResponseOperation(args: {
 	state: PermissionQueueState;
 	requestId: string;
 	optionId: string;
-	updateMessage: (toolCallId: string, content: MessageContent) => void;
+	sessionUpdateCallback: ((update: SessionUpdate) => void) | null;
 }): void {
-	const { state, requestId, optionId, updateMessage } = args;
+	const { state, requestId, optionId, sessionUpdateCallback } = args;
 	const request = state.pendingPermissionRequests.get(requestId);
 	if (!request) {
 		return;
 	}
 
-	const { resolve, toolCallId, options } = request;
-	updateMessage(toolCallId, {
-		type: "tool_call",
+	const { resolve, toolCallId, sessionId, options } = request;
+	sessionUpdateCallback?.({
+		type: "tool_call_update",
+		sessionId,
 		toolCallId,
 		status: "completed",
 		permissionRequest: {
@@ -163,7 +164,7 @@ export function handlePermissionResponseOperation(args: {
 			selectedOptionId: optionId,
 			isActive: false,
 		},
-	} as MessageContent);
+	});
 
 	resolve({
 		outcome: {
@@ -173,23 +174,24 @@ export function handlePermissionResponseOperation(args: {
 	});
 	state.pendingPermissionRequests.delete(requestId);
 	removeQueueItemByRequestId(state.pendingPermissionQueue, requestId);
-	activateNextPermissionOperation({ state, updateMessage });
+	activateNextPermissionOperation({ state, sessionUpdateCallback });
 }
 
 export function cancelPendingPermissionRequestsOperation(args: {
 	state: PermissionQueueState;
 	logger: Logger;
-	updateMessage: (toolCallId: string, content: MessageContent) => void;
+	sessionUpdateCallback: ((update: SessionUpdate) => void) | null;
 }): void {
-	const { state, logger, updateMessage } = args;
+	const { state, logger, sessionUpdateCallback } = args;
 	logger.log(
 		`[AcpAdapter] Cancelling ${state.pendingPermissionRequests.size} pending permission requests`,
 	);
 
 	state.pendingPermissionRequests.forEach(
-		({ resolve, toolCallId, options }, requestId) => {
-			updateMessage(toolCallId, {
-				type: "tool_call",
+		({ resolve, toolCallId, sessionId, options }, requestId) => {
+			sessionUpdateCallback?.({
+				type: "tool_call_update",
+				sessionId,
 				toolCallId,
 				status: "completed",
 				permissionRequest: {
@@ -198,7 +200,7 @@ export function cancelPendingPermissionRequestsOperation(args: {
 					isCancelled: true,
 					isActive: false,
 				},
-			} as MessageContent);
+			});
 
 			resolve({
 				outcome: {
@@ -217,7 +219,6 @@ export async function requestPermissionOperation(args: {
 	logger: Logger;
 	terminalPermissionMode: TerminalPermissionMode;
 	state: PermissionQueueState;
-	updateMessage: (toolCallId: string, content: MessageContent) => void;
 	sessionUpdateCallback: ((update: SessionUpdate) => void) | null;
 }): Promise<acp.RequestPermissionResponse> {
 	const {
@@ -295,6 +296,7 @@ export async function requestPermissionOperation(args: {
 	state.pendingPermissionQueue.push({
 		requestId,
 		toolCallId,
+		sessionId,
 		options: normalizedOptions,
 	});
 
@@ -317,6 +319,7 @@ export async function requestPermissionOperation(args: {
 		state.pendingPermissionRequests.set(requestId, {
 			resolve,
 			toolCallId,
+			sessionId,
 			options: normalizedOptions,
 		});
 	});

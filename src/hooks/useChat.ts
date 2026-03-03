@@ -11,12 +11,11 @@ import type { AuthenticationMethod } from "../domain/models/chat-session";
 import type { ErrorInfo } from "../domain/models/agent-error";
 import type { ImagePromptContent } from "../domain/models/prompt-content";
 import type { IMentionService } from "../shared/mention-utils";
-import { preparePrompt, sendPreparedPrompt } from "../shared/message-service";
+import { preparePrompt, sendPreparedPrompt } from "../application/use-cases/prompt";
 import { Platform } from "obsidian";
 import { chatReducer } from "./state/chat.reducer";
 import { createInitialChatState, type ChatAction } from "./state/chat.actions";
-
-type ToolCallMessageContent = Extract<MessageContent, { type: "tool_call" }>;
+import { applySessionUpdateToMessages } from "./chat/message-updaters";
 
 export interface SendMessageOptions {
 	activeNote: NoteMetadata | null;
@@ -47,14 +46,6 @@ export interface UseChatReturn {
 
 	clearError: () => void;
 
-	addMessage: (message: ChatMessage) => void;
-
-	updateLastMessage: (content: MessageContent) => void;
-
-	updateMessage: (toolCallId: string, content: MessageContent) => void;
-
-	upsertToolCall: (toolCallId: string, content: MessageContent) => void;
-
 	handleSessionUpdate: (update: SessionUpdate) => void;
 }
 
@@ -72,42 +63,6 @@ export interface SettingsContext {
 	windowsWslMode: boolean;
 	maxNoteLength: number;
 	maxSelectionLength: number;
-}
-
-function mergeToolCallContent(
-	existing: ToolCallMessageContent,
-	update: ToolCallMessageContent,
-): ToolCallMessageContent {
-	let mergedContent = existing.content || [];
-	if (update.content !== undefined) {
-		const newContent = update.content || [];
-
-		const hasDiff = newContent.some((item) => item.type === "diff");
-		if (hasDiff) {
-			mergedContent = mergedContent.filter((item) => item.type !== "diff");
-		}
-
-		mergedContent = [...mergedContent, ...newContent];
-	}
-
-	return {
-		...existing,
-		toolCallId: update.toolCallId,
-		title: update.title !== undefined ? update.title : existing.title,
-		kind: update.kind !== undefined ? update.kind : existing.kind,
-		status: update.status !== undefined ? update.status : existing.status,
-		content: mergedContent,
-		locations:
-			update.locations !== undefined ? update.locations : existing.locations,
-		rawInput:
-			update.rawInput !== undefined && Object.keys(update.rawInput).length > 0
-				? update.rawInput
-				: existing.rawInput,
-		permissionRequest:
-			update.permissionRequest !== undefined
-				? update.permissionRequest
-				: existing.permissionRequest,
-	};
 }
 
 export function useChat(
@@ -140,220 +95,13 @@ export function useChat(
 		[applyMessageUpdater],
 	);
 
-	const updateLastMessage = useCallback(
-		(content: MessageContent): void => {
-			applyMessageUpdater((prev) => {
-				if (prev.length === 0 || prev[prev.length - 1].role !== "assistant") {
-					const newMessage: ChatMessage = {
-						id: crypto.randomUUID(),
-						role: "assistant",
-						content: [content],
-						timestamp: new Date(),
-					};
-					return [...prev, newMessage];
-				}
-
-				const lastMessage = prev[prev.length - 1];
-				const updatedMessage = { ...lastMessage };
-
-				if (content.type === "text" || content.type === "agent_thought") {
-					const existingContentIndex = updatedMessage.content.findIndex(
-						(c) => c.type === content.type,
-					);
-					if (existingContentIndex >= 0) {
-						const existingContent =
-							updatedMessage.content[existingContentIndex];
-						if (
-							existingContent.type === "text" ||
-							existingContent.type === "agent_thought"
-						) {
-							updatedMessage.content[existingContentIndex] = {
-								type: content.type,
-								text: existingContent.text + content.text,
-							};
-						}
-					} else {
-						updatedMessage.content.push(content);
-					}
-				} else {
-					const existingIndex = updatedMessage.content.findIndex(
-						(c) => c.type === content.type,
-					);
-
-					if (existingIndex >= 0) {
-						updatedMessage.content[existingIndex] = content;
-					} else {
-						updatedMessage.content.push(content);
-					}
-				}
-
-				return [...prev.slice(0, -1), updatedMessage];
-			});
-		},
-		[applyMessageUpdater],
-	);
-
-	const updateUserMessage = useCallback(
-		(content: MessageContent): void => {
-			applyMessageUpdater((prev) => {
-				if (prev.length === 0 || prev[prev.length - 1].role !== "user") {
-					const newMessage: ChatMessage = {
-						id: crypto.randomUUID(),
-						role: "user",
-						content: [content],
-						timestamp: new Date(),
-					};
-					return [...prev, newMessage];
-				}
-
-				const lastMessage = prev[prev.length - 1];
-				const updatedMessage = { ...lastMessage };
-
-				if (content.type === "text") {
-					const existingContentIndex = updatedMessage.content.findIndex(
-						(c) => c.type === "text",
-					);
-					if (existingContentIndex >= 0) {
-						const existingContent =
-							updatedMessage.content[existingContentIndex];
-						if (existingContent.type === "text") {
-							updatedMessage.content[existingContentIndex] = {
-								type: "text",
-								text: existingContent.text + content.text,
-							};
-						}
-					} else {
-						updatedMessage.content.push(content);
-					}
-				} else {
-					const existingIndex = updatedMessage.content.findIndex(
-						(c) => c.type === content.type,
-					);
-					if (existingIndex >= 0) {
-						updatedMessage.content[existingIndex] = content;
-					} else {
-						updatedMessage.content.push(content);
-					}
-				}
-
-				return [...prev.slice(0, -1), updatedMessage];
-			});
-		},
-		[applyMessageUpdater],
-	);
-
-	const updateMessage = useCallback(
-		(toolCallId: string, content: MessageContent): void => {
-			if (content.type !== "tool_call") return;
-
-			applyMessageUpdater((prev) =>
-				prev.map((message) => ({
-					...message,
-					content: message.content.map((c) => {
-						if (c.type === "tool_call" && c.toolCallId === toolCallId) {
-							return mergeToolCallContent(c, content);
-						}
-						return c;
-					}),
-				})),
+	const handleSessionUpdate = useCallback(
+		(update: SessionUpdate): void => {
+			applyMessageUpdater((messages) =>
+				applySessionUpdateToMessages(messages, update),
 			);
 		},
 		[applyMessageUpdater],
-	);
-
-	const upsertToolCall = useCallback(
-		(toolCallId: string, content: MessageContent): void => {
-			if (content.type !== "tool_call") return;
-
-			applyMessageUpdater((prev) => {
-				let found = false;
-				const updated = prev.map((message) => ({
-					...message,
-					content: message.content.map((c) => {
-						if (c.type === "tool_call" && c.toolCallId === toolCallId) {
-							found = true;
-							return mergeToolCallContent(c, content);
-						}
-						return c;
-					}),
-				}));
-
-				if (found) {
-					return updated;
-				}
-
-				return [
-					...prev,
-					{
-						id: crypto.randomUUID(),
-						role: "assistant" as const,
-						content: [content],
-						timestamp: new Date(),
-					},
-				];
-			});
-		},
-		[applyMessageUpdater],
-	);
-
-	const handleSessionUpdate = useCallback(
-		(update: SessionUpdate): void => {
-			switch (update.type) {
-				case "agent_message_chunk":
-					updateLastMessage({
-						type: "text",
-						text: update.text,
-					});
-					break;
-
-				case "agent_thought_chunk":
-					updateLastMessage({
-						type: "agent_thought",
-						text: update.text,
-					});
-					break;
-
-				case "user_message_chunk":
-					updateUserMessage({
-						type: "text",
-						text: update.text,
-					});
-					break;
-
-				case "tool_call":
-				case "tool_call_update":
-					upsertToolCall(update.toolCallId, {
-						type: "tool_call",
-						toolCallId: update.toolCallId,
-						title: update.title,
-						status: update.status || "pending",
-						kind: update.kind,
-						content: update.content,
-						locations: update.locations,
-						rawInput: update.rawInput,
-						permissionRequest: update.permissionRequest,
-					});
-					break;
-
-				case "plan":
-					updateLastMessage({
-						type: "plan",
-						entries: update.entries,
-					});
-					break;
-
-				case "available_commands_update":
-				case "current_mode_update":
-				case "usage_update":
-					break;
-
-				default: {
-					const exhaustiveCheck: never = update;
-					return exhaustiveCheck;
-				}
-			}
-		},
-		[updateLastMessage, upsertToolCall],
 	);
 
 	const clearMessages = useCallback((): void => {
@@ -545,10 +293,6 @@ export function useChat(
 		setInitialMessages,
 		setMessagesFromLocal,
 		clearError,
-		addMessage,
-		updateLastMessage,
-		updateMessage,
-		upsertToolCall,
 		handleSessionUpdate,
 	};
 }

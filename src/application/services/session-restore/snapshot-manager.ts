@@ -1,4 +1,4 @@
-import type { ChatMessage } from "../domain/models/chat-message";
+import type { ChatMessage } from "../../../domain/models/chat-message";
 import {
 	discoverModifiedFiles,
 	type FileChange,

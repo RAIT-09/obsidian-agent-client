@@ -1,6 +1,6 @@
 import * as React from "react";
 import type { MessageContent } from "../../domain/models/chat-message";
-import type { IAcpClient } from "../../adapters/acp/acp.adapter";
+import type { IAgentClient } from "../../domain/ports/agent-client.port";
 import type AgentClientPlugin from "../../plugin";
 import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 import { CollapsibleThought } from "./CollapsibleThought";
@@ -16,7 +16,7 @@ interface MessageContentRendererProps {
 	messageRole?: "user" | "assistant";
 	hasPlanContent?: boolean;
 	activeSendingToolCallTarget?: { messageId: string; contentIndex: number } | null;
-	acpClient?: IAcpClient;
+	agentClient?: IAgentClient;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (requestId: string, optionId: string) => Promise<void>;
 }
@@ -29,7 +29,7 @@ export function MessageContentRenderer({
 	messageRole,
 	hasPlanContent = false,
 	activeSendingToolCallTarget,
-	acpClient,
+	agentClient,
 	onApprovePermission,
 }: MessageContentRendererProps): React.ReactElement | null {
 	switch (content.type) {
@@ -75,7 +75,7 @@ export function MessageContentRenderer({
 						activeSendingToolCallTarget.messageId === messageId &&
 						activeSendingToolCallTarget.contentIndex === contentIndex
 					}
-					acpClient={acpClient}
+					agentClient={agentClient}
 					onApprovePermission={onApprovePermission}
 				/>
 			);
@@ -112,7 +112,7 @@ export function MessageContentRenderer({
 			return (
 				<TerminalRenderer
 					terminalId={content.terminalId}
-					acpClient={acpClient || null}
+					agentClient={agentClient || null}
 					plugin={plugin}
 				/>
 			);

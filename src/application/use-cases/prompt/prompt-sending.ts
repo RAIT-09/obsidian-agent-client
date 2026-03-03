@@ -1,12 +1,12 @@
-import type { IAgentClient } from "../../domain/ports/agent-client.port";
-import { AcpErrorCode } from "../../domain/models/agent-error";
+import type { IAgentClient } from "../../../domain/ports/agent-client.port";
+import { AcpErrorCode } from "../../../domain/models/agent-error";
 import {
 	extractErrorCode,
 	isEmptyResponseError,
 	toAcpError,
-} from "../acp-error-utils";
-import type { PromptContent } from "../../domain/models/prompt-content";
-import type { AuthenticationMethod } from "../../domain/models/chat-session";
+} from "../../../shared/acp-error-utils";
+import type { PromptContent } from "../../../domain/models/prompt-content";
+import type { AuthenticationMethod } from "../../../domain/models/chat-session";
 import type { SendPreparedPromptInput, SendPromptResult } from "./types";
 
 export async function sendPreparedPrompt(

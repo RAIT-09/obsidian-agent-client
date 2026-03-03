@@ -1,21 +1,26 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 
-const MAX_LINES = 600;
+const MAX_LINES = 450;
 const ROOT = "src";
 const TARGET_EXTENSIONS = new Set([".ts", ".tsx"]);
 const EXCLUDED_SEGMENTS = new Set(["__tests__"]);
 const LEGACY_EXEMPTIONS = new Set([
 	"src/adapters/acp/acp.adapter.ts",
-	"src/plugin.ts",
-	"src/components/settings/AgentClientSettingTab.ts",
 	"src/components/chat/ChatInput.tsx",
+	"src/components/chat/ChatView.tsx",
+	"src/components/chat/SessionHistoryContent.tsx",
+	"src/components/chat/ToolCallRenderer.tsx",
+	"src/components/chat/chat-input/RichTextarea.tsx",
+	"src/components/settings/sections/agent-sections.ts",
+	"src/components/settings/sections/core-sections.ts",
+	"src/components/settings/sections/model-preferences.ts",
 	"src/hooks/useAgentSession.ts",
-	"src/hooks/useChatController.ts",
 	"src/hooks/useChat.ts",
+	"src/hooks/useChatController.ts",
 	"src/hooks/useSessionHistory.ts",
-	"src/shared/message-service.ts",
-	"src/shared/chat-exporter.ts",
+	"src/plugin.ts",
+	"src/shared/tool-icons.ts",
 ]);
 
 function walk(dir) {

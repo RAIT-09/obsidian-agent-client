@@ -1,17 +1,17 @@
 import { spawn, ChildProcess, SpawnOptions } from "child_process";
 import * as acp from "@agentclientprotocol/sdk";
-import type AgentClientPlugin from "../plugin";
-import { getLogger, Logger } from "./logger";
+import type AgentClientPlugin from "../../plugin";
+import { getLogger, Logger } from "../../shared/logger";
 import { Platform } from "obsidian";
-import { wrapCommandForWsl } from "./wsl-utils";
-import { resolveCommandDirectory } from "./path-utils";
-import { getEnhancedWindowsEnv } from "./windows-env";
+import { wrapCommandForWsl } from "../../shared/wsl-utils";
+import { resolveCommandDirectory } from "../../shared/path-utils";
+import { getEnhancedWindowsEnv } from "../../shared/windows-env";
 import {
 	escapeShellArgWindows,
 	getCachedShellEnvironment,
 	getLoginShell,
 	resolveShellEnvironment,
-} from "./shell-utils";
+} from "../../shared/shell-utils";
 
 interface TerminalProcess {
 	id: string;

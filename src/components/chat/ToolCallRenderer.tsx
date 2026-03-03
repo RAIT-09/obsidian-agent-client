@@ -1,9 +1,8 @@
 import * as React from "react";
 const { useState, useMemo, useCallback } = React;
-import * as Diff from "diff";
 import { FileSystemAdapter } from "obsidian";
 import type { MessageContent } from "../../domain/models/chat-message";
-import type { IAcpClient } from "../../adapters/acp/acp.adapter";
+import type { IAgentClient } from "../../domain/ports/agent-client.port";
 import type AgentClientPlugin from "../../plugin";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { PermissionRequestSection } from "./PermissionRequestSection";
@@ -11,6 +10,12 @@ import { DiffRenderer } from "./DiffRenderer";
 import { toRelativePath } from "../../shared/path-utils";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { ObsidianIcon } from "./ObsidianIcon";
+import { RawPatchView } from "./RawPatchView";
+import {
+	countDiffStats,
+	countRawPatchStats,
+	extractRawPatchText,
+} from "./tool-call-content-utils";
 import {
 	getToolIconName,
 	getToolDisplayName,
@@ -38,132 +43,8 @@ interface ToolCallRendererProps {
 	plugin: AgentClientPlugin;
 	hasPlanContent?: boolean;
 	showLiveIndicator?: boolean;
-	acpClient?: IAcpClient;
+	agentClient?: IAgentClient;
 	onApprovePermission?: (requestId: string, optionId: string) => Promise<void>;
-}
-
-function countDiffStats(
-	content: Extract<MessageContent, { type: "tool_call" }>["content"],
-): { added: number; removed: number } | null {
-	if (!content) return null;
-	let added = 0;
-	let removed = 0;
-	for (const item of content) {
-		if (item.type !== "diff") continue;
-		const oldText = item.oldText || "";
-		const newText = item.newText || "";
-		if (!oldText && !newText) continue;
-		if (!oldText) {
-			added += newText.split("\n").length;
-			continue;
-		}
-		const changes = Diff.diffLines(oldText, newText);
-		for (const change of changes) {
-			if (change.added) added += change.count ?? 0;
-			else if (change.removed) removed += change.count ?? 0;
-		}
-	}
-	if (added === 0 && removed === 0) return null;
-	return { added, removed };
-}
-
-function extractRawPatchText(
-	rawInput: { [k: string]: unknown } | undefined,
-): string | null {
-	if (!rawInput) return null;
-	for (const key of ["diff", "patch", "unified_diff"]) {
-		const val = rawInput[key];
-		if (typeof val === "string" && val.trim()) return val;
-	}
-	return null;
-}
-
-function countRawPatchStats(
-	text: string,
-): { added: number; removed: number } | null {
-	let added = 0;
-	let removed = 0;
-	for (const line of text.split("\n")) {
-		if (line.startsWith("+++") || line.startsWith("---")) continue;
-		if (line.startsWith("+")) added++;
-		else if (line.startsWith("-")) removed++;
-	}
-	if (added === 0 && removed === 0) return null;
-	return { added, removed };
-}
-
-function RawPatchView({
-	text,
-	autoCollapse,
-	collapseThreshold = 10,
-}: {
-	text: string;
-	autoCollapse?: boolean;
-	collapseThreshold?: number;
-}) {
-	const lines = text.split("\n");
-	const shouldCollapse = autoCollapse && lines.length > collapseThreshold;
-	const [isCollapsed, setIsCollapsed] = useState(shouldCollapse ?? false);
-	const visibleLines = isCollapsed ? lines.slice(0, collapseThreshold) : lines;
-	const remainingLines = lines.length - collapseThreshold;
-
-	return (
-		<div className="obsius-tool-call-diff">
-			<div className="obsius-tool-call-diff-content">
-				{visibleLines.map((line, idx) => {
-					if (line.startsWith("@@")) {
-						return (
-							<div key={idx} className="obsius-diff-hunk-header">
-								{line}
-							</div>
-						);
-					}
-
-					const isFileHeader =
-						line.startsWith("---") || line.startsWith("+++");
-					const isAdded = !isFileHeader && line.startsWith("+");
-					const isRemoved = !isFileHeader && line.startsWith("-");
-
-					let lineClass = "obsius-diff-line";
-					let marker = " ";
-					let content = line;
-
-					if (isAdded) {
-						lineClass += " obsius-diff-line-added";
-						marker = "+";
-						content = line.substring(1);
-					} else if (isRemoved) {
-						lineClass += " obsius-diff-line-removed";
-						marker = "-";
-						content = line.substring(1);
-					} else {
-						lineClass += " obsius-diff-line-context";
-						if (line.startsWith(" ")) content = line.substring(1);
-					}
-
-					return (
-						<div key={idx} className={lineClass}>
-							<span className="obsius-diff-line-marker">{marker}</span>
-							<span className="obsius-diff-line-content">{content}</span>
-						</div>
-					);
-				})}
-			</div>
-			{shouldCollapse && (
-				<div
-					className="obsius-diff-expand-bar"
-					onClick={() => setIsCollapsed(!isCollapsed)}
-				>
-					<span className="obsius-diff-expand-text">
-						{isCollapsed ? `${remainingLines} more lines` : "Collapse"}
-					</span>
-					<span className="obsius-diff-expand-icon">
-						{isCollapsed ? "▶" : "▲"}
-					</span>
-				</div>
-			)}
-		</div>
-	);
 }
 
 export function ToolCallRenderer({
@@ -171,7 +52,7 @@ export function ToolCallRenderer({
 	plugin,
 	hasPlanContent = false,
 	showLiveIndicator = false,
-	acpClient,
+	agentClient,
 	onApprovePermission,
 }: ToolCallRendererProps) {
 	const {
@@ -462,7 +343,7 @@ export function ToolCallRenderer({
 							<div key={index} className="ac-tree__item">
 								<TerminalRenderer
 									terminalId={item.terminalId}
-									acpClient={acpClient || null}
+									agentClient={agentClient || null}
 									plugin={plugin}
 								/>
 							</div>

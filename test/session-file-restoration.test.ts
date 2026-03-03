@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { ChatMessage } from "../src/domain/models/chat-message";
 import {
 	discoverModifiedFiles,
 	getLastAssistantMessage,
 	toVaultRelativePath,
-} from "../src/shared/session-file-restoration";
+} from "../src/application/services/session-restore";
+import type { ChatMessage } from "../src/domain/models/chat-message";
 
 function makeMessage(
 	role: "user" | "assistant",
@@ -235,7 +235,7 @@ describe("discoverModifiedFiles", () => {
 		expect(files[0].firstOldText).toBe("v1");
 	});
 
-	it("normalizes undefined oldText from diff to null", () => {
+	it("keeps undefined oldText from diff as unknown", () => {
 		const messages: ChatMessage[] = [
 			makeMessage("assistant", [
 				{
@@ -254,7 +254,46 @@ describe("discoverModifiedFiles", () => {
 			]),
 		];
 		const files = discoverModifiedFiles(messages);
-		expect(files[0].firstOldText).toBeNull();
+		expect(files[0].firstOldText).toBeUndefined();
+	});
+
+	it("uses later explicit oldText when first diff oldText is undefined", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc1",
+					status: "completed",
+					content: [
+						{
+							type: "diff",
+							path: "notes/a.md",
+							oldText: undefined,
+							newText: "first",
+						},
+					],
+				},
+			]),
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc2",
+					status: "completed",
+					content: [
+						{
+							type: "diff",
+							path: "notes/a.md",
+							oldText: "original",
+							newText: "second",
+						},
+					],
+				},
+			]),
+		];
+
+		const files = discoverModifiedFiles(messages);
+		expect(files).toHaveLength(1);
+		expect(files[0].firstOldText).toBe("original");
 	});
 
 	it("discovers deleted file paths from execute rm command", () => {

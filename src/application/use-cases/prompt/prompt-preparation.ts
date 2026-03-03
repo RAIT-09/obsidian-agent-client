@@ -1,17 +1,17 @@
 import type {
 	IVaultAccess,
-} from "../../domain/ports/vault-access.port";
+} from "../../../domain/ports/vault-access.port";
 import type {
 	PromptContent,
-} from "../../domain/models/prompt-content";
-import { extractMentionedNotes, type IMentionService } from "../mention-utils";
+} from "../../../domain/models/prompt-content";
+import { extractMentionedNotes, type IMentionService } from "../../../shared/mention-utils";
 import {
 	extractChatContextTokensFromMessage,
 	type ChatContextReference,
-} from "../chat-context-token";
-import { extractSlashCommandTokens } from "../slash-command-token";
-import { convertWindowsPathToWsl } from "../wsl-utils";
-import { buildFileUri } from "../path-utils";
+} from "../../../shared/chat-context-token";
+import { extractSlashCommandTokens } from "../../../shared/slash-command-token";
+import { convertWindowsPathToWsl } from "../../../shared/wsl-utils";
+import { buildFileUri } from "../../../shared/path-utils";
 import {
 	DEFAULT_MAX_NOTE_LENGTH,
 	DEFAULT_MAX_SELECTION_LENGTH,
@@ -21,7 +21,7 @@ import {
 import {
 	getImageMimeTypeForExtension,
 	getPathExtension,
-} from "../mentionable-files";
+} from "../../../shared/mentionable-files";
 import {
 	buildManualContextPromptContent,
 	buildAutoMentionResource,
@@ -143,6 +143,7 @@ async function preparePromptWithEmbeddedContext(
 		input.vaultBasePath,
 		vaultAccess,
 		input.convertToWsl ?? false,
+		input.supportsImage ?? false,
 		input.maxNoteLength ?? DEFAULT_MAX_NOTE_LENGTH,
 		input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
 	);
@@ -268,10 +269,14 @@ async function preparePromptWithTextContext(
 		input.vaultBasePath,
 		vaultAccess,
 		input.convertToWsl ?? false,
+		input.supportsImage ?? false,
 		input.maxNoteLength ?? DEFAULT_MAX_NOTE_LENGTH,
 		input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
 	);
 	contextBlocks.push(...manualContextBlocks.text);
+	const manualContextImageBlocks = manualContextBlocks.embedded.filter(
+		(block) => block.type === "image",
+	);
 
 	if (input.activeNote && !input.isAutoMentionDisabled) {
 		const autoMentionContextBlock = await buildAutoMentionTextContext(
@@ -303,6 +308,7 @@ async function preparePromptWithTextContext(
 	];
 	const agentContent: PromptContent[] = [
 		...imageBlocks,
+		...manualContextImageBlocks,
 		...(agentMessageText
 			? [{ type: "text" as const, text: agentMessageText }]
 			: []),

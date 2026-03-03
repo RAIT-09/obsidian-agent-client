@@ -22,7 +22,7 @@ const logger = {
 describe("permission-queue terminal policy", () => {
 	it("queues non-terminal permission requests for manual selection", async () => {
 		const state = createState();
-		const updateMessage = vi.fn();
+		const sessionUpdateCallback = vi.fn();
 		const promise = requestPermissionOperation({
 			params: {
 				sessionId: "s1",
@@ -40,8 +40,7 @@ describe("permission-queue terminal policy", () => {
 			logger: logger as never,
 			terminalPermissionMode: "prompt_once",
 			state,
-			updateMessage,
-			sessionUpdateCallback: null,
+			sessionUpdateCallback,
 		});
 
 		await Promise.resolve();
@@ -52,7 +51,7 @@ describe("permission-queue terminal policy", () => {
 			state,
 			requestId,
 			optionId: "allow",
-			updateMessage,
+			sessionUpdateCallback,
 		});
 
 		const response = await promise;
@@ -64,7 +63,6 @@ describe("permission-queue terminal policy", () => {
 
 	it("keeps terminal permission requests pending in prompt_once mode", async () => {
 		const state = createState();
-		const updateMessage = vi.fn();
 		const sessionUpdateCallback = vi.fn();
 		const promise = requestPermissionOperation({
 			params: {
@@ -83,7 +81,6 @@ describe("permission-queue terminal policy", () => {
 			logger: logger as never,
 			terminalPermissionMode: "prompt_once",
 			state,
-			updateMessage,
 			sessionUpdateCallback,
 		});
 
@@ -100,7 +97,7 @@ describe("permission-queue terminal policy", () => {
 			state,
 			requestId,
 			optionId: "allow",
-			updateMessage,
+			sessionUpdateCallback,
 		});
 
 		const response = await promise;
@@ -129,7 +126,6 @@ describe("permission-queue terminal policy", () => {
 			logger: logger as never,
 			terminalPermissionMode: "disabled",
 			state,
-			updateMessage: vi.fn(),
 			sessionUpdateCallback: null,
 		});
 
@@ -164,7 +160,6 @@ describe("permission-queue terminal policy", () => {
 			logger: logger as never,
 			terminalPermissionMode: "prompt_once",
 			state,
-			updateMessage: vi.fn(),
 			sessionUpdateCallback: (update) => {
 				capturedUpdate = update;
 			},
@@ -199,7 +194,7 @@ describe("permission-queue terminal policy", () => {
 			state,
 			requestId,
 			optionId: "reject-always",
-			updateMessage: vi.fn(),
+			sessionUpdateCallback: null,
 		});
 
 		const response = await promise;
@@ -237,7 +232,6 @@ describe("permission-queue terminal policy", () => {
 			logger: logger as never,
 			terminalPermissionMode: "always_allow",
 			state,
-			updateMessage: vi.fn(),
 			sessionUpdateCallback: null,
 		});
 
@@ -280,7 +274,6 @@ describe("permission-queue terminal policy", () => {
 			logger: logger as never,
 			terminalPermissionMode: "always_deny",
 			state,
-			updateMessage: vi.fn(),
 			sessionUpdateCallback: null,
 		});
 
@@ -316,7 +309,6 @@ describe("permission-queue terminal policy", () => {
 				logger: logger as never,
 				terminalPermissionMode: "prompt_once",
 				state,
-				updateMessage: vi.fn(),
 				sessionUpdateCallback: vi.fn(),
 			});
 
@@ -326,7 +318,7 @@ describe("permission-queue terminal policy", () => {
 				state,
 				requestId,
 				optionId,
-				updateMessage: vi.fn(),
+				sessionUpdateCallback: null,
 			});
 
 			const response = await promise;

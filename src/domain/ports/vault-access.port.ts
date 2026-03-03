@@ -100,4 +100,12 @@ export interface IVaultAccess {
 	 * @returns Promise resolving to array of all note metadata
 	 */
 	listNotes(): Promise<NoteMetadata[]>;
+
+	/**
+	 * Subscribe to active editor selection changes.
+	 *
+	 * @param listener - Callback invoked when active file/selection changes
+	 * @returns Unsubscribe function
+	 */
+	subscribeSelectionChanges(listener: () => void): () => void;
 }

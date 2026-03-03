@@ -4,6 +4,8 @@ import type { AttachedImage } from "../../components/chat/ImagePreviewStrip";
 import type { ContextUsage } from "../../components/chat/chat-input/ContextUsageMeter";
 import type { ImagePromptContent } from "../../domain/models/prompt-content";
 import type { SessionModelState } from "../../domain/models/chat-session";
+import type { IAgentClient } from "../../domain/ports/agent-client.port";
+import type { IVaultAccess } from "../../domain/ports/vault-access.port";
 import { useSettings } from "../useSettings";
 import { useMentions } from "../useMentions";
 import { useSlashCommands } from "../useSlashCommands";
@@ -13,9 +15,7 @@ import { useChat } from "../useChat";
 import { usePermission } from "../usePermission";
 import { useSessionHistory } from "../useSessionHistory";
 import type { Logger } from "../../shared/logger";
-import type { IAcpClient } from "../../adapters/acp/acp.adapter";
-import { ObsidianVaultAdapter } from "../../adapters/obsidian/vault.adapter";
-import { NoteMentionService } from "../../adapters/obsidian/mention-service";
+import type { IMentionService } from "../../shared/mention-utils";
 
 export interface AgentInfo {
 	id: string;
@@ -36,9 +36,9 @@ export interface UseChatControllerOptions {
 export interface UseChatControllerReturn {
 	logger: Logger;
 	vaultPath: string;
-	acpAdapter: IAcpClient;
-	vaultAccessAdapter: ObsidianVaultAdapter;
-	noteMentionService: NoteMentionService;
+	agentClient: IAgentClient;
+	vaultAccess: IVaultAccess;
+	mentionService: IMentionService;
 	settings: ReturnType<typeof useSettings>;
 	session: ReturnType<typeof useAgentSession>["session"];
 	isSessionReady: boolean;

@@ -1,6 +1,6 @@
 import type { SecretStorage } from "obsidian";
-import type { BaseAgentSettings } from "../domain/models/agent-config";
-import type { AgentClientPluginSettings } from "../plugin";
+import type { BaseAgentSettings } from "../../domain/models/agent-config";
+import type { AgentClientPluginSettings } from "../../plugin";
 
 type BuiltInApiKeyAgent = "claude" | "codex" | "gemini";
 

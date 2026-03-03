@@ -1,12 +1,5 @@
 import { useState, useCallback, useRef, useMemo } from "react";
-import type { IAgentClient } from "../domain/ports/agent-client.port";
-import type { ISettingsAccess } from "../domain/ports/settings-access.port";
 import type { SessionInfo } from "../domain/models/session-info";
-import type {
-	ChatSession,
-	SessionModeState,
-	SessionModelState,
-} from "../domain/models/chat-session";
 import type { ChatMessage } from "../domain/models/chat-message";
 import {
 	getSessionCapabilityFlags,
@@ -18,165 +11,19 @@ import {
 	loadMoreSessionsOperation,
 	restoreSessionOperation,
 } from "./session-history/session-history-ops";
+import {
+	CACHE_EXPIRY_MS,
+	type SessionCache,
+	type UseSessionHistoryOptions,
+	type UseSessionHistoryReturn,
+} from "./session-history/types";
 
-/**
- * Callback invoked when a session is successfully loaded/resumed/forked.
- * Provides the loaded session metadata to integrate with chat state.
- *
- * Note: Conversation history for load is received via session/update notifications,
- * not via this callback.
- */
-export interface SessionLoadCallback {
-	/**
-	 * @param sessionId - ID of the session (new session ID for fork)
-	 * @param modes - Available modes from the session
-	 * @param models - Available models from the session
-	 */
-	(
-		sessionId: string,
-		modes?: SessionModeState,
-		models?: SessionModelState,
-	): void;
-}
-
-/**
- * Callback invoked when messages should be restored from local storage.
- * Used for resume/fork operations where the agent doesn't return history.
- */
-export interface MessagesRestoreCallback {
-	/**
-	 * @param messages - Messages to restore
-	 */
-	(messages: ChatMessage[]): void;
-}
-
-/**
- * Options for useSessionHistory hook.
- */
-export interface UseSessionHistoryOptions {
-	/** ACP client for session operations */
-	agentClient: IAgentClient;
-	/** Current session (used to access agentCapabilities and agentId) */
-	session: ChatSession;
-	/** Settings access for local session storage */
-	settingsAccess: ISettingsAccess;
-	/** Working directory (vault path) for session operations */
-	cwd: string;
-	/** Callback invoked when a session is loaded/resumed/forked */
-	onSessionLoad: SessionLoadCallback;
-	/** Callback invoked when messages should be restored from local storage */
-	onMessagesRestore?: MessagesRestoreCallback;
-	/** Callback invoked when session/load starts (to start ignoring history replay) */
-	onLoadStart?: () => void;
-	/** Callback invoked when session/load ends (to stop ignoring history replay) */
-	onLoadEnd?: () => void;
-}
-
-/**
- * Return type for useSessionHistory hook.
- */
-export interface UseSessionHistoryReturn {
-	/** List of sessions */
-	sessions: SessionInfo[];
-	/** Whether sessions are being fetched */
-	loading: boolean;
-	/** Error message if fetch fails */
-	error: string | null;
-	/** Whether there are more sessions to load */
-	hasMore: boolean;
-
-	// Capability flags (from session.agentCapabilities)
-	/** Whether session history UI should be shown */
-	canShowSessionHistory: boolean;
-	/** Whether session can be restored (load or resume supported) */
-	canRestore: boolean;
-	/** Whether session/fork is supported (unstable) */
-	canFork: boolean;
-	/** Whether session/list is supported (unstable) */
-	canList: boolean;
-	/** Whether sessions are from local storage (agent doesn't support list) */
-	isUsingLocalSessions: boolean;
-
-	/** Set of session IDs that have local data (for UI filtering) */
-	localSessionIds: Set<string>;
-
-	/**
-	 * Fetch sessions list from agent.
-	 * Replaces existing sessions in state.
-	 * @param cwd - Optional working directory filter
-	 */
-	fetchSessions: (cwd?: string) => Promise<void>;
-
-	/**
-	 * Load more sessions (pagination).
-	 * Appends to existing sessions list.
-	 */
-	loadMoreSessions: () => Promise<void>;
-
-	/**
-	 * Restore a specific session by ID.
-	 * Uses load if available (with history replay), otherwise resume (without history replay).
-	 * Only available if canRestore is true.
-	 * @param sessionId - Session to restore
-	 * @param cwd - Working directory for the session
-	 */
-	restoreSession: (sessionId: string, cwd: string) => Promise<void>;
-
-	/**
-	 * Fork a specific session to create a new branch.
-	 * Only available if canFork is true.
-	 * @param sessionId - Session to fork
-	 * @param cwd - Working directory for the session
-	 */
-	forkSession: (sessionId: string, cwd: string) => Promise<void>;
-
-	/**
-	 * Delete a session (local metadata + message file).
-	 * @param sessionId - Session to delete
-	 */
-	deleteSession: (sessionId: string) => Promise<void>;
-
-	/**
-	 * Save session metadata locally.
-	 * Called when the first message is sent in a new session.
-	 * @param sessionId - Session ID to save
-	 * @param messageContent - First message content (used to generate title)
-	 */
-	saveSessionLocally: (
-		sessionId: string,
-		messageContent: string,
-	) => Promise<void>;
-
-	/**
-	 * Save session messages locally.
-	 * Called when a turn ends (agent response complete).
-	 * @param sessionId - Session ID
-	 * @param messages - Messages to save
-	 */
-	saveSessionMessages: (
-		sessionId: string,
-		messages: import("../domain/models/chat-message").ChatMessage[],
-	) => void;
-
-	/**
-	 * Invalidate the session cache.
-	 * Call this when creating a new session to refresh the list.
-	 */
-	invalidateCache: () => void;
-}
-
-/**
- * Cache entry for session list.
- */
-interface SessionCache {
-	sessions: SessionInfo[];
-	nextCursor?: string;
-	cwd?: string;
-	timestamp: number;
-}
-
-/** Cache expiry time in milliseconds (5 minutes) */
-const CACHE_EXPIRY_MS = 5 * 60 * 1000;
+export type {
+	MessagesRestoreCallback,
+	SessionLoadCallback,
+	UseSessionHistoryOptions,
+	UseSessionHistoryReturn,
+} from "./session-history/types";
 
 /**
  * Hook for managing session history.
@@ -292,8 +139,11 @@ export function useSessionHistory(
 					cwd,
 				);
 				setLocalSessionIds(new Set(localSessions.map((s) => s.sessionId)));
-				setSessions(cacheRef.current!.sessions);
-				setNextCursor(cacheRef.current!.nextCursor);
+				const cached = cacheRef.current;
+				if (cached) {
+					setSessions(cached.sessions);
+					setNextCursor(cached.nextCursor);
+				}
 				setError(null);
 				return;
 			}
@@ -531,7 +381,7 @@ export function useSessionHistory(
 	const saveSessionMessages = useCallback(
 		(
 			sessionId: string,
-			messages: import("../domain/models/chat-message").ChatMessage[],
+			messages: ChatMessage[],
 		) => {
 			if (!session.agentId || messages.length === 0) return;
 

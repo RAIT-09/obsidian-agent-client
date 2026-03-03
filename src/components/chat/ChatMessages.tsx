@@ -2,13 +2,13 @@ import * as React from "react";
 const { useRef, useState, useEffect, useCallback, useId, useMemo } = React;
 
 import type { ChatMessage } from "../../domain/models/chat-message";
-import type { IAcpClient } from "../../adapters/acp/acp.adapter";
+import type { IAgentClient } from "../../domain/ports/agent-client.port";
 import type AgentClientPlugin from "../../plugin";
 import type { IChatViewHost } from "./types";
 import { Notice, setIcon } from "obsidian";
 import { MessageRenderer } from "./MessageRenderer";
 import { ObsidianIcon } from "./ObsidianIcon";
-import { getLastAssistantMessage } from "../../shared/session-file-restoration";
+import { getLastAssistantMessage } from "../../application/services/session-restore";
 
 /**
  * Props for ChatMessages component
@@ -28,8 +28,8 @@ export interface ChatMessagesProps {
 	plugin: AgentClientPlugin;
 	/** View instance for event registration */
 	view: IChatViewHost;
-	/** ACP client for terminal operations */
-	acpClient?: IAcpClient;
+	/** Agent client for terminal operations */
+	agentClient?: IAgentClient;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (requestId: string, optionId: string) => Promise<void>;
 }
@@ -51,7 +51,7 @@ export function ChatMessages({
 	agentLabel,
 	plugin,
 	view,
-	acpClient,
+	agentClient,
 	onApprovePermission,
 }: ChatMessagesProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -248,7 +248,7 @@ export function ChatMessages({
 							key={message.id}
 							message={message}
 							plugin={plugin}
-							acpClient={acpClient}
+							agentClient={agentClient}
 							onApprovePermission={onApprovePermission}
 							activeSendingToolCallTarget={showInlineToolCallIndicator ? latestRunningToolCallTarget : null}
 						/>

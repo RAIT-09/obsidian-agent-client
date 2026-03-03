@@ -3,14 +3,14 @@ import type {
 	ChatMessage,
 	MessageContent,
 } from "../../domain/models/chat-message";
-import type { IAcpClient } from "../../adapters/acp/acp.adapter";
+import type { IAgentClient } from "../../domain/ports/agent-client.port";
 import type AgentClientPlugin from "../../plugin";
 import { MessageContentRenderer } from "./MessageContentRenderer";
 
 interface MessageRendererProps {
 	message: ChatMessage;
 	plugin: AgentClientPlugin;
-	acpClient?: IAcpClient;
+	agentClient?: IAgentClient;
 	activeSendingToolCallTarget?: { messageId: string; contentIndex: number } | null;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (requestId: string, optionId: string) => Promise<void>;
@@ -58,7 +58,7 @@ function groupContent(
 export function MessageRenderer({
 	message,
 	plugin,
-	acpClient,
+	agentClient,
 	activeSendingToolCallTarget,
 	onApprovePermission,
 }: MessageRendererProps) {
@@ -88,7 +88,7 @@ export function MessageRenderer({
 										messageRole={message.role}
 										hasPlanContent={hasPlanContent}
 										activeSendingToolCallTarget={activeSendingToolCallTarget}
-										acpClient={acpClient}
+										agentClient={agentClient}
 										onApprovePermission={onApprovePermission}
 									/>
 								))}
@@ -107,7 +107,7 @@ export function MessageRenderer({
 								messageRole={message.role}
 								hasPlanContent={hasPlanContent}
 								activeSendingToolCallTarget={activeSendingToolCallTarget}
-								acpClient={acpClient}
+								agentClient={agentClient}
 								onApprovePermission={onApprovePermission}
 							/>
 						</div>

@@ -1,7 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { FileChange } from "../src/application/services/session-restore";
+import {
+	type FileIo,
+	SnapshotManager,
+} from "../src/application/services/session-restore";
 import type { ChatMessage } from "../src/domain/models/chat-message";
-import type { FileChange } from "../src/shared/session-file-restoration";
-import { type FileIo, SnapshotManager } from "../src/shared/snapshot-manager";
+
+function requireDefined<T>(
+	value: T | null | undefined,
+	message = "Expected value to be defined",
+): T {
+	if (value === null || value === undefined) {
+		throw new Error(message);
+	}
+	return value;
+}
 
 function makeMessage(
 	role: "user" | "assistant",
@@ -87,11 +100,11 @@ describe("SnapshotManager", () => {
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).not.toBeNull();
-			expect(cs!.changes).toHaveLength(1);
-			expect(cs!.changes[0].originalText).toBe("old content");
-			expect(cs!.changes[0].finalText).toBe("new content");
-			expect(cs!.changes[0].isNewFile).toBe(false);
-			expect(cs!.changes[0].canRevert).toBe(true);
+			expect(requireDefined(cs).changes).toHaveLength(1);
+			expect(requireDefined(cs).changes[0].originalText).toBe("old content");
+			expect(requireDefined(cs).changes[0].finalText).toBe("new content");
+			expect(requireDefined(cs).changes[0].isNewFile).toBe(false);
+			expect(requireDefined(cs).changes[0].canRevert).toBe(true);
 		});
 
 		it("returns null when no tool calls modify files", async () => {
@@ -108,20 +121,18 @@ describe("SnapshotManager", () => {
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).not.toBeNull();
-			expect(cs!.changes[0].isNewFile).toBe(true);
-			expect(cs!.changes[0].originalText).toBeNull();
-			expect(cs!.changes[0].finalText).toBe("created content");
-			expect(cs!.changes[0].canRevert).toBe(true);
+			expect(requireDefined(cs).changes[0].isNewFile).toBe(true);
+			expect(requireDefined(cs).changes[0].originalText).toBeNull();
+			expect(requireDefined(cs).changes[0].finalText).toBe("created content");
+			expect(requireDefined(cs).changes[0].canRevert).toBe(true);
 		});
 
-		it("treats undefined oldText as new file", async () => {
+		it("treats undefined oldText as unknown (no false new-file detection)", async () => {
 			const io = mockFileIo({ "new.ts": "content" });
 			const messages = [makeDiffMessage("new.ts", undefined, "content")];
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
-			expect(cs).not.toBeNull();
-			expect(cs!.changes[0].isNewFile).toBe(true);
-			expect(cs!.changes[0].canRevert).toBe(true);
+			expect(cs).toBeNull();
 		});
 
 		it("skips files where disk matches original (no change)", async () => {
@@ -140,9 +151,9 @@ describe("SnapshotManager", () => {
 			];
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
-			expect(cs!.changes).toHaveLength(1);
-			expect(cs!.changes[0].originalText).toBe("v1");
-			expect(cs!.changes[0].finalText).toBe("v3");
+			expect(requireDefined(cs).changes).toHaveLength(1);
+			expect(requireDefined(cs).changes[0].originalText).toBe("v1");
+			expect(requireDefined(cs).changes[0].finalText).toBe("v3");
 		});
 
 		it("ignores trailing whitespace differences", async () => {
@@ -169,10 +180,10 @@ describe("SnapshotManager", () => {
 			const io = mockFileIo({});
 			const cs = await manager.computeChanges(messages, "/vault", io.readFile);
 			expect(cs).not.toBeNull();
-			expect(cs!.changes).toHaveLength(1);
-			expect(cs!.changes[0].vaultPath).toBe("notes/deleted.md");
-			expect(cs!.changes[0].isDeleted).toBe(true);
-			expect(cs!.changes[0].canRevert).toBe(false);
+			expect(requireDefined(cs).changes).toHaveLength(1);
+			expect(requireDefined(cs).changes[0].vaultPath).toBe("notes/deleted.md");
+			expect(requireDefined(cs).changes[0].isDeleted).toBe(true);
+			expect(requireDefined(cs).changes[0].canRevert).toBe(false);
 		});
 	});
 
@@ -185,7 +196,9 @@ describe("SnapshotManager", () => {
 
 			await manager.captureSnapshots(messages, undefined, io.readFile);
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
-			expect(cs!.changes[0].originalText).toBe("original from diff");
+			expect(requireDefined(cs).changes[0].originalText).toBe(
+				"original from diff",
+			);
 		});
 
 		it("falls back to disk read when no diff oldText", async () => {
@@ -206,7 +219,7 @@ describe("SnapshotManager", () => {
 
 			const io = mockFileIo({ "notes/a.md": "modified" });
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
-			expect(cs!.changes[0].originalText).toBe("disk content");
+			expect(requireDefined(cs).changes[0].originalText).toBe("disk content");
 		});
 
 		it("does not re-capture paths already recorded", async () => {
@@ -243,9 +256,11 @@ describe("SnapshotManager", () => {
 				postWriteIo.readFile,
 			);
 			expect(cs).not.toBeNull();
-			expect(cs!.changes).toHaveLength(1);
-			expect(cs!.changes[0].originalText).toBe("original content");
-			expect(cs!.changes[0].finalText).toBe("polished content");
+			expect(requireDefined(cs).changes).toHaveLength(1);
+			expect(requireDefined(cs).changes[0].originalText).toBe(
+				"original content",
+			);
+			expect(requireDefined(cs).changes[0].finalText).toBe("polished content");
 		});
 
 		it("ignores location files that haven't changed on disk", async () => {
@@ -279,7 +294,10 @@ describe("SnapshotManager", () => {
 				io.readFile,
 			);
 
-			const result = await manager.revertFile(cs!.changes[0], io);
+			const result = await manager.revertFile(
+				requireDefined(cs).changes[0],
+				io,
+			);
 			expect(result).toEqual({ reverted: true, conflict: false });
 			expect(io.files["notes/摘要.md"]).toBe("original");
 		});
@@ -308,14 +326,16 @@ describe("SnapshotManager", () => {
 			];
 
 			let cs = await manager.computeChanges(messages, undefined, io.readFile);
-			expect(cs!.changes).toHaveLength(2);
+			expect(requireDefined(cs).changes).toHaveLength(2);
 
-			const changeA = cs!.changes.find((c) => c.path === "a.ts")!;
+			const changeA = requireDefined(
+				requireDefined(cs).changes.find((c) => c.path === "a.ts"),
+			);
 			manager.keepFile(changeA);
 
 			cs = await manager.computeChanges(messages, undefined, io.readFile);
-			expect(cs!.changes).toHaveLength(1);
-			expect(cs!.changes[0].path).toBe("b.ts");
+			expect(requireDefined(cs).changes).toHaveLength(1);
+			expect(requireDefined(cs).changes[0].path).toBe("b.ts");
 		});
 
 		it("advances baseline so future edits on kept file are tracked", async () => {
@@ -324,10 +344,10 @@ describe("SnapshotManager", () => {
 
 			let cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).not.toBeNull();
-			expect(cs!.changes[0].originalText).toBe("v1");
-			expect(cs!.changes[0].finalText).toBe("v2");
+			expect(requireDefined(cs).changes[0].originalText).toBe("v1");
+			expect(requireDefined(cs).changes[0].finalText).toBe("v2");
 
-			manager.keepFile(cs!.changes[0]);
+			manager.keepFile(requireDefined(cs).changes[0]);
 			expect(
 				await manager.computeChanges(messages, undefined, io.readFile),
 			).toBeNull();
@@ -335,9 +355,9 @@ describe("SnapshotManager", () => {
 			io.files["a.md"] = "v3";
 			cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).not.toBeNull();
-			expect(cs!.changes[0].isNewFile).toBe(false);
-			expect(cs!.changes[0].originalText).toBe("v2");
-			expect(cs!.changes[0].finalText).toBe("v3");
+			expect(requireDefined(cs).changes[0].isNewFile).toBe(false);
+			expect(requireDefined(cs).changes[0].originalText).toBe("v2");
+			expect(requireDefined(cs).changes[0].finalText).toBe("v3");
 		});
 	});
 
@@ -349,7 +369,10 @@ describe("SnapshotManager", () => {
 			];
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 
-			const result = await manager.revertFile(cs!.changes[0], io);
+			const result = await manager.revertFile(
+				requireDefined(cs).changes[0],
+				io,
+			);
 			expect(result).toEqual({ reverted: true, conflict: false });
 			expect(io.files["src/foo.ts"]).toBe("original");
 		});
@@ -359,7 +382,10 @@ describe("SnapshotManager", () => {
 			const messages = [makeDiffMessage("new.ts", null, "content")];
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 
-			const result = await manager.revertFile(cs!.changes[0], io);
+			const result = await manager.revertFile(
+				requireDefined(cs).changes[0],
+				io,
+			);
 			expect(result).toEqual({ reverted: true, conflict: false });
 			expect(io.deleted).toContain("new.ts");
 		});
@@ -384,9 +410,9 @@ describe("SnapshotManager", () => {
 			const messages = [makeDiffMessage("a.ts", "old", "new")];
 
 			let cs = await manager.computeChanges(messages, undefined, io.readFile);
-			expect(cs!.changes).toHaveLength(1);
+			expect(requireDefined(cs).changes).toHaveLength(1);
 
-			await manager.revertFile(cs!.changes[0], io);
+			await manager.revertFile(requireDefined(cs).changes[0], io);
 
 			cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).toBeNull();
@@ -402,7 +428,7 @@ describe("SnapshotManager", () => {
 			];
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 
-			const result = await manager.revertAll(cs!.changes, io);
+			const result = await manager.revertAll(requireDefined(cs).changes, io);
 			expect(result.reverted).toEqual(["a.ts", "b.ts"]);
 			expect(result.conflicts).toEqual([]);
 			expect(io.files["a.ts"]).toBe("old-a");
@@ -418,11 +444,9 @@ describe("SnapshotManager", () => {
 				makeDiffMessage("b.ts", "old", "new"),
 			];
 
-			const cs = (await manager.computeChanges(
-				messages,
-				undefined,
-				io.readFile,
-			))!;
+			const cs = requireDefined(
+				await manager.computeChanges(messages, undefined, io.readFile),
+			);
 			manager.dismissAll(cs.changes);
 
 			expect(
@@ -437,11 +461,9 @@ describe("SnapshotManager", () => {
 				makeDiffMessage("b.ts", "old-b", "new-b"),
 			];
 
-			const cs = (await manager.computeChanges(
-				messages,
-				undefined,
-				io.readFile,
-			))!;
+			const cs = requireDefined(
+				await manager.computeChanges(messages, undefined, io.readFile),
+			);
 			manager.dismissAll(cs.changes);
 
 			expect(
@@ -455,10 +477,10 @@ describe("SnapshotManager", () => {
 				io.readFile,
 			);
 			expect(csAfter).not.toBeNull();
-			expect(csAfter!.changes).toHaveLength(1);
-			expect(csAfter!.changes[0].path).toBe("a.ts");
-			expect(csAfter!.changes[0].originalText).toBe("new-a");
-			expect(csAfter!.changes[0].finalText).toBe("new-a-2");
+			expect(requireDefined(csAfter).changes).toHaveLength(1);
+			expect(requireDefined(csAfter).changes[0].path).toBe("a.ts");
+			expect(requireDefined(csAfter).changes[0].originalText).toBe("new-a");
+			expect(requireDefined(csAfter).changes[0].finalText).toBe("new-a-2");
 		});
 	});
 
@@ -468,7 +490,7 @@ describe("SnapshotManager", () => {
 			const messages = [makeDiffMessage("a.ts", "original", "agent content")];
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 
-			await manager.revertFile(cs!.changes[0], io);
+			await manager.revertFile(requireDefined(cs).changes[0], io);
 			expect(io.files["a.ts"]).toBe("original");
 			expect(manager.canUndo).toBe(true);
 
@@ -496,9 +518,9 @@ describe("SnapshotManager", () => {
 				undefined,
 				io.readFile,
 			);
-			expect(cs!.changes[0].isDeleted).toBe(true);
+			expect(requireDefined(cs).changes[0].isDeleted).toBe(true);
 
-			await manager.revertFile(cs!.changes[0], io);
+			await manager.revertFile(requireDefined(cs).changes[0], io);
 			expect(io.files["a.ts"]).toBe("original content");
 
 			await manager.undoRevert(io);
@@ -512,7 +534,7 @@ describe("SnapshotManager", () => {
 			const io = mockFileIo({ "a.ts": "new" });
 			const messages = [makeDiffMessage("a.ts", "old", "new")];
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
-			manager.keepFile(cs!.changes[0]);
+			manager.keepFile(requireDefined(cs).changes[0]);
 
 			manager.reset();
 
@@ -522,7 +544,7 @@ describe("SnapshotManager", () => {
 				io.readFile,
 			);
 			expect(csAfter).not.toBeNull();
-			expect(csAfter!.changes).toHaveLength(1);
+			expect(requireDefined(csAfter).changes).toHaveLength(1);
 		});
 	});
 
@@ -547,12 +569,14 @@ describe("SnapshotManager", () => {
 				io.readFile,
 			);
 			expect(cs).not.toBeNull();
-			expect(cs!.changes).toHaveLength(1);
-			expect(cs!.changes[0].isDeleted).toBe(true);
-			expect(cs!.changes[0].isNewFile).toBe(false);
-			expect(cs!.changes[0].canRevert).toBe(true);
-			expect(cs!.changes[0].originalText).toBe("original content");
-			expect(cs!.changes[0].finalText).toBe("");
+			expect(requireDefined(cs).changes).toHaveLength(1);
+			expect(requireDefined(cs).changes[0].isDeleted).toBe(true);
+			expect(requireDefined(cs).changes[0].isNewFile).toBe(false);
+			expect(requireDefined(cs).changes[0].canRevert).toBe(true);
+			expect(requireDefined(cs).changes[0].originalText).toBe(
+				"original content",
+			);
+			expect(requireDefined(cs).changes[0].finalText).toBe("");
 		});
 
 		it("detects deletion via kind hint even without prior snapshot", async () => {
@@ -571,9 +595,9 @@ describe("SnapshotManager", () => {
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).not.toBeNull();
-			expect(cs!.changes[0].isDeleted).toBe(true);
-			expect(cs!.changes[0].canRevert).toBe(false);
-			expect(cs!.changes[0].originalText).toBeNull();
+			expect(requireDefined(cs).changes[0].isDeleted).toBe(true);
+			expect(requireDefined(cs).changes[0].canRevert).toBe(false);
+			expect(requireDefined(cs).changes[0].originalText).toBeNull();
 		});
 
 		it("reverts deletion by recreating file with original content", async () => {
@@ -595,7 +619,10 @@ describe("SnapshotManager", () => {
 				undefined,
 				io.readFile,
 			);
-			const result = await manager.revertFile(cs!.changes[0], io);
+			const result = await manager.revertFile(
+				requireDefined(cs).changes[0],
+				io,
+			);
 
 			expect(result).toEqual({ reverted: true, conflict: false });
 			expect(io.files["a.md"]).toBe("the original");
@@ -616,7 +643,10 @@ describe("SnapshotManager", () => {
 			];
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
-			const result = await manager.revertFile(cs!.changes[0], io);
+			const result = await manager.revertFile(
+				requireDefined(cs).changes[0],
+				io,
+			);
 			expect(result).toEqual({ reverted: false, conflict: true });
 		});
 
@@ -651,9 +681,9 @@ describe("SnapshotManager", () => {
 				undefined,
 				io.readFile,
 			);
-			expect(cs!.changes[0].isDeleted).toBe(true);
-			expect(cs!.changes[0].originalText).toBe("v1");
-			expect(cs!.changes[0].canRevert).toBe(true);
+			expect(requireDefined(cs).changes[0].isDeleted).toBe(true);
+			expect(requireDefined(cs).changes[0].originalText).toBe("v1");
+			expect(requireDefined(cs).changes[0].canRevert).toBe(true);
 		});
 
 		it("modified files have isDeleted false", async () => {
@@ -661,8 +691,8 @@ describe("SnapshotManager", () => {
 			const messages = [makeDiffMessage("a.ts", "old content", "new content")];
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
-			expect(cs!.changes[0].isDeleted).toBe(false);
-			expect(cs!.changes[0].isNewFile).toBe(false);
+			expect(requireDefined(cs).changes[0].isDeleted).toBe(false);
+			expect(requireDefined(cs).changes[0].isNewFile).toBe(false);
 		});
 
 		it("new files have isDeleted false", async () => {
@@ -670,8 +700,8 @@ describe("SnapshotManager", () => {
 			const messages = [makeDiffMessage("new.ts", null, "content")];
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
-			expect(cs!.changes[0].isDeleted).toBe(false);
-			expect(cs!.changes[0].isNewFile).toBe(true);
+			expect(requireDefined(cs).changes[0].isDeleted).toBe(false);
+			expect(requireDefined(cs).changes[0].isNewFile).toBe(true);
 		});
 	});
 
@@ -689,9 +719,11 @@ describe("SnapshotManager", () => {
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).not.toBeNull();
-			expect(cs!.changes[0].isNewFile).toBe(true);
-			expect(cs!.changes[0].originalText).toBeNull();
-			expect(cs!.changes[0].finalText).toBe("content without title");
+			expect(requireDefined(cs).changes[0].isNewFile).toBe(true);
+			expect(requireDefined(cs).changes[0].originalText).toBeNull();
+			expect(requireDefined(cs).changes[0].finalText).toBe(
+				"content without title",
+			);
 		});
 
 		it("reverts new file by deleting it", async () => {
@@ -699,12 +731,15 @@ describe("SnapshotManager", () => {
 			const messages = [makeDiffMessage("summary.md", null, "content")];
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
-			const result = await manager.revertFile(cs!.changes[0], io);
+			const result = await manager.revertFile(
+				requireDefined(cs).changes[0],
+				io,
+			);
 			expect(result).toEqual({ reverted: true, conflict: false });
 			expect(io.deleted).toContain("summary.md");
 		});
 
-		it("handles undefined oldText for new file (ACP sends undefined)", async () => {
+		it("uses later explicit oldText when first diff oldText is undefined", async () => {
 			const io = mockFileIo({ "summary.md": "final content" });
 			const messages = [
 				makeDiffMessage("summary.md", undefined, "initial content"),
@@ -713,8 +748,17 @@ describe("SnapshotManager", () => {
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).not.toBeNull();
-			expect(cs!.changes[0].isNewFile).toBe(true);
-			expect(cs!.changes[0].originalText).toBeNull();
+			expect(requireDefined(cs).changes[0].isNewFile).toBe(false);
+			expect(requireDefined(cs).changes[0].originalText).toBe(
+				"initial content",
+			);
+
+			const revertResult = await manager.revertFile(
+				requireDefined(cs).changes[0],
+				io,
+			);
+			expect(revertResult).toEqual({ reverted: true, conflict: false });
+			expect(io.files["summary.md"]).toBe("initial content");
 		});
 
 		it("kept full-file rewrite becomes baseline for later modifications", async () => {
@@ -723,14 +767,16 @@ describe("SnapshotManager", () => {
 
 			let cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).not.toBeNull();
-			manager.keepFile(cs!.changes[0]);
+			manager.keepFile(requireDefined(cs).changes[0]);
 
 			io.files["note.md"] = "rewritten content\nwith extra line";
 			cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).not.toBeNull();
-			expect(cs!.changes[0].isNewFile).toBe(false);
-			expect(cs!.changes[0].originalText).toBe("rewritten content");
-			expect(cs!.changes[0].finalText).toBe(
+			expect(requireDefined(cs).changes[0].isNewFile).toBe(false);
+			expect(requireDefined(cs).changes[0].originalText).toBe(
+				"rewritten content",
+			);
+			expect(requireDefined(cs).changes[0].finalText).toBe(
 				"rewritten content\nwith extra line",
 			);
 		});
@@ -760,14 +806,17 @@ describe("SnapshotManager", () => {
 			);
 
 			expect(cs).not.toBeNull();
-			expect(cs!.changes[0].originalText).toBe(
+			expect(requireDefined(cs).changes[0].originalText).toBe(
 				"# Title\nOriginal callout content",
 			);
-			expect(cs!.changes[0].finalText).toBe(
+			expect(requireDefined(cs).changes[0].finalText).toBe(
 				"## Title\nConverted heading content",
 			);
 
-			const result = await manager.revertFile(cs!.changes[0], io);
+			const result = await manager.revertFile(
+				requireDefined(cs).changes[0],
+				io,
+			);
 			expect(result).toEqual({ reverted: true, conflict: false });
 			expect(io.files["Clippings/摘要.md"]).toBe(
 				"# Title\nOriginal callout content",

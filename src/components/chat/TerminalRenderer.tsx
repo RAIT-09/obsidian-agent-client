@@ -1,6 +1,6 @@
 import * as React from "react";
 const { useState, useRef, useEffect } = React;
-import type { IAcpClient } from "../../adapters/acp/acp.adapter";
+import type { IAgentClient } from "../../domain/ports/agent-client.port";
 import { getLogger } from "../../shared/logger";
 import type AgentClientPlugin from "../../plugin";
 import { CollapsibleSection } from "./CollapsibleSection";
@@ -8,13 +8,13 @@ import { ObsidianIcon } from "./ObsidianIcon";
 
 interface TerminalRendererProps {
 	terminalId: string;
-	acpClient: IAcpClient | null;
+	agentClient: IAgentClient | null;
 	plugin: AgentClientPlugin;
 }
 
 export function TerminalRenderer({
 	terminalId,
-	acpClient,
+	agentClient,
 	plugin,
 }: TerminalRendererProps) {
 	const logger = getLogger();
@@ -28,21 +28,18 @@ export function TerminalRenderer({
 	const intervalRef = useRef<number | null>(null);
 
 	logger.log(
-		`[TerminalRenderer] Component rendered for terminal ${terminalId}, acpClient: ${!!acpClient}`,
+		`[TerminalRenderer] Component rendered for terminal ${terminalId}, agentClient: ${!!agentClient}`,
 	);
 
 	useEffect(() => {
 		logger.log(
-			`[TerminalRenderer] useEffect triggered for ${terminalId}, acpClient: ${!!acpClient}`,
+			`[TerminalRenderer] useEffect triggered for ${terminalId}, agentClient: ${!!agentClient}`,
 		);
-		if (!terminalId || !acpClient) return;
+		if (!terminalId || !agentClient) return;
 
 		const pollOutput = async () => {
 			try {
-				const result = await acpClient.terminalOutput({
-					terminalId,
-					sessionId: "",
-				});
+				const result = await agentClient.getTerminalOutput(terminalId);
 				logger.log(`[TerminalRenderer] Poll result for ${terminalId}:`, result);
 				setOutput(result.output);
 				if (result.exitStatus) {
@@ -88,7 +85,7 @@ export function TerminalRenderer({
 				intervalRef.current = null;
 			}
 		};
-	}, [terminalId, acpClient, logger]);
+	}, [terminalId, agentClient, logger]);
 
 	useEffect(() => {
 		if (!isRunning && intervalRef.current) {

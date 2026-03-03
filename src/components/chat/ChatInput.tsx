@@ -16,14 +16,6 @@ import type { UseAutoMentionReturn } from "../../hooks/useAutoMention";
 import type { ChatMessage } from "../../domain/models/chat-message";
 import type { IVaultAccess } from "../../domain/ports/vault-access.port";
 import { UnifiedPickerPanel } from "../picker/UnifiedPickerPanel";
-import {
-	FilePickerProvider,
-	FolderPickerProvider,
-} from "../picker/mention-provider";
-import { CommandPickerProvider } from "../picker/command-provider";
-import { usePicker, type PickerSortFn } from "../../hooks/usePicker";
-import type { PickerCategory } from "../picker/types";
-import { classifyCommands } from "../../shared/command-classification";
 import { ErrorOverlay } from "./ErrorOverlay";
 import { ImagePreviewStrip, type AttachedImage } from "./ImagePreviewStrip";
 import type { ContextUsage } from "./chat-input/ContextUsageMeter";
@@ -34,6 +26,7 @@ import {
 } from "./chat-input/RichTextarea";
 import { useChatInputBehavior } from "./chat-input/use-chat-input-behavior";
 import { useImageAttachments } from "./chat-input/use-image-attachments";
+import { useChatPickers } from "./chat-input/use-chat-pickers";
 import { useInputHistory } from "../../hooks/useInputHistory";
 import type { ErrorInfo } from "../../domain/models/agent-error";
 import { useSettings } from "../../hooks/useSettings";
@@ -110,229 +103,15 @@ export function ChatInput({
 
 	const richTextareaRef = useRef<RichTextareaHandle>(null);
 
-	const fileProvider = React.useMemo(
-		() =>
-			new FilePickerProvider(vaultAccess, (note) => {
-				const mentionTarget =
-					note.extension.toLowerCase() === "md" ? note.name : note.path;
-				const ctx = mentions.context;
-				if (ctx) {
-					richTextareaRef.current?.insertMentionAtContext(
-						mentionTarget,
-						ctx.start,
-						ctx.end,
-					);
-					mentions.close();
-				}
-			}),
-		[vaultAccess, mentions],
-	);
-
-	const folderProvider = React.useMemo(
-		() =>
-			new FolderPickerProvider(
-				() => {
-					const seen = new Set<string>();
-					for (const f of plugin.app.vault.getAllLoadedFiles()) {
-						if ("children" in f && f.path) {
-							seen.add(f.path);
-						}
-					}
-					return Array.from(seen).sort();
-				},
-				(folderPath) => {
-					const ctx = mentions.context;
-					if (ctx) {
-						richTextareaRef.current?.insertMentionAtContext(
-							folderPath,
-							ctx.start,
-							ctx.end,
-						);
-						mentions.close();
-					}
-				},
-			),
-		[plugin.app.vault, mentions],
-	);
-
-	const mentionProviders = React.useMemo(
-		() => [fileProvider, folderProvider],
-		[fileProvider, folderProvider],
-	);
-
-	const classified = React.useMemo(
-		() => classifyCommands(availableCommands),
-		[availableCommands],
-	);
-
-	const handleCommandSelect = useCallback(
-		(cmd: SlashCommand) => {
-			const ctx = slashCommands.context;
-			if (ctx) {
-				richTextareaRef.current?.insertSlashCommandAtContext(
-					cmd.name,
-					ctx.start,
-					ctx.end,
-				);
-			} else {
-				const token = `@[obsius-slash:${cmd.name}] `;
-				onInputChange(token);
-				richTextareaRef.current?.setContent(token);
-			}
-			slashCommands.close();
-			richTextareaRef.current?.focus();
-		},
-		[slashCommands, onInputChange],
-	);
-
-	const cmdProvider = React.useMemo(
-		() =>
-			new CommandPickerProvider({
-				category: "command",
-				icon: "terminal",
-				getCommands: () => classified.commands,
-				onSelect: handleCommandSelect,
-			}),
-		[classified.commands, handleCommandSelect],
-	);
-
-	const mcpProvider = React.useMemo(
-		() =>
-			new CommandPickerProvider({
-				category: "mcp",
-				icon: "globe",
-				getCommands: () => classified.mcp,
-				onSelect: handleCommandSelect,
-			}),
-		[classified.mcp, handleCommandSelect],
-	);
-
-	const skillProvider = React.useMemo(
-		() =>
-			new CommandPickerProvider({
-				category: "skill",
-				icon: "sparkles",
-				getCommands: () => classified.skills,
-				onSelect: handleCommandSelect,
-			}),
-		[classified.skills, handleCommandSelect],
-	);
-
-	const commandProviders = React.useMemo(
-		() =>
-			[cmdProvider, mcpProvider, skillProvider].filter(
-				(p) => p.search("").length > 0 || true,
-			),
-		[cmdProvider, mcpProvider, skillProvider],
-	);
-
-	const mentionSort = useCallback<PickerSortFn>((items, q) => {
-		if (!q) return items;
-		const ql = q.toLowerCase();
-		return [...items].sort((a, b) => {
-			const al = a.label.toLowerCase();
-			const bl = b.label.toLowerCase();
-			const aStart = al.startsWith(ql) ? 2 : al.includes(ql) ? 1 : 0;
-			const bStart = bl.startsWith(ql) ? 2 : bl.includes(ql) ? 1 : 0;
-			if (aStart !== bStart) return bStart - aStart;
-			const aFolder = a.category === "folder" ? 1 : 0;
-			const bFolder = b.category === "folder" ? 1 : 0;
-			if (aFolder !== bFolder) return bFolder - aFolder;
-			return al.localeCompare(bl);
-		});
-	}, []);
-
-	const commandSort = useCallback<PickerSortFn>((items, q) => {
-		if (!q) return items;
-		const ql = q.toLowerCase();
-		return [...items].sort((a, b) => {
-			const al = a.label.toLowerCase().replace(/^\//, "");
-			const bl = b.label.toLowerCase().replace(/^\//, "");
-			const aStart = al.startsWith(ql) ? 2 : al.includes(ql) ? 1 : 0;
-			const bStart = bl.startsWith(ql) ? 2 : bl.includes(ql) ? 1 : 0;
-			if (aStart !== bStart) return bStart - aStart;
-			return al.localeCompare(bl);
-		});
-	}, []);
-
-	const mentionCategoryEntries = React.useMemo<PickerCategory[]>(
-		() => ["file", "folder"],
-		[],
-	);
-	const commandCategoryEntries = React.useMemo<PickerCategory[]>(
-		() => ["command", "mcp", "skill"],
-		[],
-	);
-
-	const mentionPicker = usePicker(
-		mentionProviders,
-		mentionSort,
-		mentionCategoryEntries,
-	);
-	const commandPicker = usePicker(
-		commandProviders,
-		commandSort,
-		commandCategoryEntries,
-	);
-
-	const mentionPickerRef = useRef(mentionPicker);
-	mentionPickerRef.current = mentionPicker;
-	const commandPickerRef = useRef(commandPicker);
-	commandPickerRef.current = commandPicker;
-	const mentionsRef = useRef(mentions);
-	mentionsRef.current = mentions;
-	const slashCommandsRef = useRef(slashCommands);
-	slashCommandsRef.current = slashCommands;
-
-	const mentionQuery = mentions.context?.query ?? "";
-	const hasMentionContext = mentions.context !== null;
-	const prevMentionCtx = useRef(false);
-	useEffect(() => {
-		const picker = mentionPickerRef.current;
-		if (hasMentionContext && !prevMentionCtx.current) {
-			picker.open(mentionQuery);
-		} else if (hasMentionContext && prevMentionCtx.current) {
-			picker.setQuery(mentionQuery);
-		} else if (!hasMentionContext && prevMentionCtx.current) {
-			picker.close();
-		}
-		prevMentionCtx.current = hasMentionContext;
-	}, [hasMentionContext, mentionQuery]);
-
-	const commandQuery = slashCommands.context?.query ?? "";
-	const hasCommandContext = slashCommands.context !== null;
-	const prevCommandCtx = useRef(false);
-	useEffect(() => {
-		const picker = commandPickerRef.current;
-		if (hasCommandContext && !prevCommandCtx.current) {
-			picker.open(commandQuery);
-		} else if (hasCommandContext && prevCommandCtx.current) {
-			picker.setQuery(commandQuery);
-		} else if (!hasCommandContext && prevCommandCtx.current) {
-			picker.close();
-		}
-		prevCommandCtx.current = hasCommandContext;
-	}, [hasCommandContext, commandQuery]);
-
-	const mentionPickerOpen = mentionPicker.isOpen;
-	const prevMentionPickerOpen = useRef(false);
-	useEffect(() => {
-		if (!mentionPickerOpen && prevMentionPickerOpen.current) {
-			mentionsRef.current.close();
-			richTextareaRef.current?.focus();
-		}
-		prevMentionPickerOpen.current = mentionPickerOpen;
-	}, [mentionPickerOpen]);
-
-	const commandPickerOpen = commandPicker.isOpen;
-	const prevCommandPickerOpen = useRef(false);
-	useEffect(() => {
-		if (!commandPickerOpen && prevCommandPickerOpen.current) {
-			slashCommandsRef.current.close();
-			richTextareaRef.current?.focus();
-		}
-		prevCommandPickerOpen.current = commandPickerOpen;
-	}, [commandPickerOpen]);
+	const { mentionPicker, commandPicker } = useChatPickers({
+		availableCommands,
+		mentions,
+		slashCommands,
+		vaultAccess,
+		plugin,
+		richTextareaRef,
+		onInputChange,
+	});
 
 	/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
 	const obsidianSpellcheck: boolean =

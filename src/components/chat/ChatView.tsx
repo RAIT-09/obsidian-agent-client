@@ -1,298 +1,20 @@
 import {
 	ItemView,
-	Platform,
 	type WorkspaceLeaf,
 	type IconName,
 } from "obsidian";
-import * as React from "react";
-
 import type {
 	ChatViewType,
 	ChatViewContextReference,
 	IChatViewContainer,
 } from "../../domain/ports/chat-view-container.port";
-
-const { useState, useRef, useEffect, useCallback, useMemo } = React;
-
 import { createRoot, type Root } from "react-dom/client";
 import type { ChatInputState } from "../../domain/models/chat-input-state";
-import { useTabs } from "../../hooks/useTabs";
-import { useWorkspaceEvents } from "../../hooks/useWorkspaceEvents";
 import type AgentClientPlugin from "../../plugin";
-import { playCompletionSound } from "../../shared/completion-sound";
 import { getLogger, type Logger } from "../../shared/logger";
-import { resolveAgentDisplayName } from "../../shared/agent-display-name";
-import { useSettings } from "../../hooks/useSettings";
-import { useUpdateCheck } from "../../hooks/useUpdateCheck";
-import { ChatHeader } from "./ChatHeader";
-import { TabContent, type TabContentActions } from "./TabContent";
-
-interface AppWithSettings {
-	setting: {
-		open: () => void;
-		openTabById: (id: string) => void;
-	};
-}
+import { ChatViewComponent } from "./ChatViewComponent";
 
 export const VIEW_TYPE_CHAT = "obsius-chat-view";
-
-// ============================================================
-// ChatComponent - Manages header, tabs, and per-tab content
-// ============================================================
-
-function ChatComponent({
-	plugin,
-	view,
-	viewId,
-}: {
-	plugin: AgentClientPlugin;
-	view: ChatView;
-	viewId: string;
-}) {
-	if (!Platform.isDesktopApp) {
-		throw new Error("Obsius is only available on desktop");
-	}
-
-	const logger = getLogger();
-	const settings = useSettings(plugin);
-
-	const [restoredAgentId, setRestoredAgentId] = useState<string | undefined>(
-		view.getInitialAgentId() ?? undefined,
-	);
-
-	const availableAgents = useMemo(() => {
-		return plugin.getAvailableAgents();
-	}, [plugin]);
-
-	const isUpdateAvailable = useUpdateCheck(plugin);
-
-	// Agent ID restoration from workspace
-	useEffect(() => {
-		const unsubscribe = view.onAgentIdRestored((agentId) => {
-			logger.log(`[ChatView] Agent ID restored from workspace: ${agentId}`);
-			setRestoredAgentId(agentId);
-		});
-		return unsubscribe;
-	}, [view, logger]);
-
-	// Focus tracking
-	useEffect(() => {
-		const handleFocus = () => {
-			plugin.setLastActiveChatViewId(viewId);
-		};
-
-		const container = view.containerEl;
-		container.addEventListener("focus", handleFocus, true);
-		container.addEventListener("click", handleFocus);
-		plugin.setLastActiveChatViewId(viewId);
-
-		return () => {
-			container.removeEventListener("focus", handleFocus, true);
-			container.removeEventListener("click", handleFocus);
-		};
-	}, [plugin, viewId, view.containerEl]);
-
-	// Tab close handler: clean up adapter
-	const handleTabClose = useCallback(
-		(tabId: string) => {
-			void plugin.removeSessionAdapter(tabId);
-			view.unregisterTabAdapter(tabId);
-		},
-		[plugin, view],
-	);
-
-	const tabState = useTabs({
-		initialAgentId: restoredAgentId || plugin.settings.defaultAgentId,
-		defaultAgentId: plugin.settings.defaultAgentId,
-		availableAgents,
-		onTabClose: handleTabClose,
-	});
-
-	// Track tab actions for routing header actions to active tab
-	const tabActionsMapRef = useRef<Map<string, TabContentActions>>(new Map());
-	const [activeTabCanShowHistory, setActiveTabCanShowHistory] = useState(false);
-
-	const handleActionsReady = useCallback(
-		(tabId: string, actions: TabContentActions | null) => {
-			if (actions) {
-				tabActionsMapRef.current.set(tabId, actions);
-			} else {
-				tabActionsMapRef.current.delete(tabId);
-			}
-			if (tabId === tabState.activeTabId) {
-				setActiveTabCanShowHistory(actions?.canShowSessionHistory ?? false);
-			}
-		},
-		[tabState.activeTabId],
-	);
-
-	// Update canShowHistory when active tab changes
-	useEffect(() => {
-		const actions = tabActionsMapRef.current.get(tabState.activeTabId);
-		setActiveTabCanShowHistory(actions?.canShowSessionHistory ?? false);
-	}, [tabState.activeTabId]);
-
-	// Register tab adapters with the view for cleanup on close
-	useEffect(() => {
-		for (const tab of tabState.tabs) {
-			view.registerTabAdapter(tab.id);
-		}
-	}, [tabState.tabs, view]);
-
-	const activeAgentLabel = useMemo(
-		() => resolveAgentDisplayName(plugin.settings, tabState.activeTab.agentId),
-		[tabState.activeTab.agentId, plugin.settings],
-	);
-
-	const handleOpenSettings = useCallback(() => {
-		const appWithSettings = plugin.app as unknown as AppWithSettings;
-		appWithSettings.setting.open();
-		appWithSettings.setting.openTabById(plugin.manifest.id);
-	}, [plugin]);
-
-	const handleNewSession = useCallback(() => {
-		const actions = tabActionsMapRef.current.get(tabState.activeTabId);
-		if (actions) {
-			void actions.handleNewChat();
-		}
-	}, [tabState.activeTabId]);
-
-	const handleOpenHistory = useCallback(() => {
-		const actions = tabActionsMapRef.current.get(tabState.activeTabId);
-		if (actions) {
-			actions.handleOpenHistory();
-		}
-	}, [tabState.activeTabId]);
-
-	const handleAgentChangeForTab = useCallback(
-		(agentId: string) => {
-			tabState.handleAgentChangeForTab(agentId);
-			view.setAgentId(agentId);
-		},
-		[tabState, view],
-	);
-
-	const handleSendComplete = useCallback(
-		(tabId: string) => {
-			tabState.markTabCompleted(tabId);
-			if (settings.displaySettings.completionSound) {
-				playCompletionSound();
-			}
-		},
-		[tabState.markTabCompleted, settings.displaySettings.completionSound],
-	);
-
-	// Workspace events routed to active tab
-	const wsAutoMentionToggle = useCallback(
-		(force?: boolean) => {
-			tabActionsMapRef.current
-				.get(tabState.activeTabId)
-				?.autoMentionToggle(force);
-		},
-		[tabState.activeTabId],
-	);
-	const wsHandleNewChat = useCallback(
-		(agentId?: string) => {
-			const actions = tabActionsMapRef.current.get(tabState.activeTabId);
-			if (actions) void actions.handleNewChat(agentId);
-		},
-		[tabState.activeTabId],
-	);
-	const wsApprovePermission = useCallback(async () => {
-		return (
-			(await tabActionsMapRef.current
-				.get(tabState.activeTabId)
-				?.approveActivePermission()) ?? false
-		);
-	}, [tabState.activeTabId]);
-	const wsRejectPermission = useCallback(async () => {
-		return (
-			(await tabActionsMapRef.current
-				.get(tabState.activeTabId)
-				?.rejectActivePermission()) ?? false
-		);
-	}, [tabState.activeTabId]);
-	const wsStopGeneration = useCallback(async () => {
-		await tabActionsMapRef.current
-			.get(tabState.activeTabId)
-			?.handleStopGeneration();
-	}, [tabState.activeTabId]);
-
-	useWorkspaceEvents({
-		workspace: plugin.app.workspace,
-		viewId,
-		lastActiveChatViewId: plugin.lastActiveChatViewId,
-		autoMentionToggle: wsAutoMentionToggle,
-		handleNewChat: wsHandleNewChat,
-		approveActivePermission: wsApprovePermission,
-		rejectActivePermission: wsRejectPermission,
-		handleStopGeneration: wsStopGeneration,
-	});
-
-	// Register broadcast callbacks from active tab
-	useEffect(() => {
-		const getActiveActions = () =>
-			tabActionsMapRef.current.get(tabState.activeTabId);
-
-		view.registerInputCallbacks({
-			getDisplayName: () =>
-				getActiveActions()?.getDisplayName() ?? activeAgentLabel,
-			getInputState: () => getActiveActions()?.getInputState() ?? null,
-			setInputState: (state) => getActiveActions()?.setInputState(state),
-			addContextReference: (reference) =>
-				getActiveActions()?.addContextReference(reference) ?? false,
-			sendMessage: async () =>
-				(await getActiveActions()?.sendMessage()) ?? false,
-			canSend: () => getActiveActions()?.canSend() ?? false,
-			cancel: async () => {
-				await getActiveActions()?.cancel();
-			},
-			getLastAssistantText: () =>
-				getActiveActions()?.getLastAssistantText?.() ?? null,
-		});
-
-		return () => {
-			view.unregisterInputCallbacks();
-		};
-	}, [view, tabState.activeTabId, activeAgentLabel]);
-
-	return (
-		<div className="obsius-chat-view-container">
-			<ChatHeader
-				agentLabel={activeAgentLabel}
-				availableAgents={availableAgents}
-				currentAgentId={tabState.activeTab.agentId}
-				isUpdateAvailable={isUpdateAvailable}
-				onAgentChange={handleAgentChangeForTab}
-				onNewTab={tabState.handleNewTab}
-				onNewSession={handleNewSession}
-				onOpenSettings={handleOpenSettings}
-				onOpenHistory={activeTabCanShowHistory ? handleOpenHistory : undefined}
-				tabs={tabState.tabsWithLabels}
-				activeTabId={tabState.activeTabId}
-				completedTabIds={tabState.completedTabIds}
-				canAddTab={tabState.canAddTab}
-				canCloseTab={tabState.canCloseTab}
-				onTabClick={tabState.handleTabClick}
-				onTabClose={tabState.handleTabClose}
-			/>
-
-			{tabState.tabs.map((tab) => (
-				<TabContent
-					key={tab.id}
-					plugin={plugin}
-					view={view}
-					tabId={tab.id}
-					agentId={tab.agentId}
-					isActive={tab.id === tabState.activeTabId}
-					viewId={viewId}
-					onActionsReady={handleActionsReady}
-					onSendComplete={handleSendComplete}
-				/>
-			))}
-		</div>
-	);
-}
 
 // ============================================================
 // ChatView (Obsidian ItemView)
@@ -504,7 +226,11 @@ export class ChatView extends ItemView implements IChatViewContainer {
 
 		this.root = createRoot(container);
 		this.root.render(
-			<ChatComponent plugin={this.plugin} view={this} viewId={this.viewId} />,
+			<ChatViewComponent
+				plugin={this.plugin}
+				view={this}
+				viewId={this.viewId}
+			/>,
 		);
 
 		this.plugin.viewRegistry.register(this);

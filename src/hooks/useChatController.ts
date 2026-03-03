@@ -3,14 +3,8 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import type { AttachedImage } from "../components/chat/ImagePreviewStrip";
 import { pluginNotice } from "../shared/plugin-notice";
 
-import { NoteMentionService } from "../adapters/obsidian/mention-service";
 import { getLogger } from "../shared/logger";
-import { ObsidianVaultAdapter } from "../adapters/obsidian/vault.adapter";
 import { resolveAgentDisplayName } from "../shared/agent-display-name";
-import {
-	getApiKeyForAgentId,
-	getSecretBindingEnvForAgentId,
-} from "../shared/secret-storage";
 import { resolveVaultBasePath } from "../shared/vault-path";
 import { useModelFiltering } from "./useModelFiltering";
 
@@ -27,11 +21,8 @@ import {
 	type UseChatControllerReturn,
 } from "./chat-controller/types";
 import { useSessionHistoryHandlers } from "./chat-controller/session-history-handlers";
-
-import type {
-	SessionModeState,
-	SessionModelState,
-} from "../domain/models/chat-session";
+import { useChatControllerEffects } from "./chat-controller/controller-effects";
+import { useHistoryLoadState } from "./chat-controller/history-load-state";
 import type { ImagePromptContent } from "../domain/models/prompt-content";
 
 export function useChatController(
@@ -46,26 +37,15 @@ export function useChatController(
 		[plugin, options.workingDirectory],
 	);
 
-	const noteMentionService = useMemo(
-		() => new NoteMentionService(plugin),
-		[plugin],
-	);
-
-	useEffect(() => {
-		return () => {
-			noteMentionService.destroy();
-		};
-	}, [noteMentionService]);
-
 	const sessionKey = viewId;
-	const acpAdapter = useMemo(
-		() => plugin.getOrCreateSessionAdapter(sessionKey),
+	const { agentClient, vaultAccess, mentionService, dispose } = useMemo(
+		() => plugin.createChatSessionDependencies(sessionKey),
 		[plugin, sessionKey],
 	);
 
-	const vaultAccessAdapter = useMemo(() => {
-		return new ObsidianVaultAdapter(plugin, noteMentionService);
-	}, [plugin, noteMentionService]);
+	useEffect(() => {
+		return dispose;
+	}, [dispose]);
 
 	const settings = useSettings(plugin);
 	const resolveApiKeyForAgent = useCallback(
@@ -73,7 +53,7 @@ export function useChatController(
 			currentSettings: ReturnType<(typeof plugin.settingsStore)["getSnapshot"]>,
 			agentId: string,
 		): string =>
-			getApiKeyForAgentId(plugin.app.secretStorage, currentSettings, agentId),
+			plugin.getApiKeyForAgentId(agentId, currentSettings),
 		[plugin],
 	);
 	const resolveSecretBindingEnvForAgent = useCallback(
@@ -81,16 +61,12 @@ export function useChatController(
 			currentSettings: ReturnType<(typeof plugin.settingsStore)["getSnapshot"]>,
 			agentId: string,
 		): Record<string, string> =>
-			getSecretBindingEnvForAgentId(
-				plugin.app.secretStorage,
-				currentSettings,
-				agentId,
-			),
+			plugin.getSecretBindingEnvForAgentId(agentId, currentSettings),
 		[plugin],
 	);
 
 	const agentSession = useAgentSession(
-		acpAdapter,
+		agentClient,
 		plugin.settingsStore,
 		vaultPath,
 		resolveApiKeyForAgent,
@@ -105,9 +81,9 @@ export function useChatController(
 	} = agentSession;
 
 	const chat = useChat(
-		acpAdapter,
-		vaultAccessAdapter,
-		noteMentionService,
+		agentClient,
+		vaultAccess,
+		mentionService,
 		{
 			sessionId: session.sessionId,
 			authMethods: session.authMethods,
@@ -132,49 +108,25 @@ export function useChatController(
 		used: number;
 	} | null>(null);
 
-	const permission = usePermission(acpAdapter, messages);
+	const permission = usePermission(agentClient, messages);
 
-	const mentions = useMentions(vaultAccessAdapter, plugin);
-	const autoMention = useAutoMention(vaultAccessAdapter);
+	const mentions = useMentions(vaultAccess, plugin);
+	const autoMention = useAutoMention(vaultAccess);
 	const slashCommands = useSlashCommands(session.availableCommands || []);
 
-	const handleSessionLoad = useCallback(
-		(
-			sessionId: string,
-			modes?: SessionModeState,
-			models?: SessionModelState,
-		) => {
-			logger.log(
-				`[useChatController] Session loaded/resumed/forked: ${sessionId}`,
-				{
-					modes,
-					models,
-				},
-			);
-			agentSession.updateSessionFromLoad(sessionId, modes, models);
-		},
-		[logger, agentSession],
-	);
-
-	const [isLoadingSessionHistory, setIsLoadingSessionHistory] = useState(false);
-
-	const handleLoadStart = useCallback(() => {
-		logger.log(
-			"[useChatController] session/load started, ignoring history replay",
-		);
-		setIsLoadingSessionHistory(true);
-		chat.clearMessages();
-	}, [logger, chat]);
-
-	const handleLoadEnd = useCallback(() => {
-		logger.log(
-			"[useChatController] session/load ended, resuming normal processing",
-		);
-		setIsLoadingSessionHistory(false);
-	}, [logger]);
+	const {
+		isLoadingSessionHistory,
+		handleSessionLoad,
+		handleLoadStart,
+		handleLoadEnd,
+	} = useHistoryLoadState({
+		logger,
+		updateSessionFromLoad: agentSession.updateSessionFromLoad,
+		clearMessages: chat.clearMessages,
+	});
 
 	const sessionHistory = useSessionHistory({
-		agentClient: acpAdapter,
+		agentClient,
 		session,
 		settingsAccess: plugin.settingsStore,
 		cwd: vaultPath,
@@ -296,14 +248,13 @@ export function useChatController(
 		chat.clearMessages();
 
 		try {
-			acpAdapter.forceDisconnectRuntime();
 			await agentSession.forceRestartAgent();
 			pluginNotice("Agent restarted");
 		} catch (error) {
 			pluginNotice("Failed to restart agent");
 			logger.error("Restart error:", error);
 		}
-	}, [logger, chat, acpAdapter, agentSession]);
+	}, [logger, chat, agentSession]);
 
 	const handleClearError = useCallback(() => {
 		chat.clearError();
@@ -393,92 +344,6 @@ export function useChatController(
 		],
 	);
 
-	useEffect(() => {
-		logger.log("[Debug] Starting connection setup via useAgentSession...");
-		void agentSession.createSession(config?.agent || initialAgentId);
-	}, [agentSession.createSession, config?.agent, initialAgentId]);
-
-	useEffect(() => {
-		if (config?.model && isSessionReady && session.models) {
-			const modelExists = session.models.availableModels.some(
-				(m) => m.modelId === config.model,
-			);
-			if (modelExists && session.models.currentModelId !== config.model) {
-				logger.log(
-					"[useChatController] Applying configured model:",
-					config.model,
-				);
-				void agentSession.setModel(config.model);
-			}
-		}
-	}, [
-		config?.model,
-		isSessionReady,
-		session.models,
-		agentSession.setModel,
-		logger,
-	]);
-
-	const initialModeModelAppliedSessionRef = useRef<string | null>(null);
-
-	useEffect(() => {
-		if (
-			!isSessionReady ||
-			!session.sessionId ||
-			!session.models ||
-			!session.agentId
-		) {
-			return;
-		}
-		if (initialModeModelAppliedSessionRef.current === session.sessionId) {
-			return;
-		}
-
-		if (config?.model) {
-			initialModeModelAppliedSessionRef.current = session.sessionId;
-			return;
-		}
-
-		if (!session.modes) {
-			initialModeModelAppliedSessionRef.current = session.sessionId;
-			return;
-		}
-
-		const currentModeId = session.modes.currentModeId;
-		if (!currentModeId) {
-			return;
-		}
-
-		const modeDefaults = settings.modeModelDefaults?.[session.agentId];
-		const lastModeModels = settings.lastModeModels?.[session.agentId];
-		const targetModelId =
-			modeDefaults?.[currentModeId] ?? lastModeModels?.[currentModeId];
-
-		initialModeModelAppliedSessionRef.current = session.sessionId;
-
-		if (
-			targetModelId &&
-			targetModelId !== session.models.currentModelId &&
-			session.models.availableModels.some((m) => m.modelId === targetModelId)
-		) {
-			logger.log(
-				`[useChatController] Initial mode → model: switching to ${targetModelId} for mode ${currentModeId}`,
-			);
-			void agentSession.setModel(targetModelId);
-		}
-	}, [
-		config?.model,
-		isSessionReady,
-		session.sessionId,
-		session.agentId,
-		session.modes,
-		session.models,
-		settings.modeModelDefaults,
-		settings.lastModeModels,
-		agentSession.setModel,
-		logger,
-	]);
-
 	const filteredModels = useModelFiltering({
 		sessionModels: session.models,
 		agentId: session.agentId,
@@ -488,101 +353,36 @@ export function useChatController(
 		setModel: agentSession.setModel,
 	});
 
-	const closeSessionRef = useRef(agentSession.closeSession);
-	closeSessionRef.current = agentSession.closeSession;
-
-	useEffect(() => {
-		return () => {
-			logger.log("[useChatController] Cleanup: close session");
-			void closeSessionRef.current();
-		};
-	}, [logger]);
-
-	useEffect(() => {
-		acpAdapter.onSessionUpdate((update) => {
-			if (session.sessionId && update.sessionId !== session.sessionId) {
-				logger.log(
-					`[useChatController] Ignoring update for old session: ${update.sessionId} (current: ${session.sessionId})`,
-				);
-				return;
-			}
-
-			if (isLoadingSessionHistory) {
-				if (update.type === "available_commands_update") {
-					agentSession.updateAvailableCommands(update.commands);
-				} else if (update.type === "current_mode_update") {
-					agentSession.updateCurrentMode(update.currentModeId);
-				}
-				return;
-			}
-
-			if (update.type === "usage_update") {
-				setContextUsage({ size: update.size, used: update.used });
-				return;
-			}
-
-			chat.handleSessionUpdate(update);
-
-			if (update.type === "available_commands_update") {
-				agentSession.updateAvailableCommands(update.commands);
-			} else if (update.type === "current_mode_update") {
-				agentSession.updateCurrentMode(update.currentModeId);
-			}
-		});
-	}, [
-		acpAdapter,
-		session.sessionId,
+	useChatControllerEffects({
 		logger,
+		config,
+		initialAgentId,
+		isSessionReady,
 		isLoadingSessionHistory,
-		chat.handleSessionUpdate,
-		agentSession.updateAvailableCommands,
-		agentSession.updateCurrentMode,
-	]);
-
-	useEffect(() => {
-		acpAdapter.setUpdateMessageCallback(chat.updateMessage);
-	}, [acpAdapter, chat.updateMessage]);
-
-	const prevIsSendingRef = useRef<boolean>(false);
-
-	useEffect(() => {
-		const wasSending = prevIsSendingRef.current;
-		prevIsSendingRef.current = isSending;
-
-		if (wasSending && !isSending && session.sessionId && messages.length > 0) {
-			sessionHistory.saveSessionMessages(session.sessionId, messages);
-			logger.log(
-				`[useChatController] Session messages saved: ${session.sessionId}`,
-			);
-		}
-	}, [isSending, session.sessionId, messages, sessionHistory, logger]);
-
-	useEffect(() => {
-		let isMounted = true;
-
-		const refreshActiveNote = async () => {
-			if (!isMounted) return;
-			await autoMention.updateActiveNote();
-		};
-
-		const unsubscribe = vaultAccessAdapter.subscribeSelectionChanges(() => {
-			void refreshActiveNote();
-		});
-
-		void refreshActiveNote();
-
-		return () => {
-			isMounted = false;
-			unsubscribe();
-		};
-	}, [autoMention.updateActiveNote, vaultAccessAdapter]);
+		session,
+		modeModelDefaults: settings.modeModelDefaults,
+		lastModeModels: settings.lastModeModels,
+		createSession: agentSession.createSession,
+		setModel: agentSession.setModel,
+		closeSession: agentSession.closeSession,
+		updateAvailableCommands: agentSession.updateAvailableCommands,
+		updateCurrentMode: agentSession.updateCurrentMode,
+		handleSessionUpdate: chat.handleSessionUpdate,
+		agentClient,
+		setContextUsage,
+		isSending,
+		messages,
+		saveSessionMessages: sessionHistory.saveSessionMessages,
+		updateActiveNote: autoMention.updateActiveNote,
+		vaultAccess,
+	});
 
 	return {
 		logger,
 		vaultPath,
-		acpAdapter,
-		vaultAccessAdapter,
-		noteMentionService,
+		agentClient,
+		vaultAccess,
+		mentionService,
 
 		settings,
 		session,

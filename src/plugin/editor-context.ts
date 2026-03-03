@@ -2,6 +2,7 @@ import {
 	MarkdownView,
 	TFile,
 	TFolder,
+	parseLinktext,
 	type App,
 	type Editor,
 	type EditorPosition,
@@ -17,6 +18,10 @@ import {
 	type ChatContextReference,
 } from "../shared/chat-context-token";
 import { pluginNotice } from "../shared/plugin-notice";
+import {
+	getImageMimeTypeForExtension,
+	isMentionableExtension,
+} from "../shared/mentionable-files";
 
 export interface EditorContextHost {
 	app: App;
@@ -62,8 +67,12 @@ async function ensureFocusedView(
 	return getFocusedView(host);
 }
 
-function isMarkdownFile(file: TAbstractFile): file is TFile {
-	return file instanceof TFile && file.extension.toLowerCase() === "md";
+function isContextAttachableFile(file: TAbstractFile): file is TFile {
+	return file instanceof TFile && isMentionableExtension(file.extension);
+}
+
+function isImageFile(file: TFile): boolean {
+	return getImageMimeTypeForExtension(file.extension) !== undefined;
 }
 
 function addSelectionContextMenuItem(
@@ -117,6 +126,99 @@ function addFileContextMenuItem(
 	);
 }
 
+function addImageFileContextMenuItem(
+	host: EditorContextHost,
+	menu: Menu,
+	file: TFile,
+): void {
+	if (!isImageFile(file)) {
+		return;
+	}
+
+	menu.addItem((item) =>
+		item
+			.setTitle("Add image to current chat")
+			.setIcon("image-plus")
+			.onClick(() => {
+				void addContextToCurrentChat(host, {
+					type: "file",
+					notePath: file.path,
+					noteName: file.name,
+				});
+			}),
+	);
+}
+
+function decodeMarkdownLinkTarget(path: string): string {
+	try {
+		return decodeURIComponent(path);
+	} catch {
+		return path;
+	}
+}
+
+function resolveEmbeddedImageAtCursor(
+	host: EditorContextHost,
+	editor: Editor,
+	sourceFile: TFile,
+): TFile | null {
+	const cursor = editor.getCursor();
+	const line = editor.getLine(cursor.line);
+
+	const wikiEmbedRegex = /!\[\[([^\]]+)\]\]/g;
+	let match: RegExpExecArray | null;
+	while ((match = wikiEmbedRegex.exec(line)) !== null) {
+		const start = match.index;
+		const end = start + match[0].length;
+		if (cursor.ch < start || cursor.ch > end) {
+			continue;
+		}
+
+		const rawTarget = match[1].split("|")[0]?.trim();
+		if (!rawTarget) {
+			continue;
+		}
+
+		const parsed = parseLinktext(rawTarget);
+		const embedded = host.app.metadataCache.getFirstLinkpathDest(
+			parsed.path,
+			sourceFile.path,
+		);
+		if (embedded instanceof TFile && isImageFile(embedded)) {
+			return embedded;
+		}
+	}
+
+	const markdownImageRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
+	while ((match = markdownImageRegex.exec(line)) !== null) {
+		const start = match.index;
+		const end = start + match[0].length;
+		if (cursor.ch < start || cursor.ch > end) {
+			continue;
+		}
+
+		let target = match[1].trim();
+		if (target.startsWith("<") && target.endsWith(">")) {
+			target = target.slice(1, -1).trim();
+		}
+		if (!target || /^[a-z]+:\/\//i.test(target)) {
+			continue;
+		}
+
+		const targetWithoutTitle = target.split(/\s+/)[0];
+		const decoded = decodeMarkdownLinkTarget(targetWithoutTitle);
+		const embedded = host.app.metadataCache.getFirstLinkpathDest(
+			decoded,
+			sourceFile.path,
+		);
+		if (embedded instanceof TFile && isImageFile(embedded)) {
+			return embedded;
+		}
+	}
+
+	return null;
+}
+
 export function registerEditorContextMenus(host: EditorContextHost): void {
 	const workspace = host.app.workspace;
 
@@ -134,12 +236,17 @@ export function registerEditorContextMenus(host: EditorContextHost): void {
 				file,
 				"Add current file to current chat",
 			);
+
+			const embeddedImage = resolveEmbeddedImageAtCursor(host, editor, file);
+			if (embeddedImage) {
+				addImageFileContextMenuItem(host, menu, embeddedImage);
+			}
 		}),
 	);
 
 	host.registerEvent(
 		workspace.on("file-menu", (menu: Menu, file: TAbstractFile) => {
-			if (isMarkdownFile(file)) {
+			if (isContextAttachableFile(file)) {
 				addFileContextMenuItem(host, menu, file, "Add file to current chat");
 			}
 
