@@ -1,4 +1,4 @@
-import { Notice, Platform, Setting } from "obsidian";
+import { Notice, Platform, Setting, setIcon } from "obsidian";
 import type AgentClientPlugin from "../../../plugin";
 import type { AgentSecretBinding, ChatViewLocation } from "../../../plugin";
 import {
@@ -8,6 +8,8 @@ import {
 } from "../../../shared/display-settings";
 import { resolveCommandFromShell } from "../../../shared/shell-utils";
 import { renderSectionHeader } from "../settings-ui-helpers";
+
+const secretBindingPickerCleanup = new WeakMap<HTMLElement, () => void>();
 
 export const renderCoreSections = (
 	containerEl: HTMLElement,
@@ -106,21 +108,22 @@ function renderGlobalSecretBindings(
 	const description =
 		"Bind environment variable names to Obsidian keychain secrets. Example: GEMINI_API_KEY -> nano-banana-api.";
 
+	new Setting(containerEl)
+		.setName("Secret bindings")
+		.setDesc(description)
+		.addButton((button) =>
+			button.setButtonText("Add binding").onClick(async () => {
+				await store.updateSettings({
+					secretBindings: [
+						...plugin.settings.secretBindings,
+						{ envKey: "", secretId: "" },
+					],
+				});
+				redisplay();
+			}),
+		);
+
 	if (bindings.length === 0) {
-		new Setting(containerEl)
-			.setName("Secret bindings")
-			.setDesc(description)
-			.addButton((button) =>
-				button.setButtonText("Add binding").onClick(async () => {
-					await store.updateSettings({
-						secretBindings: [
-							...plugin.settings.secretBindings,
-							{ envKey: "", secretId: "" },
-						],
-					});
-					redisplay();
-				}),
-			);
 		return;
 	}
 
@@ -134,12 +137,20 @@ function renderGlobalSecretBindings(
 		await store.updateSettings({ secretBindings: next });
 	};
 
-	bindings.forEach((binding, index) => {
-		const isFirst = index === 0;
-		const row = new Setting(containerEl);
-		if (isFirst) {
-			row.setName("Secret bindings").setDesc(description);
-		}
+	const orderedBindings = bindings
+		.map((binding, index) => ({ binding, index }))
+		.sort((left, right) => {
+			const leftIsGemini = left.binding.envKey.trim() === "GEMINI_API_KEY";
+			const rightIsGemini = right.binding.envKey.trim() === "GEMINI_API_KEY";
+			if (leftIsGemini === rightIsGemini) {
+				return left.index - right.index;
+			}
+			return leftIsGemini ? 1 : -1;
+		});
+
+	orderedBindings.forEach(({ binding, index }) => {
+		const rowWrapper = containerEl.createDiv();
+		const row = new Setting(rowWrapper);
 		row
 			.addText((text) =>
 				text
@@ -149,24 +160,22 @@ function renderGlobalSecretBindings(
 						await updateBinding(index, { envKey: value.trim() });
 					}),
 			)
-			.addSearch((search) => {
-				search.setPlaceholder("Link...").setValue(binding.secretId);
-				const listId = `obsius-secret-bindings-${index}`;
-				const existing = row.controlEl.querySelector(`#${listId}`);
-				if (existing) {
-					existing.remove();
-				}
-				const listEl = row.controlEl.createEl("datalist", {
-					attr: { id: listId },
-				});
-				for (const secretId of availableSecrets) {
-					listEl.createEl("option", { attr: { value: secretId } });
-				}
-				search.inputEl.setAttr("list", listId);
-				search.onChange(async (value) => {
-					await updateBinding(index, { secretId: value.trim().toLowerCase() });
-				});
-				return search;
+			.addButton((button) => {
+				const label = binding.secretId.length > 0 ? binding.secretId : "Link...";
+				button
+					.setButtonText(label)
+					.setTooltip("Choose keychain secret")
+					.onClick(() => {
+						toggleSecretBindingPicker(
+							rowWrapper,
+							binding.secretId,
+							availableSecrets,
+							async (secretId) => {
+								await updateBinding(index, { secretId });
+								redisplay();
+							},
+						);
+					});
 			})
 			.addButton((button) =>
 				button.setButtonText("Refresh").onClick(() => {
@@ -186,18 +195,83 @@ function renderGlobalSecretBindings(
 					}),
 			);
 	});
+}
 
-	new Setting(containerEl).addButton((button) =>
-		button.setButtonText("Add binding").onClick(async () => {
-			await store.updateSettings({
-				secretBindings: [
-					...plugin.settings.secretBindings,
-					{ envKey: "", secretId: "" },
-				],
-			});
-			redisplay();
-		}),
+function destroySecretBindingPicker(picker: HTMLElement): void {
+	const cleanup = secretBindingPickerCleanup.get(picker);
+	if (cleanup) {
+		cleanup();
+		secretBindingPickerCleanup.delete(picker);
+	}
+	picker.remove();
+}
+
+function toggleSecretBindingPicker(
+	wrapper: HTMLElement,
+	selectedSecretId: string,
+	availableSecrets: string[],
+	onSelect: (secretId: string) => Promise<void>,
+): void {
+	const existing: HTMLElement | null = wrapper.querySelector(
+		".obsius-secret-binding-picker",
 	);
+	if (existing) {
+		destroySecretBindingPicker(existing);
+		return;
+	}
+
+	const picker = wrapper.createDiv({
+		cls: "obsius-model-picker obsius-secret-binding-picker",
+	});
+	const listEl = picker.createDiv({ cls: "obsius-model-picker-list" });
+	const options = Array.from(new Set(availableSecrets)).sort((a, b) =>
+		a.localeCompare(b),
+	);
+
+	if (options.length === 0) {
+		listEl.createDiv({
+			text: "No keychain secrets found.",
+			cls: "obsius-model-picker-empty",
+		});
+	} else {
+		for (const secretId of options) {
+			const isSelected = secretId === selectedSecretId;
+			const item = listEl.createDiv({
+				cls: `obsius-model-picker-item${isSelected ? " is-selected" : ""}`,
+			});
+			const checkEl = item.createSpan({ cls: "obsius-model-picker-check" });
+			if (isSelected) {
+				setIcon(checkEl, "check");
+			}
+
+			const textEl = item.createDiv({ cls: "obsius-model-picker-item-text" });
+			textEl.createSpan({
+				text: secretId,
+				cls: "obsius-model-picker-item-name",
+			});
+			textEl.createSpan({
+				text: "Obsidian keychain secret",
+				cls: "obsius-model-picker-item-desc",
+			});
+
+			item.addEventListener("click", () => {
+				void (async () => {
+					await onSelect(secretId);
+					destroySecretBindingPicker(picker);
+				})();
+			});
+		}
+	}
+
+	const onClickOutside = (event: MouseEvent) => {
+		if (!picker.contains(event.target as Node)) {
+			destroySecretBindingPicker(picker);
+		}
+	};
+	document.addEventListener("mousedown", onClickOutside, true);
+	secretBindingPickerCleanup.set(picker, () => {
+		document.removeEventListener("mousedown", onClickOutside, true);
+	});
 }
 
 function getAvailableSecretIds(plugin: AgentClientPlugin): string[] {
