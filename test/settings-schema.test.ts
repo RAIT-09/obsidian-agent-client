@@ -13,4 +13,14 @@ describe("settings schema", () => {
 		expect(result.resetReason).toBeUndefined();
 		expect(result.settings.schemaVersion).toBe(SETTINGS_SCHEMA_VERSION);
 	});
+
+	it("defaults allowTerminalCommands to false when missing", () => {
+		const defaults = createDefaultSettings();
+		const legacyLike = { ...defaults } as Record<string, unknown>;
+		delete legacyLike.allowTerminalCommands;
+
+		const result = parseStoredSettings(legacyLike);
+		expect(result.resetReason).toBeUndefined();
+		expect(result.settings.allowTerminalCommands).toBe(false);
+	});
 });

@@ -48,6 +48,7 @@ const defaultInitArgs = {
 	pluginVersion: "0.1.0",
 	windowsWslMode: false,
 	nodePath: "",
+	allowTerminalCommands: false,
 };
 
 // ── RuntimeMultiplexer ─────────────────────────────────────────────────
@@ -222,6 +223,25 @@ describe("RuntimeMultiplexer", () => {
 		expect(multiplexer.sessionCount).toBe(1);
 		multiplexer.clear();
 		expect(multiplexer.sessionCount).toBe(0);
+	});
+
+	it("rejects ACP fs/read_text_file when capability is disabled", async () => {
+		await expect(
+			multiplexer.readTextFile({
+				sessionId: "s1",
+				path: "notes/a.md",
+			} as never),
+		).rejects.toThrow(/fs\/read_text_file is disabled/i);
+	});
+
+	it("rejects ACP fs/write_text_file when capability is disabled", async () => {
+		await expect(
+			multiplexer.writeTextFile({
+				sessionId: "s1",
+				path: "notes/a.md",
+				content: "x",
+			} as never),
+		).rejects.toThrow(/fs\/write_text_file is disabled/i);
 	});
 });
 

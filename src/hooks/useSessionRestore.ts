@@ -16,6 +16,7 @@ export interface UseSessionRestoreReturn {
 	isRestored: boolean;
 	changeSet: SessionChangeSet | null;
 
+	reset: () => void;
 	refreshChanges: (
 		messages: ChatMessage[],
 		vaultBasePath?: string,
@@ -74,6 +75,11 @@ export function useSessionRestore(): UseSessionRestoreReturn {
 		}
 		syncState(null);
 	}, [changeSet, syncState]);
+
+	const reset = useCallback(() => {
+		managerRef.current.reset();
+		syncState(null);
+	}, [syncState]);
 
 	const keepFile = useCallback(
 		(changePath: string) => {
@@ -183,6 +189,7 @@ export function useSessionRestore(): UseSessionRestoreReturn {
 	return {
 		isRestored,
 		changeSet,
+		reset,
 		refreshChanges,
 		dismiss,
 		keepFile,

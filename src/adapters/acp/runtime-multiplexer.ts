@@ -159,10 +159,18 @@ export class RuntimeMultiplexer implements acp.Client {
 	}
 
 	readTextFile(_params: acp.ReadTextFileRequest) {
-		return Promise.resolve({ content: "" });
+		return Promise.reject(
+			new Error(
+				"fs/read_text_file is disabled by client capabilities (vault-only policy).",
+			),
+		);
 	}
 
 	writeTextFile(_params: acp.WriteTextFileRequest) {
-		return Promise.resolve({});
+		return Promise.reject(
+			new Error(
+				"fs/write_text_file is disabled by client capabilities (vault-only policy).",
+			),
+		);
 	}
 }

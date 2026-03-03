@@ -294,7 +294,7 @@ function renderPermissionSection(
 	new Setting(containerEl)
 		.setName("Auto-allow permissions")
 		.setDesc(
-			"Automatically allow all permission requests from agents. ⚠️ Use with caution - this gives agents full access to your system.", // eslint-disable-line obsidianmd/ui/sentence-case
+			"Automatically allow non-terminal permission requests from agents. Terminal commands always require manual approval.", // eslint-disable-line obsidianmd/ui/sentence-case
 		)
 		.addToggle((toggle) =>
 			toggle
@@ -302,6 +302,21 @@ function renderPermissionSection(
 				.onChange(async (value) => {
 					await plugin.settingsStore.updateSettings({
 						autoAllowPermissions: value,
+					});
+				}),
+		);
+
+	new Setting(containerEl)
+		.setName("Allow terminal tool calls")
+		.setDesc(
+			"Enable ACP terminal methods (terminal/*). Disabled by default for safety.",
+		)
+		.addToggle((toggle) =>
+			toggle
+				.setValue(plugin.settings.allowTerminalCommands)
+				.onChange(async (value) => {
+					await plugin.settingsStore.updateSettings({
+						allowTerminalCommands: value,
 					});
 				}),
 		);

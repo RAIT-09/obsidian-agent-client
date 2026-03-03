@@ -30,6 +30,7 @@ export async function initializeOperation(args: {
 	windowsWslMode: boolean;
 	windowsWslDistribution?: string;
 	nodePath: string;
+	allowTerminalCommands: boolean;
 	onError: (error: ProcessError) => void;
 	clientFactory: (
 		stream: ReturnType<typeof acp.ndJsonStream>,
@@ -49,6 +50,7 @@ export async function initializeOperation(args: {
 		windowsWslMode,
 		windowsWslDistribution,
 		nodePath,
+		allowTerminalCommands,
 		onError,
 		clientFactory,
 		onStderrData,
@@ -253,7 +255,7 @@ export async function initializeOperation(args: {
 				readTextFile: false,
 				writeTextFile: false,
 			},
-			terminal: true,
+			terminal: allowTerminalCommands,
 		},
 		clientInfo: {
 			name: "obsius",

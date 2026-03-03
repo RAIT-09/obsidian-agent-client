@@ -4,6 +4,20 @@ export const Platform = {
 	isLinux: true,
 };
 
+export class Notice {
+	message: string;
+
+	constructor(message: string) {
+		this.message = message;
+	}
+}
+
+export async function requestUrl(_opts: { url: string }): Promise<{
+	json: unknown;
+}> {
+	return { json: {} };
+}
+
 export function setIcon(el: HTMLElement, icon: string): void {
 	el.setAttribute("data-icon", icon);
 }

@@ -25,6 +25,43 @@ export interface PermissionQueueState {
 	pendingPermissionQueue: PendingPermissionQueueItem[];
 }
 
+function normalizePermissionKind(
+	kind: unknown,
+	name: string,
+): PermissionOption["kind"] {
+	if (
+		kind === "allow_once" ||
+		kind === "allow_always" ||
+		kind === "reject_once" ||
+		kind === "reject_always"
+	) {
+		return kind;
+	}
+
+	return name.toLowerCase().includes("allow") ? "allow_once" : "reject_once";
+}
+
+function isTerminalPermissionRequest(
+	params: acp.RequestPermissionRequest,
+): boolean {
+	const toolCall = params.toolCall;
+	if (!toolCall) return false;
+
+	if (toolCall.kind === "execute") return true;
+
+	const rawInput =
+		(toolCall.rawInput as Record<string, unknown> | undefined) || {};
+	if (
+		typeof rawInput.command === "string" &&
+		rawInput.command.trim().length > 0
+	) {
+		return true;
+	}
+
+	const title = toolCall.title?.toLowerCase() || "";
+	return /\b(terminal|shell|bash|command)\b/.test(title);
+}
+
 function removeQueueItemByRequestId(
 	queue: PendingPermissionQueueItem[],
 	requestId: string,
@@ -144,14 +181,14 @@ export async function requestPermissionOperation(args: {
 		args;
 
 	logger.log("[AcpAdapter] Permission request received:", params);
-	if (autoAllowPermissions) {
+	if (autoAllowPermissions && !isTerminalPermissionRequest(params)) {
 		const allowOption =
-			params.options.find(
-				(option) =>
-					option.kind === "allow_once" ||
-					option.kind === "allow_always" ||
-					(!option.kind && option.name.toLowerCase().includes("allow")),
-			) || params.options[0];
+			params.options.find((option) => option.kind === "allow_once") ||
+			params.options.find((option) => option.kind === "allow_always") ||
+			params.options.find((option) =>
+				option.name.toLowerCase().includes("allow"),
+			) ||
+			params.options[0];
 
 		logger.log("[AcpAdapter] Auto-allowing permission request:", allowOption);
 		return {
@@ -166,18 +203,10 @@ export async function requestPermissionOperation(args: {
 	const toolCallId = params.toolCall?.toolCallId || crypto.randomUUID();
 	const sessionId = params.sessionId;
 	const normalizedOptions: PermissionOption[] = params.options.map((option) => {
-		const normalizedKind =
-			option.kind === "reject_always" ? "reject_once" : option.kind;
-		const kind: PermissionOption["kind"] = normalizedKind
-			? normalizedKind
-			: option.name.toLowerCase().includes("allow")
-				? "allow_once"
-				: "reject_once";
-
 		return {
 			optionId: option.optionId,
 			name: option.name,
-			kind,
+			kind: normalizePermissionKind(option.kind, option.name),
 		};
 	});
 

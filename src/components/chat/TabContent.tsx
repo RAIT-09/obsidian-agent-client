@@ -138,7 +138,7 @@ export function TabContent({
 
 	useEffect(() => {
 		if (messages.length === 0) {
-			sessionRestore.dismiss();
+			sessionRestore.reset();
 			return;
 		}
 		void sessionRestore.refreshChanges(messages, vaultPath, readFile);
@@ -146,7 +146,7 @@ export function TabContent({
 		messages,
 		vaultPath,
 		readFile,
-		sessionRestore.dismiss,
+		sessionRestore.reset,
 		sessionRestore.refreshChanges,
 	]);
 

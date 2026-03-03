@@ -95,6 +95,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient, SessionHandler {
 	private currentAgentId: string | null = null;
 	private currentSessionId: string | null = null;
 	private autoAllowPermissions = false;
+	private allowTerminalCommands = false;
 
 	private terminalManager: TerminalManager;
 	private currentMessageId: string | null = null;
@@ -154,14 +155,15 @@ export class AcpAdapter implements IAgentClient, IAcpClient, SessionHandler {
 
 		this.currentConfig = config;
 		this.autoAllowPermissions = this.plugin.settings.autoAllowPermissions;
+		this.allowTerminalCommands = this.plugin.settings.allowTerminalCommands;
 
 		try {
 			const runtime = await this.runtimeManager.acquireRuntime(config, {
 				pluginVersion: this.plugin.manifest.version,
 				windowsWslMode: this.plugin.settings.windowsWslMode,
-				windowsWslDistribution:
-					this.plugin.settings.windowsWslDistribution,
+				windowsWslDistribution: this.plugin.settings.windowsWslDistribution,
 				nodePath: this.plugin.settings.nodePath,
+				allowTerminalCommands: this.allowTerminalCommands,
 			});
 			this.runtime = runtime;
 			this.isInitializedFlag = true;
@@ -200,10 +202,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient, SessionHandler {
 		});
 	}
 
-	async sendPrompt(
-		sessionId: string,
-		content: PromptContent[],
-	): Promise<void> {
+	async sendPrompt(sessionId: string, content: PromptContent[]): Promise<void> {
 		await sendPromptOperation({
 			connection: this.connection,
 			logger: this.logger,
@@ -249,6 +248,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient, SessionHandler {
 		this.isInitializedFlag = false;
 		this.currentAgentId = null;
 		this.currentSessionId = null;
+		this.allowTerminalCommands = false;
 		return Promise.resolve();
 	}
 
@@ -354,6 +354,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient, SessionHandler {
 	createTerminal(
 		params: acp.CreateTerminalRequest,
 	): Promise<acp.CreateTerminalResponse> {
+		this.ensureTerminalEnabled();
 		return Promise.resolve(
 			createTerminalOperation({
 				params,
@@ -367,6 +368,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient, SessionHandler {
 	terminalOutput(
 		params: acp.TerminalOutputRequest,
 	): Promise<acp.TerminalOutputResponse> {
+		this.ensureTerminalEnabled();
 		return Promise.resolve(
 			terminalOutputOperation({
 				params,
@@ -378,6 +380,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient, SessionHandler {
 	async waitForTerminalExit(
 		params: acp.WaitForTerminalExitRequest,
 	): Promise<acp.WaitForTerminalExitResponse> {
+		this.ensureTerminalEnabled();
 		return await waitForTerminalExitOperation({
 			params,
 			terminalManager: this.terminalManager,
@@ -387,6 +390,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient, SessionHandler {
 	killTerminal(
 		params: acp.KillTerminalCommandRequest,
 	): Promise<acp.KillTerminalCommandResponse> {
+		this.ensureTerminalEnabled();
 		return Promise.resolve(
 			killTerminalOperation({
 				params,
@@ -398,6 +402,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient, SessionHandler {
 	releaseTerminal(
 		params: acp.ReleaseTerminalRequest,
 	): Promise<acp.ReleaseTerminalResponse> {
+		this.ensureTerminalEnabled();
 		return Promise.resolve(
 			releaseTerminalOperation({
 				params,
@@ -445,6 +450,14 @@ export class AcpAdapter implements IAgentClient, IAcpClient, SessionHandler {
 
 	private extractStderrErrorHint(): string | null {
 		return extractStderrErrorHint(this.recentStderr);
+	}
+
+	private ensureTerminalEnabled(): void {
+		if (!this.allowTerminalCommands) {
+			throw new Error(
+				"Terminal methods are disabled by client settings (allowTerminalCommands=false).",
+			);
+		}
 	}
 
 	private cancelPendingPermissionRequests(): void {

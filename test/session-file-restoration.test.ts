@@ -179,10 +179,7 @@ describe("discoverModifiedFiles", () => {
 					toolCallId: "tc1",
 					status: "completed",
 					title: "obsidian-markdown",
-					locations: [
-						{ path: "notes/doc.md" },
-						{ path: "notes/doc.md" },
-					],
+					locations: [{ path: "notes/doc.md" }, { path: "notes/doc.md" }],
 				},
 			]),
 		];
@@ -246,13 +243,81 @@ describe("discoverModifiedFiles", () => {
 					toolCallId: "tc1",
 					status: "completed",
 					content: [
-						{ type: "diff", path: "new.ts", oldText: undefined, newText: "content" },
+						{
+							type: "diff",
+							path: "new.ts",
+							oldText: undefined,
+							newText: "content",
+						},
 					],
 				},
 			]),
 		];
 		const files = discoverModifiedFiles(messages);
 		expect(files[0].firstOldText).toBeNull();
+	});
+
+	it("discovers deleted file paths from execute rm command", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc-rm",
+					status: "completed",
+					kind: "execute",
+					rawInput: {
+						command:
+							'rm "/vault/notes/Dario Amodei关于我们与战争部讨论的声明 - 摘要.md"',
+					},
+				},
+			]),
+		];
+		const files = discoverModifiedFiles(messages, "/vault");
+		expect(files).toHaveLength(1);
+		expect(files[0].vaultPath).toBe(
+			"notes/Dario Amodei关于我们与战争部讨论的声明 - 摘要.md",
+		);
+		expect(files[0].wasDeleted).toBe(true);
+	});
+
+	it("discovers source and destination from execute mv command", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc-mv",
+					status: "completed",
+					kind: "execute",
+					rawInput: {
+						command: 'mv "/vault/old.md" "/vault/new.md"',
+					},
+				},
+			]),
+		];
+
+		const files = discoverModifiedFiles(messages, "/vault");
+		expect(files).toHaveLength(2);
+		expect(files.find((f) => f.vaultPath === "old.md")?.wasDeleted).toBe(true);
+		expect(files.find((f) => f.vaultPath === "new.md")?.wasDeleted).toBe(false);
+	});
+
+	it("ignores complex chained execute commands", () => {
+		const messages: ChatMessage[] = [
+			makeMessage("assistant", [
+				{
+					type: "tool_call",
+					toolCallId: "tc-chain",
+					status: "completed",
+					kind: "execute",
+					rawInput: {
+						command: 'rm "/vault/a.md" && rm "/vault/b.md"',
+					},
+				},
+			]),
+		];
+
+		const files = discoverModifiedFiles(messages, "/vault");
+		expect(files).toHaveLength(0);
 	});
 });
 

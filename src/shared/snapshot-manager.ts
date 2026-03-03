@@ -37,14 +37,8 @@ interface OriginalFileState {
  * All I/O is injected via {@link FileIo} — no React or Obsidian dependencies.
  */
 export class SnapshotManager {
-	/** vault-relative path -> state before the agent first touched the file */
+	/** vault-relative path -> accepted baseline state for this session */
 	private originals = new Map<string, OriginalFileState>();
-
-	/** vault-relative path -> kept/reverted flag */
-	private handledPaths = new Map<
-		string,
-		{ action: "kept" | "reverted" }
-	>();
 
 	/** vault-relative path -> content right before we reverted (null = file didn't exist) */
 	private preRevertBackups = new Map<string, string | null>();
@@ -121,8 +115,8 @@ export class SnapshotManager {
 
 	/**
 	 * Build the visible change set by comparing every captured snapshot with
-	 * the current file content on disk. Files already kept/reverted are
-	 * excluded. Files whose content hasn't changed are filtered out.
+	 * the current file content on disk. Files whose content hasn't changed are
+	 * filtered out.
 	 */
 	async computeChanges(
 		messages: ChatMessage[],
@@ -134,8 +128,6 @@ export class SnapshotManager {
 		const changes: FileChange[] = [];
 
 		for (const [vaultPath, original] of this.originals) {
-			if (this.handledPaths.has(vaultPath)) continue;
-
 			const current = await this.tryReadFile(
 				{ readFile } as FileIo,
 				vaultPath,
@@ -196,7 +188,6 @@ export class SnapshotManager {
 				return { reverted: false, conflict: true };
 			}
 
-			this.handledPaths.set(vaultPath, { action: "reverted" });
 			return { reverted: true, conflict: false };
 		} catch {
 			return { reverted: false, conflict: true };
@@ -223,16 +214,12 @@ export class SnapshotManager {
 	}
 
 	keepFile(change: FileChange): void {
-		if (change.vaultPath) {
-			this.handledPaths.set(change.vaultPath, { action: "kept" });
-		}
+		this.advanceBaseline(change);
 	}
 
 	dismissAll(changes: FileChange[]): void {
 		for (const change of changes) {
-			if (change.vaultPath) {
-				this.handledPaths.set(change.vaultPath, { action: "kept" });
-			}
+			this.advanceBaseline(change);
 		}
 		this.preRevertBackups.clear();
 	}
@@ -254,8 +241,25 @@ export class SnapshotManager {
 
 	reset(): void {
 		this.originals.clear();
-		this.handledPaths.clear();
 		this.preRevertBackups.clear();
+	}
+
+	private advanceBaseline(change: FileChange): void {
+		const vaultPath = change.vaultPath;
+		if (!vaultPath) return;
+
+		const existing = this.originals.get(vaultPath);
+		const nextContent = change.isDeleted ? null : change.finalText;
+
+		this.originals.set(vaultPath, {
+			content: nextContent,
+			isNew: change.isDeleted,
+			wasDeletedByAgent:
+				change.isDeleted || existing?.wasDeletedByAgent === true,
+			rawPath: existing?.rawPath ?? change.path,
+			// Treat accepted state as authoritative baseline for future comparisons.
+			fromDiff: true,
+		});
 	}
 
 	private async tryReadFile(

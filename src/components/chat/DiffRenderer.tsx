@@ -32,9 +32,7 @@ interface DiffStats {
 }
 
 function isNewFile(diff: DiffRendererProps["diff"]): boolean {
-	return (
-		diff.oldText === null || diff.oldText === undefined || diff.oldText === ""
-	);
+	return diff.oldText === null || diff.oldText === undefined;
 }
 
 function fileNameOnly(filePath: string): string {

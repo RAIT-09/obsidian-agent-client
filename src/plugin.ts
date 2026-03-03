@@ -82,6 +82,7 @@ export interface AgentClientPluginSettings {
 	/** Default agent ID for new views (renamed from activeAgentId for multi-session) */
 	defaultAgentId: string;
 	autoAllowPermissions: boolean;
+	allowTerminalCommands: boolean;
 	autoMentionActiveNote: boolean;
 	debugMode: boolean;
 	nodePath: string;
@@ -448,7 +449,25 @@ export default class AgentClientPlugin extends Plugin {
 	 * - Prerelease users: compare with both latest stable and latest prerelease
 	 */
 	async checkForUpdates(): Promise<boolean> {
-		return await checkForUpdates(this.manifest.version);
+		const currentVersion = await this.resolveInstalledVersion();
+		return await checkForUpdates(currentVersion);
+	}
+
+	private async resolveInstalledVersion(): Promise<string> {
+		const runtimeVersion = this.manifest.version;
+		const manifestPath = `${this.app.vault.configDir}/plugins/${this.manifest.id}/manifest.json`;
+
+		try {
+			const rawManifest = await this.app.vault.adapter.read(manifestPath);
+			const parsed = JSON.parse(rawManifest) as { version?: unknown };
+			if (typeof parsed.version === "string" && parsed.version.trim()) {
+				return parsed.version.trim();
+			}
+		} catch {
+			// Fallback to runtime manifest version.
+		}
+
+		return runtimeVersion;
 	}
 
 	ensureDefaultAgentId(): void {

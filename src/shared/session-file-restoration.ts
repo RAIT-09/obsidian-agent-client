@@ -20,7 +20,10 @@ function normalizeForComparison(path: string): string {
 }
 
 function normalizeVaultPath(path: string): string {
-	return path.replace(/\\/g, "/").replace(/^\.\/+/, "").replace(/^\/+/, "");
+	return path
+		.replace(/\\/g, "/")
+		.replace(/^\.\/+/, "")
+		.replace(/^\/+/, "");
 }
 
 function getPathFromRawInput(rawInput: Record<string, unknown>): string | null {
@@ -30,6 +33,116 @@ function getPathFromRawInput(rawInput: Record<string, unknown>): string | null {
 		(rawInput.path as string) ||
 		"";
 	return rawPath || null;
+}
+
+function getCommandFromRawInput(rawInput: Record<string, unknown>): string {
+	const command =
+		typeof rawInput.command === "string" ? rawInput.command.trim() : "";
+	if (!command) return "";
+
+	const args = rawInput.args;
+	if (Array.isArray(args) && args.every((arg) => typeof arg === "string")) {
+		if (/\s/.test(command)) return command;
+		return `${command} ${args.join(" ")}`.trim();
+	}
+	return command;
+}
+
+function tokenizeShellCommand(command: string): string[] {
+	const tokens: string[] = [];
+	let current = "";
+	let quote: "'" | '"' | null = null;
+	let escaped = false;
+
+	for (const ch of command) {
+		if (escaped) {
+			current += ch;
+			escaped = false;
+			continue;
+		}
+
+		if (quote === "'") {
+			if (ch === "'") {
+				quote = null;
+			} else {
+				current += ch;
+			}
+			continue;
+		}
+
+		if (quote === '"') {
+			if (ch === '"') {
+				quote = null;
+			} else if (ch === "\\") {
+				escaped = true;
+			} else {
+				current += ch;
+			}
+			continue;
+		}
+
+		if (ch === "'" || ch === '"') {
+			quote = ch;
+			continue;
+		}
+
+		if (ch === "\\") {
+			escaped = true;
+			continue;
+		}
+
+		if (/\s/.test(ch)) {
+			if (current) {
+				tokens.push(current);
+				current = "";
+			}
+			continue;
+		}
+
+		current += ch;
+	}
+
+	if (current) tokens.push(current);
+	return tokens;
+}
+
+interface ParsedCommandPath {
+	path: string;
+	isDelete: boolean;
+}
+
+function parseExecuteCommandPaths(command: string): ParsedCommandPath[] {
+	if (!command.trim()) return [];
+	if (/[;&|]/.test(command)) return [];
+
+	const tokens = tokenizeShellCommand(command);
+	if (tokens.length === 0) return [];
+
+	const executable = tokens[0].split("/").pop()?.toLowerCase() || "";
+	const args = tokens
+		.slice(1)
+		.filter((token) => token && !token.startsWith("-"));
+
+	if (executable === "rm") {
+		return args.map((path) => ({ path, isDelete: true }));
+	}
+
+	if (executable === "mv") {
+		if (args.length < 2) return [];
+		const destination = args[args.length - 1];
+		const sources = args.slice(0, -1);
+		return [
+			...sources.map((path) => ({ path, isDelete: true })),
+			{ path: destination, isDelete: false },
+		];
+	}
+
+	if (executable === "cp") {
+		if (args.length < 2) return [];
+		return [{ path: args[args.length - 1], isDelete: false }];
+	}
+
+	return [];
 }
 
 export function toVaultRelativePath(
@@ -85,11 +198,7 @@ export function discoverModifiedFiles(
 ): DiscoveredFile[] {
 	const found = new Map<string, DiscoveredFile>();
 
-	const add = (
-		rawPath: string,
-		oldText?: string | null,
-		kind?: ToolKind,
-	) => {
+	const add = (rawPath: string, oldText?: string | null, kind?: ToolKind) => {
 		const vaultPath = toVaultRelativePath(rawPath, vaultBasePath);
 		if (!vaultPath) return;
 
@@ -123,9 +232,15 @@ export function discoverModifiedFiles(
 			}
 
 			if (content.rawInput) {
+				const command = getCommandFromRawInput(content.rawInput);
+				if (kind === "execute" && command) {
+					for (const parsed of parseExecuteCommandPaths(command)) {
+						add(parsed.path, undefined, parsed.isDelete ? "delete" : kind);
+					}
+				}
+
 				const rawPath =
-					getPathFromRawInput(content.rawInput) ||
-					content.locations?.[0]?.path;
+					getPathFromRawInput(content.rawInput) || content.locations?.[0]?.path;
 				if (rawPath) add(rawPath, undefined, kind);
 			}
 

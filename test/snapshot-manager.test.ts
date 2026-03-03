@@ -81,7 +81,9 @@ describe("SnapshotManager", () => {
 	describe("computeChanges — disk comparison", () => {
 		it("detects change when disk content differs from diff oldText", async () => {
 			const io = mockFileIo({ "src/foo.ts": "new content" });
-			const messages = [makeDiffMessage("src/foo.ts", "old content", "new content")];
+			const messages = [
+				makeDiffMessage("src/foo.ts", "old content", "new content"),
+			];
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).not.toBeNull();
@@ -94,10 +96,10 @@ describe("SnapshotManager", () => {
 
 		it("returns null when no tool calls modify files", async () => {
 			const io = mockFileIo();
-			const messages = [
-				makeMessage("user", [{ type: "text", text: "hello" }]),
-			];
-			expect(await manager.computeChanges(messages, undefined, io.readFile)).toBeNull();
+			const messages = [makeMessage("user", [{ type: "text", text: "hello" }])];
+			expect(
+				await manager.computeChanges(messages, undefined, io.readFile),
+			).toBeNull();
 		});
 
 		it("detects new file (oldText null)", async () => {
@@ -150,12 +152,36 @@ describe("SnapshotManager", () => {
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).toBeNull();
 		});
+
+		it("detects deletion from execute rm command without diff payload", async () => {
+			const messages: ChatMessage[] = [
+				makeMessage("assistant", [
+					{
+						type: "tool_call",
+						toolCallId: crypto.randomUUID(),
+						status: "completed",
+						kind: "execute",
+						rawInput: { command: 'rm "/vault/notes/deleted.md"' },
+					},
+				]),
+			];
+
+			const io = mockFileIo({});
+			const cs = await manager.computeChanges(messages, "/vault", io.readFile);
+			expect(cs).not.toBeNull();
+			expect(cs!.changes).toHaveLength(1);
+			expect(cs!.changes[0].vaultPath).toBe("notes/deleted.md");
+			expect(cs!.changes[0].isDeleted).toBe(true);
+			expect(cs!.changes[0].canRevert).toBe(false);
+		});
 	});
 
 	describe("captureSnapshots — original state capture", () => {
 		it("captures original from diff oldText (highest priority)", async () => {
 			const io = mockFileIo({ "a.md": "already modified on disk" });
-			const messages = [makeDiffMessage("a.md", "original from diff", "modified")];
+			const messages = [
+				makeDiffMessage("a.md", "original from diff", "modified"),
+			];
 
 			await manager.captureSnapshots(messages, undefined, io.readFile);
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
@@ -211,7 +237,11 @@ describe("SnapshotManager", () => {
 			];
 
 			const postWriteIo = mockFileIo({ "notes/摘要.md": "polished content" });
-			const cs = await manager.computeChanges(allMessages, undefined, postWriteIo.readFile);
+			const cs = await manager.computeChanges(
+				allMessages,
+				undefined,
+				postWriteIo.readFile,
+			);
 			expect(cs).not.toBeNull();
 			expect(cs!.changes).toHaveLength(1);
 			expect(cs!.changes[0].originalText).toBe("original content");
@@ -220,7 +250,9 @@ describe("SnapshotManager", () => {
 
 		it("ignores location files that haven't changed on disk", async () => {
 			const io = mockFileIo({ "notes/a.md": "same content" });
-			const messages = [makeLocationMessage("some-tool", [{ path: "notes/a.md" }])];
+			const messages = [
+				makeLocationMessage("some-tool", [{ path: "notes/a.md" }]),
+			];
 
 			const readFile = vi.fn(async () => "same content");
 			await manager.captureSnapshots(messages, undefined, readFile);
@@ -230,7 +262,9 @@ describe("SnapshotManager", () => {
 		});
 
 		it("reverts location-based changes using original snapshot", async () => {
-			const readMessages = [makeLocationMessage("Read", [{ path: "notes/摘要.md" }], "read")];
+			const readMessages = [
+				makeLocationMessage("Read", [{ path: "notes/摘要.md" }], "read"),
+			];
 			const preWriteRead = vi.fn(async () => "original");
 			await manager.captureSnapshots(readMessages, undefined, preWriteRead);
 
@@ -239,7 +273,11 @@ describe("SnapshotManager", () => {
 				makeLocationMessage("obsidian-markdown", [{ path: "notes/摘要.md" }]),
 			];
 			const io = mockFileIo({ "notes/摘要.md": "polished" });
-			const cs = await manager.computeChanges(allMessages, undefined, io.readFile);
+			const cs = await manager.computeChanges(
+				allMessages,
+				undefined,
+				io.readFile,
+			);
 
 			const result = await manager.revertFile(cs!.changes[0], io);
 			expect(result).toEqual({ reverted: true, conflict: false });
@@ -249,7 +287,11 @@ describe("SnapshotManager", () => {
 		it("skips search tool locations", async () => {
 			const io = mockFileIo({ "a.md": "content", "b.md": "content" });
 			const messages = [
-				makeLocationMessage("Grep", [{ path: "a.md" }, { path: "b.md" }], "search"),
+				makeLocationMessage(
+					"Grep",
+					[{ path: "a.md" }, { path: "b.md" }],
+					"search",
+				),
 			];
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
@@ -275,12 +317,36 @@ describe("SnapshotManager", () => {
 			expect(cs!.changes).toHaveLength(1);
 			expect(cs!.changes[0].path).toBe("b.ts");
 		});
+
+		it("advances baseline so future edits on kept file are tracked", async () => {
+			const io = mockFileIo({ "a.md": "v2" });
+			const messages = [makeDiffMessage("a.md", "v1", "v2")];
+
+			let cs = await manager.computeChanges(messages, undefined, io.readFile);
+			expect(cs).not.toBeNull();
+			expect(cs!.changes[0].originalText).toBe("v1");
+			expect(cs!.changes[0].finalText).toBe("v2");
+
+			manager.keepFile(cs!.changes[0]);
+			expect(
+				await manager.computeChanges(messages, undefined, io.readFile),
+			).toBeNull();
+
+			io.files["a.md"] = "v3";
+			cs = await manager.computeChanges(messages, undefined, io.readFile);
+			expect(cs).not.toBeNull();
+			expect(cs!.changes[0].isNewFile).toBe(false);
+			expect(cs!.changes[0].originalText).toBe("v2");
+			expect(cs!.changes[0].finalText).toBe("v3");
+		});
 	});
 
 	describe("revertFile", () => {
 		it("restores original content for modified file", async () => {
 			const io = mockFileIo({ "src/foo.ts": "agent content" });
-			const messages = [makeDiffMessage("src/foo.ts", "original", "agent content")];
+			const messages = [
+				makeDiffMessage("src/foo.ts", "original", "agent content"),
+			];
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 
 			const result = await manager.revertFile(cs!.changes[0], io);
@@ -352,10 +418,47 @@ describe("SnapshotManager", () => {
 				makeDiffMessage("b.ts", "old", "new"),
 			];
 
-			const cs = (await manager.computeChanges(messages, undefined, io.readFile))!;
+			const cs = (await manager.computeChanges(
+				messages,
+				undefined,
+				io.readFile,
+			))!;
 			manager.dismissAll(cs.changes);
 
-			expect(await manager.computeChanges(messages, undefined, io.readFile)).toBeNull();
+			expect(
+				await manager.computeChanges(messages, undefined, io.readFile),
+			).toBeNull();
+		});
+
+		it("advances baseline for all files and still tracks later edits", async () => {
+			const io = mockFileIo({ "a.ts": "new-a", "b.ts": "new-b" });
+			const messages = [
+				makeDiffMessage("a.ts", "old-a", "new-a"),
+				makeDiffMessage("b.ts", "old-b", "new-b"),
+			];
+
+			const cs = (await manager.computeChanges(
+				messages,
+				undefined,
+				io.readFile,
+			))!;
+			manager.dismissAll(cs.changes);
+
+			expect(
+				await manager.computeChanges(messages, undefined, io.readFile),
+			).toBeNull();
+
+			io.files["a.ts"] = "new-a-2";
+			const csAfter = await manager.computeChanges(
+				messages,
+				undefined,
+				io.readFile,
+			);
+			expect(csAfter).not.toBeNull();
+			expect(csAfter!.changes).toHaveLength(1);
+			expect(csAfter!.changes[0].path).toBe("a.ts");
+			expect(csAfter!.changes[0].originalText).toBe("new-a");
+			expect(csAfter!.changes[0].finalText).toBe("new-a-2");
 		});
 	});
 
@@ -384,9 +487,15 @@ describe("SnapshotManager", () => {
 			delete io.files["a.ts"];
 			const deleteMessages = [
 				...readMessages,
-				makeLocationMessage("Delete", [{ path: "a.ts" }], "delete", { path: "a.ts" }),
+				makeLocationMessage("Delete", [{ path: "a.ts" }], "delete", {
+					path: "a.ts",
+				}),
 			];
-			const cs = await manager.computeChanges(deleteMessages, undefined, io.readFile);
+			const cs = await manager.computeChanges(
+				deleteMessages,
+				undefined,
+				io.readFile,
+			);
 			expect(cs!.changes[0].isDeleted).toBe(true);
 
 			await manager.revertFile(cs!.changes[0], io);
@@ -407,7 +516,11 @@ describe("SnapshotManager", () => {
 
 			manager.reset();
 
-			const csAfter = await manager.computeChanges(messages, undefined, io.readFile);
+			const csAfter = await manager.computeChanges(
+				messages,
+				undefined,
+				io.readFile,
+			);
 			expect(csAfter).not.toBeNull();
 			expect(csAfter!.changes).toHaveLength(1);
 		});
@@ -424,9 +537,15 @@ describe("SnapshotManager", () => {
 			delete io.files["a.ts"];
 			const allMessages = [
 				...readMessages,
-				makeLocationMessage("Delete", [{ path: "a.ts" }], "delete", { path: "a.ts" }),
+				makeLocationMessage("Delete", [{ path: "a.ts" }], "delete", {
+					path: "a.ts",
+				}),
 			];
-			const cs = await manager.computeChanges(allMessages, undefined, io.readFile);
+			const cs = await manager.computeChanges(
+				allMessages,
+				undefined,
+				io.readFile,
+			);
 			expect(cs).not.toBeNull();
 			expect(cs!.changes).toHaveLength(1);
 			expect(cs!.changes[0].isDeleted).toBe(true);
@@ -459,15 +578,23 @@ describe("SnapshotManager", () => {
 
 		it("reverts deletion by recreating file with original content", async () => {
 			const io = mockFileIo({ "a.md": "the original" });
-			const readMessages = [makeLocationMessage("Read", [{ path: "a.md" }], "read")];
+			const readMessages = [
+				makeLocationMessage("Read", [{ path: "a.md" }], "read"),
+			];
 			await manager.captureSnapshots(readMessages, undefined, io.readFile);
 
 			delete io.files["a.md"];
 			const allMessages = [
 				...readMessages,
-				makeLocationMessage("Delete", [{ path: "a.md" }], "delete", { path: "a.md" }),
+				makeLocationMessage("Delete", [{ path: "a.md" }], "delete", {
+					path: "a.md",
+				}),
 			];
-			const cs = await manager.computeChanges(allMessages, undefined, io.readFile);
+			const cs = await manager.computeChanges(
+				allMessages,
+				undefined,
+				io.readFile,
+			);
 			const result = await manager.revertFile(cs!.changes[0], io);
 
 			expect(result).toEqual({ reverted: true, conflict: false });
@@ -495,9 +622,7 @@ describe("SnapshotManager", () => {
 
 		it("create then delete: no net change", async () => {
 			const io = mockFileIo();
-			const messages = [
-				makeDiffMessage("temp.ts", null, "content"),
-			];
+			const messages = [makeDiffMessage("temp.ts", null, "content")];
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
 			expect(cs).toBeNull();
@@ -521,7 +646,11 @@ describe("SnapshotManager", () => {
 					},
 				]),
 			];
-			const cs = await manager.computeChanges(deleteMessages, undefined, io.readFile);
+			const cs = await manager.computeChanges(
+				deleteMessages,
+				undefined,
+				io.readFile,
+			);
 			expect(cs!.changes[0].isDeleted).toBe(true);
 			expect(cs!.changes[0].originalText).toBe("v1");
 			expect(cs!.changes[0].canRevert).toBe(true);
@@ -551,7 +680,11 @@ describe("SnapshotManager", () => {
 			const io = mockFileIo({ "summary.md": "content without title" });
 			const messages = [
 				makeDiffMessage("summary.md", null, "# Title\ncontent without title"),
-				makeDiffMessage("summary.md", "# Title\ncontent without title", "content without title"),
+				makeDiffMessage(
+					"summary.md",
+					"# Title\ncontent without title",
+					"content without title",
+				),
 			];
 
 			const cs = await manager.computeChanges(messages, undefined, io.readFile);
@@ -584,27 +717,63 @@ describe("SnapshotManager", () => {
 			expect(cs!.changes[0].originalText).toBeNull();
 		});
 
+		it("kept full-file rewrite becomes baseline for later modifications", async () => {
+			const io = mockFileIo({ "note.md": "rewritten content" });
+			const messages = [
+				makeDiffMessage("note.md", "", "rewritten content"),
+			];
+
+			let cs = await manager.computeChanges(messages, undefined, io.readFile);
+			expect(cs).not.toBeNull();
+			manager.keepFile(cs!.changes[0]);
+
+			io.files["note.md"] = "rewritten content\nwith extra line";
+			cs = await manager.computeChanges(messages, undefined, io.readFile);
+			expect(cs).not.toBeNull();
+			expect(cs!.changes[0].isNewFile).toBe(false);
+			expect(cs!.changes[0].originalText).toBe("rewritten content");
+			expect(cs!.changes[0].finalText).toBe(
+				"rewritten content\nwith extra line",
+			);
+		});
+
 		it("read then write via custom tool: captures before write", async () => {
 			const messages1: ChatMessage[] = [
 				makeLocationMessage("Read", [{ path: "Clippings/摘要.md" }], "read"),
 			];
-			const preWriteRead = vi.fn(async () => "# Title\nOriginal callout content");
+			const preWriteRead = vi.fn(
+				async () => "# Title\nOriginal callout content",
+			);
 			await manager.captureSnapshots(messages1, undefined, preWriteRead);
 
 			const messages2: ChatMessage[] = [
 				...messages1,
-				makeLocationMessage("obsidian-markdown", [{ path: "Clippings/摘要.md" }]),
+				makeLocationMessage("obsidian-markdown", [
+					{ path: "Clippings/摘要.md" },
+				]),
 			];
-			const io = mockFileIo({ "Clippings/摘要.md": "## Title\nConverted heading content" });
-			const cs = await manager.computeChanges(messages2, undefined, io.readFile);
+			const io = mockFileIo({
+				"Clippings/摘要.md": "## Title\nConverted heading content",
+			});
+			const cs = await manager.computeChanges(
+				messages2,
+				undefined,
+				io.readFile,
+			);
 
 			expect(cs).not.toBeNull();
-			expect(cs!.changes[0].originalText).toBe("# Title\nOriginal callout content");
-			expect(cs!.changes[0].finalText).toBe("## Title\nConverted heading content");
+			expect(cs!.changes[0].originalText).toBe(
+				"# Title\nOriginal callout content",
+			);
+			expect(cs!.changes[0].finalText).toBe(
+				"## Title\nConverted heading content",
+			);
 
 			const result = await manager.revertFile(cs!.changes[0], io);
 			expect(result).toEqual({ reverted: true, conflict: false });
-			expect(io.files["Clippings/摘要.md"]).toBe("# Title\nOriginal callout content");
+			expect(io.files["Clippings/摘要.md"]).toBe(
+				"# Title\nOriginal callout content",
+			);
 		});
 	});
 });

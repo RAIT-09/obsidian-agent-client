@@ -7,13 +7,27 @@ export function useUpdateCheck(plugin: AgentClientPlugin): boolean {
 	const logger = getLogger();
 
 	useEffect(() => {
+		let isCancelled = false;
+		setIsUpdateAvailable(false);
+
 		plugin
 			.checkForUpdates()
-			.then(setIsUpdateAvailable)
+			.then((hasUpdate) => {
+				if (!isCancelled) {
+					setIsUpdateAvailable(hasUpdate);
+				}
+			})
 			.catch((error) => {
 				logger.error("Failed to check for updates:", error);
+				if (!isCancelled) {
+					setIsUpdateAvailable(false);
+				}
 			});
-	}, [plugin, logger]);
+
+		return () => {
+			isCancelled = true;
+		};
+	}, [plugin]);
 
 	return isUpdateAvailable;
 }

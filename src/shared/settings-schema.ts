@@ -63,6 +63,7 @@ const settingsSchema = z.object({
 	customAgents: z.array(commonAgentSettingsSchema),
 	defaultAgentId: z.string().min(1),
 	autoAllowPermissions: z.boolean(),
+	allowTerminalCommands: z.boolean(),
 	autoMentionActiveNote: z.boolean(),
 	debugMode: z.boolean(),
 	nodePath: z.string(),
@@ -142,6 +143,7 @@ export const createDefaultSettings = (): AgentClientPluginSettings => ({
 	customAgents: [],
 	defaultAgentId: "opencode",
 	autoAllowPermissions: false,
+	allowTerminalCommands: false,
 	autoMentionActiveNote: true,
 	debugMode: false,
 	nodePath: "",
@@ -203,6 +205,10 @@ export function parseStoredSettings(raw: unknown): {
 		if (ds.completionSound === undefined) {
 			ds.completionSound = true;
 		}
+	}
+
+	if (candidate.allowTerminalCommands === undefined) {
+		candidate.allowTerminalCommands = false;
 	}
 
 	const parsed = settingsSchema.safeParse(candidate);
