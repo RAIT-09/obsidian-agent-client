@@ -730,6 +730,17 @@ export default class AgentClientPlugin extends Plugin {
 				);
 			},
 		});
+
+		this.addCommand({
+			id: "export-chat",
+			name: "Export chat",
+			callback: () => {
+				this.app.workspace.trigger(
+					"agent-client:export-chat" as "quit",
+					this.lastActiveChatViewId,
+				);
+			},
+		});
 	}
 
 	/**
