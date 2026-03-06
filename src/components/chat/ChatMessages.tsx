@@ -83,6 +83,13 @@ export function ChatMessages({
 		}
 	}, []);
 
+	// Reset scroll state when messages are cleared (new chat)
+	useEffect(() => {
+		if (messages.length === 0) {
+			setIsAtBottom(true);
+		}
+	}, [messages.length]);
+
 	// Auto-scroll when messages change
 	useEffect(() => {
 		if (isAtBottom && messages.length > 0) {
