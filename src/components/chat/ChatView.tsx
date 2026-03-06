@@ -496,16 +496,33 @@ function ChatComponent({
 			void handleStopGeneration();
 		});
 
+		const exportRef = (
+			workspace as unknown as {
+				on: (
+					name: string,
+					callback: CustomEventCallback,
+				) => ReturnType<typeof workspace.on>;
+			}
+		).on("agent-client:export-chat", (targetViewId?: string) => {
+			// Only respond if this view is the target (or no target specified)
+			if (targetViewId && targetViewId !== viewId) {
+				return;
+			}
+			void handleExportChat();
+		});
+
 		return () => {
 			workspace.offref(approveRef);
 			workspace.offref(rejectRef);
 			workspace.offref(cancelRef);
+			workspace.offref(exportRef);
 		};
 	}, [
 		plugin.app.workspace,
 		permission.approveActivePermission,
 		permission.rejectActivePermission,
 		handleStopGeneration,
+		handleExportChat,
 		viewId,
 	]);
 
