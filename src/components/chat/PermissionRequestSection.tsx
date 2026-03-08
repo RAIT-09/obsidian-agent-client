@@ -1,11 +1,11 @@
 import type AgentClientPlugin from "../../plugin";
 import { getLogger } from "../../shared/logger";
-import * as acp from "@agentclientprotocol/sdk";
+import type { PermissionOption } from "../../domain/models/chat-message";
 
 interface PermissionRequestSectionProps {
 	permissionRequest: {
 		requestId: string;
-		options: acp.PermissionOption[];
+		options: PermissionOption[];
 		selectedOptionId?: string;
 		isCancelled?: boolean;
 		isActive?: boolean;

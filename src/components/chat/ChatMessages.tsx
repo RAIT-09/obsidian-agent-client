@@ -65,7 +65,7 @@ export function ChatMessages({
 		const container = containerRef.current;
 		if (!container) return true;
 
-		const threshold = 20;
+		const threshold = 35;
 		const isNearBottom =
 			container.scrollTop + container.clientHeight >=
 			container.scrollHeight - threshold;
@@ -82,6 +82,13 @@ export function ChatMessages({
 			container.scrollTop = container.scrollHeight;
 		}
 	}, []);
+
+	// Reset scroll state when messages are cleared (new chat)
+	useEffect(() => {
+		if (messages.length === 0) {
+			setIsAtBottom(true);
+		}
+	}, [messages.length]);
 
 	// Auto-scroll when messages change
 	useEffect(() => {
@@ -150,7 +157,10 @@ export function ChatMessages({
 							onClick={() => {
 								const container = containerRef.current;
 								if (container) {
-									container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+									container.scrollTo({
+										top: container.scrollHeight,
+										behavior: "smooth",
+									});
 								}
 							}}
 							ref={(el) => {

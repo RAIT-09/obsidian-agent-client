@@ -24,24 +24,24 @@ The chat panel opens in the right sidebar.
   <img src="/images/sending-messages.webp" alt="Sending Messages" />
 </p>
 
-## Sending Images
+## Sending Images and Files
 
-You can attach images to your messages by pasting or dragging and dropping.
+You can attach images and files to your messages by pasting or dragging and dropping.
 
-1. **Paste**: Copy an image to your clipboard and paste (`Cmd/Ctrl + V`) in the input field
-2. **Drag and Drop**: Drag image files directly onto the input area
+1. **Paste**: Copy a file or image and paste (`Cmd/Ctrl + V`) in the input field
+2. **Drag and Drop**: Drag files directly onto the input area
 
-Attached images appear as thumbnails below the text area. Click the **×** on a thumbnail to remove it.
+Attached files appear as thumbnails or file icons below the text area. Click the **×** to remove.
 
 <p align="center">
-  <img src="/images/sending-images.webp" alt="Sending Images" width="400" />
+  <img src="/images/sending-images.webp" alt="Sending Images and Files" width="400" />
 </p>
 
 ::: tip
-Image attachments require agent support. If the agent doesn't support images, a notification will appear when you try to attach one.
+Embedding images requires agent support. Non-image files are always sent as file path references.
 :::
 
-See [Sending Images](/usage/sending-images) for more details.
+See [Sending Images and Files](/usage/sending-images) for more details.
 
 ## Switching Agents
 

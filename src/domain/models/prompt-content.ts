@@ -64,9 +64,29 @@ export interface ResourcePromptContent {
 }
 
 /**
+ * Resource link content in a prompt
+ *
+ * References a file by URI without embedding its contents.
+ * The agent is expected to access the file itself.
+ * No prompt capability is required (unlike image/audio/resource).
+ */
+export interface ResourceLinkPromptContent {
+	type: "resource_link";
+	/** Resource URI (e.g., "file:///path/to/document.pdf") */
+	uri: string;
+	/** Human-readable file name */
+	name: string;
+	/** MIME type of the resource */
+	mimeType?: string;
+	/** File size in bytes */
+	size?: number;
+}
+
+/**
  * Union type for all prompt content types
  */
 export type PromptContent =
 	| TextPromptContent
 	| ImagePromptContent
-	| ResourcePromptContent;
+	| ResourcePromptContent
+	| ResourceLinkPromptContent;

@@ -48,6 +48,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		docContainer.createEl("a", {
 			text: "documentation",
 			href: "https://rait-09.github.io/obsidian-agent-client/",
+			attr: { target: "_blank" },
 		});
 		docContainer.createSpan({ text: "." });
 

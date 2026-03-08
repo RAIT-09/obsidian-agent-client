@@ -1,4 +1,5 @@
 import * as React from "react";
+import { setIcon } from "obsidian";
 import type { MessageContent } from "../../domain/models/chat-message";
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../plugin";
@@ -108,6 +109,21 @@ export function MessageContentRenderer({
 						alt="Attached image"
 						className="agent-client-message-image-thumbnail"
 					/>
+				</div>
+			);
+
+		case "resource_link":
+			return (
+				<div className="agent-client-message-resource-link">
+					<span
+						className="agent-client-message-resource-link-icon"
+						ref={(el) => {
+							if (el) setIcon(el, "file");
+						}}
+					/>
+					<span className="agent-client-message-resource-link-name">
+						{content.name}
+					</span>
 				</div>
 			);
 

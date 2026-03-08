@@ -9,18 +9,25 @@ import type {
 	SlashCommand,
 	SessionModeState,
 	SessionModelState,
+	SessionUsage,
 } from "../../domain/models/chat-session";
-import type { ImagePromptContent } from "../../domain/models/prompt-content";
+import type {
+	SessionConfigOption,
+	SessionConfigSelectGroup,
+} from "../../domain/models/session-update";
+import { flattenConfigSelectOptions } from "../../shared/config-option-utils";
+import type { AttachedFile } from "../../domain/models/chat-input-state";
 import type { UseMentionsReturn } from "../../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../../hooks/useSlashCommands";
 import type { UseAutoMentionReturn } from "../../hooks/useAutoMention";
 import type { ChatMessage } from "../../domain/models/chat-message";
 import { SuggestionDropdown } from "./SuggestionDropdown";
 import { ErrorOverlay } from "./ErrorOverlay";
-import { ImagePreviewStrip, type AttachedImage } from "./ImagePreviewStrip";
+import { AttachmentPreviewStrip } from "./AttachmentPreviewStrip";
 import { useInputHistory } from "../../hooks/useInputHistory";
 import { getLogger } from "../../shared/logger";
 import type { ErrorInfo } from "../../domain/models/agent-error";
+import type { AgentUpdateNotification } from "../../shared/agent-update-checker";
 import { useSettings } from "../../hooks/useSettings";
 
 // ============================================================================
@@ -33,8 +40,8 @@ const MAX_IMAGE_SIZE_MB = 5;
 /** Maximum image size in bytes */
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
 
-/** Maximum number of images per message */
-const MAX_IMAGE_COUNT = 10;
+/** Maximum number of attachments per message (images + files combined) */
+const MAX_ATTACHMENT_COUNT = 10;
 
 /** Supported image MIME types (whitelist) */
 const SUPPORTED_IMAGE_TYPES = [
@@ -45,6 +52,25 @@ const SUPPORTED_IMAGE_TYPES = [
 ] as const;
 
 type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
+
+// ============================================================================
+// Usage Indicator Helpers
+// ============================================================================
+
+/** Format token count for display (e.g., 21367 → "21.4K", 200000 → "200K") */
+function formatTokenCount(tokens: number): string {
+	if (tokens < 1000) return String(tokens);
+	const k = tokens / 1000;
+	return k >= 100 ? `${Math.round(k)}K` : `${k.toFixed(1)}K`;
+}
+
+/** Get CSS class for usage percentage color thresholds */
+function getUsageColorClass(percentage: number): string {
+	if (percentage >= 90) return "agent-client-usage-danger";
+	if (percentage >= 80) return "agent-client-usage-warning";
+	if (percentage >= 70) return "agent-client-usage-caution";
+	return "agent-client-usage-normal";
+}
 
 /**
  * Props for ChatInput component
@@ -74,10 +100,10 @@ export interface ChatInputProps {
 	plugin: AgentClientPlugin;
 	/** View instance for event registration */
 	view: IChatViewHost;
-	/** Callback to send a message with optional images */
+	/** Callback to send a message with optional attachments */
 	onSendMessage: (
 		content: string,
-		images?: ImagePromptContent[],
+		attachments?: AttachedFile[],
 	) => Promise<void>;
 	/** Callback to stop the current generation */
 	onStopGeneration: () => Promise<void>;
@@ -91,6 +117,12 @@ export interface ChatInputProps {
 	models?: SessionModelState;
 	/** Callback when model is changed */
 	onModelChange?: (modelId: string) => void;
+	/** Session config options (supersedes modes/models when present) */
+	configOptions?: SessionConfigOption[];
+	/** Callback when a config option is changed */
+	onConfigOptionChange?: (configId: string, value: string) => void;
+	/** Context window usage (shown as percentage indicator) */
+	usage?: SessionUsage;
 	/** Whether the agent supports image attachments */
 	supportsImages?: boolean;
 	/** Current agent ID (used to clear images on agent switch) */
@@ -100,14 +132,18 @@ export interface ChatInputProps {
 	inputValue: string;
 	/** Callback when input text changes */
 	onInputChange: (value: string) => void;
-	/** Currently attached images */
-	attachedImages: AttachedImage[];
-	/** Callback when attached images change */
-	onAttachedImagesChange: (images: AttachedImage[]) => void;
+	/** Currently attached files (images and non-image files) */
+	attachedFiles: AttachedFile[];
+	/** Callback when attached files change */
+	onAttachedFilesChange: (files: AttachedFile[]) => void;
 	/** Error information to display as overlay */
 	errorInfo: ErrorInfo | null;
 	/** Callback to clear the error */
 	onClearError: () => void;
+	/** Agent update notification (version update or migration) */
+	agentUpdateNotification: AgentUpdateNotification | null;
+	/** Callback to dismiss the agent update notification */
+	onClearAgentUpdate: () => void;
 	/** Messages array for input history navigation */
 	messages: ChatMessage[];
 }
@@ -144,16 +180,22 @@ export function ChatInput({
 	onModeChange,
 	models,
 	onModelChange,
+	configOptions,
+	onConfigOptionChange,
+	usage,
 	supportsImages = false,
 	agentId,
 	// Controlled component props
 	inputValue,
 	onInputChange,
-	attachedImages,
-	onAttachedImagesChange,
+	attachedFiles,
+	onAttachedFilesChange,
 	// Error overlay props
 	errorInfo,
 	onClearError,
+	// Agent update notification props
+	agentUpdateNotification,
+	onClearAgentUpdate,
 	// Input history
 	messages,
 }: ChatInputProps) {
@@ -187,37 +229,49 @@ export function ChatInput({
 	const modeDropdownInstance = useRef<DropdownComponent | null>(null);
 	const modelDropdownRef = useRef<HTMLDivElement>(null);
 	const modelDropdownInstance = useRef<DropdownComponent | null>(null);
+	const configOptionsRef = useRef<HTMLDivElement>(null);
+	const configDropdownInstances = useRef<Map<string, DropdownComponent>>(
+		new Map(),
+	);
 
-	// Clear attached images when agent changes
+	// Clear attached files when agent changes
 	useEffect(() => {
-		onAttachedImagesChange([]);
-	}, [agentId, onAttachedImagesChange]);
+		onAttachedFilesChange([]);
+	}, [agentId, onAttachedFilesChange]);
 
 	/**
-	 * Add an image to the attached images list.
-	 * Simple addition - validation is done in handlePaste.
+	 * Add multiple attachments at once with limit enforcement.
+	 * Single state update avoids stale closure issues.
 	 */
-	const addImage = useCallback(
-		(image: AttachedImage) => {
-			// Safety check for max count
-			if (attachedImages.length >= MAX_IMAGE_COUNT) {
+	const addAttachments = useCallback(
+		(newFiles: AttachedFile[]) => {
+			if (newFiles.length === 0) return;
+			const remaining = MAX_ATTACHMENT_COUNT - attachedFiles.length;
+			if (remaining <= 0) {
+				new Notice(
+					`[Agent Client] Maximum ${MAX_ATTACHMENT_COUNT} attachments allowed`,
+				);
 				return;
 			}
-			onAttachedImagesChange([...attachedImages, image]);
+			const toAdd = newFiles.slice(0, remaining);
+			if (toAdd.length < newFiles.length) {
+				new Notice(
+					`[Agent Client] Maximum ${MAX_ATTACHMENT_COUNT} attachments allowed`,
+				);
+			}
+			onAttachedFilesChange([...attachedFiles, ...toAdd]);
 		},
-		[attachedImages, onAttachedImagesChange],
+		[attachedFiles, onAttachedFilesChange],
 	);
 
 	/**
-	 * Remove an image from the attached images list.
+	 * Remove a file from the attached files list.
 	 */
-	const removeImage = useCallback(
+	const removeFile = useCallback(
 		(id: string) => {
-			onAttachedImagesChange(
-				attachedImages.filter((img) => img.id !== id),
-			);
+			onAttachedFilesChange(attachedFiles.filter((f) => f.id !== id));
 		},
-		[attachedImages, onAttachedImagesChange],
+		[attachedFiles, onAttachedFilesChange],
 	);
 
 	/**
@@ -238,83 +292,137 @@ export function ChatInput({
 	}, []);
 
 	/**
-	 * Process and attach image files.
-	 * Common logic for paste and drop handlers.
+	 * Convert image files to Base64 AttachedFile objects.
+	 * Returns the converted attachments without updating state.
 	 */
-	const processImageFiles = useCallback(
-		async (files: File[]) => {
-			let addedCount = 0;
-
+	const convertImagesToAttachments = useCallback(
+		async (files: File[]): Promise<AttachedFile[]> => {
+			const result: AttachedFile[] = [];
 			for (const file of files) {
-				// Check image count
-				if (attachedImages.length + addedCount >= MAX_IMAGE_COUNT) {
-					new Notice(
-						`[Agent Client] Maximum ${MAX_IMAGE_COUNT} images allowed`,
-					);
-					break;
-				}
-
-				// Check file size (before conversion - memory efficiency)
 				if (file.size > MAX_IMAGE_SIZE_BYTES) {
 					new Notice(
 						`[Agent Client] Image too large (max ${MAX_IMAGE_SIZE_MB}MB)`,
 					);
 					continue;
 				}
-
-				// Convert to Base64 and add
 				try {
 					const base64 = await fileToBase64(file);
-					addImage({
+					result.push({
 						id: crypto.randomUUID(),
+						kind: "image",
 						data: base64,
 						mimeType: file.type,
 					});
-					addedCount++;
 				} catch (error) {
 					console.error("Failed to convert image:", error);
 					new Notice("[Agent Client] Failed to attach image");
 				}
 			}
+			return result;
 		},
-		[attachedImages.length, addImage, fileToBase64],
+		[fileToBase64],
 	);
 
 	/**
-	 * Handle paste event for image attachment.
+	 * Convert files to resource_link AttachedFile objects.
+	 * Returns the converted attachments without updating state.
+	 */
+	const convertFilesToAttachments = useCallback(
+		(files: File[]): AttachedFile[] => {
+			// Get file path via Electron's webUtils API (File.path was removed in Electron 32)
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const { webUtils } = require("electron") as {
+				webUtils: { getPathForFile: (file: File) => string };
+			};
+			const result: AttachedFile[] = [];
+			for (const file of files) {
+				const filePath = webUtils.getPathForFile(file);
+				if (!filePath) {
+					new Notice("[Agent Client] Could not determine file path");
+					continue;
+				}
+				result.push({
+					id: crypto.randomUUID(),
+					kind: "file",
+					mimeType: file.type || "application/octet-stream",
+					name: file.name,
+					path: filePath,
+					size: file.size,
+				});
+			}
+			return result;
+		},
+		[],
+	);
+
+	/**
+	 * Handle paste event for file attachment.
+	 * Images are embedded as Base64 if agent supports it, otherwise sent as resource_link.
+	 * Non-image files are sent as resource_link.
 	 */
 	const handlePaste = useCallback(
 		async (e: React.ClipboardEvent) => {
 			const items = e.clipboardData?.items;
 			if (!items) return;
 
-			// Extract image files from clipboard
+			// Extract files from clipboard, split by type
 			const imageFiles: File[] = [];
+			const nonImageFiles: File[] = [];
+
 			for (const item of Array.from(items)) {
+				if (item.kind !== "file") continue;
+				const file = item.getAsFile();
+				if (!file) continue;
+
 				if (
 					SUPPORTED_IMAGE_TYPES.includes(
 						item.type as SupportedImageType,
 					)
 				) {
-					const file = item.getAsFile();
-					if (file) imageFiles.push(file);
+					imageFiles.push(file);
+				} else {
+					nonImageFiles.push(file);
 				}
 			}
 
-			if (imageFiles.length === 0) return;
+			if (imageFiles.length === 0 && nonImageFiles.length === 0) return;
 
 			e.preventDefault();
 
-			if (!supportsImages) {
-				new Notice(
-					"[Agent Client] This agent does not support image attachments",
-				);
-				return;
+			const newAttachments: AttachedFile[] = [];
+
+			if (imageFiles.length > 0) {
+				if (supportsImages) {
+					newAttachments.push(
+						...(await convertImagesToAttachments(imageFiles)),
+					);
+				} else {
+					// Try resource_link fallback (works for files copied from Finder, not for screenshots)
+					const converted = convertFilesToAttachments(imageFiles);
+					if (converted.length > 0) {
+						newAttachments.push(...converted);
+					} else {
+						new Notice(
+							"[Agent Client] This agent does not support image paste. Try drag & drop instead.",
+						);
+					}
+				}
 			}
 
-			await processImageFiles(imageFiles);
+			if (nonImageFiles.length > 0) {
+				newAttachments.push(
+					...convertFilesToAttachments(nonImageFiles),
+				);
+			}
+
+			addAttachments(newAttachments);
 		},
-		[supportsImages, processImageFiles],
+		[
+			supportsImages,
+			convertImagesToAttachments,
+			convertFilesToAttachments,
+			addAttachments,
+		],
 	);
 
 	/**
@@ -352,7 +460,9 @@ export function ChatInput({
 	}, []);
 
 	/**
-	 * Handle drop event for image files.
+	 * Handle drop event for file attachments.
+	 * Images are embedded as Base64 if agent supports it, otherwise sent as resource_link.
+	 * Non-image files are always sent as resource_link.
 	 */
 	const handleDrop = useCallback(
 		async (e: React.DragEvent) => {
@@ -362,25 +472,53 @@ export function ChatInput({
 			const files = e.dataTransfer?.files;
 			if (!files || files.length === 0) return;
 
-			// Filter to supported image types
-			const imageFiles = Array.from(files).filter((file) =>
-				SUPPORTED_IMAGE_TYPES.includes(file.type as SupportedImageType),
-			);
-
-			if (imageFiles.length === 0) return;
-
 			e.preventDefault();
 
-			if (!supportsImages) {
-				new Notice(
-					"[Agent Client] This agent does not support image attachments",
-				);
-				return;
+			const droppedFiles = Array.from(files);
+			const imageFiles: File[] = [];
+			const nonImageFiles: File[] = [];
+
+			for (const file of droppedFiles) {
+				if (
+					SUPPORTED_IMAGE_TYPES.includes(
+						file.type as SupportedImageType,
+					)
+				) {
+					imageFiles.push(file);
+				} else if (file.type || file.name) {
+					nonImageFiles.push(file);
+				}
 			}
 
-			await processImageFiles(imageFiles);
+			// Convert all files, then update state once
+			const newAttachments: AttachedFile[] = [];
+
+			if (imageFiles.length > 0) {
+				if (supportsImages) {
+					newAttachments.push(
+						...(await convertImagesToAttachments(imageFiles)),
+					);
+				} else {
+					newAttachments.push(
+						...convertFilesToAttachments(imageFiles),
+					);
+				}
+			}
+
+			if (nonImageFiles.length > 0) {
+				newAttachments.push(
+					...convertFilesToAttachments(nonImageFiles),
+				);
+			}
+
+			addAttachments(newAttachments);
 		},
-		[supportsImages, processImageFiles],
+		[
+			supportsImages,
+			convertImagesToAttachments,
+			convertFilesToAttachments,
+			addAttachments,
+		],
 	);
 
 	/**
@@ -508,7 +646,7 @@ export function ChatInput({
 			} else {
 				// Send button - active when has input (text or images)
 				const hasContent =
-					inputValue.trim() !== "" || attachedImages.length > 0;
+					inputValue.trim() !== "" || attachedFiles.length > 0;
 				svg.classList.add(
 					hasContent
 						? "agent-client-icon-active"
@@ -516,7 +654,7 @@ export function ChatInput({
 				);
 			}
 		},
-		[isSending, inputValue, attachedImages.length],
+		[isSending, inputValue, attachedFiles.length],
 	);
 
 	/**
@@ -528,38 +666,30 @@ export function ChatInput({
 			return;
 		}
 
-		// Allow sending if there's text OR images
-		if (!inputValue.trim() && attachedImages.length === 0) return;
+		// Allow sending if there's text OR attachments
+		if (!inputValue.trim() && attachedFiles.length === 0) return;
 
-		// Save input value and images before clearing
+		// Save input value and files before clearing
 		const messageToSend = inputValue.trim();
-		const imagesToSend: ImagePromptContent[] = attachedImages.map(
-			(img) => ({
-				type: "image",
-				data: img.data,
-				mimeType: img.mimeType,
-			}),
-		);
+		const filesToSend =
+			attachedFiles.length > 0 ? [...attachedFiles] : undefined;
 
-		// Clear input, images, and hint state immediately
+		// Clear input, files, and hint state immediately
 		onInputChange("");
-		onAttachedImagesChange([]);
+		onAttachedFilesChange([]);
 		setHintText(null);
 		setCommandText("");
 		resetHistory();
 
-		await onSendMessage(
-			messageToSend,
-			imagesToSend.length > 0 ? imagesToSend : undefined,
-		);
+		await onSendMessage(messageToSend, filesToSend);
 	}, [
 		isSending,
 		inputValue,
-		attachedImages,
+		attachedFiles,
 		onSendMessage,
 		onStopGeneration,
 		onInputChange,
-		onAttachedImagesChange,
+		onAttachedFilesChange,
 		resetHistory,
 	]);
 
@@ -635,10 +765,10 @@ export function ChatInput({
 		[slashCommands, mentions, handleSelectSlashCommand, selectMention],
 	);
 
-	// Button disabled state - also allow sending if images are attached
+	// Button disabled state - also allow sending if files are attached
 	const isButtonDisabled =
 		!isSending &&
-		((inputValue.trim() === "" && attachedImages.length === 0) ||
+		((inputValue.trim() === "" && attachedFiles.length === 0) ||
 			!isSessionReady ||
 			isRestoringSession);
 
@@ -739,7 +869,7 @@ export function ChatInput({
 		}
 	}, [isSending, updateIconColor]);
 
-	// Update icon color when input or attached images change
+	// Update icon color when input or attached files change
 	useEffect(() => {
 		if (sendButtonRef.current) {
 			const svg = sendButtonRef.current.querySelector("svg");
@@ -747,7 +877,7 @@ export function ChatInput({
 				updateIconColor(svg);
 			}
 		}
-	}, [inputValue, attachedImages.length, updateIconColor]);
+	}, [inputValue, attachedFiles.length, updateIconColor]);
 
 	// Auto-focus textarea on mount
 	useEffect(() => {
@@ -901,6 +1031,82 @@ export function ChatInput({
 		}
 	}, [currentModelId]);
 
+	// Stable reference for configOption callback
+	const onConfigOptionChangeRef = useRef(onConfigOptionChange);
+	onConfigOptionChangeRef.current = onConfigOptionChange;
+
+	// Initialize configOptions dropdowns (dynamic, replaces mode/model when present)
+	useEffect(() => {
+		const containerEl = configOptionsRef.current;
+		if (!containerEl) return;
+
+		// Clean up existing dropdowns
+		containerEl.empty();
+		configDropdownInstances.current.clear();
+
+		if (!configOptions || configOptions.length === 0) return;
+
+		for (const option of configOptions) {
+			// Flatten options (handle both flat and grouped)
+			const flatOptions = flattenConfigSelectOptions(option.options);
+
+			// Only show if there are multiple values
+			if (flatOptions.length <= 1) continue;
+
+			// Create wrapper div with appropriate class based on category
+			const categoryClass = option.category
+				? `agent-client-config-selector-${option.category}`
+				: "agent-client-config-selector";
+			const wrapperEl = containerEl.createDiv({
+				cls: `agent-client-config-selector ${categoryClass}`,
+				attr: { title: option.description ?? option.name },
+			});
+
+			const dropdownContainer = wrapperEl.createDiv();
+			const dropdown = new DropdownComponent(dropdownContainer);
+
+			// Add options (with group prefix for grouped options)
+			if (option.options.length > 0 && "group" in option.options[0]) {
+				for (const group of option.options as SessionConfigSelectGroup[]) {
+					for (const opt of group.options) {
+						dropdown.addOption(
+							opt.value,
+							`${group.name} / ${opt.name}`,
+						);
+					}
+				}
+			} else {
+				for (const opt of flatOptions) {
+					dropdown.addOption(opt.value, opt.name);
+				}
+			}
+
+			// Set current value
+			dropdown.setValue(option.currentValue);
+
+			// Handle change
+			const configId = option.id;
+			dropdown.onChange((value) => {
+				if (onConfigOptionChangeRef.current) {
+					onConfigOptionChangeRef.current(configId, value);
+				}
+			});
+
+			// Add chevron icon
+			const iconEl = wrapperEl.createSpan({
+				cls: "agent-client-config-selector-icon",
+			});
+			setIcon(iconEl, "chevron-down");
+
+			configDropdownInstances.current.set(option.id, dropdown);
+		}
+
+		return () => {
+			containerEl.empty();
+			configDropdownInstances.current.clear();
+		};
+	}, [configOptions]);
+
 	// Placeholder text
 	const placeholder = `Message ${agentLabel} - @ to mention notes${availableCommands.length > 0 ? ", / for commands" : ""}`;
 
@@ -913,6 +1119,17 @@ export function ChatInput({
 					onClose={onClearError}
 					showEmojis={showEmojis}
 					view={view}
+				/>
+			)}
+
+			{/* Agent Update Notification - hidden when error is showing */}
+			{!errorInfo && agentUpdateNotification && (
+				<ErrorOverlay
+					errorInfo={agentUpdateNotification}
+					onClose={onClearAgentUpdate}
+					showEmojis={showEmojis}
+					view={view}
+					variant={agentUpdateNotification.variant}
 				/>
 			)}
 
@@ -1024,54 +1241,78 @@ export function ChatInput({
 					)}
 				</div>
 
-				{/* Image Preview Strip (only shown when agent supports images) */}
-				{supportsImages && (
-					<ImagePreviewStrip
-						images={attachedImages}
-						onRemove={removeImage}
-					/>
-				)}
+				{/* Attachment Preview Strip (images + file references) */}
+				<AttachmentPreviewStrip
+					files={attachedFiles}
+					onRemove={removeFile}
+				/>
 
-				{/* Input Actions (Mode Selector + Model Selector + Send Button) */}
+				{/* Input Actions (Config Options / Mode Selector / Model Selector + Send Button) */}
 				<div className="agent-client-chat-input-actions">
-					{/* Mode Selector */}
-					{modes && modes.availableModes.length > 1 && (
-						<div
-							className="agent-client-mode-selector"
-							title={
-								modes.availableModes.find(
-									(m) => m.id === modes.currentModeId,
-								)?.description ?? "Select mode"
+					{/* Context Usage Indicator (left-aligned via margin-right: auto) */}
+					{usage && (
+						<span
+							className={`agent-client-usage-indicator ${getUsageColorClass(Math.round((usage.used / usage.size) * 100))}`}
+							aria-label={
+								usage.cost
+									? `${formatTokenCount(usage.used)} / ${formatTokenCount(usage.size)} tokens\n$${usage.cost.amount.toFixed(2)}`
+									: `${formatTokenCount(usage.used)} / ${formatTokenCount(usage.size)} tokens`
 							}
 						>
-							<div ref={modeDropdownRef} />
-							<span
-								className="agent-client-mode-selector-icon"
-								ref={(el) => {
-									if (el) setIcon(el, "chevron-down");
-								}}
-							/>
-						</div>
+							{Math.round((usage.used / usage.size) * 100)}%
+						</span>
 					)}
 
-					{/* Model Selector (experimental) */}
-					{models && models.availableModels.length > 1 && (
+					{/* Config Options (supersedes legacy mode/model selectors) */}
+					{configOptions && configOptions.length > 0 ? (
 						<div
-							className="agent-client-model-selector"
-							title={
-								models.availableModels.find(
-									(m) => m.modelId === models.currentModelId,
-								)?.description ?? "Select model"
-							}
-						>
-							<div ref={modelDropdownRef} />
-							<span
-								className="agent-client-model-selector-icon"
-								ref={(el) => {
-									if (el) setIcon(el, "chevron-down");
-								}}
-							/>
-						</div>
+							ref={configOptionsRef}
+							className="agent-client-config-options-container"
+						/>
+					) : (
+						<>
+							{/* Legacy Mode Selector */}
+							{modes && modes.availableModes.length > 1 && (
+								<div
+									className="agent-client-mode-selector"
+									title={
+										modes.availableModes.find(
+											(m) => m.id === modes.currentModeId,
+										)?.description ?? "Select mode"
+									}
+								>
+									<div ref={modeDropdownRef} />
+									<span
+										className="agent-client-mode-selector-icon"
+										ref={(el) => {
+											if (el) setIcon(el, "chevron-down");
+										}}
+									/>
+								</div>
+							)}
+
+							{/* Legacy Model Selector */}
+							{models && models.availableModels.length > 1 && (
+								<div
+									className="agent-client-model-selector"
+									title={
+										models.availableModels.find(
+											(m) =>
+												m.modelId ===
+												models.currentModelId,
+										)?.description ?? "Select model"
+									}
+								>
+									<div ref={modelDropdownRef} />
+									<span
+										className="agent-client-model-selector-icon"
+										ref={(el) => {
+											if (el) setIcon(el, "chevron-down");
+										}}
+									/>
+								</div>
+							)}
+						</>
 					)}
 
 					{/* Send/Stop Button */}
