@@ -438,7 +438,8 @@ If your plugin does not need CSS, delete this file.
 /* Header */
 .agent-client-chat-view-header {
 	padding: 16px;
-	border-bottom: 1px solid var(--background-modifier-border);
+	margin: 0;
+	border-bottom: none;
 	flex-shrink: 0;
 	display: flex;
 	align-items: center;
@@ -454,6 +455,11 @@ If your plugin does not need CSS, delete this file.
 
 .agent-client-chat-view-header-title {
 	margin: 0 !important;
+	color: var(--nav-item-color) !important;
+	font-size: 13px;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
 }
 
 .agent-client-chat-view-header-update {
@@ -477,7 +483,8 @@ If your plugin does not need CSS, delete this file.
 	align-items: center;
 	justify-content: space-between;
 	padding: 8px 12px;
-	border-bottom: 1px solid var(--background-modifier-border);
+	margin: 0;
+	border-bottom: none;
 	background-color: var(--background-primary);
 	flex-shrink: 0;
 	flex-wrap: nowrap;
@@ -726,7 +733,8 @@ If your plugin does not need CSS, delete this file.
 	justify-content: space-between;
 	gap: 4px;
 	padding: 6px 12px;
-	border-bottom: 1px solid var(--background-modifier-border);
+	margin: 0;
+	border-bottom: none;
 	background-color: transparent;
 }
 
@@ -1198,7 +1206,8 @@ If your plugin does not need CSS, delete this file.
 }
 
 .agent-client-mention-dropdown-item.agent-client-has-border {
-	border-bottom: 1px solid var(--background-modifier-border);
+	margin: 0;
+	border-bottom: none;
 }
 
 .agent-client-mention-dropdown-item-name {
@@ -1449,7 +1458,8 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-muted);
 	font-size: 11px;
 	border-top: 1px solid var(--background-modifier-border);
-	border-bottom: 1px solid var(--background-modifier-border);
+	margin: 0;
+	border-bottom: none;
 	font-weight: 500;
 }
 
@@ -1537,7 +1547,7 @@ If your plugin does not need CSS, delete this file.
 .agent-client-attachment-preview-strip {
 	display: flex;
 	gap: 8px;
-	padding: 8px 12px;
+	padding: 0;
 	background-color: transparent;
 	overflow-x: auto;
 	scrollbar-width: thin;
@@ -1727,7 +1737,8 @@ If your plugin does not need CSS, delete this file.
 .agent-client-session-history-filter {
 	margin-bottom: 16px;
 	padding-bottom: 12px;
-	border-bottom: 1px solid var(--background-modifier-border);
+	margin: 0;
+	border-bottom: none;
 }
 
 .agent-client-session-history-filter-label {
@@ -1933,7 +1944,7 @@ If your plugin does not need CSS, delete this file.
 
 /* Local sessions banner */
 .agent-client-session-history-local-banner {
-	padding: 8px 12px;
+	padding: 0;
 	margin-bottom: 12px;
 	background: var(--background-secondary);
 	border-radius: 4px;
@@ -1944,7 +1955,7 @@ If your plugin does not need CSS, delete this file.
 
 /* Warning banner for agents that don't support restoration */
 .agent-client-session-history-warning-banner {
-	padding: 8px 12px;
+	padding: 0;
 	margin-bottom: 12px;
 	background: var(--background-secondary);
 	border-radius: 4px;
@@ -2137,7 +2148,8 @@ If your plugin does not need CSS, delete this file.
 	font-size: 13px;
 	color: var(--text-muted);
 	background: var(--background-secondary);
-	border-bottom: 1px solid var(--background-modifier-border);
+	margin: 0;
+	border-bottom: none;
 }
 
 .agent-client-floating-instance-menu-item {
