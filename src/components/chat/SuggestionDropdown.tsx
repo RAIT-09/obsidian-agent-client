@@ -77,8 +77,11 @@ export function SuggestionDropdown({
 			}
 		};
 
-		view.registerDomEvent(document, "mousedown", handleClickOutside);
-	}, [onClose, view]);
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
+	}, [onClose]);
 
 	// Scroll selected item into view
 	useEffect(() => {

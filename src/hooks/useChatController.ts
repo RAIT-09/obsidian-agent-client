@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Notice, FileSystemAdapter } from "obsidian";
+import { Notice, FileSystemAdapter, Platform } from "obsidian";
 
 import type AgentClientPlugin from "../plugin";
-import type { AttachedImage } from "../components/chat/ImagePreviewStrip";
+import type { AttachedFile } from "../domain/models/chat-input-state";
 import { SessionHistoryModal } from "../components/chat/SessionHistoryModal";
 import { ConfirmDeleteModal } from "../components/chat/ConfirmDeleteModal";
 
@@ -31,7 +31,16 @@ import type {
 	SessionModeState,
 	SessionModelState,
 } from "../domain/models/chat-session";
-import type { ImagePromptContent } from "../domain/models/prompt-content";
+import type { SessionConfigOption } from "../domain/models/session-update";
+import { flattenConfigSelectOptions } from "../shared/config-option-utils";
+import type {
+	ImagePromptContent,
+	ResourceLinkPromptContent,
+} from "../domain/models/prompt-content";
+import { buildFileUri } from "../shared/path-utils";
+import { convertWindowsPathToWsl } from "../shared/wsl-utils";
+import type { AgentUpdateNotification } from "../shared/agent-update-checker";
+import { checkAgentUpdate } from "../shared/agent-update-checker";
 
 // Agent info for display (from plugin.getAvailableAgents())
 interface AgentInfo {
@@ -82,11 +91,12 @@ export interface UseChatControllerReturn {
 	errorInfo:
 		| ReturnType<typeof useChat>["errorInfo"]
 		| ReturnType<typeof useAgentSession>["errorInfo"];
+	agentUpdateNotification: AgentUpdateNotification | null;
 
 	// Core callbacks
 	handleSendMessage: (
 		content: string,
-		images?: ImagePromptContent[],
+		attachments?: AttachedFile[],
 	) => Promise<void>;
 	handleStopGeneration: () => Promise<void>;
 	handleNewChat: (requestedAgentId?: string) => Promise<void>;
@@ -94,18 +104,20 @@ export interface UseChatControllerReturn {
 	handleSwitchAgent: (agentId: string) => Promise<void>;
 	handleRestartAgent: () => Promise<void>;
 	handleClearError: () => void;
+	handleClearAgentUpdate: () => void;
 	handleRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	handleForkSession: (sessionId: string, cwd: string) => Promise<void>;
 	handleDeleteSession: (sessionId: string) => void;
 	handleOpenHistory: () => void;
 	handleSetMode: (modeId: string) => Promise<void>;
 	handleSetModel: (modelId: string) => Promise<void>;
+	handleSetConfigOption: (configId: string, value: string) => Promise<void>;
 
 	// Input state (for broadcast commands - sidebar only)
 	inputValue: string;
 	setInputValue: (value: string) => void;
-	attachedImages: AttachedImage[];
-	setAttachedImages: (images: AttachedImage[]) => void;
+	attachedFiles: AttachedFile[];
+	setAttachedFiles: (files: AttachedFile[]) => void;
 	restoredMessage: string | null;
 	handleRestoredMessageConsumed: () => void;
 
@@ -209,15 +221,22 @@ export function useChatController(
 			sessionId: string,
 			modes?: SessionModeState,
 			models?: SessionModelState,
+			configOptions?: SessionConfigOption[],
 		) => {
 			logger.log(
 				`[useChatController] Session loaded/resumed/forked: ${sessionId}`,
 				{
 					modes,
 					models,
+					configOptions,
 				},
 			);
-			agentSession.updateSessionFromLoad(sessionId, modes, models);
+			agentSession.updateSessionFromLoad(
+				sessionId,
+				modes,
+				models,
+				configOptions,
+			);
 		},
 		[logger, agentSession],
 	);
@@ -259,11 +278,13 @@ export function useChatController(
 	// Local State
 	// ============================================================
 	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+	const [agentUpdateNotification, setAgentUpdateNotification] =
+		useState<AgentUpdateNotification | null>(null);
 	const [restoredMessage, setRestoredMessage] = useState<string | null>(null);
 
 	// Input state (for broadcast commands - sidebar only)
 	const [inputValue, setInputValue] = useState("");
-	const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+	const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 
 	// ============================================================
 	// Refs
@@ -303,9 +324,46 @@ export function useChatController(
 	// ============================================================
 	// Callbacks
 	// ============================================================
+	const shouldConvertToWsl = Platform.isWin && settings.windowsWslMode;
+
 	const handleSendMessage = useCallback(
-		async (content: string, images?: ImagePromptContent[]) => {
+		async (content: string, attachments?: AttachedFile[]) => {
+			// Dismiss overlays on send
+			chat.clearError();
+			setAgentUpdateNotification(null);
+
 			const isFirstMessage = messages.length === 0;
+
+			// Split attachments by kind
+			const images: ImagePromptContent[] = [];
+			const resourceLinks: ResourceLinkPromptContent[] = [];
+
+			if (attachments) {
+				for (const file of attachments) {
+					if (file.kind === "image" && file.data) {
+						images.push({
+							type: "image",
+							data: file.data,
+							mimeType: file.mimeType,
+						});
+					} else if (file.kind === "file" && file.path) {
+						let filePath = file.path;
+						if (shouldConvertToWsl) {
+							filePath = convertWindowsPathToWsl(filePath);
+						}
+						resourceLinks.push({
+							type: "resource_link",
+							uri: buildFileUri(filePath),
+							name:
+								file.name ??
+								file.path.split("/").pop() ??
+								"file",
+							mimeType: file.mimeType || undefined,
+							size: file.size,
+						});
+					}
+				}
+			}
 
 			await chat.sendMessage(content, {
 				activeNote: settings.autoMentionActiveNote
@@ -313,7 +371,9 @@ export function useChatController(
 					: null,
 				vaultBasePath: vaultPath,
 				isAutoMentionDisabled: autoMention.isDisabled,
-				images,
+				images: images.length > 0 ? images : undefined,
+				resourceLinks:
+					resourceLinks.length > 0 ? resourceLinks : undefined,
 			});
 
 			// Save session metadata locally on first message
@@ -330,12 +390,13 @@ export function useChatController(
 		[
 			chat,
 			autoMention,
-			plugin,
 			messages.length,
 			session.sessionId,
 			sessionHistory,
 			logger,
 			settings.autoMentionActiveNote,
+			shouldConvertToWsl,
+			vaultPath,
 		],
 	);
 
@@ -456,6 +517,10 @@ export function useChatController(
 	const handleClearError = useCallback(() => {
 		chat.clearError();
 	}, [chat]);
+
+	const handleClearAgentUpdate = useCallback(() => {
+		setAgentUpdateNotification(null);
+	}, []);
 
 	const handleRestoredMessageConsumed = useCallback(() => {
 		setRestoredMessage(null);
@@ -587,6 +652,13 @@ export function useChatController(
 		[agentSession],
 	);
 
+	const handleSetConfigOption = useCallback(
+		async (configId: string, value: string) => {
+			await agentSession.setConfigOption(configId, value);
+		},
+		[agentSession],
+	);
+
 	// Update modal props when session history state changes
 	useEffect(() => {
 		if (historyModalRef.current) {
@@ -638,9 +710,35 @@ export function useChatController(
 		void agentSession.createSession(config?.agent || initialAgentId);
 	}, [agentSession.createSession, config?.agent, initialAgentId]);
 
-	// TODO(code-block): Apply configured model when session is ready
+	// Apply configured model when session is ready
 	useEffect(() => {
-		if (config?.model && isSessionReady && session.models) {
+		if (!config?.model || !isSessionReady) return;
+
+		// Prefer configOptions if available
+		if (session.configOptions) {
+			const modelOption = session.configOptions.find(
+				(o) => o.category === "model",
+			);
+			if (modelOption && modelOption.currentValue !== config.model) {
+				const valueExists = flattenConfigSelectOptions(
+					modelOption.options,
+				).some((o) => o.value === config.model);
+				if (valueExists) {
+					logger.log(
+						"[useChatController] Applying configured model via configOptions:",
+						config.model,
+					);
+					void agentSession.setConfigOption(
+						modelOption.id,
+						config.model,
+					);
+				}
+			}
+			return;
+		}
+
+		// Fallback to legacy models
+		if (session.models) {
 			const modelExists = session.models.availableModels.some(
 				(m) => m.modelId === config.model,
 			);
@@ -655,7 +753,9 @@ export function useChatController(
 	}, [
 		config?.model,
 		isSessionReady,
+		session.configOptions,
 		session.models,
+		agentSession.setConfigOption,
 		agentSession.setModel,
 		logger,
 	]);
@@ -708,6 +808,14 @@ export function useChatController(
 					agentSession.updateAvailableCommands(update.commands);
 				} else if (update.type === "current_mode_update") {
 					agentSession.updateCurrentMode(update.currentModeId);
+				} else if (update.type === "config_option_update") {
+					agentSession.updateConfigOptions(update.configOptions);
+				} else if (update.type === "usage_update") {
+					agentSession.updateUsage({
+						used: update.used,
+						size: update.size,
+						cost: update.cost ?? undefined,
+					});
 				}
 				// Ignore all message-related updates (history replay)
 				return;
@@ -721,6 +829,14 @@ export function useChatController(
 				agentSession.updateAvailableCommands(update.commands);
 			} else if (update.type === "current_mode_update") {
 				agentSession.updateCurrentMode(update.currentModeId);
+			} else if (update.type === "config_option_update") {
+				agentSession.updateConfigOptions(update.configOptions);
+			} else if (update.type === "usage_update") {
+				agentSession.updateUsage({
+					used: update.used,
+					size: update.size,
+					cost: update.cost ?? undefined,
+				});
 			}
 		});
 	}, [
@@ -749,6 +865,23 @@ export function useChatController(
 				logger.error("Failed to check for updates:", error);
 			});
 	}, [plugin, logger]);
+
+	// ============================================================
+	// Effects - Agent Update Check
+	// ============================================================
+	useEffect(() => {
+		if (!isSessionReady || !session.agentInfo?.name) {
+			return;
+		}
+
+		checkAgentUpdate(
+			session.agentInfo as { name: string; version?: string },
+		)
+			.then(setAgentUpdateNotification)
+			.catch((error) => {
+				logger.error("Failed to check agent update:", error);
+			});
+	}, [isSessionReady, session.agentInfo, logger]);
 
 	// ============================================================
 	// Effects - Save Session Messages on Turn End
@@ -828,6 +961,7 @@ export function useChatController(
 		activeAgentLabel,
 		availableAgents,
 		errorInfo,
+		agentUpdateNotification,
 
 		// Core callbacks
 		handleSendMessage,
@@ -837,18 +971,20 @@ export function useChatController(
 		handleSwitchAgent,
 		handleRestartAgent,
 		handleClearError,
+		handleClearAgentUpdate,
 		handleRestoreSession,
 		handleForkSession,
 		handleDeleteSession,
 		handleOpenHistory,
 		handleSetMode,
 		handleSetModel,
+		handleSetConfigOption,
 
 		// Input state
 		inputValue,
 		setInputValue,
-		attachedImages,
-		setAttachedImages,
+		attachedFiles,
+		setAttachedFiles,
 		restoredMessage,
 		handleRestoredMessageConsumed,
 

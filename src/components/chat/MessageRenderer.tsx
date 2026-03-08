@@ -19,38 +19,41 @@ interface MessageRendererProps {
 }
 
 /**
- * Group consecutive image contents together for horizontal scrolling display.
- * Non-image contents are wrapped individually.
+ * Group consecutive image/resource_link contents together for horizontal display.
+ * Non-attachment contents are wrapped individually.
  */
 function groupContent(
 	contents: MessageContent[],
 ): Array<
-	| { type: "images"; items: MessageContent[] }
+	| { type: "attachments"; items: MessageContent[] }
 	| { type: "single"; item: MessageContent }
 > {
 	const groups: Array<
-		| { type: "images"; items: MessageContent[] }
+		| { type: "attachments"; items: MessageContent[] }
 		| { type: "single"; item: MessageContent }
 	> = [];
 
-	let currentImageGroup: MessageContent[] = [];
+	let currentAttachmentGroup: MessageContent[] = [];
 
 	for (const content of contents) {
-		if (content.type === "image") {
-			currentImageGroup.push(content);
+		if (content.type === "image" || content.type === "resource_link") {
+			currentAttachmentGroup.push(content);
 		} else {
-			// Flush any pending image group
-			if (currentImageGroup.length > 0) {
-				groups.push({ type: "images", items: currentImageGroup });
-				currentImageGroup = [];
+			// Flush any pending attachment group
+			if (currentAttachmentGroup.length > 0) {
+				groups.push({
+					type: "attachments",
+					items: currentAttachmentGroup,
+				});
+				currentAttachmentGroup = [];
 			}
 			groups.push({ type: "single", item: content });
 		}
 	}
 
-	// Flush remaining images
-	if (currentImageGroup.length > 0) {
-		groups.push({ type: "images", items: currentImageGroup });
+	// Flush remaining attachments
+	if (currentAttachmentGroup.length > 0) {
+		groups.push({ type: "attachments", items: currentAttachmentGroup });
 	}
 
 	return groups;
@@ -69,8 +72,8 @@ export function MessageRenderer({
 			className={`agent-client-message-renderer ${message.role === "user" ? "agent-client-message-user" : "agent-client-message-assistant"}`}
 		>
 			{groups.map((group, idx) => {
-				if (group.type === "images") {
-					// Render images in horizontal scroll container
+				if (group.type === "attachments") {
+					// Render attachments (images + resource_links) in horizontal strip
 					return (
 						<div
 							key={idx}

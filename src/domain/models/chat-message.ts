@@ -135,6 +135,7 @@ export interface ChatMessage {
  * - text: Plain text from user or agent
  * - agent_thought: Agent's internal reasoning (often collapsed in UI)
  * - image: Visual content (base64 encoded)
+ * - resource_link: Reference to a file the agent can access (URI only)
  * - tool_call: Agent's tool execution with results
  * - plan: Agent's task breakdown
  * - permission_request: Request for user approval
@@ -166,6 +167,13 @@ export type MessageContent =
 			data: string; // Base64 encoded image data
 			mimeType: string; // e.g., "image/png"
 			uri?: string; // Optional source URI
+	  }
+	| {
+			type: "resource_link";
+			uri: string; // Resource URI (e.g., "file:///path/to/file.pdf")
+			name: string; // Human-readable file name
+			mimeType?: string; // e.g., "application/pdf"
+			size?: number; // File size in bytes
 	  }
 	| {
 			type: "tool_call";

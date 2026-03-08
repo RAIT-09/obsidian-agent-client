@@ -1,47 +1,41 @@
-# Sending Images
+# Sending Images and Files
 
-Attach images to your messages to provide visual context to the AI agent.
+Attach images and files to your messages to provide context to the AI agent.
 
-## Agent Support
-
-Image attachments are agent-specific. Not all agents support image attachments.
-
-::: tip
-If your agent doesn't support images, you'll see a notification when attempting to attach one:
-
-`[Agent Client] This agent does not support image attachments`
-:::
-
-## Attaching Images
-
-### Paste from Clipboard
-
-1. Copy an image to your clipboard (screenshot, copied image, etc.)
-2. Focus the input field
-3. Paste with `Cmd/Ctrl + V`
+## Attaching Files
 
 ### Drag and Drop
 
-1. Drag image files from Finder/Explorer
-2. Drop them onto the input area
-3. The input area highlights when you drag over it
+1. Drag files from Finder/Explorer onto the input area
+2. The input area highlights when you drag over it
+3. Thumbnails (images) or file icons (other files) appear below the text area
+
+### Paste from Clipboard
+
+1. Copy a file or image to your clipboard
+2. Focus the input field
+3. Paste with `Cmd/Ctrl + V`
 
 <p align="center">
-  <img src="/images/sending-images.webp" alt="Sending Images" width="400" />
+  <img src="/images/sending-images.webp" alt="Sending Images and Files" width="400" />
 </p>
+
+::: tip
+Embedding images in messages requires agent support. If the agent doesn't support images, image files are sent as file references instead (via drag and drop or paste from Finder/Explorer).
+:::
 
 ## Managing Attachments
 
-Attached images appear as thumbnails below the text area.
+Attached files appear as thumbnails or file icons below the text area.
 
-- **Remove an image**: Hover over the thumbnail and click the **×** button
-- **Images are sent with your message**: When you send, all attached images are included
+- **Remove an attachment**: Hover over it and click the **×** button
+- **Attachments are sent with your message**: When you send, all attached files are included
 
 <p align="center">
-  <img src="/images/remove-image.webp" alt="Remove image button" width="400" />
+  <img src="/images/remove-image.webp" alt="Remove attachment button" width="400" />
 </p>
 
-## Supported Formats
+## Supported Image Formats
 
 | Format | MIME Type |
 |--------|-----------|
@@ -50,15 +44,21 @@ Attached images appear as thumbnails below the text area.
 | GIF | `image/gif` |
 | WebP | `image/webp` |
 
+Non-image files have no format restriction.
+
+::: info
+Non-image files are sent as file path references. How the agent processes the file depends on its capabilities and available tools.
+:::
+
 ## Limits
 
 | Limit | Value |
 |-------|-------|
-| Maximum file size | 5 MB per image |
-| Maximum images | 10 per message |
+| Maximum image size | 5 MB per image |
+| Maximum attachments | 10 per message (images + files combined) |
 
 ::: info
 If you exceed these limits, a notification will inform you:
 - `[Agent Client] Image too large (max 5MB)`
-- `[Agent Client] Maximum 10 images allowed`
+- `[Agent Client] Maximum 10 attachments allowed`
 :::

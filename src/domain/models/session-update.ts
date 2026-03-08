@@ -135,6 +135,70 @@ export interface CurrentModeUpdate extends SessionUpdateBase {
 	currentModeId: string;
 }
 
+/**
+ * Session info update (title, timestamp).
+ * Sent when the agent updates session metadata.
+ */
+export interface SessionInfoUpdate extends SessionUpdateBase {
+	type: "session_info_update";
+	title?: string | null;
+	updatedAt?: string | null;
+}
+
+/**
+ * Context window and cost update for a session.
+ * Sent periodically to report token usage and cost.
+ */
+export interface UsageUpdate extends SessionUpdateBase {
+	type: "usage_update";
+	/** Total context window size in tokens */
+	size: number;
+	/** Tokens currently in context */
+	used: number;
+	/** Cumulative session cost */
+	cost?: { amount: number; currency: string } | null;
+}
+
+/**
+ * Session configuration options have been updated.
+ * Sent when the agent changes config options (mode, model, thought_level, etc.).
+ * Supersedes legacy modes/models API.
+ */
+export interface ConfigOptionUpdate extends SessionUpdateBase {
+	type: "config_option_update";
+	configOptions: SessionConfigOption[];
+}
+
+// ============================================================================
+// Config Option Types
+// ============================================================================
+
+/**
+ * A session configuration option (e.g. mode, model, thought_level).
+ * Part of the ACP configOptions API that supersedes legacy modes/models.
+ */
+export interface SessionConfigOption {
+	id: string;
+	name: string;
+	description?: string | null;
+	category?: string | null;
+	type: "select";
+	currentValue: string;
+	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[];
+}
+
+export interface SessionConfigSelectOption {
+	value: string;
+	name: string;
+	description?: string | null;
+}
+
+export interface SessionConfigSelectGroup {
+	group: string;
+	name: string;
+	options: SessionConfigSelectOption[];
+}
+
 // ============================================================================
 // Union Type
 // ============================================================================
@@ -151,6 +215,9 @@ export interface CurrentModeUpdate extends SessionUpdateBase {
  * - plan: Agent's task plan
  * - available_commands_update: Slash commands changed
  * - current_mode_update: Mode changed
+ * - session_info_update: Session metadata changed
+ * - usage_update: Context window and cost update
+ * - config_option_update: Session config options changed
  *
  * All session update types include a sessionId field to identify which
  * session the update belongs to. This enables filtering/routing of updates
@@ -164,4 +231,7 @@ export type SessionUpdate =
 	| ToolCallUpdate
 	| Plan
 	| AvailableCommandsUpdate
-	| CurrentModeUpdate;
+	| CurrentModeUpdate
+	| SessionInfoUpdate
+	| UsageUpdate
+	| ConfigOptionUpdate;
