@@ -1,5 +1,6 @@
 import * as React from "react";
 import { HeaderButton } from "./HeaderButton";
+import { AgentIcon } from "./AgentIcon";
 
 /**
  * Props for ChatHeader component
@@ -42,7 +43,7 @@ export function ChatHeader({
 		<div className="agent-client-chat-view-header">
 			<div className="agent-client-chat-view-header-main">
 				<h3 className="agent-client-chat-view-header-title">
-					{agentLabel}
+					<AgentIcon agentLabel={agentLabel} />{agentLabel}
 				</h3>
 			</div>
 			{isUpdateAvailable && (
