@@ -47,7 +47,11 @@ jobs:
           body: $BODY
           url: $URL
 
-          Translate all of the above content into Japanese exactly as written. Do not summarize or omit anything. Post the full translation to Discord." \
+          You are a translator. Your ONLY job is to translate the above content into Japanese word-for-word. Rules:
+          1. Translate the ENTIRE body text. Do NOT summarize, shorten, paraphrase, or omit any part.
+          2. Preserve all formatting, line breaks, code blocks, and links from the original.
+          3. Output ONLY the translation — no commentary, no preamble, no summary.
+          Post the full translation to Discord." \
             --arg ch "discord" \
             --arg to "$OPENCLAW_DISCORD_CHANNEL" \
             '{message: $msg, deliver: true, channel: $ch, to: $to, name: "GitHub", agentId: "github-hook", announce: false}' | \
