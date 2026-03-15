@@ -773,7 +773,9 @@ function FloatingChatComponent({
 						view={viewHost}
 						acpClient={acpClientRef.current}
 						onApprovePermission={permission.approvePermission}
-						hasActivePermission={permission.activePermission != null}
+						hasActivePermission={
+							permission.activePermission != null
+						}
 					/>
 				</div>
 
