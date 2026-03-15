@@ -258,7 +258,12 @@ export default class AgentClientPlugin extends Plugin {
 			id: "open-floating-chat",
 			name: "Open floating chat window",
 			callback: () => {
-				if (!this.settings.showFloatingButton) return;
+				if (!this.settings.showFloatingButton) {
+					new Notice(
+						"[Agent Client] Floating chat is disabled in settings",
+					);
+					return;
+				}
 				const instances = this.getFloatingChatInstances();
 				if (instances.length === 0) {
 					this.openNewFloatingChat(true);
@@ -281,7 +286,12 @@ export default class AgentClientPlugin extends Plugin {
 			id: "open-new-floating-chat",
 			name: "Open new floating chat window",
 			callback: () => {
-				if (!this.settings.showFloatingButton) return;
+				if (!this.settings.showFloatingButton) {
+					new Notice(
+						"[Agent Client] Floating chat is disabled in settings",
+					);
+					return;
+				}
 				this.openNewFloatingChat(true);
 			},
 		});
