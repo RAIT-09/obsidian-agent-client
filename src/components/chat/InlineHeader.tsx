@@ -50,7 +50,7 @@ export interface InlineHeaderProps {
  * - Agent selector
  * - Update notification (if available)
  * - Action buttons with Lucide icons (new chat, history, export, restart)
- * - Minimize button (floating variant only)
+ * - Minimize and close buttons (floating variant only)
  */
 export function InlineHeader({
 	agentLabel,
