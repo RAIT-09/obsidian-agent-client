@@ -39,6 +39,8 @@ export interface InlineHeaderProps {
 	onOpenNewWindow?: () => void;
 	/** Callback to minimize window (floating only) */
 	onMinimize?: () => void;
+	/** Callback to close and terminate window (floating only) */
+	onClose?: () => void;
 }
 
 /**
@@ -64,6 +66,7 @@ export function InlineHeader({
 	variant,
 	onOpenNewWindow,
 	onMinimize,
+	onClose,
 }: InlineHeaderProps) {
 	// Refs for agent dropdown
 	const agentDropdownRef = useRef<HTMLDivElement>(null);
@@ -183,6 +186,13 @@ export function InlineHeader({
 						iconName="minimize-2"
 						tooltip="Minimize"
 						onClick={onMinimize}
+					/>
+				)}
+				{variant === "floating" && onClose && (
+					<HeaderButton
+						iconName="x"
+						tooltip="Close"
+						onClick={onClose}
 					/>
 				)}
 			</div>

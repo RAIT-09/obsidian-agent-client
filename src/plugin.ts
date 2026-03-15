@@ -297,6 +297,17 @@ export default class AgentClientPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "close-floating-chat",
+			name: "Close floating chat window",
+			callback: () => {
+				const focused = this.viewRegistry.getFocused();
+				if (focused && focused.viewType === "floating") {
+					this.closeFloatingChat(focused.viewId);
+				}
+			},
+		});
+
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
 
 		// Mount floating button (always present; visibility controlled by settings inside component)

@@ -333,6 +333,10 @@ function FloatingChatComponent({
 		setIsExpanded(false);
 	}, []);
 
+	const handleCloseWindow = useCallback(() => {
+		plugin.closeFloatingChat(viewId);
+	}, [plugin, viewId]);
+
 	// Listen for expand requests
 	useEffect(() => {
 		const handleExpandRequest = (
@@ -758,6 +762,7 @@ function FloatingChatComponent({
 					onRestartAgent={() => void handleRestartAgent()}
 					onOpenNewWindow={handleOpenNewFloatingChat}
 					onMinimize={handleMinimizeWindow}
+					onClose={handleCloseWindow}
 				/>
 			</div>
 
