@@ -104,8 +104,8 @@ export interface AgentClientPluginSettings {
 	lastUsedModels: Record<string, string>;
 	// Last used mode per agent (agentId → modeId)
 	lastUsedModes: Record<string, string>;
-	// Floating chat button settings
-	showFloatingButton: boolean;
+	// Floating chat settings
+	enableFloatingChat: boolean;
 	floatingButtonImage: string;
 	floatingWindowSize: { width: number; height: number };
 	floatingWindowPosition: { x: number; y: number } | null;
@@ -169,7 +169,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	savedSessions: [],
 	lastUsedModels: {},
 	lastUsedModes: {},
-	showFloatingButton: false,
+	enableFloatingChat: false,
 	floatingButtonImage: "",
 	floatingWindowSize: { width: 400, height: 500 },
 	floatingWindowPosition: null,
@@ -258,7 +258,7 @@ export default class AgentClientPlugin extends Plugin {
 			id: "open-floating-chat",
 			name: "Open floating chat window",
 			callback: () => {
-				if (!this.settings.showFloatingButton) {
+				if (!this.settings.enableFloatingChat) {
 					new Notice(
 						"[Agent Client] Floating chat is disabled in settings",
 					);
@@ -286,7 +286,7 @@ export default class AgentClientPlugin extends Plugin {
 			id: "open-new-floating-chat",
 			name: "Open new floating chat window",
 			callback: () => {
-				if (!this.settings.showFloatingButton) {
+				if (!this.settings.enableFloatingChat) {
 					new Notice(
 						"[Agent Client] Floating chat is disabled in settings",
 					);
@@ -325,7 +325,7 @@ export default class AgentClientPlugin extends Plugin {
 		this.floatingButton.mount();
 
 		// Mount initial floating chat instance only if enabled
-		if (this.settings.showFloatingButton) {
+		if (this.settings.enableFloatingChat) {
 			this.openNewFloatingChat();
 		}
 
@@ -1166,10 +1166,13 @@ export default class AgentClientPlugin extends Plugin {
 				}
 				return DEFAULT_SETTINGS.lastUsedModes;
 			})(),
-			showFloatingButton:
-				typeof rawSettings.showFloatingButton === "boolean"
-					? rawSettings.showFloatingButton
-					: DEFAULT_SETTINGS.showFloatingButton,
+			// Migration: support old showFloatingButton → new enableFloatingChat
+			enableFloatingChat:
+				typeof rawSettings.enableFloatingChat === "boolean"
+					? rawSettings.enableFloatingChat
+					: typeof rawSettings.showFloatingButton === "boolean"
+						? rawSettings.showFloatingButton
+						: DEFAULT_SETTINGS.enableFloatingChat,
 			floatingButtonImage:
 				typeof rawSettings.floatingButtonImage === "string"
 					? rawSettings.floatingButtonImage
