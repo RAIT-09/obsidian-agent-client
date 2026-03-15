@@ -17,12 +17,12 @@ The Floating Chat provides a lightweight alternative to the sidebar chat view:
 - **Independent sessions** — each window runs its own agent session
 
 ::: tip
-Enable the floating chat in **Settings → Agent Client → Floating chat → Show floating button**.
+Enable the floating chat in **Settings → Agent Client → Floating chat → Enable floating chat**.
 :::
 
 ## Getting Started
 
-1. Enable **Show floating button** in settings
+1. Enable **Enable floating chat** in settings
 2. A floating button appears in the bottom-right corner
 3. Click the button to open a chat window
 4. Start chatting — the window works just like the sidebar chat
@@ -67,7 +67,8 @@ The focused floating window is always displayed in front of other floating windo
 |---------|-------------|
 | **Open floating chat window** | Open an existing floating window, or create one if none exist |
 | **Open new floating chat window** | Always create a new floating window |
-| **Close floating chat window** | Hide the focused floating window (session is preserved) |
+| **Minimize floating chat window** | Hide the focused floating window (session is preserved) |
+| **Close floating chat window** | Close the focused floating window and end the session |
 
 ::: tip
 Assign keyboard shortcuts to these commands in **Settings → Hotkeys** for quick access.
@@ -79,5 +80,5 @@ Customize the floating chat in **Settings → Agent Client → Floating chat**:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| **Show floating button** | Off | Display the floating button and enable floating chat |
+| **Enable floating chat** | Off | Enable the floating chat button and draggable chat windows |
 | **Floating button image** | Default icon | URL or vault path to a custom button image |
