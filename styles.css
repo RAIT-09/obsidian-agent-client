@@ -48,6 +48,17 @@ If your plugin does not need CSS, delete this file.
 	visibility: hidden;
 }
 
+.agent-client-loading-status {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	font-style: italic;
+	margin-left: 8px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
+}
+
 /* ===== Scroll to Bottom Button ===== */
 .agent-client-scroll-to-bottom {
 	position: sticky;
