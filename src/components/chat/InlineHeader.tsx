@@ -37,8 +37,8 @@ export interface InlineHeaderProps {
 	variant: "floating" | "codeblock";
 	/** Callback to open new window (floating only) */
 	onOpenNewWindow?: () => void;
-	/** Callback to close window (floating only) */
-	onClose?: () => void;
+	/** Callback to minimize window (floating only) */
+	onMinimize?: () => void;
 }
 
 /**
@@ -48,7 +48,7 @@ export interface InlineHeaderProps {
  * - Agent selector
  * - Update notification (if available)
  * - Action buttons with Lucide icons (new chat, history, export, restart)
- * - Close button (floating variant only)
+ * - Minimize button (floating variant only)
  */
 export function InlineHeader({
 	agentLabel,
@@ -63,7 +63,7 @@ export function InlineHeader({
 	onRestartAgent,
 	variant,
 	onOpenNewWindow,
-	onClose,
+	onMinimize,
 }: InlineHeaderProps) {
 	// Refs for agent dropdown
 	const agentDropdownRef = useRef<HTMLDivElement>(null);
@@ -178,11 +178,11 @@ export function InlineHeader({
 						onClick={onOpenNewWindow}
 					/>
 				)}
-				{variant === "floating" && onClose && (
+				{variant === "floating" && onMinimize && (
 					<HeaderButton
-						iconName="x"
-						tooltip="Close"
-						onClick={onClose}
+						iconName="minimize-2"
+						tooltip="Minimize"
+						onClick={onMinimize}
 					/>
 				)}
 			</div>

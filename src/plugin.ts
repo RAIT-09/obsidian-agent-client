@@ -287,8 +287,8 @@ export default class AgentClientPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: "close-floating-chat",
-			name: "Close floating chat window",
+			id: "minimize-floating-chat",
+			name: "Minimize floating chat window",
 			callback: () => {
 				const focused = this.viewRegistry.getFocused();
 				if (focused && focused.viewType === "floating") {

@@ -329,7 +329,7 @@ function FloatingChatComponent({
 		);
 	}, [plugin, position, size.width, size.height]);
 
-	const handleCloseWindow = useCallback(() => {
+	const handleMinimizeWindow = useCallback(() => {
 		setIsExpanded(false);
 	}, []);
 
@@ -757,7 +757,7 @@ function FloatingChatComponent({
 					onExportChat={() => void handleExportChat()}
 					onRestartAgent={() => void handleRestartAgent()}
 					onOpenNewWindow={handleOpenNewFloatingChat}
-					onClose={handleCloseWindow}
+					onMinimize={handleMinimizeWindow}
 				/>
 			</div>
 
