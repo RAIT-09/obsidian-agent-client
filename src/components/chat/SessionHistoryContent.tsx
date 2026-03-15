@@ -314,7 +314,7 @@ export function SessionHistoryContent({
 	onClose,
 }: SessionHistoryContentProps) {
 	const [filterByCurrentVault, setFilterByCurrentVault] = useState(true);
-	const [hideNonLocalSessions, setHideNonLocalSessions] = useState(true);
+	const [hideNonLocalSessions, setHideNonLocalSessions] = useState(false);
 
 	const handleFilterChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {
