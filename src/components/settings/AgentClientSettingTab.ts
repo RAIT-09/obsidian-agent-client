@@ -356,17 +356,17 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName("Floating chat").setHeading();
 
 		new Setting(containerEl)
-			.setName("Show floating button")
+			.setName("Enable floating chat")
 			.setDesc(
-				"Display a floating chat button that opens a draggable chat window.",
+				"Enable the floating chat button and draggable chat windows.",
 			)
 			.addToggle((toggle) =>
 				toggle
-					.setValue(this.plugin.settings.showFloatingButton)
+					.setValue(this.plugin.settings.enableFloatingChat)
 					.onChange(async (value) => {
 						const wasEnabled =
-							this.plugin.settings.showFloatingButton;
-						this.plugin.settings.showFloatingButton = value;
+							this.plugin.settings.enableFloatingChat;
+						this.plugin.settings.enableFloatingChat = value;
 						await this.plugin.saveSettings();
 
 						// Handle dynamic toggle of floating chat

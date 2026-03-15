@@ -211,6 +211,7 @@ function SessionItem({
 	session,
 	canRestore,
 	canFork,
+	currentCwd,
 	onRestoreSession,
 	onForkSession,
 	onDeleteSession,
@@ -219,6 +220,7 @@ function SessionItem({
 	session: SessionInfo;
 	canRestore: boolean;
 	canFork: boolean;
+	currentCwd: string;
 	onRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
 	onDeleteSession: (sessionId: string) => void;
@@ -250,6 +252,14 @@ function SessionItem({
 					{session.updatedAt && (
 						<span className="agent-client-session-history-item-timestamp">
 							{formatRelativeTime(new Date(session.updatedAt))}
+						</span>
+					)}
+					{session.cwd !== currentCwd && (
+						<span
+							className="agent-client-session-history-item-cwd"
+							title={session.cwd}
+						>
+							{session.cwd}
 						</span>
 					)}
 				</div>
@@ -314,7 +324,7 @@ export function SessionHistoryContent({
 	onClose,
 }: SessionHistoryContentProps) {
 	const [filterByCurrentVault, setFilterByCurrentVault] = useState(true);
-	const [hideNonLocalSessions, setHideNonLocalSessions] = useState(true);
+	const [hideNonLocalSessions, setHideNonLocalSessions] = useState(false);
 
 	const handleFilterChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -465,6 +475,7 @@ export function SessionHistoryContent({
 									session={session}
 									canRestore={canRestore}
 									canFork={canFork}
+									currentCwd={currentCwd}
 									onRestoreSession={onRestoreSession}
 									onForkSession={onForkSession}
 									onDeleteSession={onDeleteSession}
