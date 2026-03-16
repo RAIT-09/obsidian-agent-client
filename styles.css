@@ -732,7 +732,6 @@ If your plugin does not need CSS, delete this file.
 	justify-content: space-between;
 	gap: 4px;
 	padding: 6px 12px;
-	border-bottom: 1px solid var(--background-modifier-border);
 	background-color: transparent;
 }
 
