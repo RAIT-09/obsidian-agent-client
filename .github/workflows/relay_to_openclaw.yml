@@ -17,6 +17,10 @@ on:
     types: [opened]
   pull_request_review_comment:
     types: [created]
+  discussion:
+    types: [created]
+  discussion_comment:
+    types: [created]
 
 jobs:
   relay:
@@ -30,9 +34,9 @@ jobs:
           OPENCLAW_DISCORD_CHANNEL: ${{ secrets.OPENCLAW_DISCORD_CHANNEL }}
         run: |
           # Extract only the fields we need to avoid 413
-          TITLE=$(echo "$GH_EVENT" | jq -r '.issue.title // .pull_request.title // ""')
-          BODY=$(echo "$GH_EVENT" | jq -r '.comment.body // .issue.body // .pull_request.body // ""')
-          URL=$(echo "$GH_EVENT" | jq -r '.comment.html_url // .issue.html_url // .pull_request.html_url // ""')
+          TITLE=$(echo "$GH_EVENT" | jq -r '.issue.title // .pull_request.title // .discussion.title // ""')
+          BODY=$(echo "$GH_EVENT" | jq -r '.comment.body // .issue.body // .pull_request.body // .discussion.body // ""')
+          URL=$(echo "$GH_EVENT" | jq -r '.comment.html_url // .issue.html_url // .pull_request.html_url // .discussion.html_url // ""')
           USER=$(echo "$GH_EVENT" | jq -r '.sender.login // ""')
 
           jq -n \
@@ -43,7 +47,11 @@ jobs:
           body: $BODY
           url: $URL
 
-          Translate all of the above content into Japanese exactly as written. Do not summarize or omit anything. Post the full translation to Discord." \
+          You are a translator. Your ONLY job is to translate the above content into Japanese word-for-word. Rules:
+          1. Translate the ENTIRE body text. Do NOT summarize, shorten, paraphrase, or omit any part.
+          2. Preserve all formatting, line breaks, code blocks, and links from the original.
+          3. Output ONLY the translation — no commentary, no preamble, no summary.
+          Post the full translation to Discord." \
             --arg ch "discord" \
             --arg to "$OPENCLAW_DISCORD_CHANNEL" \
             '{message: $msg, deliver: true, channel: $ch, to: $to, name: "GitHub", agentId: "github-hook", announce: false}' | \

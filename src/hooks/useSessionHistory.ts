@@ -477,15 +477,30 @@ export function useSessionHistory(
 				onSessionLoad(sessionId, undefined, undefined, undefined);
 
 				if (capabilities.canLoad) {
-					// Notify that load is starting (to ignore history replay)
-					onLoadStart?.();
+					// Check local messages first to decide whether to use them or agent replay
+					const localMessages =
+						await settingsAccess.loadSessionMessages(sessionId);
 
-					try {
-						// Start loading local messages in parallel with agent load
-						const localMessagesPromise =
-							settingsAccess.loadSessionMessages(sessionId);
-
-						// Use load (agent will replay history via session/update, but we ignore it)
+					if (localMessages && onMessagesRestore) {
+						// Local messages available: ignore agent replay, restore from local
+						onLoadStart?.();
+						try {
+							const result = await agentClient.loadSession(
+								sessionId,
+								cwd,
+							);
+							onSessionLoad(
+								result.sessionId,
+								result.modes,
+								result.models,
+								result.configOptions,
+							);
+							onMessagesRestore(localMessages);
+						} finally {
+							onLoadEnd?.();
+						}
+					} else {
+						// No local messages: let agent replay flow through to UI
 						const result = await agentClient.loadSession(
 							sessionId,
 							cwd,
@@ -496,15 +511,6 @@ export function useSessionHistory(
 							result.models,
 							result.configOptions,
 						);
-
-						// Restore local messages (may have already resolved)
-						const localMessages = await localMessagesPromise;
-						if (localMessages && onMessagesRestore) {
-							onMessagesRestore(localMessages);
-						}
-					} finally {
-						// Notify that load is complete (stop ignoring)
-						onLoadEnd?.();
 					}
 				} else if (capabilities.canResume) {
 					// Use resume (without history replay, restore from local storage)

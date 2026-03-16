@@ -329,9 +329,13 @@ function FloatingChatComponent({
 		);
 	}, [plugin, position, size.width, size.height]);
 
-	const handleCloseWindow = useCallback(() => {
+	const handleMinimizeWindow = useCallback(() => {
 		setIsExpanded(false);
 	}, []);
+
+	const handleCloseWindow = useCallback(() => {
+		plugin.closeFloatingChat(viewId);
+	}, [plugin, viewId]);
 
 	// Listen for expand requests
 	useEffect(() => {
@@ -757,6 +761,7 @@ function FloatingChatComponent({
 					onExportChat={() => void handleExportChat()}
 					onRestartAgent={() => void handleRestartAgent()}
 					onOpenNewWindow={handleOpenNewFloatingChat}
+					onMinimize={handleMinimizeWindow}
 					onClose={handleCloseWindow}
 				/>
 			</div>
@@ -773,6 +778,9 @@ function FloatingChatComponent({
 						view={viewHost}
 						acpClient={acpClientRef.current}
 						onApprovePermission={permission.approvePermission}
+						hasActivePermission={
+							permission.activePermission != null
+						}
 					/>
 				</div>
 

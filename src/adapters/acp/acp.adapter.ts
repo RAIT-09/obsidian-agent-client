@@ -1430,6 +1430,30 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	// ========================================================================
+	// ACP Extension Handlers
+	// ========================================================================
+
+	/**
+	 * Handle custom notifications from agents (ACP extensibility).
+	 *
+	 * ACP agents may send custom notifications prefixed with underscore (e.g.,
+	 * `_kiro.dev/commands/available`). Per the ACP spec, clients SHOULD ignore
+	 * unrecognized notifications. Without this handler, the SDK raises
+	 * `methodNotFound` errors for these notifications.
+	 *
+	 * @see https://agentclientprotocol.com/protocol/extensibility#custom-notifications
+	 */
+	async extNotification(
+		method: string,
+		params: Record<string, unknown>,
+	): Promise<void> {
+		this.logger.log(
+			`[AcpAdapter] Extension notification received: ${method}`,
+			params,
+		);
+	}
+
+	// ========================================================================
 	// Terminal Operations (IAcpClient)
 	// ========================================================================
 
