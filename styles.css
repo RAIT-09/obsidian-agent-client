@@ -2073,7 +2073,7 @@ If your plugin does not need CSS, delete this file.
 	flex-direction: column;
 	overflow: hidden;
 	resize: both;
-	min-width: 300px;
+	min-width: 330px;
 	min-height: 460px;
 }
 
