@@ -483,7 +483,7 @@ If your plugin does not need CSS, delete this file.
 	align-items: center;
 	justify-content: space-between;
 	padding: 8px 12px;
-	border-bottom: 1px solid var(--background-modifier-border);
+	border-bottom: none;
 	background-color: var(--background-primary);
 	flex-shrink: 0;
 	flex-wrap: nowrap;
