@@ -2,7 +2,6 @@ import * as React from "react";
 import { useEffect, useRef } from "react";
 import { DropdownComponent, setIcon } from "obsidian";
 import { HeaderButton } from "./HeaderButton";
-import { AgentIcon } from "./AgentIcon";
 
 // Agent info for display
 interface AgentInfo {
@@ -142,7 +141,7 @@ export function InlineHeader({
 					</div>
 				) : (
 					<span className="agent-client-agent-label">
-						<AgentIcon agentLabel={agentLabel} />{agentLabel}
+						{agentLabel}
 					</span>
 				)}
 			</div>

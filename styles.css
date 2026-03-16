@@ -2309,4 +2309,3 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-normal);
 	font-size: 12px;
 }
-.agent-client-agent-icon svg {\n\twidth: 14px;\n\theight: 14px;\n\tcolor: var(--nav-item-color);\n}
