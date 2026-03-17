@@ -6,6 +6,7 @@ import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../plugin";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { PermissionRequestSection } from "./PermissionRequestSection";
+import { LucideIcon } from "./LucideIcon";
 import { toRelativePath } from "../../shared/path-utils";
 import * as Diff from "diff";
 // import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
@@ -62,31 +63,29 @@ export function ToolCallRenderer({
 	// Get showEmojis setting
 	const showEmojis = plugin.settings.displaySettings.showEmojis;
 
-	// Get icon based on kind
-	const getKindIcon = (kind?: string) => {
-		if (!showEmojis) return null;
-
+	// Get Lucide icon name based on tool kind
+	const getKindIconName = (kind?: string): string => {
 		switch (kind) {
 			case "read":
-				return "📖";
+				return "book-open";
 			case "edit":
-				return "✏️";
+				return "pencil";
 			case "delete":
-				return "🗑️";
+				return "trash";
 			case "move":
-				return "📦";
+				return "folder-open";
 			case "search":
-				return "🔍";
+				return "search";
 			case "execute":
-				return "💻";
+				return "square-terminal";
 			case "think":
-				return "💭";
+				return "message-circle-more";
 			case "fetch":
-				return "🌐";
+				return "globe";
 			case "switch_mode":
-				return "🔄";
+				return "arrow-left-right";
 			default:
-				return "🔧";
+				return "hammer";
 		}
 	};
 
@@ -96,9 +95,10 @@ export function ToolCallRenderer({
 			<div className="agent-client-message-tool-call-header">
 				<div className="agent-client-message-tool-call-title">
 					{showEmojis && (
-						<span className="agent-client-message-tool-call-icon">
-							{getKindIcon(kind)}
-						</span>
+						<LucideIcon
+							name={getKindIconName(kind)}
+							className="agent-client-message-tool-call-icon"
+						/>
 					)}
 					{title}
 				</div>

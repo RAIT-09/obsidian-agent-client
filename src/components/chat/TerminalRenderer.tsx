@@ -3,6 +3,7 @@ const { useState, useRef, useEffect } = React;
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 import { getLogger } from "../../shared/logger";
 import type AgentClientPlugin from "../../plugin";
+import { LucideIcon } from "./LucideIcon";
 
 interface TerminalRendererProps {
 	terminalId: string;
@@ -107,7 +108,13 @@ export function TerminalRenderer({
 	return (
 		<div className="agent-client-terminal-renderer">
 			<div className="agent-client-terminal-renderer-header">
-				{showEmojis && "🖥️ "}Terminal {terminalId.slice(0, 8)}
+				{showEmojis && (
+					<LucideIcon
+						name="square-terminal"
+						className="agent-client-terminal-renderer-label-icon"
+					/>
+				)}
+				Terminal {terminalId.slice(0, 8)}
 				{isRunning ? (
 					<span className="agent-client-terminal-status agent-client-running">
 						● RUNNING

@@ -2,6 +2,7 @@ import * as React from "react";
 const { useEffect } = React;
 import { setIcon } from "obsidian";
 import type { ErrorInfo } from "../../domain/models/agent-error";
+import { LucideIcon } from "./LucideIcon";
 import type { IChatViewHost } from "./types";
 
 /** Visual variant for the overlay */
@@ -76,7 +77,12 @@ export function ErrorOverlay({
 			</p>
 			{errorInfo.suggestion && (
 				<div className="agent-client-error-overlay-suggestion">
-					{showEmojis && variant === "error" && "💡 "}
+					{showEmojis && variant === "error" && (
+						<LucideIcon
+							name="circle-alert"
+							className="agent-client-error-overlay-suggestion-icon"
+						/>
+					)}
 					{variant !== "error" ? (
 						<code className="agent-client-error-overlay-code">
 							{errorInfo.suggestion}

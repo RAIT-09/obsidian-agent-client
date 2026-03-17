@@ -159,6 +159,25 @@ If your plugin does not need CSS, delete this file.
 	}
 }
 
+/* ===== Inline Lucide Icons (replace emojis) ===== */
+.agent-client-message-tool-call-icon svg,
+.agent-client-collapsible-thought-label-icon svg,
+.agent-client-terminal-renderer-label-icon svg,
+.agent-client-error-overlay-suggestion-icon svg,
+.agent-client-message-plan-label-icon svg {
+	width: 14px;
+	height: 14px;
+	vertical-align: -2px;
+	margin-right: 4px;
+	color: var(--text-muted);
+}
+
+.agent-client-message-plan-entry-icon svg {
+	width: 12px;
+	height: 12px;
+	vertical-align: -2px;
+}
+
 /* ===== Message Content Components ===== */
 
 /* Tool Call */
@@ -251,17 +270,14 @@ If your plugin does not need CSS, delete this file.
 }
 
 .agent-client-message-plan-entry-icon.agent-client-status-completed {
-	color: var(--color-green);
 	user-select: text;
 }
 
 .agent-client-message-plan-entry-icon.agent-client-status-in_progress {
-	color: var(--color-orange);
 	user-select: text;
 }
 
 .agent-client-message-plan-entry-icon.agent-client-status-pending {
-	color: var(--text-muted);
 	user-select: text;
 }
 
