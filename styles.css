@@ -308,58 +308,12 @@ If your plugin does not need CSS, delete this file.
 
 /* Permission Request */
 .agent-client-message-permission-request {
-	padding: 6px 0px;
-	margin-top: 4px;
-	font-size: 14px;
-	user-select: text;
-	overflow-wrap: break-word;
-	word-wrap: break-word;
-	word-break: break-word;
-	max-width: 100%;
-}
-
-.agent-client-message-permission-request-title {
-	font-weight: bold;
-	margin-bottom: 8px;
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	user-select: text;
-	overflow-wrap: break-word;
-	word-wrap: break-word;
-	word-break: break-word;
-}
-
-.agent-client-message-permission-request-description {
-	margin-bottom: 12px;
-	color: var(--text-normal);
-	user-select: text;
-	overflow-wrap: break-word;
-	word-wrap: break-word;
-	word-break: break-word;
-}
-
-.agent-client-message-permission-request-options {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
 	justify-content: flex-end;
-}
-
-.agent-client-message-permission-request-result {
-	padding: 8px;
-	background-color: var(--background-primary);
-	border-radius: 4px;
-	font-size: 13px;
-	user-select: text;
-}
-
-.agent-client-message-permission-request-result.agent-client-selected {
-	color: var(--text-accent);
-}
-
-.agent-client-message-permission-request-result.agent-client-cancelled {
-	color: var(--color-orange);
+	padding: 6px 0;
+	margin-top: 4px;
 }
 
 /* ===== Permission Request Buttons ===== */
