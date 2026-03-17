@@ -1392,34 +1392,6 @@ If your plugin does not need CSS, delete this file.
 	user-select: text;
 }
 
-.agent-client-diff-line-number {
-	display: inline-block;
-	width: 40px;
-	padding: 2px 8px;
-	text-align: right;
-	flex-shrink: 0;
-	color: var(--text-muted);
-	user-select: none;
-	font-size: 11px;
-}
-
-.agent-client-diff-line-number-old {
-	border-right: 1px solid var(--background-modifier-border);
-}
-
-.agent-client-diff-line-number-new {
-	border-right: 1px solid var(--background-modifier-border);
-}
-
-.agent-client-diff-line-marker {
-	display: inline-block;
-	width: 20px;
-	padding: 2px 4px;
-	flex-shrink: 0;
-	font-weight: bold;
-	user-select: none;
-	text-align: center;
-}
 
 .agent-client-diff-line-content {
 	flex: 1;
@@ -1432,16 +1404,8 @@ If your plugin does not need CSS, delete this file.
 	background-color: rgba(46, 160, 67, 0.15);
 }
 
-.agent-client-diff-line-added .agent-client-diff-line-marker {
-	color: var(--color-green);
-}
-
 .agent-client-diff-line-removed {
 	background-color: rgba(248, 81, 73, 0.15);
-}
-
-.agent-client-diff-line-removed .agent-client-diff-line-marker {
-	color: var(--color-red);
 }
 
 .agent-client-diff-line-context {

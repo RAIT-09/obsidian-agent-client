@@ -391,27 +391,17 @@ function DiffRenderer({
 		}
 
 		let lineClass = "agent-client-diff-line";
-		let marker = " ";
 
 		if (line.type === "added") {
 			lineClass += " agent-client-diff-line-added";
-			marker = "+";
 		} else if (line.type === "removed") {
 			lineClass += " agent-client-diff-line-removed";
-			marker = "-";
 		} else {
 			lineClass += " agent-client-diff-line-context";
 		}
 
 		return (
 			<div key={idx} className={lineClass}>
-				<span className="agent-client-diff-line-number agent-client-diff-line-number-old">
-					{line.oldLineNumber ?? ""}
-				</span>
-				<span className="agent-client-diff-line-number agent-client-diff-line-number-new">
-					{line.newLineNumber ?? ""}
-				</span>
-				<span className="agent-client-diff-line-marker">{marker}</span>
 				<span className="agent-client-diff-line-content">
 					{line.wordDiff &&
 					(line.type === "added" || line.type === "removed")
