@@ -72,8 +72,15 @@ export function wrapCommandForWsl(
 		pathPrefix = `export PATH="${escapePathForShell(wslPath)}:$PATH"; `;
 	}
 
-	const fullCommand = `${pathPrefix}cd ${escapeShellArg(wslCwd)} && ${command}${argsString}`;
-	wslArgs.push("bash", "-l", "-c", fullCommand);
+	// Use the user's actual default shell ($SHELL) instead of hardcoding bash.
+	// This ensures the correct profile files are loaded (e.g., .zprofile for zsh,
+	// .bash_profile for bash). We first source ~/.profile via sh as a fallback,
+	// because bash -l skips ~/.profile when ~/.bash_profile exists, and many tools
+	// (linuxbrew, nvm, mise) install their PATH setup in ~/.profile.
+	const innerCommand = `${pathPrefix}cd ${escapeShellArg(wslCwd)} && ${command}${argsString}`;
+	const innerEscaped = innerCommand.replace(/'/g, "'\\''");
+	const wrapperCommand = `. ~/.profile 2>/dev/null; exec "\${SHELL:-/bin/bash}" -l -c '${innerEscaped}'`;
+	wslArgs.push("sh", "-c", wrapperCommand);
 
 	return {
 		command: "C:\\Windows\\System32\\wsl.exe",

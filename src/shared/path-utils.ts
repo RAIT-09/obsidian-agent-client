@@ -1,3 +1,45 @@
+import { execFile } from "child_process";
+import { Platform } from "obsidian";
+
+/**
+ * Resolve the absolute path of a command using `which` (macOS/Linux) or `where` (Windows).
+ * If the command is already an absolute path, returns it as-is.
+ * Runs asynchronously to avoid blocking the Electron main thread.
+ *
+ * @param command - Command name (e.g. "node", "claude") or absolute path
+ * @returns Absolute path string, or null if not found
+ */
+export function resolveCommandPath(command: string): Promise<string | null> {
+	if (!command || command.trim().length === 0) return Promise.resolve(null);
+
+	const trimmed = command.trim();
+
+	// Already absolute — return as-is
+	if (trimmed.startsWith("/") || /^[A-Za-z]:[\\/]/.test(trimmed)) {
+		return Promise.resolve(trimmed);
+	}
+
+	return new Promise((resolve) => {
+		if (Platform.isWin) {
+			execFile("where", [trimmed], { timeout: 5000, windowsHide: true }, (err, stdout) => {
+				if (err) { resolve(null); return; }
+				const resolved = stdout.split("\n")[0].trim();
+				resolve(resolved.length > 0 ? resolved : null);
+			});
+		} else {
+			// Use login shell to pick up nvm/mise/volta shims etc.
+			const shell = process.env.SHELL || "/bin/sh";
+			// Escape single quotes in the command name to prevent injection
+			const escaped = trimmed.replace(/'/g, "'\\''");
+			execFile(shell, ["-l", "-c", `which '${escaped}'`], { timeout: 5000 }, (err, stdout) => {
+				if (err) { resolve(null); return; }
+				const resolved = stdout.split("\n")[0].trim();
+				resolve(resolved.length > 0 ? resolved : null);
+			});
+		}
+	});
+}
+
 /**
  * Extract the directory containing a command (for PATH adjustments).
  * Example: /usr/local/bin/node → /usr/local/bin

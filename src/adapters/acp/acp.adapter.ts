@@ -209,19 +209,27 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			baseEnv = getEnhancedWindowsEnv(baseEnv);
 		}
 
-		// Add Node.js path to PATH if specified in settings
-		if (
-			this.plugin.settings.nodePath &&
-			this.plugin.settings.nodePath.trim().length > 0
-		) {
-			const nodeDir = resolveCommandDirectory(
-				this.plugin.settings.nodePath.trim(),
-			);
+		// Add Node.js directory to PATH only when nodePath is an explicit absolute path.
+		// On macOS/Linux the login-shell wrapper (-l) already loads the user's PATH
+		// (nvm, mise, volta shims, etc.), so injection is only needed when the user
+		// has a non-standard node location they've pinpointed manually.
+		// When nodePath is empty or just a command name ("node"), we skip injection
+		// and let the login shell handle it.
+		const explicitNodePath = this.plugin.settings.nodePath?.trim() ?? "";
+		const isAbsoluteNodePath =
+			explicitNodePath.startsWith("/") ||
+			/^[A-Za-z]:[\\/]/.test(explicitNodePath);
+		if (isAbsoluteNodePath) {
+			const nodeDir = resolveCommandDirectory(explicitNodePath);
 			if (nodeDir) {
 				const separator = Platform.isWin ? ";" : ":";
 				baseEnv.PATH = baseEnv.PATH
 					? `${nodeDir}${separator}${baseEnv.PATH}`
 					: nodeDir;
+				this.logger.log(
+					"[AcpAdapter] Node.js directory added to PATH:",
+					nodeDir,
+				);
 			}
 		}
 
@@ -236,11 +244,9 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 
 		// WSL mode for Windows (wrap command to run inside WSL)
 		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
-			// Extract node directory from settings for PATH
-			const nodeDir = this.plugin.settings.nodePath
-				? resolveCommandDirectory(
-						this.plugin.settings.nodePath.trim(),
-					) || undefined
+			// Only inject node directory when nodePath is an absolute path
+			const nodeDir = isAbsoluteNodePath
+				? resolveCommandDirectory(explicitNodePath) || undefined
 				: undefined;
 
 			const wslWrapped = wrapCommandForWsl(
@@ -261,29 +267,21 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			);
 		}
 		// On macOS and Linux, wrap the command in a login shell to inherit the user's environment
-		// This ensures that PATH modifications in .zshrc/.bash_profile are available
+		// This ensures that PATH modifications in .zshrc/.bash_profile are available.
+		// Relative command names (e.g. "claude-agent-acp", "node") work as-is because
+		// the login shell loads the full user PATH including nvm/mise/volta shims.
 		else if (Platform.isMacOS || Platform.isLinux) {
 			const shell = getLoginShell();
 			const commandString = [command, ...args]
 				.map((arg) => "'" + arg.replace(/'/g, "'\\''") + "'")
 				.join(" ");
 
-			// If nodePath is configured, prepend PATH export to ensure node is available.
-			// This is necessary because:
-			// 1. Login shells (-l) re-initialize PATH from shell config files, overwriting env.PATH
-			// 2. Even when the agent command uses an absolute path, scripts with shebang
-			//    "#!/usr/bin/env node" require node to be in PATH for the env command to find it
-			// Therefore, we must explicitly set PATH inside the shell command
+			// Only prepend PATH export when the user has configured an absolute nodePath.
+			// Relative names or empty → login shell already handles PATH correctly.
 			let fullCommand = commandString;
-			if (
-				this.plugin.settings.nodePath &&
-				this.plugin.settings.nodePath.trim().length > 0
-			) {
-				const nodeDir = resolveCommandDirectory(
-					this.plugin.settings.nodePath.trim(),
-				);
+			if (isAbsoluteNodePath) {
+				const nodeDir = resolveCommandDirectory(explicitNodePath);
 				if (nodeDir) {
-					// Escape single quotes in nodeDir for shell safety
 					const escapedNodeDir = nodeDir.replace(/'/g, "'\\''");
 					fullCommand = `export PATH='${escapedNodeDir}':"$PATH"; ${commandString}`;
 				}
