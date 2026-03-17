@@ -72,14 +72,19 @@ export function wrapCommandForWsl(
 		pathPrefix = `export PATH="${escapePathForShell(wslPath)}:$PATH"; `;
 	}
 
-	// Use the user's actual default shell ($SHELL) instead of hardcoding bash.
-	// This ensures the correct profile files are loaded (e.g., .zprofile for zsh,
-	// .bash_profile for bash). We first source ~/.profile via sh as a fallback,
-	// because bash -l skips ~/.profile when ~/.bash_profile exists, and many tools
-	// (linuxbrew, nvm, mise) install their PATH setup in ~/.profile.
+	// Use the user's default shell ($SHELL) for correct profile loading
+	// (e.g., .zprofile for zsh, .bash_profile for bash).
+	// Source ~/.profile first as a fallback because bash -l skips it when
+	// ~/.bash_profile exists, and many tools (linuxbrew, nvm, mise) add to ~/.profile.
+	// Non-POSIX shells (fish, elvish, nushell) fall back to bash since the
+	// inner command uses POSIX syntax (export, &&).
 	const innerCommand = `${pathPrefix}cd ${escapeShellArg(wslCwd)} && ${command}${argsString}`;
 	const innerEscaped = innerCommand.replace(/'/g, "'\\''");
-	const wrapperCommand = `. ~/.profile 2>/dev/null; exec "\${SHELL:-/bin/bash}" -l -c '${innerEscaped}'`;
+	const wrapperCommand =
+		`. ~/.profile 2>/dev/null; ` +
+		`s="\${SHELL:-/bin/bash}"; ` +
+		`case "$s" in */fish|*/elvish|*/nushell|*/xonsh) s=/bin/bash ;; esac; ` +
+		`exec "$s" -l -c '${innerEscaped}'`;
 	wslArgs.push("sh", "-c", wrapperCommand);
 
 	return {

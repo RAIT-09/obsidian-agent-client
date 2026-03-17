@@ -2,6 +2,13 @@ import { execFile } from "child_process";
 import { Platform } from "obsidian";
 
 /**
+ * Check whether a path string is an absolute path (Unix or Windows).
+ */
+export function isAbsolutePath(path: string): boolean {
+	return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
+}
+
+/**
  * Resolve the absolute path of a command using `which` (macOS/Linux) or `where` (Windows).
  * If the command is already an absolute path, returns it as-is.
  * Runs asynchronously to avoid blocking the Electron main thread.
@@ -14,8 +21,7 @@ export function resolveCommandPath(command: string): Promise<string | null> {
 
 	const trimmed = command.trim();
 
-	// Already absolute — return as-is
-	if (trimmed.startsWith("/") || /^[A-Za-z]:[\\/]/.test(trimmed)) {
+	if (isAbsolutePath(trimmed)) {
 		return Promise.resolve(trimmed);
 	}
 
@@ -29,7 +35,6 @@ export function resolveCommandPath(command: string): Promise<string | null> {
 		} else {
 			// Use login shell to pick up nvm/mise/volta shims etc.
 			const shell = process.env.SHELL || "/bin/sh";
-			// Escape single quotes in the command name to prevent injection
 			const escaped = trimmed.replace(/'/g, "'\\''");
 			execFile(shell, ["-l", "-c", `which '${escaped}'`], { timeout: 5000 }, (err, stdout) => {
 				if (err) { resolve(null); return; }
@@ -37,6 +42,41 @@ export function resolveCommandPath(command: string): Promise<string | null> {
 				resolve(resolved.length > 0 ? resolved : null);
 			});
 		}
+	});
+}
+
+/**
+ * Resolve the absolute path of a command inside WSL.
+ * Uses `wsl.exe bash -l -c "which ..."` to resolve within the Linux environment.
+ *
+ * @param command - Command name (e.g. "node", "claude")
+ * @param distribution - Optional WSL distribution name
+ * @returns Linux absolute path string, or null if not found
+ */
+export function resolveCommandPathInWsl(
+	command: string,
+	distribution?: string,
+): Promise<string | null> {
+	if (!command || command.trim().length === 0) return Promise.resolve(null);
+
+	const trimmed = command.trim();
+
+	if (isAbsolutePath(trimmed)) {
+		return Promise.resolve(trimmed);
+	}
+
+	return new Promise((resolve) => {
+		const escaped = trimmed.replace(/'/g, "'\\''");
+		const args: string[] = [];
+		if (distribution) {
+			args.push("-d", distribution);
+		}
+		args.push("bash", "-l", "-c", `which '${escaped}'`);
+		execFile("C:\\Windows\\System32\\wsl.exe", args, { timeout: 5000 }, (err, stdout) => {
+			if (err) { resolve(null); return; }
+			const resolved = stdout.split("\n")[0].trim();
+			resolve(resolved.length > 0 ? resolved : null);
+		});
 	});
 }
 

@@ -28,7 +28,7 @@ where.exe codex-acp
 
 :::
 
-3. Open **Settings → Agent Client** and set the **Codex path** to the path found above.
+3. Open **Settings → Agent Client**. The default command (`codex-acp`) works in many cases. If the agent is not found automatically, set the **Codex path** to the path found above, or click **Auto-detect**.
 
 ## Authentication
 

@@ -12,7 +12,10 @@ import type {
 	ChatViewLocation,
 } from "../../plugin";
 import { normalizeEnvVars } from "../../shared/settings-utils";
-import { resolveCommandPath } from "../../shared/path-utils";
+import {
+	resolveCommandPath,
+	resolveCommandPathInWsl,
+} from "../../shared/path-utils";
 import {
 	CHAT_FONT_SIZE_MAX,
 	CHAT_FONT_SIZE_MIN,
@@ -1222,7 +1225,16 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					btn.setButtonText("Detecting…");
 					btn.setDisabled(true);
 					try {
-						const found = await resolveCommandPath(commandName);
+						const isWsl =
+							Platform.isWin &&
+							this.plugin.settings.windowsWslMode;
+						const found = isWsl
+							? await resolveCommandPathInWsl(
+									commandName,
+									this.plugin.settings
+										.windowsWslDistribution || undefined,
+								)
+							: await resolveCommandPath(commandName);
 						if (found) {
 							await onResolved(found);
 							this.display();

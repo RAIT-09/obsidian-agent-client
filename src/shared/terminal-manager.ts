@@ -4,7 +4,7 @@ import type AgentClientPlugin from "../plugin";
 import { getLogger, Logger } from "./logger";
 import { Platform } from "obsidian";
 import { wrapCommandForWsl } from "./wsl-utils";
-import { resolveCommandDirectory } from "./path-utils";
+import { isAbsolutePath, resolveCommandDirectory } from "./path-utils";
 import { getEnhancedWindowsEnv } from "./windows-env";
 import { escapeShellArgWindows, getLoginShell } from "./shell-utils";
 
@@ -63,9 +63,7 @@ export class TerminalManager {
 		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
 			// Only inject node directory when nodePath is an absolute path
 			const explicitNodePath = this.plugin.settings.nodePath?.trim() ?? "";
-			const isAbsoluteNodePath =
-				explicitNodePath.startsWith("/") ||
-				/^[A-Za-z]:[\\/]/.test(explicitNodePath);
+			const isAbsoluteNodePath = isAbsolutePath(explicitNodePath);
 			const nodeDir = isAbsoluteNodePath
 				? resolveCommandDirectory(explicitNodePath) || undefined
 				: undefined;

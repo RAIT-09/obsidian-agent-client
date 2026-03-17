@@ -37,7 +37,7 @@ import {
 	wrapCommandForWsl,
 	convertWindowsPathToWsl,
 } from "../../shared/wsl-utils";
-import { resolveCommandDirectory } from "../../shared/path-utils";
+import { isAbsolutePath, resolveCommandDirectory } from "../../shared/path-utils";
 import { getEnhancedWindowsEnv } from "../../shared/windows-env";
 import { escapeShellArgWindows, getLoginShell } from "../../shared/shell-utils";
 
@@ -216,9 +216,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		// When nodePath is empty or just a command name ("node"), we skip injection
 		// and let the login shell handle it.
 		const explicitNodePath = this.plugin.settings.nodePath?.trim() ?? "";
-		const isAbsoluteNodePath =
-			explicitNodePath.startsWith("/") ||
-			/^[A-Za-z]:[\\/]/.test(explicitNodePath);
+		const isAbsoluteNodePath = isAbsolutePath(explicitNodePath);
 		if (isAbsoluteNodePath) {
 			const nodeDir = resolveCommandDirectory(explicitNodePath);
 			if (nodeDir) {
@@ -1022,7 +1020,9 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		const commandName =
 			command.split("/").pop()?.split("\\").pop() || "command";
 
-		if (Platform.isWin) {
+		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+			return `1. Verify the agent path: Use "which ${commandName}" in your WSL terminal to find the correct path. 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "which node" to find it).`;
+		} else if (Platform.isWin) {
 			return `1. Verify the agent path: Use "where ${commandName}" in Command Prompt to find the correct path. 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "where node" to find it).`;
 		} else {
 			return `1. Verify the agent path: Use "which ${commandName}" in Terminal to find the correct path. 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "which node" to find it).`;
