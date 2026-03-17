@@ -853,8 +853,10 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;
+	flex-wrap: nowrap;
 	gap: 8px;
 	padding: 4px 12px 8px 12px;
+	min-width: 0;
 }
 
 /* Mode Selector */
@@ -867,6 +869,9 @@ If your plugin does not need CSS, delete this file.
 	transition: background-color 0.1s ease;
 	height: 20px;
 	max-width: 120px;
+	min-width: 0;
+	flex-shrink: 1;
+	overflow: hidden;
 }
 
 .agent-client-mode-selector:hover {
@@ -927,6 +932,9 @@ If your plugin does not need CSS, delete this file.
 	transition: background-color 0.1s ease;
 	height: 20px;
 	max-width: 120px;
+	min-width: 0;
+	flex-shrink: 1;
+	overflow: hidden;
 }
 
 .agent-client-model-selector:hover {
@@ -992,6 +1000,9 @@ If your plugin does not need CSS, delete this file.
 	transition: background-color 0.1s ease;
 	height: 20px;
 	max-width: 120px;
+	min-width: 0;
+	flex-shrink: 1;
+	overflow: hidden;
 }
 
 .agent-client-config-selector:hover {
@@ -1046,6 +1057,7 @@ If your plugin does not need CSS, delete this file.
 .agent-client-usage-indicator {
 	font-size: var(--font-smallest);
 	margin-right: auto;
+	flex-shrink: 0;
 	cursor: default;
 	user-select: none;
 	white-space: nowrap;
