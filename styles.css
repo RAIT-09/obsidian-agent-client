@@ -196,12 +196,34 @@ If your plugin does not need CSS, delete this file.
 }
 
 .agent-client-message-tool-call-title {
+	display: flex;
+	align-items: center;
+	gap: 4px;
 	font-weight: bold;
 	margin-bottom: 4px;
 	user-select: text;
-	overflow-wrap: break-word;
-	word-wrap: break-word;
-	word-break: break-word;
+	white-space: nowrap;
+}
+
+.agent-client-message-tool-call-title-text {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.agent-client-message-tool-call-status-icon {
+	flex-shrink: 0;
+}
+
+.agent-client-message-tool-call-status-icon svg {
+	width: 14px;
+	height: 14px;
+	color: var(--text-muted);
+}
+
+.agent-client-message-tool-call-status-icon.agent-client-status-failed svg {
+	color: var(--color-red);
 }
 
 .agent-client-message-tool-call-locations {
@@ -228,13 +250,6 @@ If your plugin does not need CSS, delete this file.
 	font-size: 0.9em;
 }
 
-.agent-client-message-tool-call-status {
-	color: var(--text-muted);
-	user-select: text;
-	overflow-wrap: break-word;
-	word-wrap: break-word;
-	word-break: break-word;
-}
 
 /* Plan */
 .agent-client-message-plan {

@@ -100,7 +100,15 @@ export function ToolCallRenderer({
 							className="agent-client-message-tool-call-icon"
 						/>
 					)}
-					{title}
+					<span className="agent-client-message-tool-call-title-text">
+						{title}
+					</span>
+					{status !== "completed" && (
+						<LucideIcon
+							name={status === "failed" ? "x" : "ellipsis"}
+							className={`agent-client-message-tool-call-status-icon agent-client-status-${status}`}
+						/>
+					)}
 				</div>
 				{kind === "execute" &&
 					rawInput &&
@@ -127,9 +135,6 @@ export function ToolCallRenderer({
 						))}
 					</div>
 				)}
-				<div className="agent-client-message-tool-call-status">
-					Status: {status}
-				</div>
 			</div>
 
 			{/* Tool call content (diffs, terminal output, etc.) */}
