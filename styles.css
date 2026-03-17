@@ -428,9 +428,9 @@ If your plugin does not need CSS, delete this file.
 .agent-client-chat-view-header-title {
 	flex: 1 1 0;
 	min-width: 0;
+	padding-left: var(--size-4-1);
 	color: var(--nav-item-color);
 	font-size: var(--font-ui-small);
-	font-weight: var(--font-semibold);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
