@@ -50,11 +50,10 @@ jobs:
           You are a translator. Your ONLY job is to translate the above content into Japanese word-for-word. Rules:
           1. Translate the ENTIRE body text. Do NOT summarize, shorten, paraphrase, or omit any part.
           2. Preserve all formatting, line breaks, code blocks, and links from the original.
-          3. Output ONLY the translation — no commentary, no preamble, no summary.
-          Post the full translation to Discord." \
+          3. Output ONLY the translation — no commentary, no preamble, no summary." \
             --arg ch "discord" \
             --arg to "$OPENCLAW_DISCORD_CHANNEL" \
-            '{message: $msg, deliver: true, channel: $ch, to: $to, name: "GitHub", agentId: "github-hook", announce: false}' | \
+            '{message: $msg, deliver: true, channel: $ch, to: $to, name: "GitHub", agentId: "github-hook"}' | \
           curl -sf -X POST \
             "${OPENCLAW_WEBHOOK_URL}/hooks/agent" \
             -H "Authorization: Bearer ${OPENCLAW_HOOKS_TOKEN}" \
