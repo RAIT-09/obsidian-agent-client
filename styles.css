@@ -569,8 +569,8 @@ If your plugin does not need CSS, delete this file.
 .agent-client-error-overlay {
 	position: absolute;
 	bottom: 100%;
-	left: 0;
-	right: 0;
+	left: 8px;
+	right: 8px;
 	margin-bottom: 8px;
 	padding: 12px 16px;
 	background-color: var(--background-secondary);
