@@ -250,7 +250,6 @@ If your plugin does not need CSS, delete this file.
 	font-size: 0.9em;
 }
 
-
 /* Plan */
 .agent-client-message-plan {
 	padding: 8px;
@@ -1191,53 +1190,17 @@ If your plugin does not need CSS, delete this file.
 
 /* Terminal Renderer */
 .agent-client-terminal-renderer {
-	padding: 12px;
+	padding: 8px;
 	margin-top: 4px;
 	background-color: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
+	border-radius: 4px;
 	font-size: 12px;
 	font-family: var(--font-monospace);
-	user-select: text;
-}
-
-.agent-client-terminal-renderer-header {
-	font-weight: bold;
-	margin-bottom: 8px;
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	font-family: var(--font-interface);
-	user-select: text;
-}
-
-.agent-client-terminal-status {
-	font-size: 10px;
-	user-select: text;
-}
-
-.agent-client-terminal-status.agent-client-running {
-	color: var(--color-green);
-}
-
-.agent-client-terminal-status.agent-client-cancelled {
-	color: var(--color-orange);
-}
-
-.agent-client-terminal-status.agent-client-finished {
-	color: var(--text-muted);
-}
-
-.agent-client-terminal-renderer-output {
-	background-color: var(--background-primary);
-	padding: 8px;
-	border-radius: 4px;
-	border: 1px solid var(--background-modifier-border);
-	min-height: 100px;
-	max-height: 400px;
-	overflow: auto;
 	white-space: pre-wrap;
 	word-break: break-word;
+	max-height: 400px;
+	overflow: auto;
 	user-select: text;
 }
 
@@ -1360,7 +1323,6 @@ If your plugin does not need CSS, delete this file.
 	line-height: 1.5;
 	user-select: text;
 }
-
 
 .agent-client-diff-line-content {
 	flex: 1;
