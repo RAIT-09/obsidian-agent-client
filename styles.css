@@ -239,7 +239,7 @@ If your plugin does not need CSS, delete this file.
 /* Plan */
 .agent-client-message-plan {
 	padding: 8px;
-	margin-top: 4px;
+	margin: 4px 0;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 4px;
 	font-size: 12px;
