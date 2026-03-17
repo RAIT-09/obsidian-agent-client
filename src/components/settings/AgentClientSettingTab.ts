@@ -1219,8 +1219,13 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		onResolved: (path: string) => Promise<void>,
 	): void {
 		setting.addButton((btn) => {
+			const isWsl = Platform.isWin && this.plugin.settings.windowsWslMode;
+			const lookupCmd =
+				Platform.isWin && !isWsl ? "where" : "which";
 			btn.setButtonText("Auto-detect")
-				.setTooltip(`Run \`which ${commandName}\` to find the path`)
+				.setTooltip(
+					`Run \`${lookupCmd} ${commandName}\` to find the path`,
+				)
 				.onClick(async () => {
 					btn.setButtonText("Detecting…");
 					btn.setDisabled(true);
