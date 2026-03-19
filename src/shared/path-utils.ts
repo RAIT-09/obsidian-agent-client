@@ -72,15 +72,16 @@ export function resolveCommandPathInWsl(
 			args.push("-d", distribution);
 		}
 		// Use the same wrapper as wrapCommandForWsl so PATH resolution context is identical:
-		// source ~/.profile (linuxbrew, mise, etc.), detect user's $SHELL, fall back to bash
+		// source ~/.profile (linuxbrew, mise, etc.), detect user's $SHELL, fall back to /bin/sh
 		// for non-POSIX shells (fish, elvish, nushell, xonsh).
 		const innerCommand = `which '${escaped}'`;
 		const innerEscaped = innerCommand.replace(/'/g, "'\\''");
 		const wrapperCommand =
 			`. ~/.profile 2>/dev/null; ` +
-			`s="\${SHELL:-/bin/bash}"; ` +
-			`case "$s" in */fish|*/elvish|*/nushell|*/xonsh) s=/bin/bash ;; esac; ` +
-			`exec "$s" -l -c '${innerEscaped}'`;
+			`case \${SHELL:-/bin/sh} in ` +
+			`*/fish|*/elvish|*/nushell|*/xonsh) exec /bin/sh -l -c '${innerEscaped}';; ` +
+			`*) exec \${SHELL:-/bin/sh} -l -c '${innerEscaped}';; ` +
+			`esac`;
 		args.push("sh", "-c", wrapperCommand);
 		execFile("C:\\Windows\\System32\\wsl.exe", args, { timeout: 5000 }, (err, stdout) => {
 			if (err) { resolve(null); return; }

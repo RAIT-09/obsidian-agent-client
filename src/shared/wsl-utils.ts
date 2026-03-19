@@ -76,15 +76,16 @@ export function wrapCommandForWsl(
 	// (e.g., .zprofile for zsh, .bash_profile for bash).
 	// Source ~/.profile first as a fallback because bash -l skips it when
 	// ~/.bash_profile exists, and many tools (linuxbrew, nvm, mise) add to ~/.profile.
-	// Non-POSIX shells (fish, elvish, nushell) fall back to bash since the
+	// Non-POSIX shells (fish, elvish, nushell) fall back to /bin/sh since the
 	// inner command uses POSIX syntax (export, &&).
 	const innerCommand = `${pathPrefix}cd ${escapeShellArg(wslCwd)} && ${command}${argsString}`;
 	const innerEscaped = innerCommand.replace(/'/g, "'\\''");
 	const wrapperCommand =
 		`. ~/.profile 2>/dev/null; ` +
-		`s="\${SHELL:-/bin/bash}"; ` +
-		`case "$s" in */fish|*/elvish|*/nushell|*/xonsh) s=/bin/bash ;; esac; ` +
-		`exec "$s" -l -c '${innerEscaped}'`;
+		`case \${SHELL:-/bin/sh} in ` +
+		`*/fish|*/elvish|*/nushell|*/xonsh) exec /bin/sh -l -c '${innerEscaped}';; ` +
+		`*) exec \${SHELL:-/bin/sh} -l -c '${innerEscaped}';; ` +
+		`esac`;
 	wslArgs.push("sh", "-c", wrapperCommand);
 
 	return {
