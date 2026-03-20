@@ -21,6 +21,30 @@ export function convertWindowsPathToWsl(windowsPath: string): string {
 }
 
 /**
+ * Build a WSL shell wrapper that sources ~/.profile, detects the user's
+ * $SHELL, and falls back to /bin/sh for non-POSIX shells (fish, elvish,
+ * nushell, xonsh).
+ *
+ * IMPORTANT: wsl.exe pre-expands $VAR references using WSL environment
+ * variables before passing them to the Linux shell. Intermediate variables
+ * (e.g., s=$SHELL; exec $s) will NOT work because wsl.exe expands $s to
+ * empty. Always reference $SHELL or ${SHELL:-/bin/sh} directly.
+ *
+ * @param innerCommand - The POSIX command to execute inside the login shell
+ * @returns The full wrapper command string to pass as argument to `sh -c`
+ */
+export function buildWslShellWrapper(innerCommand: string): string {
+	const innerEscaped = innerCommand.replace(/'/g, "'\\''");
+	return (
+		`. ~/.profile 2>/dev/null; ` +
+		`case \${SHELL:-/bin/sh} in ` +
+		`*/fish|*/elvish|*/nushell|*/xonsh) exec /bin/sh -l -c '${innerEscaped}';; ` +
+		`*) exec \${SHELL:-/bin/sh} -l -c '${innerEscaped}';; ` +
+		`esac`
+	);
+}
+
+/**
  * Wrap a command to run inside WSL using wsl.exe.
  * Generates wsl.exe command with proper arguments for executing commands in WSL environment.
  */
@@ -72,21 +96,8 @@ export function wrapCommandForWsl(
 		pathPrefix = `export PATH="${escapePathForShell(wslPath)}:$PATH"; `;
 	}
 
-	// Use the user's default shell ($SHELL) for correct profile loading
-	// (e.g., .zprofile for zsh, .bash_profile for bash).
-	// Source ~/.profile first as a fallback because bash -l skips it when
-	// ~/.bash_profile exists, and many tools (linuxbrew, nvm, mise) add to ~/.profile.
-	// Non-POSIX shells (fish, elvish, nushell) fall back to /bin/sh since the
-	// inner command uses POSIX syntax (export, &&).
 	const innerCommand = `${pathPrefix}cd ${escapeShellArg(wslCwd)} && ${command}${argsString}`;
-	const innerEscaped = innerCommand.replace(/'/g, "'\\''");
-	const wrapperCommand =
-		`. ~/.profile 2>/dev/null; ` +
-		`case \${SHELL:-/bin/sh} in ` +
-		`*/fish|*/elvish|*/nushell|*/xonsh) exec /bin/sh -l -c '${innerEscaped}';; ` +
-		`*) exec \${SHELL:-/bin/sh} -l -c '${innerEscaped}';; ` +
-		`esac`;
-	wslArgs.push("sh", "-c", wrapperCommand);
+	wslArgs.push("sh", "-c", buildWslShellWrapper(innerCommand));
 
 	return {
 		command: "C:\\Windows\\System32\\wsl.exe",

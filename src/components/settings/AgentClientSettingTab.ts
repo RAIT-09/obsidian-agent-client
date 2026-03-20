@@ -1230,9 +1230,6 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					btn.setButtonText("Detecting…");
 					btn.setDisabled(true);
 					try {
-						const isWsl =
-							Platform.isWin &&
-							this.plugin.settings.windowsWslMode;
 						const found = isWsl
 							? await resolveCommandPathInWsl(
 									commandName,

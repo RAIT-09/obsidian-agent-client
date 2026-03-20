@@ -1,5 +1,7 @@
 import { execFile } from "child_process";
 import { Platform } from "obsidian";
+import { buildWslShellWrapper } from "./wsl-utils";
+import { getLoginShell } from "./shell-utils";
 
 /**
  * Check whether a path string is an absolute path (Unix or Windows).
@@ -33,8 +35,7 @@ export function resolveCommandPath(command: string): Promise<string | null> {
 				resolve(resolved.length > 0 ? resolved : null);
 			});
 		} else {
-			// Use login shell to pick up nvm/mise/volta shims etc.
-			const shell = process.env.SHELL || "/bin/sh";
+			const shell = getLoginShell();
 			const escaped = trimmed.replace(/'/g, "'\\''");
 			execFile(shell, ["-l", "-c", `which '${escaped}'`], { timeout: 5000 }, (err, stdout) => {
 				if (err) { resolve(null); return; }
@@ -47,7 +48,7 @@ export function resolveCommandPath(command: string): Promise<string | null> {
 
 /**
  * Resolve the absolute path of a command inside WSL.
- * Uses `wsl.exe bash -l -c "which ..."` to resolve within the Linux environment.
+ * Uses the WSL shell wrapper (buildWslShellWrapper) to resolve within the Linux environment.
  *
  * @param command - Command name (e.g. "node", "claude")
  * @param distribution - Optional WSL distribution name
@@ -71,18 +72,8 @@ export function resolveCommandPathInWsl(
 		if (distribution) {
 			args.push("-d", distribution);
 		}
-		// Use the same wrapper as wrapCommandForWsl so PATH resolution context is identical:
-		// source ~/.profile (linuxbrew, mise, etc.), detect user's $SHELL, fall back to /bin/sh
-		// for non-POSIX shells (fish, elvish, nushell, xonsh).
 		const innerCommand = `which '${escaped}'`;
-		const innerEscaped = innerCommand.replace(/'/g, "'\\''");
-		const wrapperCommand =
-			`. ~/.profile 2>/dev/null; ` +
-			`case \${SHELL:-/bin/sh} in ` +
-			`*/fish|*/elvish|*/nushell|*/xonsh) exec /bin/sh -l -c '${innerEscaped}';; ` +
-			`*) exec \${SHELL:-/bin/sh} -l -c '${innerEscaped}';; ` +
-			`esac`;
-		args.push("sh", "-c", wrapperCommand);
+		args.push("sh", "-c", buildWslShellWrapper(innerCommand));
 		execFile("C:\\Windows\\System32\\wsl.exe", args, { timeout: 5000 }, (err, stdout) => {
 			if (err) { resolve(null); return; }
 			const resolved = stdout.split("\n")[0].trim();
