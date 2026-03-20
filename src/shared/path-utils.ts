@@ -1,3 +1,96 @@
+import { execFile } from "child_process";
+import { Platform } from "obsidian";
+
+/**
+ * Check whether a path string is an absolute path (Unix or Windows).
+ */
+export function isAbsolutePath(path: string): boolean {
+	return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
+}
+
+/**
+ * Resolve the absolute path of a command using `which` (macOS/Linux) or `where` (Windows).
+ * If the command is already an absolute path, returns it as-is.
+ * Runs asynchronously to avoid blocking the Electron main thread.
+ *
+ * @param command - Command name (e.g. "node", "claude") or absolute path
+ * @returns Absolute path string, or null if not found
+ */
+export function resolveCommandPath(command: string): Promise<string | null> {
+	if (!command || command.trim().length === 0) return Promise.resolve(null);
+
+	const trimmed = command.trim();
+
+	if (isAbsolutePath(trimmed)) {
+		return Promise.resolve(trimmed);
+	}
+
+	return new Promise((resolve) => {
+		if (Platform.isWin) {
+			execFile("where", [trimmed], { timeout: 5000, windowsHide: true }, (err, stdout) => {
+				if (err) { resolve(null); return; }
+				const resolved = stdout.split("\n")[0].trim();
+				resolve(resolved.length > 0 ? resolved : null);
+			});
+		} else {
+			// Use login shell to pick up nvm/mise/volta shims etc.
+			const shell = process.env.SHELL || "/bin/sh";
+			const escaped = trimmed.replace(/'/g, "'\\''");
+			execFile(shell, ["-l", "-c", `which '${escaped}'`], { timeout: 5000 }, (err, stdout) => {
+				if (err) { resolve(null); return; }
+				const resolved = stdout.split("\n")[0].trim();
+				resolve(resolved.length > 0 ? resolved : null);
+			});
+		}
+	});
+}
+
+/**
+ * Resolve the absolute path of a command inside WSL.
+ * Uses `wsl.exe bash -l -c "which ..."` to resolve within the Linux environment.
+ *
+ * @param command - Command name (e.g. "node", "claude")
+ * @param distribution - Optional WSL distribution name
+ * @returns Linux absolute path string, or null if not found
+ */
+export function resolveCommandPathInWsl(
+	command: string,
+	distribution?: string,
+): Promise<string | null> {
+	if (!command || command.trim().length === 0) return Promise.resolve(null);
+
+	const trimmed = command.trim();
+
+	if (isAbsolutePath(trimmed)) {
+		return Promise.resolve(trimmed);
+	}
+
+	return new Promise((resolve) => {
+		const escaped = trimmed.replace(/'/g, "'\\''");
+		const args: string[] = [];
+		if (distribution) {
+			args.push("-d", distribution);
+		}
+		// Use the same wrapper as wrapCommandForWsl so PATH resolution context is identical:
+		// source ~/.profile (linuxbrew, mise, etc.), detect user's $SHELL, fall back to /bin/sh
+		// for non-POSIX shells (fish, elvish, nushell, xonsh).
+		const innerCommand = `which '${escaped}'`;
+		const innerEscaped = innerCommand.replace(/'/g, "'\\''");
+		const wrapperCommand =
+			`. ~/.profile 2>/dev/null; ` +
+			`case \${SHELL:-/bin/sh} in ` +
+			`*/fish|*/elvish|*/nushell|*/xonsh) exec /bin/sh -l -c '${innerEscaped}';; ` +
+			`*) exec \${SHELL:-/bin/sh} -l -c '${innerEscaped}';; ` +
+			`esac`;
+		args.push("sh", "-c", wrapperCommand);
+		execFile("C:\\Windows\\System32\\wsl.exe", args, { timeout: 5000 }, (err, stdout) => {
+			if (err) { resolve(null); return; }
+			const resolved = stdout.split("\n")[0].trim();
+			resolve(resolved.length > 0 ? resolved : null);
+		});
+	});
+}
+
 /**
  * Extract the directory containing a command (for PATH adjustments).
  * Example: /usr/local/bin/node → /usr/local/bin

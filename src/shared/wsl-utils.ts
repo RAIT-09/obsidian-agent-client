@@ -72,8 +72,21 @@ export function wrapCommandForWsl(
 		pathPrefix = `export PATH="${escapePathForShell(wslPath)}:$PATH"; `;
 	}
 
-	const fullCommand = `${pathPrefix}cd ${escapeShellArg(wslCwd)} && ${command}${argsString}`;
-	wslArgs.push("bash", "-l", "-c", fullCommand);
+	// Use the user's default shell ($SHELL) for correct profile loading
+	// (e.g., .zprofile for zsh, .bash_profile for bash).
+	// Source ~/.profile first as a fallback because bash -l skips it when
+	// ~/.bash_profile exists, and many tools (linuxbrew, nvm, mise) add to ~/.profile.
+	// Non-POSIX shells (fish, elvish, nushell) fall back to /bin/sh since the
+	// inner command uses POSIX syntax (export, &&).
+	const innerCommand = `${pathPrefix}cd ${escapeShellArg(wslCwd)} && ${command}${argsString}`;
+	const innerEscaped = innerCommand.replace(/'/g, "'\\''");
+	const wrapperCommand =
+		`. ~/.profile 2>/dev/null; ` +
+		`case \${SHELL:-/bin/sh} in ` +
+		`*/fish|*/elvish|*/nushell|*/xonsh) exec /bin/sh -l -c '${innerEscaped}';; ` +
+		`*) exec \${SHELL:-/bin/sh} -l -c '${innerEscaped}';; ` +
+		`esac`;
+	wslArgs.push("sh", "-c", wrapperCommand);
 
 	return {
 		command: "C:\\Windows\\System32\\wsl.exe",

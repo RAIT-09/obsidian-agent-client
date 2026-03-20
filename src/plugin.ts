@@ -117,7 +117,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		id: "claude-code-acp",
 		displayName: "Claude Code",
 		apiKey: "",
-		command: "",
+		command: "claude-agent-acp",
 		args: [],
 		env: [],
 	},
@@ -125,7 +125,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		id: "codex-acp",
 		displayName: "Codex",
 		apiKey: "",
-		command: "",
+		command: "codex-acp",
 		args: [],
 		env: [],
 	},
@@ -133,7 +133,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		id: "gemini-cli",
 		displayName: "Gemini CLI",
 		apiKey: "",
-		command: "",
+		command: "gemini",
 		args: ["--experimental-acp"],
 		env: [],
 	},
@@ -1006,7 +1006,8 @@ export default class AgentClientPlugin extends Plugin {
 					? rawSettings.debugMode
 					: DEFAULT_SETTINGS.debugMode,
 			nodePath:
-				typeof rawSettings.nodePath === "string"
+				typeof rawSettings.nodePath === "string" &&
+				rawSettings.nodePath.trim().length > 0
 					? rawSettings.nodePath.trim()
 					: DEFAULT_SETTINGS.nodePath,
 			exportSettings: (() => {

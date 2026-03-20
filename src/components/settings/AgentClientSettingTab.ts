@@ -13,6 +13,10 @@ import type {
 } from "../../plugin";
 import { normalizeEnvVars } from "../../shared/settings-utils";
 import {
+	resolveCommandPath,
+	resolveCommandPathInWsl,
+} from "../../shared/path-utils";
+import {
 	CHAT_FONT_SIZE_MAX,
 	CHAT_FONT_SIZE_MIN,
 	parseChatFontSize,
@@ -66,19 +70,27 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// Also update immediately on display to sync with current settings
 		this.updateAgentDropdown();
 
-		new Setting(containerEl)
+		const nodePathSetting = new Setting(containerEl)
 			.setName("Node.js path")
 			.setDesc(
-				'Absolute path to Node.js executable. On macOS/Linux, use "which node", and on Windows, use "where node" to find it.',
+				"Path to Node.js. Usually leave blank — the login shell automatically picks up nvm/mise/volta. Only needed if node is in a non-standard location (enter absolute path, e.g. /usr/local/bin/node).",
 			)
 			.addText((text) => {
-				text.setPlaceholder("Absolute path to node")
+				text.setPlaceholder("Leave blank (login shell auto-resolves)")
 					.setValue(this.plugin.settings.nodePath)
 					.onChange(async (value) => {
 						this.plugin.settings.nodePath = value.trim();
 						await this.plugin.saveSettings();
 					});
 			});
+		this.addAutoDetectButton(
+			nodePathSetting,
+			"node",
+			async (path) => {
+				this.plugin.settings.nodePath = path;
+				await this.plugin.saveSettings();
+			},
+		);
 
 		new Setting(containerEl)
 			.setName("Send message shortcut")
@@ -799,19 +811,27 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.inputEl.type = "password";
 			});
 
-		new Setting(sectionEl)
+		const geminiPathSetting = new Setting(sectionEl)
 			.setName("Path")
 			.setDesc(
-				'Absolute path to the Gemini CLI. On macOS/Linux, use "which gemini", and on Windows, use "where gemini" to find it.',
+				'Command name or path to the Gemini CLI. Use just "gemini" to let the login shell resolve it, or enter an absolute path for a specific version.',
 			)
 			.addText((text) => {
-				text.setPlaceholder("Absolute path to gemini")
+				text.setPlaceholder("gemini")
 					.setValue(gemini.command)
 					.onChange(async (value) => {
 						this.plugin.settings.gemini.command = value.trim();
 						await this.plugin.saveSettings();
 					});
 			});
+		this.addAutoDetectButton(
+			geminiPathSetting,
+			"gemini",
+			async (path) => {
+				this.plugin.settings.gemini.command = path;
+				await this.plugin.saveSettings();
+			},
+		);
 
 		new Setting(sectionEl)
 			.setName("Arguments")
@@ -867,19 +887,27 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.inputEl.type = "password";
 			});
 
-		new Setting(sectionEl)
+		const claudePathSetting = new Setting(sectionEl)
 			.setName("Path")
 			.setDesc(
-				'Absolute path to the claude-agent-acp. On macOS/Linux, use "which claude-agent-acp", and on Windows, use "where claude-agent-acp" to find it.',
+				'Command name or path to claude-agent-acp. Use just "claude-agent-acp" to let the login shell resolve it, or enter an absolute path.',
 			)
 			.addText((text) => {
-				text.setPlaceholder("Absolute path to claude-agent-acp")
+				text.setPlaceholder("claude-agent-acp")
 					.setValue(claude.command)
 					.onChange(async (value) => {
 						this.plugin.settings.claude.command = value.trim();
 						await this.plugin.saveSettings();
 					});
 			});
+		this.addAutoDetectButton(
+			claudePathSetting,
+			"claude-agent-acp",
+			async (path) => {
+				this.plugin.settings.claude.command = path;
+				await this.plugin.saveSettings();
+			},
+		);
 
 		new Setting(sectionEl)
 			.setName("Arguments")
@@ -935,19 +963,27 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.inputEl.type = "password";
 			});
 
-		new Setting(sectionEl)
+		const codexPathSetting = new Setting(sectionEl)
 			.setName("Path")
 			.setDesc(
-				'Absolute path to the codex-acp. On macOS/Linux, use "which codex-acp", and on Windows, use "where codex-acp" to find it.',
+				'Command name or path to codex-acp. Use just "codex-acp" to let the login shell resolve it, or enter an absolute path.',
 			)
 			.addText((text) => {
-				text.setPlaceholder("Absolute path to codex-acp")
+				text.setPlaceholder("codex-acp")
 					.setValue(codex.command)
 					.onChange(async (value) => {
 						this.plugin.settings.codex.command = value.trim();
 						await this.plugin.saveSettings();
 					});
 			});
+		this.addAutoDetectButton(
+			codexPathSetting,
+			"codex-acp",
+			async (path) => {
+				this.plugin.settings.codex.command = path;
+				await this.plugin.saveSettings();
+			},
+		);
 
 		new Setting(sectionEl)
 			.setName("Arguments")
@@ -1170,6 +1206,59 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			candidate = `${base}-${counter}`;
 		}
 		return candidate;
+	}
+
+	/**
+	 * Shared helper: adds an "Auto-detect" button to a Path setting.
+	 * Calls `resolveCommandPath(commandName)` and, on success, writes the
+	 * resolved absolute path via `onResolved`, then re-renders the tab.
+	 */
+	private addAutoDetectButton(
+		setting: import("obsidian").Setting,
+		commandName: string,
+		onResolved: (path: string) => Promise<void>,
+	): void {
+		setting.addButton((btn) => {
+			const isWsl = Platform.isWin && this.plugin.settings.windowsWslMode;
+			const lookupCmd =
+				Platform.isWin && !isWsl ? "where" : "which";
+			btn.setButtonText("Auto-detect")
+				.setTooltip(
+					`Run \`${lookupCmd} ${commandName}\` to find the path`,
+				)
+				.onClick(async () => {
+					btn.setButtonText("Detecting…");
+					btn.setDisabled(true);
+					try {
+						const isWsl =
+							Platform.isWin &&
+							this.plugin.settings.windowsWslMode;
+						const found = isWsl
+							? await resolveCommandPathInWsl(
+									commandName,
+									this.plugin.settings
+										.windowsWslDistribution || undefined,
+								)
+							: await resolveCommandPath(commandName);
+						if (found) {
+							await onResolved(found);
+							this.display();
+						} else {
+							btn.setButtonText("Not found");
+							setTimeout(() => {
+								btn.setButtonText("Auto-detect");
+								btn.setDisabled(false);
+							}, 2000);
+						}
+					} catch {
+						btn.setButtonText("Error");
+						setTimeout(() => {
+							btn.setButtonText("Auto-detect");
+							btn.setDisabled(false);
+						}, 2000);
+					}
+				});
+		});
 	}
 
 	private formatArgs(args: string[]): string {

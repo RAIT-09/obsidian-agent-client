@@ -29,7 +29,7 @@ where.exe your-agent
 5. Configure the agent:
    - **Agent ID**: Unique identifier (e.g., `my-agent`)
    - **Display name**: Name shown in menus (e.g., `My Agent`)
-   - **Path**: Absolute path to the agent executable
+   - **Path**: Command name or absolute path to the agent executable
    - **Arguments**: Command-line arguments, one per line (if required)
    - **Environment variables**: `KEY=VALUE` pairs, one per line (if required)
 
