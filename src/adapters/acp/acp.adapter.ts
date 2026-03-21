@@ -7,10 +7,7 @@ import type {
 	AgentConfig,
 } from "../../domain/ports/agent-client.port";
 import type { InitializeResult } from "../../domain/models/initialize-result";
-import type {
-	MessageContent,
-	PermissionOption,
-} from "../../domain/models/chat-message";
+import type { MessageContent } from "../../domain/models/chat-message";
 import type {
 	SessionConfigOption,
 	SessionUpdate,
@@ -23,6 +20,7 @@ import type {
 } from "../../domain/models/session-info";
 import { AcpTypeConverter } from "./acp-type-converter";
 import { TerminalManager } from "./terminal-manager";
+import { PermissionManager } from "./permission-manager";
 import { getLogger, Logger } from "../../shared/logger";
 import type AgentClientPlugin from "../../plugin";
 import type { SlashCommand } from "src/domain/models/chat-session";
@@ -66,24 +64,10 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 	private currentConfig: AgentConfig | null = null;
 	private isInitializedFlag = false;
 	private currentAgentId: string | null = null;
-	private autoAllowPermissions = false;
-
 	// ACP protocol handler properties
 	private terminalManager: TerminalManager;
+	private permissionManager: PermissionManager;
 	private currentMessageId: string | null = null;
-	private pendingPermissionRequests = new Map<
-		string,
-		{
-			resolve: (response: acp.RequestPermissionResponse) => void;
-			toolCallId: string;
-			options: PermissionOption[];
-		}
-	>();
-	private pendingPermissionQueue: Array<{
-		requestId: string;
-		toolCallId: string;
-		options: PermissionOption[];
-	}> = [];
 
 	// Tracks whether any session update was received during the current prompt.
 	// Used to detect silent failures (e.g., missing API keys) where the agent
@@ -97,8 +81,17 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		// Initialize with no-op callback
 		this.updateMessage = () => {};
 
-		// Initialize TerminalManager
+		// Initialize managers
 		this.terminalManager = new TerminalManager(plugin);
+		this.permissionManager = new PermissionManager(
+			{
+				onSessionUpdate: (update) =>
+					this.sessionUpdateCallback?.(update),
+				onUpdateMessage: (id, content) =>
+					this.updateMessage(id, content),
+			},
+			false, // autoAllow — updated in initialize()
+		);
 	}
 
 	/**
@@ -146,7 +139,9 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		this.currentConfig = config;
 
 		// Update auto-allow permissions from plugin settings
-		this.autoAllowPermissions = this.plugin.settings.autoAllowPermissions;
+		this.permissionManager.setAutoAllow(
+			this.plugin.settings.autoAllowPermissions,
+		);
 
 		// Validate command
 		if (!config.command || config.command.trim().length === 0) {
@@ -822,7 +817,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 			"with option:",
 			optionId,
 		);
-		this.handlePermissionResponse(requestId, optionId);
+		this.permissionManager.respond(requestId, optionId);
 		return Promise.resolve();
 	}
 
@@ -1085,207 +1080,21 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 	}
 
 	/**
-	 * Handle permission response from user.
-	 */
-	private handlePermissionResponse(requestId: string, optionId: string): void {
-		const request = this.pendingPermissionRequests.get(requestId);
-		if (!request) {
-			return;
-		}
-
-		const { resolve, toolCallId, options } = request;
-
-		// Reflect the selection in the UI immediately
-		this.updateMessage(toolCallId, {
-			type: "tool_call",
-			toolCallId,
-			permissionRequest: {
-				requestId,
-				options,
-				selectedOptionId: optionId,
-				isActive: false,
-			},
-		} as MessageContent);
-
-		resolve({
-			outcome: {
-				outcome: "selected",
-				optionId,
-			},
-		});
-		this.pendingPermissionRequests.delete(requestId);
-		this.pendingPermissionQueue = this.pendingPermissionQueue.filter(
-			(entry) => entry.requestId !== requestId,
-		);
-		this.activateNextPermission();
-	}
-
-	/**
 	 * Cancel all ongoing operations.
 	 */
 	private cancelAllOperations(): void {
-		// Cancel pending permission requests
-		this.cancelPendingPermissionRequests();
-
-		// Kill all running terminals
+		this.permissionManager.cancelAll();
 		this.terminalManager.killAllTerminals();
-	}
-
-	private activateNextPermission(): void {
-		if (this.pendingPermissionQueue.length === 0) {
-			return;
-		}
-
-		const next = this.pendingPermissionQueue[0];
-		const pending = this.pendingPermissionRequests.get(next.requestId);
-		if (!pending) {
-			return;
-		}
-
-		this.updateMessage(next.toolCallId, {
-			type: "tool_call",
-			toolCallId: next.toolCallId,
-			permissionRequest: {
-				requestId: next.requestId,
-				options: pending.options,
-				isActive: true,
-			},
-		} as MessageContent);
 	}
 
 	/**
 	 * Request permission from user for an operation.
+	 * Called by ACP ClientSideConnection dispatch.
 	 */
-	async requestPermission(
+	requestPermission(
 		params: acp.RequestPermissionRequest,
 	): Promise<acp.RequestPermissionResponse> {
-		this.logger.log("[AcpAdapter] Permission request received:", params);
-
-		// If auto-allow is enabled, automatically approve the first allow option
-		if (this.autoAllowPermissions) {
-			const allowOption =
-				params.options.find(
-					(option) =>
-						option.kind === "allow_once" ||
-						option.kind === "allow_always" ||
-						(!option.kind &&
-							option.name.toLowerCase().includes("allow")),
-				) || params.options[0]; // fallback to first option
-
-			this.logger.log(
-				"[AcpAdapter] Auto-allowing permission request:",
-				allowOption,
-			);
-
-			return Promise.resolve({
-				outcome: {
-					outcome: "selected",
-					optionId: allowOption.optionId,
-				},
-			});
-		}
-
-		// Generate unique ID for this permission request
-		const requestId = crypto.randomUUID();
-		const toolCallId = params.toolCall?.toolCallId || crypto.randomUUID();
-		const sessionId = params.sessionId;
-
-		const normalizedOptions: PermissionOption[] = params.options.map(
-			(option) => {
-				const normalizedKind =
-					option.kind === "reject_always"
-						? "reject_once"
-						: option.kind;
-				const kind: PermissionOption["kind"] = normalizedKind
-					? normalizedKind
-					: option.name.toLowerCase().includes("allow")
-						? "allow_once"
-						: "reject_once";
-
-				return {
-					optionId: option.optionId,
-					name: option.name,
-					kind,
-				};
-			},
-		);
-
-		const isFirstRequest = this.pendingPermissionQueue.length === 0;
-
-		// Prepare permission request data
-		const permissionRequestData = {
-			requestId: requestId,
-			options: normalizedOptions,
-			isActive: isFirstRequest,
-		};
-
-		this.pendingPermissionQueue.push({
-			requestId,
-			toolCallId,
-			options: normalizedOptions,
-		});
-
-		// Emit tool_call with permission request via session update callback
-		// If tool_call exists, it will be updated; otherwise, a new one will be created
-		const toolCallInfo = params.toolCall;
-		this.sessionUpdateCallback?.({
-			type: "tool_call",
-			sessionId,
-			toolCallId: toolCallId,
-			title: toolCallInfo?.title ?? undefined,
-			status: toolCallInfo?.status || "pending",
-			kind: (toolCallInfo?.kind as acp.ToolKind | undefined) ?? undefined,
-			content: AcpTypeConverter.toToolCallContent(
-				toolCallInfo?.content as acp.ToolCallContent[] | undefined,
-			),
-			rawInput: toolCallInfo?.rawInput as
-				| { [k: string]: unknown }
-				| undefined,
-			permissionRequest: permissionRequestData,
-		});
-
-		// Return a Promise that will be resolved when user clicks a button
-		return new Promise((resolve) => {
-			this.pendingPermissionRequests.set(requestId, {
-				resolve,
-				toolCallId,
-				options: normalizedOptions,
-			});
-		});
-	}
-
-	/**
-	 * Cancel all pending permission requests.
-	 */
-	private cancelPendingPermissionRequests(): void {
-		this.logger.log(
-			`[AcpAdapter] Cancelling ${this.pendingPermissionRequests.size} pending permission requests`,
-		);
-		this.pendingPermissionRequests.forEach(
-			({ resolve, toolCallId, options }, requestId) => {
-				// Update UI to show cancelled state
-				this.updateMessage(toolCallId, {
-					type: "tool_call",
-					toolCallId,
-					status: "completed",
-					permissionRequest: {
-						requestId,
-						options,
-						isCancelled: true,
-						isActive: false,
-					},
-				} as MessageContent);
-
-				// Resolve the promise with cancelled outcome
-				resolve({
-					outcome: {
-						outcome: "cancelled",
-					},
-				});
-			},
-		);
-		this.pendingPermissionRequests.clear();
-		this.pendingPermissionQueue = [];
+		return this.permissionManager.request(params);
 	}
 
 	// ========================================================================
