@@ -27,52 +27,25 @@ export interface ListSessionsResult {
 }
 
 /**
- * Result of session/load (stable).
+ * Result of session operations (new, load, resume, fork).
  *
- * Note: Conversation history is received via session/update notifications
- * (user_message_chunk, agent_message_chunk, tool_call, etc.),
- * not in the response itself.
+ * All session creation/restoration operations return the same structure:
+ * a session ID with optional mode/model/config state.
+ *
+ * Note: modes and models are DEPRECATED in favor of configOptions.
+ * They are kept for backward compatibility with agents that don't
+ * support configOptions yet.
  */
-export interface LoadSessionResult {
-	/** Session ID */
+export interface SessionResult {
+	/** Unique session identifier */
 	sessionId: string;
-	/** DEPRECATED: Use configOptions instead. Kept for backward compatibility. */
-	modes?: SessionModeState;
-	/** DEPRECATED: Use configOptions instead. Kept for backward compatibility. */
-	models?: SessionModelState;
-	/** Session config options (supersedes modes/models) */
-	configOptions?: SessionConfigOption[];
-}
 
-/**
- * Result of session/resume (unstable).
- *
- * Resumes a session without history replay.
- * Use when client manages its own history storage.
- */
-export interface ResumeSessionResult {
-	/** Session ID */
-	sessionId: string;
 	/** DEPRECATED: Use configOptions instead. Kept for backward compatibility. */
 	modes?: SessionModeState;
-	/** DEPRECATED: Use configOptions instead. Kept for backward compatibility. */
-	models?: SessionModelState;
-	/** Session config options (supersedes modes/models) */
-	configOptions?: SessionConfigOption[];
-}
 
-/**
- * Result of session/fork (unstable).
- *
- * Creates a new session with inherited context from the original.
- */
-export interface ForkSessionResult {
-	/** New session ID (different from original) */
-	sessionId: string;
-	/** DEPRECATED: Use configOptions instead. Kept for backward compatibility. */
-	modes?: SessionModeState;
 	/** DEPRECATED: Use configOptions instead. Kept for backward compatibility. */
 	models?: SessionModelState;
+
 	/** Session config options (supersedes modes/models) */
 	configOptions?: SessionConfigOption[];
 }

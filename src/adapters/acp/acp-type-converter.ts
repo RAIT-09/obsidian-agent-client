@@ -6,6 +6,23 @@ import type {
 	SessionConfigSelectGroup,
 	SessionConfigSelectOption,
 } from "../../domain/models/session-update";
+import type { SessionResult } from "../../domain/models/session-info";
+
+/**
+ * Common shape of ACP session responses.
+ *
+ * NewSessionResponse and ForkSessionResponse include sessionId.
+ * LoadSessionResponse and ResumeSessionResponse do not (the sessionId
+ * is the same as the request parameter). This interface captures the
+ * shared fields for type-safe conversion; sessionId is optional here
+ * and supplied explicitly when missing from the response.
+ */
+interface AcpSessionResponse {
+	sessionId?: string;
+	modes?: acp.SessionModeState | null;
+	models?: acp.SessionModelState | null;
+	configOptions?: acp.SessionConfigOption[] | null;
+}
 
 /**
  * Type converter between ACP Protocol types and Domain types.
@@ -104,6 +121,59 @@ export class AcpTypeConverter {
 			name: o.name,
 			description: o.description ?? undefined,
 		}));
+	}
+
+	/**
+	 * Convert ACP session response to domain SessionResult.
+	 *
+	 * Handles the modes/models/configOptions conversion that is common
+	 * to newSession, loadSession, resumeSession, and forkSession responses.
+	 *
+	 * ACP uses `null` for absent optional fields, while domain uses `undefined`.
+	 * This method normalizes that difference.
+	 *
+	 * @param sessionId - The session ID (from response or from request params)
+	 * @param response - ACP session response (new/load/resume/fork)
+	 * @returns Domain SessionResult
+	 */
+	static toSessionResult(
+		sessionId: string,
+		response: AcpSessionResponse,
+	): SessionResult {
+		let modes: SessionResult["modes"];
+		if (response.modes) {
+			modes = {
+				availableModes: response.modes.availableModes.map((m) => ({
+					id: m.id,
+					name: m.name,
+					description: m.description ?? undefined,
+				})),
+				currentModeId: response.modes.currentModeId,
+			};
+		}
+
+		let models: SessionResult["models"];
+		if (response.models) {
+			models = {
+				availableModels: response.models.availableModels.map((m) => ({
+					modelId: m.modelId,
+					name: m.name,
+					description: m.description ?? undefined,
+				})),
+				currentModelId: response.models.currentModelId,
+			};
+		}
+
+		const configOptions = response.configOptions
+			? this.toSessionConfigOptions(response.configOptions)
+			: undefined;
+
+		return {
+			sessionId,
+			modes,
+			models,
+			configOptions,
+		};
 	}
 
 	static toAcpContentBlock(content: PromptContent): acp.ContentBlock {

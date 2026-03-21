@@ -12,11 +12,7 @@
  */
 
 import type { PermissionOption } from "../models/chat-message";
-import type {
-	AuthenticationMethod,
-	SessionModeState,
-	SessionModelState,
-} from "../models/chat-session";
+import type { AuthenticationMethod } from "../models/chat-session";
 import type {
 	SessionConfigOption,
 	SessionUpdate,
@@ -25,9 +21,7 @@ import type { ProcessError } from "../models/agent-error";
 import type { PromptContent } from "../models/prompt-content";
 import type {
 	ListSessionsResult,
-	LoadSessionResult,
-	ResumeSessionResult,
-	ForkSessionResult,
+	SessionResult,
 } from "../models/session-info";
 
 /**
@@ -198,23 +192,6 @@ export interface InitializeResult {
 }
 
 /**
- * Result of creating a new session.
- */
-export interface NewSessionResult {
-	/** Unique identifier for the new session */
-	sessionId: string;
-
-	/** DEPRECATED: Use configOptions instead. Kept for backward compatibility. */
-	modes?: SessionModeState;
-
-	/** DEPRECATED: Use configOptions instead. Kept for backward compatibility. */
-	models?: SessionModelState;
-
-	/** Session config options (supersedes modes/models) */
-	configOptions?: SessionConfigOption[];
-}
-
-/**
  * Interface for communicating with ACP-compatible agents.
  *
  * Provides methods for connecting to agents, sending messages,
@@ -242,7 +219,7 @@ export interface IAgentClient {
 	 * @returns Promise resolving to new session result
 	 * @throws AgentError if session creation fails
 	 */
-	newSession(workingDirectory: string): Promise<NewSessionResult>;
+	newSession(workingDirectory: string): Promise<SessionResult>;
 
 	/**
 	 * Authenticate with the agent.
@@ -350,7 +327,7 @@ export interface IAgentClient {
 	 * Set the session mode.
 	 *
 	 * Changes the agent's operating mode for the current session.
-	 * The mode must be one of the available modes returned in NewSessionResult.
+	 * The mode must be one of the available modes returned in SessionResult.
 	 * After calling this, the agent will send a current_mode_update notification
 	 * to confirm the mode change.
 	 *
@@ -415,7 +392,7 @@ export interface IAgentClient {
 	 * @param cwd - Working directory
 	 * @returns Promise resolving to session result with modes and models
 	 */
-	loadSession(sessionId: string, cwd: string): Promise<LoadSessionResult>;
+	loadSession(sessionId: string, cwd: string): Promise<SessionResult>;
 
 	/**
 	 * Resume a session without history replay (unstable).
@@ -427,7 +404,7 @@ export interface IAgentClient {
 	 * @param cwd - Working directory
 	 * @returns Promise resolving to session result with modes and models
 	 */
-	resumeSession(sessionId: string, cwd: string): Promise<ResumeSessionResult>;
+	resumeSession(sessionId: string, cwd: string): Promise<SessionResult>;
 
 	/**
 	 * Fork a session to create a new branch (unstable).
@@ -439,5 +416,5 @@ export interface IAgentClient {
 	 * @param cwd - Working directory
 	 * @returns Promise resolving to session result with new sessionId
 	 */
-	forkSession(sessionId: string, cwd: string): Promise<ForkSessionResult>;
+	forkSession(sessionId: string, cwd: string): Promise<SessionResult>;
 }

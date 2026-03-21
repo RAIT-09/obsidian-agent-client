@@ -6,7 +6,6 @@ import type {
 	IAgentClient,
 	AgentConfig,
 	InitializeResult,
-	NewSessionResult,
 } from "../../domain/ports/agent-client.port";
 import type {
 	MessageContent,
@@ -20,19 +19,13 @@ import type { PromptContent } from "../../domain/models/prompt-content";
 import type { ProcessError } from "../../domain/models/agent-error";
 import type {
 	ListSessionsResult,
-	LoadSessionResult,
-	ResumeSessionResult,
-	ForkSessionResult,
+	SessionResult,
 } from "../../domain/models/session-info";
 import { AcpTypeConverter } from "./acp-type-converter";
 import { TerminalManager } from "../../shared/terminal-manager";
 import { getLogger, Logger } from "../../shared/logger";
 import type AgentClientPlugin from "../../plugin";
-import type {
-	SlashCommand,
-	SessionModeState,
-	SessionModelState,
-} from "src/domain/models/chat-session";
+import type { SlashCommand } from "src/domain/models/chat-session";
 import { convertWindowsPathToWsl } from "../../shared/wsl-utils";
 import { resolveNodeDirectory } from "../../shared/path-utils";
 import { getEnhancedWindowsEnv } from "../../shared/windows-env";
@@ -459,98 +452,26 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	/**
 	 * Create a new chat session with the agent.
 	 */
-	async newSession(workingDirectory: string): Promise<NewSessionResult> {
-		if (!this.connection) {
-			throw new Error(
-				"Connection not initialized. Call initialize() first.",
-			);
-		}
+	async newSession(workingDirectory: string): Promise<SessionResult> {
+		const connection = this.requireConnection();
 
 		try {
 			this.logger.log("[AcpAdapter] Creating new session...");
 
-			// Convert Windows path to WSL path if in WSL mode
-			let sessionCwd = workingDirectory;
-			if (Platform.isWin && this.plugin.settings.windowsWslMode) {
-				sessionCwd = convertWindowsPathToWsl(workingDirectory);
-			}
-
-			this.logger.log(
-				"[AcpAdapter] Using working directory:",
-				sessionCwd,
-			);
-
-			const sessionResult = await this.connection.newSession({
-				cwd: sessionCwd,
+			const response = await connection.newSession({
+				cwd: this.toSessionCwd(workingDirectory),
 				mcpServers: [],
 			});
 
 			this.logger.log(
-				`[AcpAdapter] 📝 Created session: ${sessionResult.sessionId}`,
+				`[AcpAdapter] Created session: ${response.sessionId}`,
 			);
-			this.logger.log(
-				"[AcpAdapter] NewSessionResponse:",
-				JSON.stringify(sessionResult, null, 2),
+			return AcpTypeConverter.toSessionResult(
+				response.sessionId,
+				response,
 			);
-
-			// Convert modes from ACP format to domain format
-			let modes: SessionModeState | undefined;
-			if (sessionResult.modes) {
-				modes = {
-					availableModes: sessionResult.modes.availableModes.map(
-						(m) => ({
-							id: m.id,
-							name: m.name,
-							// Convert null to undefined for type compatibility
-							description: m.description ?? undefined,
-						}),
-					),
-					currentModeId: sessionResult.modes.currentModeId,
-				};
-				this.logger.log(
-					`[AcpAdapter] Session modes: ${modes.availableModes.map((m) => m.id).join(", ")} (current: ${modes.currentModeId})`,
-				);
-			}
-
-			// Convert models from ACP format to domain format (experimental)
-			let models: SessionModelState | undefined;
-			if (sessionResult.models) {
-				models = {
-					availableModels: sessionResult.models.availableModels.map(
-						(m) => ({
-							modelId: m.modelId,
-							name: m.name,
-							// Convert null to undefined for type compatibility
-							description: m.description ?? undefined,
-						}),
-					),
-					currentModelId: sessionResult.models.currentModelId,
-				};
-				this.logger.log(
-					`[AcpAdapter] Session models: ${models.availableModels.map((m) => m.modelId).join(", ")} (current: ${models.currentModelId})`,
-				);
-			}
-
-			// Convert configOptions from ACP format to domain format
-			let configOptions: SessionConfigOption[] | undefined;
-			if (sessionResult.configOptions) {
-				configOptions = AcpTypeConverter.toSessionConfigOptions(
-					sessionResult.configOptions,
-				);
-				this.logger.log(
-					`[AcpAdapter] Session configOptions: ${configOptions.map((o) => o.id).join(", ")}`,
-				);
-			}
-
-			return {
-				sessionId: sessionResult.sessionId,
-				modes,
-				models,
-				configOptions,
-			};
 		} catch (error) {
 			this.logger.error("[AcpAdapter] New Session Error:", error);
-
 			throw error;
 		}
 	}
@@ -925,6 +846,29 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	// Helper methods
+
+	/**
+	 * Assert that the ACP connection is initialized and return it.
+	 * @throws Error if connection is not available
+	 */
+	private requireConnection(): acp.ClientSideConnection {
+		if (!this.connection) {
+			throw new Error(
+				"Connection not initialized. Call initialize() first.",
+			);
+		}
+		return this.connection;
+	}
+
+	/**
+	 * Convert working directory to WSL path if in WSL mode on Windows.
+	 */
+	private toSessionCwd(cwd: string): string {
+		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+			return convertWindowsPathToWsl(cwd);
+		}
+		return cwd;
+	}
 
 	/**
 	 * Get error information for process spawn errors.
@@ -1476,22 +1420,14 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		cwd?: string,
 		cursor?: string,
 	): Promise<ListSessionsResult> {
-		if (!this.connection) {
-			throw new Error(
-				"ACP connection not initialized. Call initialize() first.",
-			);
-		}
+		const connection = this.requireConnection();
 
 		try {
 			this.logger.log("[AcpAdapter] Listing sessions...");
 
-			// Convert Windows path to WSL path if in WSL mode
-			let filterCwd = cwd;
-			if (cwd && Platform.isWin && this.plugin.settings.windowsWslMode) {
-				filterCwd = convertWindowsPathToWsl(cwd);
-			}
+			const filterCwd = cwd ? this.toSessionCwd(cwd) : undefined;
 
-			const response = await this.connection.unstable_listSessions({
+			const response = await connection.unstable_listSessions({
 				cwd: filterCwd ?? null,
 				cursor: cursor ?? null,
 			});
@@ -1528,75 +1464,20 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	async loadSession(
 		sessionId: string,
 		cwd: string,
-	): Promise<LoadSessionResult> {
-		if (!this.connection) {
-			throw new Error(
-				"ACP connection not initialized. Call initialize() first.",
-			);
-		}
+	): Promise<SessionResult> {
+		const connection = this.requireConnection();
 
 		try {
 			this.logger.log(`[AcpAdapter] Loading session: ${sessionId}...`);
 
-			// Convert Windows path to WSL path if in WSL mode
-			let sessionCwd = cwd;
-			if (Platform.isWin && this.plugin.settings.windowsWslMode) {
-				sessionCwd = convertWindowsPathToWsl(cwd);
-			}
-
-			const response = await this.connection.loadSession({
+			const response = await connection.loadSession({
 				sessionId,
-				cwd: sessionCwd,
+				cwd: this.toSessionCwd(cwd),
 				mcpServers: [],
 			});
 
-			// Conversation history is received via session/update notifications
-			// (user_message_chunk, agent_message_chunk, tool_call, etc.)
-			// and handled by the onSessionUpdate callback
-
 			this.logger.log(`[AcpAdapter] Session loaded: ${sessionId}`);
-
-			// Convert modes/models to domain types
-			let modes: SessionModeState | undefined;
-			if (response.modes) {
-				modes = {
-					availableModes: response.modes.availableModes.map((m) => ({
-						id: m.id,
-						name: m.name,
-						description: m.description ?? undefined,
-					})),
-					currentModeId: response.modes.currentModeId,
-				};
-			}
-
-			let models: SessionModelState | undefined;
-			if (response.models) {
-				models = {
-					availableModels: response.models.availableModels.map(
-						(m) => ({
-							modelId: m.modelId,
-							name: m.name,
-							description: m.description ?? undefined,
-						}),
-					),
-					currentModelId: response.models.currentModelId,
-				};
-			}
-
-			// Convert configOptions from ACP format to domain format
-			let configOptions: SessionConfigOption[] | undefined;
-			if (response.configOptions) {
-				configOptions = AcpTypeConverter.toSessionConfigOptions(
-					response.configOptions,
-				);
-			}
-
-			return {
-				sessionId,
-				modes,
-				models,
-				configOptions,
-			};
+			return AcpTypeConverter.toSessionResult(sessionId, response);
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Load Session Error:", error);
 			throw error;
@@ -1615,71 +1496,20 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	async resumeSession(
 		sessionId: string,
 		cwd: string,
-	): Promise<ResumeSessionResult> {
-		if (!this.connection) {
-			throw new Error(
-				"ACP connection not initialized. Call initialize() first.",
-			);
-		}
+	): Promise<SessionResult> {
+		const connection = this.requireConnection();
 
 		try {
 			this.logger.log(`[AcpAdapter] Resuming session: ${sessionId}...`);
 
-			// Convert Windows path to WSL path if in WSL mode
-			let sessionCwd = cwd;
-			if (Platform.isWin && this.plugin.settings.windowsWslMode) {
-				sessionCwd = convertWindowsPathToWsl(cwd);
-			}
-
-			const response = await this.connection.unstable_resumeSession({
+			const response = await connection.unstable_resumeSession({
 				sessionId,
-				cwd: sessionCwd,
+				cwd: this.toSessionCwd(cwd),
 				mcpServers: [],
 			});
 
 			this.logger.log(`[AcpAdapter] Session resumed: ${sessionId}`);
-
-			// Convert modes/models to domain types
-			let modes: SessionModeState | undefined;
-			if (response.modes) {
-				modes = {
-					availableModes: response.modes.availableModes.map((m) => ({
-						id: m.id,
-						name: m.name,
-						description: m.description ?? undefined,
-					})),
-					currentModeId: response.modes.currentModeId,
-				};
-			}
-
-			let models: SessionModelState | undefined;
-			if (response.models) {
-				models = {
-					availableModels: response.models.availableModels.map(
-						(m) => ({
-							modelId: m.modelId,
-							name: m.name,
-							description: m.description ?? undefined,
-						}),
-					),
-					currentModelId: response.models.currentModelId,
-				};
-			}
-
-			// Convert configOptions from ACP format to domain format
-			let configOptions: SessionConfigOption[] | undefined;
-			if (response.configOptions) {
-				configOptions = AcpTypeConverter.toSessionConfigOptions(
-					response.configOptions,
-				);
-			}
-
-			return {
-				sessionId,
-				modes,
-				models,
-				configOptions,
-			};
+			return AcpTypeConverter.toSessionResult(sessionId, response);
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Resume Session Error:", error);
 			throw error;
@@ -1698,74 +1528,25 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	async forkSession(
 		sessionId: string,
 		cwd: string,
-	): Promise<ForkSessionResult> {
-		if (!this.connection) {
-			throw new Error(
-				"ACP connection not initialized. Call initialize() first.",
-			);
-		}
+	): Promise<SessionResult> {
+		const connection = this.requireConnection();
 
 		try {
 			this.logger.log(`[AcpAdapter] Forking session: ${sessionId}...`);
 
-			// Convert Windows path to WSL path if in WSL mode
-			let sessionCwd = cwd;
-			if (Platform.isWin && this.plugin.settings.windowsWslMode) {
-				sessionCwd = convertWindowsPathToWsl(cwd);
-			}
-
-			const response = await this.connection.unstable_forkSession({
+			const response = await connection.unstable_forkSession({
 				sessionId,
-				cwd: sessionCwd,
+				cwd: this.toSessionCwd(cwd),
 				mcpServers: [],
 			});
 
-			const newSessionId = response.sessionId;
 			this.logger.log(
-				`[AcpAdapter] Session forked: ${sessionId} -> ${newSessionId}`,
+				`[AcpAdapter] Session forked: ${sessionId} -> ${response.sessionId}`,
 			);
-
-			// Convert modes/models to domain types
-			let modes: SessionModeState | undefined;
-			if (response.modes) {
-				modes = {
-					availableModes: response.modes.availableModes.map((m) => ({
-						id: m.id,
-						name: m.name,
-						description: m.description ?? undefined,
-					})),
-					currentModeId: response.modes.currentModeId,
-				};
-			}
-
-			let models: SessionModelState | undefined;
-			if (response.models) {
-				models = {
-					availableModels: response.models.availableModels.map(
-						(m) => ({
-							modelId: m.modelId,
-							name: m.name,
-							description: m.description ?? undefined,
-						}),
-					),
-					currentModelId: response.models.currentModelId,
-				};
-			}
-
-			// Convert configOptions from ACP format to domain format
-			let configOptions: SessionConfigOption[] | undefined;
-			if (response.configOptions) {
-				configOptions = AcpTypeConverter.toSessionConfigOptions(
-					response.configOptions,
-				);
-			}
-
-			return {
-				sessionId: newSessionId,
-				modes,
-				models,
-				configOptions,
-			};
+			return AcpTypeConverter.toSessionResult(
+				response.sessionId,
+				response,
+			);
 		} catch (error) {
 			this.logger.error("[AcpAdapter] Fork Session Error:", error);
 			throw error;
