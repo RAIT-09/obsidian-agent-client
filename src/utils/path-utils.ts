@@ -1,7 +1,6 @@
 import { execFile } from "child_process";
 import { Platform } from "obsidian";
-import { buildWslShellWrapper } from "./wsl-utils";
-import { getLoginShell } from "./shell-utils";
+import { buildWslShellWrapper, getLoginShell } from "./platform";
 
 /**
  * Check whether a path string is an absolute path (Unix or Windows).

@@ -13,10 +13,34 @@ import type {
 } from "../types/session";
 import type { SessionConfigOption } from "../types/session";
 import type { ChatMessage } from "../types/chat";
-import {
-	getSessionCapabilityFlags,
-	type SessionCapabilityFlags,
-} from "../utils/session-capability-utils";
+import type { AgentCapabilities } from "../types/session";
+
+// ============================================================================
+// Session Capability Helpers (from session-capability-utils.ts)
+// ============================================================================
+
+interface SessionCapabilityFlags {
+	/** Whether session/load is supported (stable) */
+	canLoad: boolean;
+	/** Whether session/resume is supported (unstable) */
+	canResume: boolean;
+	/** Whether session/fork is supported (unstable) */
+	canFork: boolean;
+	/** Whether session/list is supported (unstable) */
+	canList: boolean;
+}
+
+function getSessionCapabilityFlags(
+	agentCapabilities?: AgentCapabilities,
+): SessionCapabilityFlags {
+	const sessionCaps = agentCapabilities?.sessionCapabilities;
+	return {
+		canLoad: agentCapabilities?.loadSession === true,
+		canResume: sessionCaps?.resume !== undefined,
+		canFork: sessionCaps?.fork !== undefined,
+		canList: sessionCaps?.list !== undefined,
+	};
+}
 
 // ============================================================================
 // Types

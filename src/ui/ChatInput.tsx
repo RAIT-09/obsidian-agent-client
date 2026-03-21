@@ -14,8 +14,8 @@ import type {
 import type {
 	SessionConfigOption,
 	SessionConfigSelectGroup,
+	SessionConfigSelectOption,
 } from "../types/session";
-import { flattenConfigSelectOptions } from "../utils/config-option-utils";
 import type { AttachedFile } from "../types/chat";
 import type { UseMentionsReturn } from "../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../hooks/useSlashCommands";
@@ -29,6 +29,18 @@ import { getLogger } from "../utils/logger";
 import type { ErrorInfo } from "../types/errors";
 import type { AgentUpdateNotification } from "../services/update-checker";
 import { useSettings } from "../hooks/useSettings";
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function flattenConfigSelectOptions(
+	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],
+): SessionConfigSelectOption[] {
+	if (options.length === 0) return [];
+	if ("value" in options[0]) return options as SessionConfigSelectOption[];
+	return (options as SessionConfigSelectGroup[]).flatMap((g) => g.options);
+}
 
 // ============================================================================
 // Image Constants

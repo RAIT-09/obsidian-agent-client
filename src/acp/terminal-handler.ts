@@ -3,8 +3,7 @@ import type AgentClientPlugin from "../plugin";
 import { getLogger, Logger } from "../utils/logger";
 import { Platform } from "obsidian";
 import { resolveNodeDirectory } from "../utils/path-utils";
-import { getEnhancedWindowsEnv } from "../utils/windows-env";
-import { prepareShellCommand } from "../utils/command-builder";
+import { getEnhancedWindowsEnv, prepareShellCommand } from "../utils/platform";
 
 /**
  * Parameters for creating a terminal process.

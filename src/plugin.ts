@@ -25,8 +25,8 @@ import {
 	normalizeEnvVars,
 	normalizeCustomAgent,
 	ensureUniqueCustomAgentIds,
-} from "./utils/settings-utils";
-import { parseChatFontSize } from "./utils/display-settings";
+} from "./services/settings-service";
+import { parseChatFontSize } from "./services/settings-service";
 import {
 	AgentEnvVar,
 	GeminiAgentSettings,

@@ -21,10 +21,8 @@ import { PermissionManager } from "./permission-handler";
 import { getLogger, Logger } from "../utils/logger";
 import type AgentClientPlugin from "../plugin";
 import type { SlashCommand } from "../types/session";
-import { convertWindowsPathToWsl } from "../utils/wsl-utils";
+import { convertWindowsPathToWsl, getEnhancedWindowsEnv, prepareShellCommand } from "../utils/platform";
 import { resolveNodeDirectory } from "../utils/path-utils";
-import { getEnhancedWindowsEnv } from "../utils/windows-env";
-import { prepareShellCommand } from "../utils/command-builder";
 
 
 // ============================================================================

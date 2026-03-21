@@ -19,7 +19,21 @@ import { InlineHeader } from "./InlineHeader";
 // Hooks imports
 import { useChatController } from "../hooks/useChatController";
 
-import { clampPosition } from "../utils/floating-utils";
+// ============================================================
+// Helpers
+// ============================================================
+
+function clampPosition(
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+): { x: number; y: number } {
+	return {
+		x: Math.max(0, Math.min(x, window.innerWidth - width)),
+		y: Math.max(0, Math.min(y, window.innerHeight - height)),
+	};
+}
 
 // ============================================================
 // Type Definitions

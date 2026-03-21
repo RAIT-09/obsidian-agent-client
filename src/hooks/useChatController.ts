@@ -30,17 +30,26 @@ import { useSessionHistory } from "./useSessionHistory";
 import type {
 	SessionModeState,
 	SessionModelState,
+	SessionConfigOption,
+	SessionConfigSelectOption,
+	SessionConfigSelectGroup,
 } from "../types/session";
-import type { SessionConfigOption } from "../types/session";
-import { flattenConfigSelectOptions } from "../utils/config-option-utils";
 import type {
 	ImagePromptContent,
 	ResourceLinkPromptContent,
 } from "../types/chat";
 import { buildFileUri } from "../utils/path-utils";
-import { convertWindowsPathToWsl } from "../utils/wsl-utils";
+import { convertWindowsPathToWsl } from "../utils/platform";
 import type { AgentUpdateNotification } from "../services/update-checker";
 import { checkAgentUpdate } from "../services/update-checker";
+
+function flattenConfigSelectOptions(
+	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],
+): SessionConfigSelectOption[] {
+	if (options.length === 0) return [];
+	if ("value" in options[0]) return options as SessionConfigSelectOption[];
+	return (options as SessionConfigSelectGroup[]).flatMap((g) => g.options);
+}
 
 // Agent info for display (from plugin.getAvailableAgents())
 interface AgentInfo {

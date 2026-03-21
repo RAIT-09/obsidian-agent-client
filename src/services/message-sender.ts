@@ -32,7 +32,7 @@ import type {
 	ResourceLinkPromptContent,
 } from "../types/chat";
 import { extractMentionedNotes, type IMentionService } from "../utils/mention-utils";
-import { convertWindowsPathToWsl } from "../utils/wsl-utils";
+import { convertWindowsPathToWsl } from "../utils/platform";
 import { buildFileUri } from "../utils/path-utils";
 
 // ============================================================================

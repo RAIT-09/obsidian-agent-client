@@ -8,8 +8,11 @@ import type {
 	SlashCommand,
 	AuthenticationMethod,
 } from "../types/session";
-import type { SessionConfigOption } from "../types/session";
-import { flattenConfigSelectOptions } from "../utils/config-option-utils";
+import type {
+	SessionConfigOption,
+	SessionConfigSelectOption,
+	SessionConfigSelectGroup,
+} from "../types/session";
 import type { IAgentClient } from "../acp/acp-client";
 import type { ISettingsAccess } from "../services/settings-service";
 import type { AgentClientPluginSettings } from "../plugin";
@@ -19,7 +22,7 @@ import type {
 	GeminiAgentSettings,
 	CodexAgentSettings,
 } from "../types/agent";
-import { toAgentConfig } from "../utils/settings-utils";
+import { toAgentConfig } from "../services/settings-service";
 
 // ============================================================================
 // Types
@@ -327,6 +330,18 @@ function createInitialSession(
 		lastActivityAt: new Date(),
 		workingDirectory,
 	};
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function flattenConfigSelectOptions(
+	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],
+): SessionConfigSelectOption[] {
+	if (options.length === 0) return [];
+	if ("value" in options[0]) return options as SessionConfigSelectOption[];
+	return (options as SessionConfigSelectGroup[]).flatMap((g) => g.options);
 }
 
 // ============================================================================
