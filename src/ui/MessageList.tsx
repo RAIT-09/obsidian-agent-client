@@ -6,12 +6,12 @@ import type { ITerminalClient } from "../acp/acp-client";
 import type AgentClientPlugin from "../plugin";
 import type { IChatViewHost } from "./types";
 import { setIcon } from "obsidian";
-import { MessageRenderer } from "./MessageRenderer";
+import { MessageBubble } from "./MessageBubble";
 
 /**
- * Props for ChatMessages component
+ * Props for MessageList component
  */
-export interface ChatMessagesProps {
+export interface MessageListProps {
 	/** All messages in the current chat session */
 	messages: ChatMessage[];
 	/** Whether a message is currently being sent */
@@ -46,7 +46,7 @@ export interface ChatMessagesProps {
  * - Empty state display
  * - Loading indicator
  */
-export function ChatMessages({
+export function MessageList({
 	messages,
 	isSending,
 	isSessionReady,
@@ -57,7 +57,7 @@ export function ChatMessages({
 	terminalClient,
 	onApprovePermission,
 	hasActivePermission,
-}: ChatMessagesProps) {
+}: MessageListProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
 
@@ -131,7 +131,7 @@ export function ChatMessages({
 			) : (
 				<>
 					{messages.map((message) => (
-						<MessageRenderer
+						<MessageBubble
 							key={message.id}
 							message={message}
 							plugin={plugin}

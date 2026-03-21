@@ -12,9 +12,9 @@ import type { ChatInputState } from "../types/chat";
 import type { IChatViewHost } from "./types";
 
 // Component imports
-import { ChatMessages } from "./ChatMessages";
-import { ChatInput } from "./ChatInput";
-import { InlineHeader } from "./InlineHeader";
+import { MessageList } from "./MessageList";
+import { InputArea } from "./InputArea";
+import { ChatHeader } from "./ChatHeader";
 
 // Hooks imports
 import { useChatController } from "../hooks/useChatController";
@@ -761,7 +761,7 @@ function FloatingChatComponent({
 				className="agent-client-floating-header"
 				onMouseDown={onMouseDown}
 			>
-				<InlineHeader
+				<ChatHeader
 					variant="floating"
 					agentLabel={activeAgentLabel}
 					availableAgents={availableAgents}
@@ -781,7 +781,7 @@ function FloatingChatComponent({
 
 			<div className="agent-client-floating-content">
 				<div className="agent-client-floating-messages-container">
-					<ChatMessages
+					<MessageList
 						messages={messages}
 						isSending={isSending}
 						isSessionReady={isSessionReady}
@@ -797,7 +797,7 @@ function FloatingChatComponent({
 					/>
 				</div>
 
-				<ChatInput
+				<InputArea
 					isSending={isSending}
 					isSessionReady={isSessionReady}
 					isRestoringSession={sessionHistory.loading}

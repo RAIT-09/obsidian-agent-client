@@ -19,8 +19,8 @@ import type { ChatInputState } from "../types/chat";
 
 // Component imports
 import { ChatHeader } from "./ChatHeader";
-import { ChatMessages } from "./ChatMessages";
-import { ChatInput } from "./ChatInput";
+import { MessageList } from "./MessageList";
+import { InputArea } from "./InputArea";
 // Utility imports
 import { getLogger, Logger } from "../utils/logger";
 
@@ -548,6 +548,7 @@ function ChatComponent({
 			style={chatFontSizeStyle}
 		>
 			<ChatHeader
+				variant="sidebar"
 				agentLabel={activeAgentLabel}
 				isUpdateAvailable={isUpdateAvailable}
 				hasHistoryCapability={sessionHistory.canShowSessionHistory}
@@ -557,7 +558,7 @@ function ChatComponent({
 				onOpenHistory={handleOpenHistory}
 			/>
 
-			<ChatMessages
+			<MessageList
 				messages={messages}
 				isSending={isSending}
 				isSessionReady={isSessionReady}
@@ -570,7 +571,7 @@ function ChatComponent({
 				hasActivePermission={permission.activePermission != null}
 			/>
 
-			<ChatInput
+			<InputArea
 				isSending={isSending}
 				isSessionReady={isSessionReady}
 				isRestoringSession={sessionHistory.loading}

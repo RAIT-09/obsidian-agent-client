@@ -4,7 +4,6 @@ import { Notice, FileSystemAdapter, Platform } from "obsidian";
 import type AgentClientPlugin from "../plugin";
 import type { AttachedFile } from "../types/chat";
 import { SessionHistoryModal } from "../ui/SessionHistoryModal";
-import { ConfirmDeleteModal } from "../ui/ConfirmDeleteModal";
 
 // Service imports
 import { getLogger, Logger } from "../utils/logger";
@@ -116,7 +115,7 @@ export interface UseChatControllerReturn {
 	handleClearAgentUpdate: () => void;
 	handleRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	handleForkSession: (sessionId: string, cwd: string) => Promise<void>;
-	handleDeleteSession: (sessionId: string) => void;
+	handleDeleteSession: (sessionId: string) => Promise<void>;
 	handleOpenHistory: () => void;
 	handleSetMode: (modeId: string) => Promise<void>;
 	handleSetModel: (modelId: string) => Promise<void>;
@@ -624,31 +623,19 @@ export function useChatController(
 	);
 
 	const handleDeleteSession = useCallback(
-		(sessionId: string) => {
-			const targetSession = sessionHistory.sessions.find(
-				(s) => s.sessionId === sessionId,
-			);
-			const sessionTitle = targetSession?.title ?? "Untitled Session";
-
-			const confirmModal = new ConfirmDeleteModal(
-				plugin.app,
-				sessionTitle,
-				async () => {
-					try {
-						logger.log(
-							`[useChatController] Deleting session: ${sessionId}`,
-						);
-						await sessionHistory.deleteSession(sessionId);
-						new Notice("[Agent Client] Session deleted");
-					} catch (error) {
-						new Notice("[Agent Client] Failed to delete session");
-						logger.error("Session delete error:", error);
-					}
-				},
-			);
-			confirmModal.open();
+		async (sessionId: string) => {
+			try {
+				logger.log(
+					`[useChatController] Deleting session: ${sessionId}`,
+				);
+				await sessionHistory.deleteSession(sessionId);
+				new Notice("[Agent Client] Session deleted");
+			} catch (error) {
+				new Notice("[Agent Client] Failed to delete session");
+				logger.error("Session delete error:", error);
+			}
 		},
-		[plugin.app, sessionHistory, logger],
+		[sessionHistory, logger],
 	);
 
 	const handleLoadMore = useCallback(() => {

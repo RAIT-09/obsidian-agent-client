@@ -3,17 +3,17 @@ const { useState, useRef, useEffect } = React;
 import type { ITerminalClient } from "../acp/acp-client";
 import { getLogger } from "../utils/logger";
 import type AgentClientPlugin from "../plugin";
-interface TerminalRendererProps {
+interface TerminalBlockProps {
 	terminalId: string;
 	terminalClient: ITerminalClient | null;
 	plugin: AgentClientPlugin;
 }
 
-export function TerminalRenderer({
+export function TerminalBlock({
 	terminalId,
 	terminalClient,
 	plugin,
-}: TerminalRendererProps) {
+}: TerminalBlockProps) {
 	const logger = getLogger();
 	const [output, setOutput] = useState("");
 	const [exitStatus, setExitStatus] = useState<{
@@ -24,12 +24,12 @@ export function TerminalRenderer({
 	const intervalRef = useRef<number | null>(null);
 
 	logger.log(
-		`[TerminalRenderer] Component rendered for terminal ${terminalId}, terminalClient: ${!!terminalClient}`,
+		`[TerminalBlock] Component rendered for terminal ${terminalId}, terminalClient: ${!!terminalClient}`,
 	);
 
 	useEffect(() => {
 		logger.log(
-			`[TerminalRenderer] useEffect triggered for ${terminalId}, terminalClient: ${!!terminalClient}`,
+			`[TerminalBlock] useEffect triggered for ${terminalId}, terminalClient: ${!!terminalClient}`,
 		);
 		if (!terminalId || !terminalClient) return;
 
@@ -38,7 +38,7 @@ export function TerminalRenderer({
 				const result =
 					await terminalClient.getTerminalOutput(terminalId);
 				logger.log(
-					`[TerminalRenderer] Poll result for ${terminalId}:`,
+					`[TerminalBlock] Poll result for ${terminalId}:`,
 					result,
 				);
 				setOutput(result.output);
@@ -58,7 +58,7 @@ export function TerminalRenderer({
 					error instanceof Error ? error.message : String(error);
 
 				logger.log(
-					`[TerminalRenderer] Polling error for terminal ${terminalId}: ${errorMessage}`,
+					`[TerminalBlock] Polling error for terminal ${terminalId}: ${errorMessage}`,
 				);
 
 				setIsRunning(false);

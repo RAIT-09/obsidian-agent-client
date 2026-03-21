@@ -12,7 +12,7 @@ import type { App } from "obsidian";
 /**
  * Minimal interface for components that need view-level DOM event registration.
  *
- * ChatMessages, ChatInput, SuggestionDropdown, and ErrorOverlay use this
+ * ChatMessages, ChatInput, SuggestionPopup, and ErrorBanner use this
  * for registering scroll and click-outside handlers.
  *
  * Note on `this: HTMLElement` in callback signatures:

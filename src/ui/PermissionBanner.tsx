@@ -2,7 +2,7 @@ import type AgentClientPlugin from "../plugin";
 import { getLogger } from "../utils/logger";
 import type { PermissionOption } from "../types/chat";
 
-interface PermissionRequestSectionProps {
+interface PermissionBannerProps {
 	permissionRequest: {
 		requestId: string;
 		options: PermissionOption[];
@@ -20,13 +20,13 @@ interface PermissionRequestSectionProps {
 	onOptionSelected?: (optionId: string) => void;
 }
 
-export function PermissionRequestSection({
+export function PermissionBanner({
 	permissionRequest,
 	toolCallId,
 	plugin,
 	onApprovePermission,
 	onOptionSelected,
-}: PermissionRequestSectionProps) {
+}: PermissionBannerProps) {
 	const logger = getLogger();
 
 	const isSelected = permissionRequest.selectedOptionId !== undefined;

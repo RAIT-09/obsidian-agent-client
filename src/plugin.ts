@@ -18,7 +18,7 @@ import {
 	createSettingsService,
 	type SettingsService,
 } from "./services/settings-service";
-import { AgentClientSettingTab } from "./ui/AgentClientSettingTab";
+import { AgentClientSettingTab } from "./ui/SettingsTab";
 import { AcpAdapter } from "./acp/acp-client";
 import {
 	sanitizeArgs,

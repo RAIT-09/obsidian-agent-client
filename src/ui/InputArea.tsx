@@ -20,9 +20,9 @@ import type { AttachedFile } from "../types/chat";
 import type { UseMentionsReturn } from "../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../hooks/useSlashCommands";
 import type { ChatMessage } from "../types/chat";
-import { SuggestionDropdown } from "./SuggestionDropdown";
-import { ErrorOverlay } from "./ErrorOverlay";
-import { AttachmentPreviewStrip } from "./AttachmentPreviewStrip";
+import { SuggestionPopup } from "./SuggestionPopup";
+import { ErrorBanner } from "./ErrorBanner";
+import { AttachmentStrip } from "./shared/AttachmentStrip";
 import { useInputHistory } from "../hooks/useInputHistory";
 import { getLogger } from "../utils/logger";
 import type { ErrorInfo } from "../types/errors";
@@ -84,9 +84,9 @@ function getUsageColorClass(percentage: number): string {
 }
 
 /**
- * Props for ChatInput component
+ * Props for InputArea component
  */
-export interface ChatInputProps {
+export interface InputAreaProps {
 	/** Whether a message is currently being sent */
 	isSending: boolean;
 	/** Whether the session is ready for user input */
@@ -169,7 +169,7 @@ export interface ChatInputProps {
  * - Send/stop button
  * - Keyboard navigation
  */
-export function ChatInput({
+export function InputArea({
 	isSending,
 	isSessionReady,
 	isRestoringSession,
@@ -206,7 +206,7 @@ export function ChatInput({
 	onClearAgentUpdate,
 	// Input history
 	messages,
-}: ChatInputProps) {
+}: InputAreaProps) {
 	const logger = getLogger();
 	const settings = useSettings(plugin);
 	const showEmojis = plugin.settings.displaySettings.showEmojis;
@@ -1122,7 +1122,7 @@ export function ChatInput({
 		<div className="agent-client-chat-input-container">
 			{/* Error Overlay - displayed above input */}
 			{errorInfo && (
-				<ErrorOverlay
+				<ErrorBanner
 					errorInfo={errorInfo}
 					onClose={onClearError}
 					showEmojis={showEmojis}
@@ -1132,7 +1132,7 @@ export function ChatInput({
 
 			{/* Agent Update Notification - hidden when error is showing */}
 			{!errorInfo && agentUpdateNotification && (
-				<ErrorOverlay
+				<ErrorBanner
 					errorInfo={agentUpdateNotification}
 					onClose={onClearAgentUpdate}
 					showEmojis={showEmojis}
@@ -1143,7 +1143,7 @@ export function ChatInput({
 
 			{/* Mention Dropdown */}
 			{mentions.isOpen && (
-				<SuggestionDropdown
+				<SuggestionPopup
 					type="mention"
 					items={mentions.suggestions}
 					selectedIndex={mentions.selectedIndex}
@@ -1156,7 +1156,7 @@ export function ChatInput({
 
 			{/* Slash Command Dropdown */}
 			{slashCommands.isOpen && (
-				<SuggestionDropdown
+				<SuggestionPopup
 					type="slash-command"
 					items={slashCommands.suggestions}
 					selectedIndex={slashCommands.selectedIndex}
@@ -1250,7 +1250,7 @@ export function ChatInput({
 				</div>
 
 				{/* Attachment Preview Strip (images + file references) */}
-				<AttachmentPreviewStrip
+				<AttachmentStrip
 					files={attachedFiles}
 					onRemove={removeFile}
 				/>

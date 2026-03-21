@@ -4,14 +4,14 @@ import { FileSystemAdapter } from "obsidian";
 import type { MessageContent } from "../types/chat";
 import type { ITerminalClient } from "../acp/acp-client";
 import type AgentClientPlugin from "../plugin";
-import { TerminalRenderer } from "./TerminalRenderer";
-import { PermissionRequestSection } from "./PermissionRequestSection";
-import { LucideIcon } from "./LucideIcon";
+import { TerminalBlock } from "./TerminalBlock";
+import { PermissionBanner } from "./PermissionBanner";
+import { LucideIcon } from "./shared/IconButton";
 import { toRelativePath } from "../utils/path-utils";
 import * as Diff from "diff";
-// import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
+// import { MarkdownRenderer } from "./shared/MarkdownRenderer";
 
-interface ToolCallRendererProps {
+interface ToolCallBlockProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
 	plugin: AgentClientPlugin;
 	terminalClient?: ITerminalClient;
@@ -22,12 +22,12 @@ interface ToolCallRendererProps {
 	) => Promise<void>;
 }
 
-export function ToolCallRenderer({
+export function ToolCallBlock({
 	content,
 	plugin,
 	terminalClient,
 	onApprovePermission,
-}: ToolCallRendererProps) {
+}: ToolCallBlockProps) {
 	const {
 		kind,
 		title,
@@ -142,7 +142,7 @@ export function ToolCallRenderer({
 				toolContent.map((item, index) => {
 					if (item.type === "terminal") {
 						return (
-							<TerminalRenderer
+							<TerminalBlock
 								key={index}
 								terminalId={item.terminalId}
 								terminalClient={terminalClient || null}
@@ -172,7 +172,7 @@ export function ToolCallRenderer({
 
 			{/* Permission request section */}
 			{permissionRequest && (
-				<PermissionRequestSection
+				<PermissionBanner
 					permissionRequest={{
 						...permissionRequest,
 						selectedOptionId: selectedOptionId,

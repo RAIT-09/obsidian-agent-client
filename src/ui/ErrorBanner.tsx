@@ -2,13 +2,13 @@ import * as React from "react";
 const { useEffect } = React;
 import { setIcon } from "obsidian";
 import type { ErrorInfo } from "../types/errors";
-import { LucideIcon } from "./LucideIcon";
+import { LucideIcon } from "./shared/IconButton";
 import type { IChatViewHost } from "./types";
 
 /** Visual variant for the overlay */
 export type OverlayVariant = "error" | "info";
 
-export interface ErrorOverlayProps {
+export interface ErrorBannerProps {
 	/** Error information to display */
 	errorInfo: ErrorInfo;
 	/** Callback to close/clear the error */
@@ -22,24 +22,24 @@ export interface ErrorOverlayProps {
 }
 
 /**
- * Overlay component displayed above the input field.
+ * Banner component displayed above the input field.
  *
  * Supports visual variants:
  * - "error" (default): Red border/title — for process errors and failures
  * - "info": Subtle border/title — for update notifications
  *
  * Design decisions:
- * - Uses same positioning pattern as SuggestionDropdown (position: absolute; bottom: 100%)
+ * - Uses same positioning pattern as SuggestionPopup (position: absolute; bottom: 100%)
  * - Closes on Escape key or close button
  * - Does not block chat messages from being visible
  */
-export function ErrorOverlay({
+export function ErrorBanner({
 	errorInfo,
 	onClose,
 	showEmojis,
 	view,
 	variant = "error",
-}: ErrorOverlayProps) {
+}: ErrorBannerProps) {
 	// Handle Escape key to close
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {

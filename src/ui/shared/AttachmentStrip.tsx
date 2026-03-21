@@ -1,8 +1,8 @@
 import * as React from "react";
 import { setIcon } from "obsidian";
-import type { AttachedFile } from "../types/chat";
+import type { AttachedFile } from "../../types/chat";
 
-interface AttachmentPreviewStripProps {
+interface AttachmentStripProps {
 	files: AttachedFile[];
 	onRemove: (id: string) => void;
 }
@@ -12,10 +12,10 @@ interface AttachmentPreviewStripProps {
  * - Images: show thumbnail
  * - Files: show file icon with filename
  */
-export function AttachmentPreviewStrip({
+export function AttachmentStrip({
 	files,
 	onRemove,
-}: AttachmentPreviewStripProps) {
+}: AttachmentStripProps) {
 	if (files.length === 0) return null;
 
 	return (

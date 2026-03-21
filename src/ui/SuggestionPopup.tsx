@@ -12,12 +12,12 @@ import type { SlashCommand } from "../types/session";
 type DropdownType = "mention" | "slash-command";
 
 /**
- * Props for the SuggestionDropdown component.
+ * Props for the SuggestionPopup component.
  *
  * This component can display either note mentions or slash commands
  * based on the `type` prop.
  */
-interface SuggestionDropdownProps {
+interface SuggestionPopupProps {
 	/** Type of dropdown to display */
 	type: DropdownType;
 
@@ -41,7 +41,7 @@ interface SuggestionDropdownProps {
 }
 
 /**
- * Generic suggestion dropdown component.
+ * Generic suggestion popup component.
  *
  * Displays either:
  * - Note mentions (@[[note]])
@@ -49,7 +49,7 @@ interface SuggestionDropdownProps {
  *
  * Handles keyboard navigation, mouse selection, and outside click detection.
  */
-export function SuggestionDropdown({
+export function SuggestionPopup({
 	type,
 	items,
 	selectedIndex,
@@ -57,11 +57,11 @@ export function SuggestionDropdown({
 	onClose,
 	plugin,
 	view,
-}: SuggestionDropdownProps) {
+}: SuggestionPopupProps) {
 	const dropdownRef = useRef<HTMLDivElement>(null);
 	const logger = getLogger();
 
-	logger.log(`[DEBUG] SuggestionDropdown (${type}) rendering with:`, {
+	logger.log(`[DEBUG] SuggestionPopup (${type}) rendering with:`, {
 		itemsCount: items.length,
 		selectedIndex,
 	});

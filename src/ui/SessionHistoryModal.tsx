@@ -1,12 +1,99 @@
+/**
+ * Session History Modal
+ *
+ * Contains the Obsidian Modal wrapper, the React content component,
+ * and the confirmation modal for session deletion.
+ */
+
+import { Modal, App, setIcon } from "obsidian";
 import * as React from "react";
 const { useState, useCallback } = React;
-import { setIcon } from "obsidian";
+import { createRoot, Root } from "react-dom/client";
 import type { SessionInfo } from "../types/session";
+
+// ============================================================
+// ConfirmDeleteModal (internal)
+// ============================================================
+
+/**
+ * Confirmation modal for session deletion.
+ *
+ * Displays session title and asks user to confirm deletion.
+ * Calls onConfirm callback only when user clicks Delete button.
+ */
+class ConfirmDeleteModal extends Modal {
+	private sessionTitle: string;
+	private onConfirm: () => void | Promise<void>;
+
+	constructor(
+		app: App,
+		sessionTitle: string,
+		onConfirm: () => void | Promise<void>,
+	) {
+		super(app);
+		this.sessionTitle = sessionTitle;
+		this.onConfirm = onConfirm;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		// Title
+		contentEl.createEl("h2", { text: "Delete session?" });
+
+		// Message
+		contentEl.createEl("p", {
+			text: `Are you sure you want to delete "${this.sessionTitle}"?`,
+			cls: "agent-client-confirm-delete-message",
+		});
+
+		contentEl.createEl("p", {
+			text: "This only removes the session from this plugin. The session data will remain on the agent side.",
+			cls: "agent-client-confirm-delete-warning",
+		});
+
+		// Buttons container
+		const buttonContainer = contentEl.createDiv({
+			cls: "agent-client-confirm-delete-buttons",
+		});
+
+		// Cancel button
+		const cancelButton = buttonContainer.createEl("button", {
+			text: "Cancel",
+			cls: "agent-client-confirm-delete-cancel",
+		});
+		cancelButton.addEventListener("click", () => {
+			this.close();
+		});
+
+		// Delete button
+		const deleteButton = buttonContainer.createEl("button", {
+			text: "Delete",
+			cls: "agent-client-confirm-delete-confirm mod-warning",
+		});
+		deleteButton.addEventListener("click", () => {
+			this.close();
+			void this.onConfirm();
+		});
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
+// ============================================================
+// SessionHistoryContent (internal)
+// ============================================================
 
 /**
  * Props for SessionHistoryContent component.
  */
-export interface SessionHistoryContentProps {
+interface SessionHistoryContentProps {
+	/** Obsidian App instance (for creating modals) */
+	app: App;
 	/** List of sessions to display */
 	sessions: SessionInfo[];
 	/** Whether sessions are being fetched */
@@ -42,8 +129,8 @@ export interface SessionHistoryContentProps {
 	onRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	/** Callback when a session is forked (create new branch) */
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
-	/** Callback when a session is deleted (shows confirmation dialog) */
-	onDeleteSession: (sessionId: string) => void;
+	/** Callback when a session is deleted */
+	onDeleteSession: (sessionId: string) => void | Promise<void>;
 	/** Callback to load more sessions (pagination) */
 	onLoadMore: () => void;
 	/** Callback to fetch sessions with filter */
@@ -223,7 +310,7 @@ function SessionItem({
 	currentCwd: string;
 	onRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
-	onDeleteSession: (sessionId: string) => void;
+	onDeleteSession: (sessionId: string) => void | Promise<void>;
 	onClose: () => void;
 }) {
 	const handleRestore = useCallback(() => {
@@ -237,7 +324,7 @@ function SessionItem({
 	}, [session, onForkSession, onClose]);
 
 	const handleDelete = useCallback(() => {
-		onDeleteSession(session.sessionId);
+		void onDeleteSession(session.sessionId);
 	}, [session.sessionId, onDeleteSession]);
 
 	return (
@@ -303,7 +390,8 @@ function SessionItem({
  * - Session list with load/resume/fork actions
  * - Pagination
  */
-export function SessionHistoryContent({
+function SessionHistoryContent({
+	app,
 	sessions,
 	loading,
 	error,
@@ -340,6 +428,26 @@ export function SessionHistoryContent({
 		const cwd = filterByCurrentVault ? currentCwd : undefined;
 		onFetchSessions(cwd);
 	}, [filterByCurrentVault, currentCwd, onFetchSessions]);
+
+	// Wrap onDeleteSession to show confirmation modal
+	const handleDeleteWithConfirmation = useCallback(
+		(sessionId: string) => {
+			const targetSession = sessions.find(
+				(s) => s.sessionId === sessionId,
+			);
+			const sessionTitle = targetSession?.title ?? "Untitled Session";
+
+			const confirmModal = new ConfirmDeleteModal(
+				app,
+				sessionTitle,
+				() => {
+					void onDeleteSession(sessionId);
+				},
+			);
+			confirmModal.open();
+		},
+		[app, sessions, onDeleteSession],
+	);
 
 	// Filter sessions based on hideNonLocalSessions setting
 	// Only applies to agent session/list (not local sessions which are already filtered)
@@ -478,7 +586,9 @@ export function SessionHistoryContent({
 									currentCwd={currentCwd}
 									onRestoreSession={onRestoreSession}
 									onForkSession={onForkSession}
-									onDeleteSession={onDeleteSession}
+									onDeleteSession={
+										handleDeleteWithConfirmation
+									}
 									onClose={onClose}
 								/>
 							))}
@@ -501,4 +611,89 @@ export function SessionHistoryContent({
 			)}
 		</>
 	);
+}
+
+// ============================================================
+// SessionHistoryModal (exported)
+// ============================================================
+
+/**
+ * Props for SessionHistoryModal (same as SessionHistoryContentProps minus onClose and app).
+ */
+export type SessionHistoryModalProps = Omit<
+	SessionHistoryContentProps,
+	"onClose" | "app"
+>;
+
+/**
+ * Modal for displaying and selecting from session history.
+ *
+ * This is a thin wrapper around the SessionHistoryContent React component.
+ * It extends Obsidian's Modal class for proper modal behavior (backdrop,
+ * escape key handling, etc.) while delegating all UI rendering to React.
+ */
+export class SessionHistoryModal extends Modal {
+	private root: Root | null = null;
+	private props: SessionHistoryModalProps;
+
+	constructor(app: App, props: SessionHistoryModalProps) {
+		super(app);
+		this.props = props;
+	}
+
+	/**
+	 * Update modal props and re-render the React component.
+	 * Call this when session data changes.
+	 */
+	updateProps(props: SessionHistoryModalProps) {
+		this.props = props;
+		this.renderContent();
+	}
+
+	/**
+	 * Called when modal is opened.
+	 * Creates React root and renders the content.
+	 */
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		// Add modal title
+		contentEl.createEl("h2", { text: "Session history" });
+
+		// Create container for React content
+		const reactContainer = contentEl.createDiv();
+
+		// Create React root and render
+		this.root = createRoot(reactContainer);
+		this.renderContent();
+	}
+
+	/**
+	 * Render or re-render the React content.
+	 */
+	private renderContent() {
+		if (this.root) {
+			this.root.render(
+				React.createElement(SessionHistoryContent, {
+					...this.props,
+					app: this.app,
+					onClose: () => this.close(),
+				}),
+			);
+		}
+	}
+
+	/**
+	 * Called when modal is closed.
+	 * Unmounts React component and cleans up.
+	 */
+	onClose() {
+		if (this.root) {
+			this.root.unmount();
+			this.root = null;
+		}
+		const { contentEl } = this;
+		contentEl.empty();
+	}
 }
