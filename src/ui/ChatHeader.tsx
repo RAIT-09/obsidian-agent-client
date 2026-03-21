@@ -2,16 +2,7 @@ import * as React from "react";
 const { useRef, useEffect } = React;
 import { setIcon, DropdownComponent } from "obsidian";
 import { HeaderButton } from "./shared/IconButton";
-
-// ============================================================================
-// Shared Types
-// ============================================================================
-
-/** Agent info for display */
-interface AgentInfo {
-	id: string;
-	displayName: string;
-}
+import type { AgentDisplayInfo } from "../services/session-helpers";
 
 // ============================================================================
 // Props Types
@@ -46,7 +37,7 @@ export interface FloatingHeaderProps {
 	/** Display name of the active agent */
 	agentLabel: string;
 	/** Available agents for switching */
-	availableAgents: AgentInfo[];
+	availableAgents: AgentDisplayInfo[];
 	/** Current agent ID */
 	currentAgentId: string;
 	/** Whether a plugin update is available */

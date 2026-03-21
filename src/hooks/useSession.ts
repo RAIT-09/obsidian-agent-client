@@ -15,7 +15,7 @@ import type {
 import type { IAgentClient } from "../acp/acp-client";
 import type { ISettingsAccess } from "../services/settings-service";
 import {
-	type AgentInfo,
+	type AgentDisplayInfo,
 	getDefaultAgentId,
 	getAvailableAgentsFromSettings,
 	getCurrentAgent,
@@ -85,7 +85,7 @@ export interface UseSessionReturn {
 	 * Get list of available agents.
 	 * @returns Array of agent info with id and displayName
 	 */
-	getAvailableAgents: () => AgentInfo[];
+	getAvailableAgents: () => AgentDisplayInfo[];
 
 	/**
 	 * Update session state after loading/resuming/forking a session.

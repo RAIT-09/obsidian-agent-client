@@ -661,7 +661,7 @@ export interface AgentCapabilities {
  * Provided by the agent during initialization for identification
  * and debugging purposes.
  *
- * Note: This is distinct from the UI-level AgentInfo { id, displayName }
+ * Note: This is distinct from the UI-level AgentDisplayInfo { id, displayName }
  * used in hooks/components for agent switching UI.
  */
 export interface AgentInfo {

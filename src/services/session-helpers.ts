@@ -21,7 +21,7 @@ import { toAgentConfig } from "./settings-service";
  * Agent information for display.
  * (Inlined from SwitchAgentUseCase)
  */
-export interface AgentInfo {
+export interface AgentDisplayInfo {
 	/** Unique agent ID */
 	id: string;
 	/** Display name for UI */
@@ -46,7 +46,7 @@ export function getDefaultAgentId(
  */
 export function getAvailableAgentsFromSettings(
 	settings: AgentClientPluginSettings,
-): AgentInfo[] {
+): AgentDisplayInfo[] {
 	return [
 		{
 			id: settings.claude.id,
@@ -73,7 +73,7 @@ export function getAvailableAgentsFromSettings(
 export function getCurrentAgent(
 	settings: AgentClientPluginSettings,
 	agentId?: string,
-): AgentInfo {
+): AgentDisplayInfo {
 	const activeId = agentId || getDefaultAgentId(settings);
 	const agents = getAvailableAgentsFromSettings(settings);
 	return (
