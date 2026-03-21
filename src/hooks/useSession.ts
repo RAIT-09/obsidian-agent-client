@@ -104,7 +104,7 @@ export interface UseSessionReturn {
 
 	/**
 	 * Callback to update available slash commands.
-	 * Called by AcpAdapter when agent sends available_commands_update.
+	 * Called by AcpClient when agent sends available_commands_update.
 	 */
 	updateAvailableCommands: (commands: SlashCommand[]) => void;
 
@@ -112,7 +112,7 @@ export interface UseSessionReturn {
 	 * DEPRECATED: Use updateConfigOptions instead.
 	 *
 	 * Callback to update current mode.
-	 * Called by AcpAdapter when agent sends current_mode_update.
+	 * Called by AcpClient when agent sends current_mode_update.
 	 */
 	updateCurrentMode: (modeId: string) => void;
 
@@ -581,7 +581,7 @@ export function useSession(
 
 	/**
 	 * Update available slash commands.
-	 * Called by AcpAdapter when receiving available_commands_update.
+	 * Called by AcpClient when receiving available_commands_update.
 	 */
 	const updateAvailableCommands = useCallback((commands: SlashCommand[]) => {
 		setSession((prev) => ({
@@ -592,7 +592,7 @@ export function useSession(
 
 	/**
 	 * Update current mode.
-	 * Called by AcpAdapter when receiving current_mode_update.
+	 * Called by AcpClient when receiving current_mode_update.
 	 */
 	const updateCurrentMode = useCallback((modeId: string) => {
 		setSession((prev) => {

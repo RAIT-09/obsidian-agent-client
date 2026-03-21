@@ -335,7 +335,7 @@ export interface ITerminalClient {
  * - Handles message updates and terminal operations
  * - Provides callbacks for UI updates
  */
-export class AcpAdapter implements IAgentClient, ITerminalClient {
+export class AcpClient implements IAgentClient, ITerminalClient {
 	private connection: acp.ClientSideConnection | null = null;
 	private agentProcess: ChildProcess | null = null;
 	private logger: Logger;
@@ -407,17 +407,17 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 	 */
 	async initialize(config: AgentConfig): Promise<InitializeResult> {
 		this.logger.log(
-			"[AcpAdapter] Starting initialization with config:",
+			"[AcpClient] Starting initialization with config:",
 			config,
 		);
 		this.logger.log(
-			`[AcpAdapter] Current state - process: ${!!this.agentProcess}, PID: ${this.agentProcess?.pid}`,
+			`[AcpClient] Current state - process: ${!!this.agentProcess}, PID: ${this.agentProcess?.pid}`,
 		);
 
 		// Clean up existing process if any (e.g., when switching agents)
 		if (this.agentProcess) {
 			this.logger.log(
-				`[AcpAdapter] Killing existing process (PID: ${this.agentProcess.pid})`,
+				`[AcpClient] Killing existing process (PID: ${this.agentProcess.pid})`,
 			);
 			this.agentProcess.kill();
 			this.agentProcess = null;
@@ -425,7 +425,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 
 		// Clean up existing connection
 		if (this.connection) {
-			this.logger.log("[AcpAdapter] Cleaning up existing connection");
+			this.logger.log("[AcpClient] Cleaning up existing connection");
 			this.connection = null;
 		}
 
@@ -447,11 +447,11 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		const args = config.args.length > 0 ? [...config.args] : [];
 
 		this.logger.log(
-			`[AcpAdapter] Active agent: ${config.displayName} (${config.id})`,
+			`[AcpClient] Active agent: ${config.displayName} (${config.id})`,
 		);
-		this.logger.log("[AcpAdapter] Command:", command);
+		this.logger.log("[AcpClient] Command:", command);
 		this.logger.log(
-			"[AcpAdapter] Args:",
+			"[AcpClient] Args:",
 			args.length > 0 ? args.join(" ") : "(none)",
 		);
 
@@ -477,13 +477,13 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 				? `${nodeDir}${separator}${baseEnv.PATH}`
 				: nodeDir;
 			this.logger.log(
-				"[AcpAdapter] Node.js directory added to PATH:",
+				"[AcpClient] Node.js directory added to PATH:",
 				nodeDir,
 			);
 		}
 
 		this.logger.log(
-			"[AcpAdapter] Starting agent process in directory:",
+			"[AcpClient] Starting agent process in directory:",
 			config.workingDirectory,
 		);
 
@@ -504,7 +504,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		const needsShell = prepared.needsShell;
 
 		this.logger.log(
-			"[AcpAdapter] Prepared spawn command:",
+			"[AcpClient] Prepared spawn command:",
 			spawnCommand,
 			spawnArgs,
 		);
@@ -523,14 +523,14 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		// Set up process event handlers
 		agentProcess.on("spawn", () => {
 			this.logger.log(
-				`[AcpAdapter] ${agentLabel} process spawned successfully, PID:`,
+				`[AcpClient] ${agentLabel} process spawned successfully, PID:`,
 				agentProcess.pid,
 			);
 		});
 
 		agentProcess.on("error", (error) => {
 			this.logger.error(
-				`[AcpAdapter] ${agentLabel} process error:`,
+				`[AcpClient] ${agentLabel} process error:`,
 				error,
 			);
 
@@ -547,14 +547,14 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 
 		agentProcess.on("exit", (code, signal) => {
 			this.logger.log(
-				`[AcpAdapter] ${agentLabel} process exited with code:`,
+				`[AcpClient] ${agentLabel} process exited with code:`,
 				code,
 				"signal:",
 				signal,
 			);
 
 			if (code === 127) {
-				this.logger.error(`[AcpAdapter] Command not found: ${command}`);
+				this.logger.error(`[AcpClient] Command not found: ${command}`);
 
 				const processError: ProcessError = {
 					type: "command_not_found",
@@ -571,7 +571,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 
 		agentProcess.on("close", (code, signal) => {
 			this.logger.log(
-				`[AcpAdapter] ${agentLabel} process closed with code:`,
+				`[AcpClient] ${agentLabel} process closed with code:`,
 				code,
 				"signal:",
 				signal,
@@ -580,7 +580,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 
 		agentProcess.stderr?.setEncoding("utf8");
 		agentProcess.stderr?.on("data", (data) => {
-			this.logger.log(`[AcpAdapter] ${agentLabel} stderr:`, data);
+			this.logger.log(`[AcpClient] ${agentLabel} stderr:`, data);
 			// Keep a rolling window of recent stderr for error diagnostics
 			this.recentStderr += data;
 			if (this.recentStderr.length > 8192) {
@@ -617,7 +617,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		});
 
 		this.logger.log(
-			"[AcpAdapter] Using working directory:",
+			"[AcpClient] Using working directory:",
 			config.workingDirectory,
 		);
 
@@ -625,7 +625,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		this.connection = new acp.ClientSideConnection(() => this, stream);
 
 		try {
-			this.logger.log("[AcpAdapter] Starting ACP initialization...");
+			this.logger.log("[AcpClient] Starting ACP initialization...");
 
 			const initResult = await this.connection.initialize({
 				protocolVersion: acp.PROTOCOL_VERSION,
@@ -644,14 +644,14 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 			});
 
 			this.logger.log(
-				`[AcpAdapter] ✅ Connected to agent (protocol v${initResult.protocolVersion})`,
+				`[AcpClient] ✅ Connected to agent (protocol v${initResult.protocolVersion})`,
 			);
 			this.logger.log(
-				"[AcpAdapter] Auth methods:",
+				"[AcpClient] Auth methods:",
 				initResult.authMethods,
 			);
 			this.logger.log(
-				"[AcpAdapter] Agent capabilities:",
+				"[AcpClient] Agent capabilities:",
 				initResult.agentCapabilities,
 			);
 
@@ -708,7 +708,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 					: undefined,
 			};
 		} catch (error) {
-			this.logger.error("[AcpAdapter] Initialization Error:", error);
+			this.logger.error("[AcpClient] Initialization Error:", error);
 
 			// Reset flags on failure
 			this.isInitializedFlag = false;
@@ -725,7 +725,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		const connection = this.requireConnection();
 
 		try {
-			this.logger.log("[AcpAdapter] Creating new session...");
+			this.logger.log("[AcpClient] Creating new session...");
 
 			const response = await connection.newSession({
 				cwd: this.toSessionCwd(workingDirectory),
@@ -733,14 +733,14 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 			});
 
 			this.logger.log(
-				`[AcpAdapter] Created session: ${response.sessionId}`,
+				`[AcpClient] Created session: ${response.sessionId}`,
 			);
 			return AcpTypeConverter.toSessionResult(
 				response.sessionId,
 				response,
 			);
 		} catch (error) {
-			this.logger.error("[AcpAdapter] New Session Error:", error);
+			this.logger.error("[AcpClient] New Session Error:", error);
 			throw error;
 		}
 	}
@@ -757,10 +757,10 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 
 		try {
 			await this.connection.authenticate({ methodId });
-			this.logger.log("[AcpAdapter] ✅ authenticate ok:", methodId);
+			this.logger.log("[AcpClient] ✅ authenticate ok:", methodId);
 			return true;
 		} catch (error: unknown) {
-			this.logger.error("[AcpAdapter] Authentication Error:", error);
+			this.logger.error("[AcpClient] Authentication Error:", error);
 			return false;
 		}
 	}
@@ -790,7 +790,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 			);
 
 			this.logger.log(
-				`[AcpAdapter] Sending prompt with ${content.length} content blocks`,
+				`[AcpClient] Sending prompt with ${content.length} content blocks`,
 			);
 
 			const promptResult = await this.connection.prompt({
@@ -799,7 +799,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 			});
 
 			this.logger.log(
-				`[AcpAdapter] Agent completed with: ${promptResult.stopReason}`,
+				`[AcpClient] Agent completed with: ${promptResult.stopReason}`,
 			);
 
 			// Detect silent failures: agent returned end_turn but sent no content.
@@ -816,19 +816,19 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 				const stderrHint = this.extractStderrErrorHint();
 				if (stderrHint) {
 					this.logger.warn(
-						"[AcpAdapter] Agent returned end_turn with no session updates — detected error in stderr",
+						"[AcpClient] Agent returned end_turn with no session updates — detected error in stderr",
 					);
 					throw new Error(
 						`The agent returned an empty response. ${stderrHint}`,
 					);
 				} else {
 					this.logger.log(
-						"[AcpAdapter] Agent returned end_turn with no session updates (may be expected for some commands)",
+						"[AcpClient] Agent returned end_turn with no session updates (may be expected for some commands)",
 					);
 				}
 			}
 		} catch (error: unknown) {
-			this.logger.error("[AcpAdapter] Prompt Error:", error);
+			this.logger.error("[AcpClient] Prompt Error:", error);
 
 			// Check if this is an ignorable error (empty response or user abort)
 			const errorObj = error as Record<string, unknown> | null;
@@ -852,14 +852,14 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 					// Ignore "empty response text" errors
 					if (errorData.details.includes("empty response text")) {
 						this.logger.log(
-							"[AcpAdapter] Empty response text error - ignoring",
+							"[AcpClient] Empty response text error - ignoring",
 						);
 						return;
 					}
 					// Ignore "user aborted" errors (from cancel operation)
 					if (errorData.details.includes("user aborted")) {
 						this.logger.log(
-							"[AcpAdapter] User aborted request - ignoring",
+							"[AcpClient] User aborted request - ignoring",
 						);
 						return;
 					}
@@ -875,13 +875,13 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 	 */
 	async cancel(sessionId: string): Promise<void> {
 		if (!this.connection) {
-			this.logger.warn("[AcpAdapter] Cannot cancel: no connection");
+			this.logger.warn("[AcpClient] Cannot cancel: no connection");
 			return;
 		}
 
 		try {
 			this.logger.log(
-				"[AcpAdapter] Sending session/cancel notification...",
+				"[AcpClient] Sending session/cancel notification...",
 			);
 
 			await this.connection.cancel({
@@ -889,14 +889,14 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 			});
 
 			this.logger.log(
-				"[AcpAdapter] Cancellation request sent successfully",
+				"[AcpClient] Cancellation request sent successfully",
 			);
 
 			// Cancel all running operations (permission requests + terminals)
 			this.cancelAllOperations();
 		} catch (error) {
 			this.logger.error(
-				"[AcpAdapter] Failed to send cancellation:",
+				"[AcpClient] Failed to send cancellation:",
 				error,
 			);
 
@@ -909,7 +909,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 	 * Disconnect from the agent and clean up resources.
 	 */
 	disconnect(): Promise<void> {
-		this.logger.log("[AcpAdapter] Disconnecting...");
+		this.logger.log("[AcpClient] Disconnecting...");
 
 		// Cancel all pending operations
 		this.cancelAllOperations();
@@ -917,7 +917,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		// Kill the agent process
 		if (this.agentProcess) {
 			this.logger.log(
-				`[AcpAdapter] Killing agent process (PID: ${this.agentProcess.pid})`,
+				`[AcpClient] Killing agent process (PID: ${this.agentProcess.pid})`,
 			);
 			this.agentProcess.kill();
 			this.agentProcess = null;
@@ -931,7 +931,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		this.isInitializedFlag = false;
 		this.currentAgentId = null;
 
-		this.logger.log("[AcpAdapter] Disconnected");
+		this.logger.log("[AcpClient] Disconnected");
 		return Promise.resolve();
 	}
 
@@ -975,7 +975,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		}
 
 		this.logger.log(
-			`[AcpAdapter] Setting session mode to: ${modeId} for session: ${sessionId}`,
+			`[AcpClient] Setting session mode to: ${modeId} for session: ${sessionId}`,
 		);
 
 		try {
@@ -983,10 +983,10 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 				sessionId,
 				modeId,
 			});
-			this.logger.log(`[AcpAdapter] Session mode set to: ${modeId}`);
+			this.logger.log(`[AcpClient] Session mode set to: ${modeId}`);
 		} catch (error) {
 			this.logger.error(
-				"[AcpAdapter] Failed to set session mode:",
+				"[AcpClient] Failed to set session mode:",
 				error,
 			);
 			throw error;
@@ -1006,7 +1006,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		}
 
 		this.logger.log(
-			`[AcpAdapter] Setting session model to: ${modelId} for session: ${sessionId}`,
+			`[AcpClient] Setting session model to: ${modelId} for session: ${sessionId}`,
 		);
 
 		try {
@@ -1014,10 +1014,10 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 				sessionId,
 				modelId,
 			});
-			this.logger.log(`[AcpAdapter] Session model set to: ${modelId}`);
+			this.logger.log(`[AcpClient] Session model set to: ${modelId}`);
 		} catch (error) {
 			this.logger.error(
-				"[AcpAdapter] Failed to set session model:",
+				"[AcpClient] Failed to set session model:",
 				error,
 			);
 			throw error;
@@ -1043,7 +1043,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		}
 
 		this.logger.log(
-			`[AcpAdapter] Setting config option: ${configId}=${value} for session: ${sessionId}`,
+			`[AcpClient] Setting config option: ${configId}=${value} for session: ${sessionId}`,
 		);
 
 		try {
@@ -1053,7 +1053,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 				value,
 			});
 			this.logger.log(
-				`[AcpAdapter] Config option set. Updated options:`,
+				`[AcpClient] Config option set. Updated options:`,
 				response.configOptions,
 			);
 			return AcpTypeConverter.toSessionConfigOptions(
@@ -1061,7 +1061,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 			);
 		} catch (error) {
 			this.logger.error(
-				"[AcpAdapter] Failed to set config option:",
+				"[AcpClient] Failed to set config option:",
 				error,
 			);
 			throw error;
@@ -1105,7 +1105,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		}
 
 		this.logger.log(
-			"[AcpAdapter] Responding to permission request:",
+			"[AcpClient] Responding to permission request:",
 			requestId,
 			"with option:",
 			optionId,
@@ -1218,7 +1218,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		const update = params.update;
 		const sessionId = params.sessionId;
 		this.promptSessionUpdateCount++;
-		this.logger.log("[AcpAdapter] sessionUpdate:", { sessionId, update });
+		this.logger.log("[AcpClient] sessionUpdate:", { sessionId, update });
 
 		switch (update.sessionUpdate) {
 			case "agent_message_chunk":
@@ -1281,7 +1281,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 
 			case "available_commands_update": {
 				this.logger.log(
-					`[AcpAdapter] available_commands_update, commands:`,
+					`[AcpClient] available_commands_update, commands:`,
 					update.availableCommands,
 				);
 
@@ -1303,7 +1303,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 
 			case "current_mode_update": {
 				this.logger.log(
-					`[AcpAdapter] current_mode_update: ${update.currentModeId}`,
+					`[AcpClient] current_mode_update: ${update.currentModeId}`,
 				);
 
 				this.sessionUpdateCallback?.({
@@ -1315,7 +1315,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 			}
 
 			case "session_info_update": {
-				this.logger.log(`[AcpAdapter] session_info_update:`, {
+				this.logger.log(`[AcpClient] session_info_update:`, {
 					title: update.title,
 					updatedAt: update.updatedAt,
 				});
@@ -1330,7 +1330,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 			}
 
 			case "usage_update": {
-				this.logger.log(`[AcpAdapter] usage_update:`, {
+				this.logger.log(`[AcpClient] usage_update:`, {
 					size: update.size,
 					used: update.used,
 					cost: update.cost,
@@ -1348,7 +1348,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 
 			case "config_option_update": {
 				this.logger.log(
-					`[AcpAdapter] config_option_update:`,
+					`[AcpClient] config_option_update:`,
 					update.configOptions,
 				);
 
@@ -1409,7 +1409,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		params: Record<string, unknown>,
 	): Promise<void> {
 		this.logger.log(
-			`[AcpAdapter] Extension notification received: ${method}`,
+			`[AcpClient] Extension notification received: ${method}`,
 			params,
 		);
 	}
@@ -1430,7 +1430,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		params: acp.CreateTerminalRequest,
 	): Promise<acp.CreateTerminalResponse> {
 		this.logger.log(
-			"[AcpAdapter] createTerminal called with params:",
+			"[AcpClient] createTerminal called with params:",
 			params,
 		);
 
@@ -1490,7 +1490,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		// Don't throw error if terminal not found - it may have been already cleaned up
 		if (!success) {
 			this.logger.log(
-				`[AcpAdapter] releaseTerminal: Terminal ${params.terminalId} not found (may have been already cleaned up)`,
+				`[AcpClient] releaseTerminal: Terminal ${params.terminalId} not found (may have been already cleaned up)`,
 			);
 		}
 		return Promise.resolve({});
@@ -1516,7 +1516,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		const connection = this.requireConnection();
 
 		try {
-			this.logger.log("[AcpAdapter] Listing sessions...");
+			this.logger.log("[AcpClient] Listing sessions...");
 
 			const filterCwd = cwd ? this.toSessionCwd(cwd) : undefined;
 
@@ -1526,7 +1526,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 			});
 
 			this.logger.log(
-				`[AcpAdapter] Found ${response.sessions.length} sessions`,
+				`[AcpClient] Found ${response.sessions.length} sessions`,
 			);
 
 			return {
@@ -1539,7 +1539,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 				nextCursor: response.nextCursor ?? undefined,
 			};
 		} catch (error) {
-			this.logger.error("[AcpAdapter] List Sessions Error:", error);
+			this.logger.error("[AcpClient] List Sessions Error:", error);
 			throw error;
 		}
 	}
@@ -1561,7 +1561,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		const connection = this.requireConnection();
 
 		try {
-			this.logger.log(`[AcpAdapter] Loading session: ${sessionId}...`);
+			this.logger.log(`[AcpClient] Loading session: ${sessionId}...`);
 
 			const response = await connection.loadSession({
 				sessionId,
@@ -1569,10 +1569,10 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 				mcpServers: [],
 			});
 
-			this.logger.log(`[AcpAdapter] Session loaded: ${sessionId}`);
+			this.logger.log(`[AcpClient] Session loaded: ${sessionId}`);
 			return AcpTypeConverter.toSessionResult(sessionId, response);
 		} catch (error) {
-			this.logger.error("[AcpAdapter] Load Session Error:", error);
+			this.logger.error("[AcpClient] Load Session Error:", error);
 			throw error;
 		}
 	}
@@ -1593,7 +1593,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		const connection = this.requireConnection();
 
 		try {
-			this.logger.log(`[AcpAdapter] Resuming session: ${sessionId}...`);
+			this.logger.log(`[AcpClient] Resuming session: ${sessionId}...`);
 
 			const response = await connection.unstable_resumeSession({
 				sessionId,
@@ -1601,10 +1601,10 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 				mcpServers: [],
 			});
 
-			this.logger.log(`[AcpAdapter] Session resumed: ${sessionId}`);
+			this.logger.log(`[AcpClient] Session resumed: ${sessionId}`);
 			return AcpTypeConverter.toSessionResult(sessionId, response);
 		} catch (error) {
-			this.logger.error("[AcpAdapter] Resume Session Error:", error);
+			this.logger.error("[AcpClient] Resume Session Error:", error);
 			throw error;
 		}
 	}
@@ -1625,7 +1625,7 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 		const connection = this.requireConnection();
 
 		try {
-			this.logger.log(`[AcpAdapter] Forking session: ${sessionId}...`);
+			this.logger.log(`[AcpClient] Forking session: ${sessionId}...`);
 
 			const response = await connection.unstable_forkSession({
 				sessionId,
@@ -1634,14 +1634,14 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 			});
 
 			this.logger.log(
-				`[AcpAdapter] Session forked: ${sessionId} -> ${response.sessionId}`,
+				`[AcpClient] Session forked: ${sessionId} -> ${response.sessionId}`,
 			);
 			return AcpTypeConverter.toSessionResult(
 				response.sessionId,
 				response,
 			);
 		} catch (error) {
-			this.logger.error("[AcpAdapter] Fork Session Error:", error);
+			this.logger.error("[AcpClient] Fork Session Error:", error);
 			throw error;
 		}
 	}

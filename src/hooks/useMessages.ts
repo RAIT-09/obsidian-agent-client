@@ -96,19 +96,19 @@ export interface UseMessagesReturn {
 
 	/**
 	 * Callback to add a new message.
-	 * Used by AcpAdapter when receiving agent messages.
+	 * Used by AcpClient when receiving agent messages.
 	 */
 	addMessage: (message: ChatMessage) => void;
 
 	/**
 	 * Callback to update the last message content.
-	 * Used by AcpAdapter for streaming text updates.
+	 * Used by AcpClient for streaming text updates.
 	 */
 	updateLastMessage: (content: MessageContent) => void;
 
 	/**
 	 * Callback to update a specific message by tool call ID.
-	 * Used by AcpAdapter for tool call status updates.
+	 * Used by AcpClient for tool call status updates.
 	 */
 	updateMessage: (toolCallId: string, content: MessageContent) => void;
 
@@ -116,7 +116,7 @@ export interface UseMessagesReturn {
 	 * Callback to upsert a tool call message.
 	 * If a tool call with the given ID exists, it will be updated.
 	 * Otherwise, a new message will be created.
-	 * Used by AcpAdapter for tool_call and tool_call_update events.
+	 * Used by AcpClient for tool_call and tool_call_update events.
 	 */
 	upsertToolCall: (toolCallId: string, content: MessageContent) => void;
 
@@ -215,7 +215,7 @@ function mergeToolCallContent(
  * - Message operations (send, add, update)
  *
  * It provides callbacks (addMessage, updateLastMessage, updateMessage) that
- * should be passed to AcpAdapter.setMessageCallbacks() for receiving
+ * should be passed to AcpClient.setMessageCallbacks() for receiving
  * agent responses.
  *
  * @param agentClient - Agent client for sending messages

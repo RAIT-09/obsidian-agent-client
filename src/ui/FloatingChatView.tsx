@@ -225,7 +225,7 @@ function FloatingChatComponent({
 	// Services (owned by FloatingViewContainer, created here for context)
 	// ============================================================
 	const acpClient = useMemo(
-		() => plugin.getOrCreateAdapter(viewId),
+		() => plugin.getOrCreateAcpClient(viewId),
 		[plugin, viewId],
 	);
 

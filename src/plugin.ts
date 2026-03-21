@@ -19,7 +19,7 @@ import {
 	type SettingsService,
 } from "./services/settings-service";
 import { AgentClientSettingTab } from "./ui/SettingsTab";
-import { AcpAdapter } from "./acp/acp-client";
+import { AcpClient } from "./acp/acp-client";
 import {
 	sanitizeArgs,
 	normalizeEnvVars,
@@ -183,8 +183,8 @@ export default class AgentClientPlugin extends Plugin {
 	/** Registry for all chat view containers (sidebar + floating) */
 	viewRegistry = new ChatViewRegistry();
 
-	/** Map of viewId to AcpAdapter for multi-session support */
-	private _adapters: Map<string, AcpAdapter> = new Map();
+	/** Map of viewId to AcpClient for multi-session support */
+	private _acpClients: Map<string, AcpClient> = new Map();
 	/** Floating button container (independent from chat view instances) */
 	private floatingButton: FloatingButtonContainer | null = null;
 	/** Map of viewId to floating chat roots and containers (legacy, being migrated to viewRegistry) */
@@ -334,15 +334,15 @@ export default class AgentClientPlugin extends Plugin {
 		this.registerEvent(
 			this.app.workspace.on("quit", () => {
 				// Fire and forget - don't block Obsidian from quitting
-				for (const [viewId, adapter] of this._adapters) {
-					adapter.disconnect().catch((error) => {
+				for (const [viewId, client] of this._acpClients) {
+					client.disconnect().catch((error) => {
 						console.warn(
 							`[AgentClient] Quit cleanup error for view ${viewId}:`,
 							error,
 						);
 					});
 				}
-				this._adapters.clear();
+				this._acpClients.clear();
 			}),
 		);
 	}
@@ -367,34 +367,34 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	/**
-	 * Get or create an AcpAdapter for a specific view.
-	 * Each ChatView has its own adapter for independent sessions.
+	 * Get or create an AcpClient for a specific view.
+	 * Each ChatView has its own AcpClient for independent sessions.
 	 */
-	getOrCreateAdapter(viewId: string): AcpAdapter {
-		let adapter = this._adapters.get(viewId);
-		if (!adapter) {
-			adapter = new AcpAdapter(this);
-			this._adapters.set(viewId, adapter);
+	getOrCreateAcpClient(viewId: string): AcpClient {
+		let client = this._acpClients.get(viewId);
+		if (!client) {
+			client = new AcpClient(this);
+			this._acpClients.set(viewId, client);
 		}
-		return adapter;
+		return client;
 	}
 
 	/**
-	 * Remove and disconnect the adapter for a specific view.
+	 * Remove and disconnect the AcpClient for a specific view.
 	 * Called when a ChatView is closed.
 	 */
-	async removeAdapter(viewId: string): Promise<void> {
-		const adapter = this._adapters.get(viewId);
-		if (adapter) {
+	async removeAcpClient(viewId: string): Promise<void> {
+		const client = this._acpClients.get(viewId);
+		if (client) {
 			try {
-				await adapter.disconnect();
+				await client.disconnect();
 			} catch (error) {
 				console.warn(
-					`[AgentClient] Failed to disconnect adapter for view ${viewId}:`,
+					`[AgentClient] Failed to disconnect client for view ${viewId}:`,
 					error,
 				);
 			}
-			this._adapters.delete(viewId);
+			this._acpClients.delete(viewId);
 		}
 		// Note: lastActiveChatViewId is now managed by viewRegistry
 		// Clearing happens automatically when view is unregistered

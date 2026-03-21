@@ -107,7 +107,7 @@ export class ChatView extends ItemView implements IChatViewContainer {
 
 	// Services owned by this class (lifecycle managed here)
 	/** @internal Exposed to ChatComponent for context creation */
-	acpClient!: ReturnType<AgentClientPlugin["getOrCreateAdapter"]>;
+	acpClient!: ReturnType<AgentClientPlugin["getOrCreateAcpClient"]>;
 	/** @internal Exposed to ChatComponent for context creation */
 	vaultService!: VaultService;
 
@@ -311,7 +311,7 @@ export class ChatView extends ItemView implements IChatViewContainer {
 		container.empty();
 
 		// Create services owned by this class
-		this.acpClient = this.plugin.getOrCreateAdapter(this.viewId);
+		this.acpClient = this.plugin.getOrCreateAcpClient(this.viewId);
 		this.vaultService = new VaultService(this.plugin);
 
 		this.root = createRoot(container);
@@ -346,6 +346,6 @@ export class ChatView extends ItemView implements IChatViewContainer {
 		this.vaultService?.destroy();
 
 		// Remove adapter for this view (disconnect process)
-		await this.plugin.removeAdapter(this.viewId);
+		await this.plugin.removeAcpClient(this.viewId);
 	}
 }

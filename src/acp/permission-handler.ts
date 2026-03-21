@@ -10,9 +10,9 @@ import { getLogger, Logger } from "../utils/logger";
 /**
  * Callbacks that PermissionManager uses to communicate with the outside world.
  *
- * These are injected by AcpAdapter and wrap the dynamically-set callbacks
+ * These are injected by AcpClient and wrap the dynamically-set callbacks
  * (sessionUpdateCallback, updateMessage) so that PermissionManager doesn't
- * need to know about AcpAdapter's lifecycle.
+ * need to know about AcpClient's lifecycle.
  */
 interface PermissionManagerCallbacks {
 	/** Emit a session update event (used to notify UI of new permission requests) */
@@ -31,7 +31,7 @@ interface PermissionManagerCallbacks {
  * - Resolving/cancelling pending permission Promises
  * - Notifying UI of permission state changes
  *
- * This class was extracted from AcpAdapter to separate the permission
+ * This class was extracted from AcpClient to separate the permission
  * state machine from the main protocol adapter.
  */
 export class PermissionManager {
@@ -64,7 +64,7 @@ export class PermissionManager {
 
 	/**
 	 * Update the auto-allow setting.
-	 * Called by AcpAdapter during initialize() when settings are read.
+	 * Called by AcpClient during initialize() when settings are read.
 	 */
 	setAutoAllow(autoAllow: boolean): void {
 		this.autoAllow = autoAllow;
@@ -73,7 +73,7 @@ export class PermissionManager {
 	/**
 	 * Handle a permission request from the agent (ACP protocol).
 	 *
-	 * This is the core method called by AcpAdapter.requestPermission().
+	 * This is the core method called by AcpClient.requestPermission().
 	 * It either auto-approves or creates a pending request with a Promise
 	 * that resolves when the user responds via the UI.
 	 */

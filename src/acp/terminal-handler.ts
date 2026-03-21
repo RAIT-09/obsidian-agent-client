@@ -9,7 +9,7 @@ import { getEnhancedWindowsEnv, prepareShellCommand } from "../utils/platform";
  * Parameters for creating a terminal process.
  *
  * This is the TerminalManager's own parameter type, independent of the ACP SDK.
- * The AcpAdapter is responsible for converting ACP protocol types to this format.
+ * The AcpClient is responsible for converting ACP protocol types to this format.
  */
 interface CreateTerminalParams {
 	/** The command to execute */
