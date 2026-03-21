@@ -21,7 +21,6 @@ export function TerminalRenderer({
 		signal: string | null;
 	} | null>(null);
 	const [isRunning, setIsRunning] = useState(true);
-	const [isCancelled, setIsCancelled] = useState(false);
 	const intervalRef = useRef<number | null>(null);
 
 	logger.log(
@@ -61,11 +60,6 @@ export function TerminalRenderer({
 				logger.log(
 					`[TerminalRenderer] Polling error for terminal ${terminalId}: ${errorMessage}`,
 				);
-
-				// If terminal not found and no exit status was captured, it was likely cancelled
-				if (errorMessage.includes("not found") && !exitStatus) {
-					setIsCancelled(true);
-				}
 
 				setIsRunning(false);
 				if (intervalRef.current) {
