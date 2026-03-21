@@ -10,7 +10,7 @@
 
 import { requestUrl } from "obsidian";
 import * as semver from "semver";
-import type { OverlayVariant } from "../ui/ErrorBanner";
+import type { OverlayVariant } from "../types/errors";
 
 // ============================================================================
 // Types

@@ -1,12 +1,9 @@
 import * as React from "react";
 const { useEffect } = React;
 import { setIcon } from "obsidian";
-import type { ErrorInfo } from "../types/errors";
+import type { ErrorInfo, OverlayVariant } from "../types/errors";
 import { LucideIcon } from "./shared/IconButton";
 import type { IChatViewHost } from "./types";
-
-/** Visual variant for the overlay */
-export type OverlayVariant = "error" | "info";
 
 export interface ErrorBannerProps {
 	/** Error information to display */
