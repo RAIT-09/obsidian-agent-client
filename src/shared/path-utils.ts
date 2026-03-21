@@ -104,6 +104,24 @@ export function resolveCommandDirectory(command: string): string | null {
 }
 
 /**
+ * Resolve the Node.js directory from the plugin's nodePath setting.
+ * Returns the directory only when nodePath is an absolute path.
+ * When nodePath is empty or a bare command name, returns undefined
+ * (the login shell handles PATH resolution).
+ *
+ * @param nodePathSetting - The raw nodePath setting value
+ * @returns Directory path, or undefined
+ */
+export function resolveNodeDirectory(
+	nodePathSetting: string | undefined,
+): string | undefined {
+	if (!nodePathSetting) return undefined;
+	const trimmed = nodePathSetting.trim();
+	if (!isAbsolutePath(trimmed)) return undefined;
+	return resolveCommandDirectory(trimmed) || undefined;
+}
+
+/**
  * Convert absolute path to relative path if it's under basePath.
  * Otherwise return the absolute path as-is.
  *

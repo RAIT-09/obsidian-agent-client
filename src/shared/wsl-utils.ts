@@ -1,3 +1,5 @@
+import { escapeShellArgBash } from "./shell-utils";
+
 /**
  * Convert Windows path to WSL path format.
  * Example: C:\Users\name\vault → /mnt/c/Users/name/vault
@@ -85,7 +87,7 @@ export function wrapCommandForWsl(
 
 	// Build command to execute inside WSL
 	// Use login shell (-l) to inherit PATH from user's shell profile
-	const escapedArgs = args.map(escapeShellArg).join(" ");
+	const escapedArgs = args.map(escapeShellArgBash).join(" ");
 	const argsString = escapedArgs.length > 0 ? ` ${escapedArgs}` : "";
 
 	// Add additional PATH if provided (e.g., for Node.js)
@@ -96,21 +98,13 @@ export function wrapCommandForWsl(
 		pathPrefix = `export PATH="${escapePathForShell(wslPath)}:$PATH"; `;
 	}
 
-	const innerCommand = `${pathPrefix}cd ${escapeShellArg(wslCwd)} && ${command}${argsString}`;
+	const innerCommand = `${pathPrefix}cd ${escapeShellArgBash(wslCwd)} && ${command}${argsString}`;
 	wslArgs.push("sh", "-c", buildWslShellWrapper(innerCommand));
 
 	return {
 		command: "C:\\Windows\\System32\\wsl.exe",
 		args: wslArgs,
 	};
-}
-
-/**
- * Escape a shell argument for Bash.
- * Wraps the argument in single quotes and escapes internal single quotes as '\''
- */
-function escapeShellArg(arg: string): string {
-	return `'${arg.replace(/'/g, "'\\''")}'`;
 }
 
 /**

@@ -3,10 +3,9 @@ import * as acp from "@agentclientprotocol/sdk";
 import type AgentClientPlugin from "../plugin";
 import { getLogger, Logger } from "./logger";
 import { Platform } from "obsidian";
-import { wrapCommandForWsl } from "./wsl-utils";
-import { isAbsolutePath, resolveCommandDirectory } from "./path-utils";
+import { resolveNodeDirectory } from "./path-utils";
 import { getEnhancedWindowsEnv } from "./windows-env";
-import { escapeShellArgWindows, getLoginShell } from "./shell-utils";
+import { prepareShellCommand } from "./command-builder";
 
 interface TerminalProcess {
 	id: string;
@@ -59,65 +58,27 @@ export class TerminalManager {
 		let args = params.args || [];
 
 		// Platform-specific shell wrapping
-		// Each platform wraps the command once in its appropriate shell
-		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
-			// Only inject node directory when nodePath is an absolute path
-			const explicitNodePath = this.plugin.settings.nodePath?.trim() ?? "";
-			const isAbsoluteNodePath = isAbsolutePath(explicitNodePath);
-			const nodeDir = isAbsoluteNodePath
-				? resolveCommandDirectory(explicitNodePath) || undefined
-				: undefined;
-
-			const wslWrapped = wrapCommandForWsl(
-				command,
-				args,
-				params.cwd || process.cwd(),
-				this.plugin.settings.windowsWslDistribution,
+		const nodeDir = resolveNodeDirectory(this.plugin.settings.nodePath);
+		const prepared = prepareShellCommand(
+			command,
+			args,
+			params.cwd || process.cwd(),
+			{
+				wslMode: this.plugin.settings.windowsWslMode,
+				wslDistribution: this.plugin.settings.windowsWslDistribution,
 				nodeDir,
-			);
-			command = wslWrapped.command;
-			args = wslWrapped.args;
-			this.logger.log(
-				`[Terminal ${terminalId}] Using WSL mode:`,
-				this.plugin.settings.windowsWslDistribution || "default",
-			);
-		}
-		// On macOS and Linux, wrap the command in a login shell to inherit the user's environment
-		else if (Platform.isMacOS || Platform.isLinux) {
-			const shell = getLoginShell();
-			let commandString: string;
-			if (args.length > 0) {
-				// args provided: escape each argument individually
-				commandString = [command, ...args]
-					.map((arg) => "'" + arg.replace(/'/g, "'\\''") + "'")
-					.join(" ");
-			} else {
-				// no args: pass command as-is to shell (shell will parse it)
-				commandString = command;
-			}
-			command = shell;
-			args = ["-l", "-c", commandString];
-		}
-		// On Windows (non-WSL), escape command and arguments for shell
-		// spawn() will be called with shell: true below
-		else if (Platform.isWin) {
-			if (args.length > 0) {
-				// args provided: escape each argument individually
-				command = escapeShellArgWindows(command);
-				args = args.map(escapeShellArgWindows);
-			}
-			// no args: pass command as-is to shell (shell will parse it)
-		}
+				alwaysEscape: false,
+			},
+		);
+		command = prepared.command;
+		args = prepared.args;
+		const needsShell = prepared.needsShell;
 
 		this.logger.log(`[Terminal ${terminalId}] Creating terminal:`, {
 			command,
 			args,
 			cwd: params.cwd,
 		});
-
-		// Use shell on Windows (non-WSL) for proper command handling
-		const needsShell =
-			Platform.isWin && !this.plugin.settings.windowsWslMode;
 
 		// Spawn the process
 		const spawnOptions: SpawnOptions = {

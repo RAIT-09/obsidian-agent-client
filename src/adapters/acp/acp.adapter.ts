@@ -33,13 +33,10 @@ import type {
 	SessionModeState,
 	SessionModelState,
 } from "src/domain/models/chat-session";
-import {
-	wrapCommandForWsl,
-	convertWindowsPathToWsl,
-} from "../../shared/wsl-utils";
-import { isAbsolutePath, resolveCommandDirectory } from "../../shared/path-utils";
+import { convertWindowsPathToWsl } from "../../shared/wsl-utils";
+import { resolveNodeDirectory } from "../../shared/path-utils";
 import { getEnhancedWindowsEnv } from "../../shared/windows-env";
-import { escapeShellArgWindows, getLoginShell } from "../../shared/shell-utils";
+import { prepareShellCommand } from "../../shared/command-builder";
 
 /**
  * Extended ACP Client interface for UI layer.
@@ -210,25 +207,17 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		}
 
 		// Add Node.js directory to PATH only when nodePath is an explicit absolute path.
-		// On macOS/Linux the login-shell wrapper (-l) already loads the user's PATH
-		// (nvm, mise, volta shims, etc.), so injection is only needed when the user
-		// has a non-standard node location they've pinpointed manually.
-		// When nodePath is empty or just a command name ("node"), we skip injection
-		// and let the login shell handle it.
-		const explicitNodePath = this.plugin.settings.nodePath?.trim() ?? "";
-		const isAbsoluteNodePath = isAbsolutePath(explicitNodePath);
-		if (isAbsoluteNodePath) {
-			const nodeDir = resolveCommandDirectory(explicitNodePath);
-			if (nodeDir) {
-				const separator = Platform.isWin ? ";" : ":";
-				baseEnv.PATH = baseEnv.PATH
-					? `${nodeDir}${separator}${baseEnv.PATH}`
-					: nodeDir;
-				this.logger.log(
-					"[AcpAdapter] Node.js directory added to PATH:",
-					nodeDir,
-				);
-			}
+		// When nodePath is empty or a bare command name, the login shell handles it.
+		const nodeDir = resolveNodeDirectory(this.plugin.settings.nodePath);
+		if (nodeDir) {
+			const separator = Platform.isWin ? ";" : ":";
+			baseEnv.PATH = baseEnv.PATH
+				? `${nodeDir}${separator}${baseEnv.PATH}`
+				: nodeDir;
+			this.logger.log(
+				"[AcpAdapter] Node.js directory added to PATH:",
+				nodeDir,
+			);
 		}
 
 		this.logger.log(
@@ -236,80 +225,27 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 			config.workingDirectory,
 		);
 
-		// Prepare command and args for spawning
-		let spawnCommand = command;
-		let spawnArgs = args;
-
-		// WSL mode for Windows (wrap command to run inside WSL)
-		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
-			// Only inject node directory when nodePath is an absolute path
-			const nodeDir = isAbsoluteNodePath
-				? resolveCommandDirectory(explicitNodePath) || undefined
-				: undefined;
-
-			const wslWrapped = wrapCommandForWsl(
-				command,
-				args,
-				config.workingDirectory,
-				this.plugin.settings.windowsWslDistribution,
+		// Prepare command and args for spawning (platform-specific shell wrapping)
+		const prepared = prepareShellCommand(
+			command,
+			args,
+			config.workingDirectory,
+			{
+				wslMode: this.plugin.settings.windowsWslMode,
+				wslDistribution: this.plugin.settings.windowsWslDistribution,
 				nodeDir,
-			);
-			spawnCommand = wslWrapped.command;
-			spawnArgs = wslWrapped.args;
-			this.logger.log(
-				"[AcpAdapter] Using WSL mode:",
-				this.plugin.settings.windowsWslDistribution || "default",
-				"with command:",
-				spawnCommand,
-				spawnArgs,
-			);
-		}
-		// On macOS and Linux, wrap the command in a login shell to inherit the user's environment
-		// This ensures that PATH modifications in .zshrc/.bash_profile are available.
-		// Relative command names (e.g. "claude-agent-acp", "node") work as-is because
-		// the login shell loads the full user PATH including nvm/mise/volta shims.
-		else if (Platform.isMacOS || Platform.isLinux) {
-			const shell = getLoginShell();
-			const commandString = [command, ...args]
-				.map((arg) => "'" + arg.replace(/'/g, "'\\''") + "'")
-				.join(" ");
+				alwaysEscape: true,
+			},
+		);
+		const spawnCommand = prepared.command;
+		const spawnArgs = prepared.args;
+		const needsShell = prepared.needsShell;
 
-			// Only prepend PATH export when the user has configured an absolute nodePath.
-			// Relative names or empty → login shell already handles PATH correctly.
-			let fullCommand = commandString;
-			if (isAbsoluteNodePath) {
-				const nodeDir = resolveCommandDirectory(explicitNodePath);
-				if (nodeDir) {
-					const escapedNodeDir = nodeDir.replace(/'/g, "'\\''");
-					fullCommand = `export PATH='${escapedNodeDir}':"$PATH"; ${commandString}`;
-				}
-			}
-
-			spawnCommand = shell;
-			spawnArgs = ["-l", "-c", fullCommand];
-			this.logger.log(
-				"[AcpAdapter] Using login shell:",
-				shell,
-				"with command:",
-				fullCommand,
-			);
-		}
-		// On Windows (non-WSL), escape command and arguments for cmd.exe
-		// spawn() will be called with shell: true below
-		else if (Platform.isWin) {
-			spawnCommand = escapeShellArgWindows(command);
-			spawnArgs = args.map(escapeShellArgWindows);
-			this.logger.log(
-				"[AcpAdapter] Using Windows shell with command:",
-				spawnCommand,
-				spawnArgs,
-			);
-		}
-
-		// Use shell on Windows for proper argument handling, but NOT in WSL mode
-		// When using WSL, wsl.exe is the command and doesn't need shell wrapper
-		const needsShell =
-			Platform.isWin && !this.plugin.settings.windowsWslMode;
+		this.logger.log(
+			"[AcpAdapter] Prepared spawn command:",
+			spawnCommand,
+			spawnArgs,
+		);
 
 		// Spawn the agent process
 		const agentProcess = spawn(spawnCommand, spawnArgs, {

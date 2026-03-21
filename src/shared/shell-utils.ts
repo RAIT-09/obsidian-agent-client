@@ -34,3 +34,14 @@ export function getLoginShell(): string {
 	}
 	return Platform.isMacOS ? "/bin/zsh" : "/bin/sh";
 }
+
+/**
+ * Escape a shell argument for Bash/Zsh/POSIX shells.
+ * Wraps the argument in single quotes and escapes internal single quotes
+ * using the '\'' idiom (end quote, escaped quote, start quote).
+ *
+ * Example: hello'world → 'hello'\''world'
+ */
+export function escapeShellArgBash(arg: string): string {
+	return `'${arg.replace(/'/g, "'\\''")}'`;
+}
