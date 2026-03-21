@@ -45,3 +45,6 @@ docs/.vitepress/cache/
 
 # Personal developer logs
 dev/
+
+# Local implementation plans and working documents
+plan/
