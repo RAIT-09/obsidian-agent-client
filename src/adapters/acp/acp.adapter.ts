@@ -30,29 +30,10 @@ import { convertWindowsPathToWsl } from "../../shared/wsl-utils";
 import { resolveNodeDirectory } from "../../shared/path-utils";
 import { getEnhancedWindowsEnv } from "../../shared/windows-env";
 import { prepareShellCommand } from "../../shared/command-builder";
-
-/**
- * Extended ACP Client interface for UI layer.
- *
- * Provides ACP-specific operations needed by UI components
- * (terminal rendering, permission handling, etc.) that are not
- * part of the domain-level IAgentClient interface.
- *
- * This interface extends the base ACP Client from the protocol library
- * with plugin-specific methods for:
- * - Permission response handling
- * - Operation cancellation
- * - Message state management
- * - Terminal I/O operations
- */
-export interface IAcpClient extends acp.Client {
-	handlePermissionResponse(requestId: string, optionId: string): void;
-	cancelAllOperations(): void;
-	resetCurrentMessage(): void;
-	terminalOutput(
-		params: acp.TerminalOutputRequest,
-	): Promise<acp.TerminalOutputResponse>;
-}
+import type {
+	ITerminalClient,
+	TerminalOutputResult,
+} from "../../domain/ports/terminal-client.port";
 
 /**
  * Adapter that wraps the Agent Client Protocol (ACP) library.
@@ -63,7 +44,7 @@ export interface IAcpClient extends acp.Client {
  * - Handles message updates and terminal operations
  * - Provides callbacks for UI updates
  */
-export class AcpAdapter implements IAgentClient, IAcpClient {
+export class AcpAdapter implements IAgentClient, ITerminalClient {
 	private connection: acp.ClientSideConnection | null = null;
 	private agentProcess: ChildProcess | null = null;
 	private logger: Logger;
@@ -87,7 +68,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	private currentAgentId: string | null = null;
 	private autoAllowPermissions = false;
 
-	// IAcpClient implementation properties
+	// ACP protocol handler properties
 	private terminalManager: TerminalManager;
 	private currentMessageId: string | null = null;
 	private pendingPermissionRequests = new Map<
@@ -938,7 +919,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	// ========================================================================
-	// IAcpClient Implementation
+	// ACP Client Protocol Handlers
 	// ========================================================================
 
 	/**
@@ -1099,14 +1080,14 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	/**
 	 * Reset the current message ID.
 	 */
-	resetCurrentMessage(): void {
+	private resetCurrentMessage(): void {
 		this.currentMessageId = null;
 	}
 
 	/**
 	 * Handle permission response from user.
 	 */
-	handlePermissionResponse(requestId: string, optionId: string): void {
+	private handlePermissionResponse(requestId: string, optionId: string): void {
 		const request = this.pendingPermissionRequests.get(requestId);
 		if (!request) {
 			return;
@@ -1142,7 +1123,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	/**
 	 * Cancel all ongoing operations.
 	 */
-	cancelAllOperations(): void {
+	private cancelAllOperations(): void {
 		// Cancel pending permission requests
 		this.cancelPendingPermissionRequests();
 
@@ -1332,7 +1313,7 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 	}
 
 	// ========================================================================
-	// Terminal Operations (IAcpClient)
+	// Terminal Operations
 	// ========================================================================
 
 	readTextFile(params: acp.ReadTextFileRequest) {
@@ -1364,14 +1345,25 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		});
 	}
 
+	/**
+	 * Get terminal output for UI rendering (ITerminalClient implementation).
+	 */
+	getTerminalOutput(terminalId: string): Promise<TerminalOutputResult> {
+		const result = this.terminalManager.getOutput(terminalId);
+		if (!result) {
+			throw new Error(`Terminal ${terminalId} not found`);
+		}
+		return Promise.resolve(result);
+	}
+
+	/**
+	 * ACP protocol handler for terminal output.
+	 * Called by ClientSideConnection dispatch. Delegates to getTerminalOutput.
+	 */
 	terminalOutput(
 		params: acp.TerminalOutputRequest,
 	): Promise<acp.TerminalOutputResponse> {
-		const result = this.terminalManager.getOutput(params.terminalId);
-		if (!result) {
-			throw new Error(`Terminal ${params.terminalId} not found`);
-		}
-		return Promise.resolve(result);
+		return this.getTerminalOutput(params.terminalId);
 	}
 
 	async waitForTerminalExit(

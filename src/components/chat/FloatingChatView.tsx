@@ -208,7 +208,7 @@ function FloatingChatComponent({
 	});
 
 	const {
-		acpAdapter,
+		terminalClient,
 		settings,
 		session,
 		isSessionReady,
@@ -277,7 +277,7 @@ function FloatingChatComponent({
 	const dragOffset = useRef({ x: 0, y: 0 });
 	const containerRef = useRef<HTMLDivElement>(null);
 
-	const acpClientRef = useRef(acpAdapter);
+	const terminalClientRef = useRef(terminalClient);
 
 	// Track registered listeners for cleanup
 	const registeredListenersRef = useRef<RegisteredListener[]>([]);
@@ -776,7 +776,7 @@ function FloatingChatComponent({
 						agentLabel={activeAgentLabel}
 						plugin={plugin}
 						view={viewHost}
-						acpClient={acpClientRef.current}
+						terminalClient={terminalClientRef.current}
 						onApprovePermission={permission.approvePermission}
 						hasActivePermission={
 							permission.activePermission != null

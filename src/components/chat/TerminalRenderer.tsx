@@ -1,17 +1,17 @@
 import * as React from "react";
 const { useState, useRef, useEffect } = React;
-import type { IAcpClient } from "../../adapters/acp/acp.adapter";
+import type { ITerminalClient } from "../../domain/ports/terminal-client.port";
 import { getLogger } from "../../shared/logger";
 import type AgentClientPlugin from "../../plugin";
 interface TerminalRendererProps {
 	terminalId: string;
-	acpClient: IAcpClient | null;
+	terminalClient: ITerminalClient | null;
 	plugin: AgentClientPlugin;
 }
 
 export function TerminalRenderer({
 	terminalId,
-	acpClient,
+	terminalClient,
 	plugin,
 }: TerminalRendererProps) {
 	const logger = getLogger();
@@ -25,21 +25,19 @@ export function TerminalRenderer({
 	const intervalRef = useRef<number | null>(null);
 
 	logger.log(
-		`[TerminalRenderer] Component rendered for terminal ${terminalId}, acpClient: ${!!acpClient}`,
+		`[TerminalRenderer] Component rendered for terminal ${terminalId}, terminalClient: ${!!terminalClient}`,
 	);
 
 	useEffect(() => {
 		logger.log(
-			`[TerminalRenderer] useEffect triggered for ${terminalId}, acpClient: ${!!acpClient}`,
+			`[TerminalRenderer] useEffect triggered for ${terminalId}, terminalClient: ${!!terminalClient}`,
 		);
-		if (!terminalId || !acpClient) return;
+		if (!terminalId || !terminalClient) return;
 
 		const pollOutput = async () => {
 			try {
-				const result = await acpClient.terminalOutput({
-					terminalId,
-					sessionId: "",
-				});
+				const result =
+					await terminalClient.getTerminalOutput(terminalId);
 				logger.log(
 					`[TerminalRenderer] Poll result for ${terminalId}:`,
 					result,
@@ -91,7 +89,7 @@ export function TerminalRenderer({
 				intervalRef.current = null;
 			}
 		};
-	}, [terminalId, acpClient, logger]); // Include acpClient and logger in dependencies
+	}, [terminalId, terminalClient, logger]);
 
 	// Separate effect to stop polling when no longer running
 	useEffect(() => {

@@ -13,7 +13,7 @@ import { ChatExporter } from "../shared/chat-exporter";
 
 // Adapter imports
 import { ObsidianVaultAdapter } from "../adapters/obsidian/vault.adapter";
-import type { IAcpClient } from "../adapters/acp/acp.adapter";
+import type { ITerminalClient } from "../domain/ports/terminal-client.port";
 
 // Hooks imports
 import { useSettings } from "./useSettings";
@@ -64,7 +64,7 @@ export interface UseChatControllerReturn {
 	// Memoized services/adapters
 	logger: Logger;
 	vaultPath: string;
-	acpAdapter: IAcpClient;
+	terminalClient: ITerminalClient;
 	vaultAccessAdapter: ObsidianVaultAdapter;
 	noteMentionService: NoteMentionService;
 
@@ -936,7 +936,7 @@ export function useChatController(
 		// Services & Adapters
 		logger,
 		vaultPath,
-		acpAdapter,
+		terminalClient: acpAdapter,
 		vaultAccessAdapter,
 		noteMentionService,
 

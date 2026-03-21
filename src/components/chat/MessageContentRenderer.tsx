@@ -1,7 +1,7 @@
 import * as React from "react";
 import { setIcon } from "obsidian";
 import type { MessageContent } from "../../domain/models/chat-message";
-import type { IAcpClient } from "../../adapters/acp/acp.adapter";
+import type { ITerminalClient } from "../../domain/ports/terminal-client.port";
 import type AgentClientPlugin from "../../plugin";
 import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 import { CollapsibleThought } from "./CollapsibleThought";
@@ -15,7 +15,7 @@ interface MessageContentRendererProps {
 	plugin: AgentClientPlugin;
 	messageId?: string;
 	messageRole?: "user" | "assistant";
-	acpClient?: IAcpClient;
+	terminalClient?: ITerminalClient;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (
 		requestId: string,
@@ -28,7 +28,7 @@ export function MessageContentRenderer({
 	plugin,
 	messageId,
 	messageRole,
-	acpClient,
+	terminalClient,
 	onApprovePermission,
 }: MessageContentRendererProps) {
 	switch (content.type) {
@@ -58,7 +58,7 @@ export function MessageContentRenderer({
 				<ToolCallRenderer
 					content={content}
 					plugin={plugin}
-					acpClient={acpClient}
+					terminalClient={terminalClient}
 					onApprovePermission={onApprovePermission}
 				/>
 			);
@@ -108,7 +108,7 @@ export function MessageContentRenderer({
 			return (
 				<TerminalRenderer
 					terminalId={content.terminalId}
-					acpClient={acpClient || null}
+					terminalClient={terminalClient || null}
 					plugin={plugin}
 				/>
 			);

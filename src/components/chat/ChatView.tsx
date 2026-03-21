@@ -24,8 +24,8 @@ import { ChatInput } from "./ChatInput";
 // Utility imports
 import { getLogger, Logger } from "../../shared/logger";
 
-// Adapter imports
-import type { IAcpClient } from "../../adapters/acp/acp.adapter";
+// Port imports
+import type { ITerminalClient } from "../../domain/ports/terminal-client.port";
 
 // Hooks imports
 import { useChatController } from "../../hooks/useChatController";
@@ -75,7 +75,7 @@ function ChatComponent({
 
 	const {
 		logger,
-		acpAdapter,
+		terminalClient,
 		settings,
 		session,
 		isSessionReady,
@@ -149,7 +149,7 @@ function ChatComponent({
 	// ============================================================
 	// Refs
 	// ============================================================
-	const acpClientRef = useRef<IAcpClient>(acpAdapter);
+	const terminalClientRef = useRef<ITerminalClient>(terminalClient);
 	/** Track if initial agent restoration has been performed (prevent re-triggering) */
 	const hasRestoredAgentRef = useRef(false);
 
@@ -566,7 +566,7 @@ function ChatComponent({
 				agentLabel={activeAgentLabel}
 				plugin={plugin}
 				view={view}
-				acpClient={acpClientRef.current}
+				terminalClient={terminalClientRef.current}
 				onApprovePermission={permission.approvePermission}
 				hasActivePermission={permission.activePermission != null}
 			/>

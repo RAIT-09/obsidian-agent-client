@@ -3,14 +3,14 @@ import type {
 	ChatMessage,
 	MessageContent,
 } from "../../domain/models/chat-message";
-import type { IAcpClient } from "../../adapters/acp/acp.adapter";
+import type { ITerminalClient } from "../../domain/ports/terminal-client.port";
 import type AgentClientPlugin from "../../plugin";
 import { MessageContentRenderer } from "./MessageContentRenderer";
 
 interface MessageRendererProps {
 	message: ChatMessage;
 	plugin: AgentClientPlugin;
-	acpClient?: IAcpClient;
+	terminalClient?: ITerminalClient;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (
 		requestId: string,
@@ -62,7 +62,7 @@ function groupContent(
 export function MessageRenderer({
 	message,
 	plugin,
-	acpClient,
+	terminalClient,
 	onApprovePermission,
 }: MessageRendererProps) {
 	const groups = groupContent(message.content);
@@ -86,7 +86,7 @@ export function MessageRenderer({
 									plugin={plugin}
 									messageId={message.id}
 									messageRole={message.role}
-									acpClient={acpClient}
+									terminalClient={terminalClient}
 									onApprovePermission={onApprovePermission}
 								/>
 							))}
@@ -101,7 +101,7 @@ export function MessageRenderer({
 								plugin={plugin}
 								messageId={message.id}
 								messageRole={message.role}
-								acpClient={acpClient}
+								terminalClient={terminalClient}
 								onApprovePermission={onApprovePermission}
 							/>
 						</div>

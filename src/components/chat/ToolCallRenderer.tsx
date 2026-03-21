@@ -2,7 +2,7 @@ import * as React from "react";
 const { useState, useMemo } = React;
 import { FileSystemAdapter } from "obsidian";
 import type { MessageContent } from "../../domain/models/chat-message";
-import type { IAcpClient } from "../../adapters/acp/acp.adapter";
+import type { ITerminalClient } from "../../domain/ports/terminal-client.port";
 import type AgentClientPlugin from "../../plugin";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { PermissionRequestSection } from "./PermissionRequestSection";
@@ -14,7 +14,7 @@ import * as Diff from "diff";
 interface ToolCallRendererProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
 	plugin: AgentClientPlugin;
-	acpClient?: IAcpClient;
+	terminalClient?: ITerminalClient;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (
 		requestId: string,
@@ -25,7 +25,7 @@ interface ToolCallRendererProps {
 export function ToolCallRenderer({
 	content,
 	plugin,
-	acpClient,
+	terminalClient,
 	onApprovePermission,
 }: ToolCallRendererProps) {
 	const {
@@ -145,7 +145,7 @@ export function ToolCallRenderer({
 							<TerminalRenderer
 								key={index}
 								terminalId={item.terminalId}
-								acpClient={acpClient || null}
+								terminalClient={terminalClient || null}
 								plugin={plugin}
 							/>
 						);
