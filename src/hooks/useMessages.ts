@@ -41,9 +41,9 @@ export interface SendMessageOptions {
 }
 
 /**
- * Return type for useChat hook.
+ * Return type for useMessages hook.
  */
-export interface UseChatReturn {
+export interface UseMessagesReturn {
 	/** All messages in the current chat session */
 	messages: ChatMessage[];
 	/** Whether a message is currently being sent */
@@ -224,13 +224,13 @@ function mergeToolCallContent(
  * @param sessionContext - Session information (sessionId, authMethods)
  * @param settingsContext - Settings information (windowsWslMode)
  */
-export function useChat(
+export function useMessages(
 	agentClient: IAgentClient,
 	vaultAccess: IVaultAccess,
 	mentionService: IMentionService,
 	sessionContext: SessionContext,
 	settingsContext: SettingsContext,
-): UseChatReturn {
+): UseMessagesReturn {
 	// Message state
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [isSending, setIsSending] = useState(false);
@@ -440,7 +440,7 @@ export function useChat(
 	 *
 	 * Note: available_commands_update and current_mode_update are not handled here
 	 * as they are session-level updates, not message-level updates.
-	 * They should be handled by useAgentSession.
+	 * They should be handled by useSession.
 	 */
 	const handleSessionUpdate = useCallback(
 		(update: SessionUpdate): void => {
@@ -488,7 +488,7 @@ export function useChat(
 					});
 					break;
 
-				// Session-level updates are handled elsewhere (useAgentSession)
+				// Session-level updates are handled elsewhere (useSession)
 				case "available_commands_update":
 				case "current_mode_update":
 				case "session_info_update":

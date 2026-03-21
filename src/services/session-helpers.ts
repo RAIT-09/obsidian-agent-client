@@ -1,6 +1,6 @@
 /**
  * Pure helper functions for agent session management.
- * Extracted from useAgentSession hook for reusability and testability.
+ * Extracted from useSession hook for reusability and testability.
  */
 
 import type { AgentClientPluginSettings } from "../plugin";

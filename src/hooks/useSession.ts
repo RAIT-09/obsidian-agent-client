@@ -38,9 +38,9 @@ export interface SessionErrorInfo {
 }
 
 /**
- * Return type for useAgentSession hook.
+ * Return type for useSession hook.
  */
-export interface UseAgentSessionReturn {
+export interface UseSessionReturn {
 	/** Current session state */
 	session: ChatSession;
 	/** Whether the session is ready for user input */
@@ -54,17 +54,6 @@ export interface UseAgentSessionReturn {
 	 * @param overrideAgentId - Optional agent ID to use instead of default
 	 */
 	createSession: (overrideAgentId?: string) => Promise<void>;
-
-	/**
-	 * Load a previous session by ID.
-	 * Restores conversation context via session/load.
-	 *
-	 * Note: Conversation history is received via session/update notifications
-	 * (user_message_chunk, agent_message_chunk, etc.), not returned from this function.
-	 *
-	 * @param sessionId - ID of the session to load
-	 */
-	loadSession: (sessionId: string) => Promise<void>;
 
 	/**
 	 * Restart the current session.
@@ -193,12 +182,12 @@ function flattenConfigSelectOptions(
  * @param workingDirectory - Working directory for the session
  * @param initialAgentId - Optional initial agent ID (from view persistence)
  */
-export function useAgentSession(
+export function useSession(
 	agentClient: IAgentClient,
 	settingsAccess: ISettingsAccess,
 	workingDirectory: string,
 	initialAgentId?: string,
-): UseAgentSessionReturn {
+): UseSessionReturn {
 	// Get initial agent info from settings
 	const initialSettings = settingsAccess.getSnapshot();
 	const effectiveInitialAgentId =
@@ -484,145 +473,6 @@ export function useAgentSession(
 					message: `Failed to create new session: ${error instanceof Error ? error.message : String(error)}`,
 					suggestion:
 						"Please check the agent configuration and try again.",
-				});
-			}
-		},
-		[agentClient, settingsAccess, workingDirectory],
-	);
-
-	/**
-	 * Load a previous session by ID.
-	 * Restores conversation history and creates a new session for future prompts.
-	 *
-	 * Note: Conversation history is received via session/update notifications
-	 * (user_message_chunk, agent_message_chunk, etc.), not returned from this function.
-	 *
-	 * @param sessionId - ID of the session to load
-	 */
-	const loadSession = useCallback(
-		async (sessionId: string) => {
-			// Get current settings and agent info
-			const settings = settingsAccess.getSnapshot();
-			const defaultAgentId = getDefaultAgentId(settings);
-			const currentAgent = getCurrentAgent(settings);
-
-			// Reset to initializing state immediately
-			setSession((prev) => ({
-				...prev,
-				sessionId: null,
-				state: "initializing",
-				agentId: defaultAgentId,
-				agentDisplayName: currentAgent.displayName,
-				authMethods: [],
-				availableCommands: undefined,
-				modes: undefined,
-				models: undefined,
-				configOptions: undefined,
-				promptCapabilities: prev.promptCapabilities,
-				createdAt: new Date(),
-				lastActivityAt: new Date(),
-			}));
-			setErrorInfo(null);
-
-			try {
-				// Find agent settings
-				const agentSettings = findAgentSettings(
-					settings,
-					defaultAgentId,
-				);
-
-				if (!agentSettings) {
-					setSession((prev) => ({ ...prev, state: "error" }));
-					setErrorInfo({
-						title: "Agent Not Found",
-						message: `Agent with ID "${defaultAgentId}" not found in settings`,
-						suggestion:
-							"Please check your agent configuration in settings.",
-					});
-					return;
-				}
-
-				// Build AgentConfig with API key injection
-				const agentConfig = buildAgentConfigWithApiKey(
-					settings,
-					agentSettings,
-					defaultAgentId,
-					workingDirectory,
-				);
-
-				// Check if initialization is needed
-				const needsInitialize =
-					!agentClient.isInitialized() ||
-					agentClient.getCurrentAgentId() !== defaultAgentId;
-
-				let authMethods: AuthenticationMethod[] = [];
-				let promptCapabilities:
-					| {
-							image?: boolean;
-							audio?: boolean;
-							embeddedContext?: boolean;
-					  }
-					| undefined;
-				let agentCapabilities:
-					| {
-							loadSession?: boolean;
-							sessionCapabilities?: {
-								resume?: Record<string, unknown>;
-								fork?: Record<string, unknown>;
-								list?: Record<string, unknown>;
-							};
-							mcpCapabilities?: {
-								http?: boolean;
-								sse?: boolean;
-							};
-							promptCapabilities?: {
-								image?: boolean;
-								audio?: boolean;
-								embeddedContext?: boolean;
-							};
-					  }
-					| undefined;
-
-				if (needsInitialize) {
-					// Initialize connection to agent
-					const initResult =
-						await agentClient.initialize(agentConfig);
-					authMethods = initResult.authMethods;
-					promptCapabilities = initResult.promptCapabilities;
-					agentCapabilities = initResult.agentCapabilities;
-				}
-
-				// Load the session
-				// Conversation history is received via session/update notifications
-				const loadResult = await agentClient.loadSession(
-					sessionId,
-					workingDirectory,
-				);
-
-				// Success - update to ready state with session ID
-				setSession((prev) => ({
-					...prev,
-					sessionId: loadResult.sessionId,
-					state: "ready",
-					authMethods: authMethods,
-					modes: loadResult.modes,
-					models: loadResult.models,
-					configOptions: loadResult.configOptions,
-					promptCapabilities: needsInitialize
-						? promptCapabilities
-						: prev.promptCapabilities,
-					agentCapabilities: needsInitialize
-						? agentCapabilities
-						: prev.agentCapabilities,
-					lastActivityAt: new Date(),
-				}));
-			} catch (error) {
-				// Error - update to error state
-				setSession((prev) => ({ ...prev, state: "error" }));
-				setErrorInfo({
-					title: "Session Loading Failed",
-					message: `Failed to load session: ${error instanceof Error ? error.message : String(error)}`,
-					suggestion: "Please try again or create a new session.",
 				});
 			}
 		},
@@ -1041,7 +891,6 @@ export function useAgentSession(
 		isReady,
 		errorInfo,
 		createSession,
-		loadSession,
 		restartSession,
 		closeSession,
 		forceRestartAgent,

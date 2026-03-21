@@ -128,7 +128,7 @@ function selectOption(
  * - Handles hotkey-triggered approve/reject actions
  *
  * @param agentClient - Agent client for permission responses
- * @param messages - Chat messages (from useChat) to scan for active permissions
+ * @param messages - Chat messages (from useMessages) to scan for active permissions
  */
 export function usePermission(
 	agentClient: IAgentClient,

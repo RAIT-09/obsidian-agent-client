@@ -231,7 +231,6 @@ function FloatingChatComponent({
 		isUpdateAvailable,
 		permission,
 		mentions,
-		autoMention,
 		slashCommands,
 		sessionHistory,
 		activeAgentLabel,
@@ -591,13 +590,13 @@ function FloatingChatComponent({
 			}
 		).on("agent-client:toggle-auto-mention", (targetViewId?: string) => {
 			if (targetViewId && targetViewId !== viewId) return;
-			autoMention.toggle();
+			mentions.toggleAutoMention();
 		});
 
 		return () => {
 			workspace.offref(eventRef);
 		};
-	}, [plugin.app.workspace, autoMention.toggle, viewId]);
+	}, [plugin.app.workspace, mentions.toggleAutoMention, viewId]);
 
 	// 2. New chat requested (from "New chat with [Agent]" command)
 	useEffect(() => {
@@ -808,7 +807,6 @@ function FloatingChatComponent({
 					restoredMessage={restoredMessage}
 					mentions={mentions}
 					slashCommands={slashCommands}
-					autoMention={autoMention}
 					plugin={plugin}
 					view={viewHost}
 					onSendMessage={handleSendMessage}

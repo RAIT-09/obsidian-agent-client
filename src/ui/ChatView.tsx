@@ -84,7 +84,6 @@ function ChatComponent({
 		isUpdateAvailable,
 		permission,
 		mentions,
-		autoMention,
 		slashCommands,
 		sessionHistory,
 		activeAgentLabel,
@@ -393,13 +392,13 @@ function ChatComponent({
 			if (targetViewId && targetViewId !== viewId) {
 				return;
 			}
-			autoMention.toggle();
+			mentions.toggleAutoMention();
 		});
 
 		return () => {
 			workspace.offref(eventRef);
 		};
-	}, [plugin.app.workspace, autoMention.toggle, viewId]);
+	}, [plugin.app.workspace, mentions.toggleAutoMention, viewId]);
 
 	// Handle new chat request from plugin commands (e.g., "New chat with [Agent]")
 	useEffect(() => {
@@ -581,7 +580,6 @@ function ChatComponent({
 				restoredMessage={restoredMessage}
 				mentions={mentions}
 				slashCommands={slashCommands}
-				autoMention={autoMention}
 				plugin={plugin}
 				view={view}
 				onSendMessage={handleSendMessage}

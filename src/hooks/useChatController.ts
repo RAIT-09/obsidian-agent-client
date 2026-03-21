@@ -18,15 +18,14 @@ import type { ITerminalClient } from "../acp/acp-client";
 import { useSettings } from "./useSettings";
 import { useMentions } from "./useMentions";
 import { useSlashCommands } from "./useSlashCommands";
-import { useAutoMention } from "./useAutoMention";
-import { useAgentSession } from "./useAgentSession";
-import { useChat } from "./useChat";
+import { useSession } from "./useSession";
+import { useMessages } from "./useMessages";
 import { usePermission } from "./usePermission";
-import { useAutoExport } from "./useAutoExport";
 import { useSessionHistory } from "./useSessionHistory";
 
 // Domain model imports
 import type {
+	ChatSession,
 	SessionModeState,
 	SessionModelState,
 	SessionConfigOption,
@@ -34,6 +33,7 @@ import type {
 	SessionConfigSelectGroup,
 } from "../types/session";
 import type {
+	ChatMessage,
 	ImagePromptContent,
 	ResourceLinkPromptContent,
 } from "../types/chat";
@@ -77,9 +77,9 @@ export interface UseChatControllerReturn {
 
 	// Settings & State
 	settings: ReturnType<typeof useSettings>;
-	session: ReturnType<typeof useAgentSession>["session"];
+	session: ReturnType<typeof useSession>["session"];
 	isSessionReady: boolean;
-	messages: ReturnType<typeof useChat>["messages"];
+	messages: ReturnType<typeof useMessages>["messages"];
 	isSending: boolean;
 	isUpdateAvailable: boolean;
 	isLoadingSessionHistory: boolean;
@@ -87,17 +87,19 @@ export interface UseChatControllerReturn {
 	// Hook returns
 	permission: ReturnType<typeof usePermission>;
 	mentions: ReturnType<typeof useMentions>;
-	autoMention: ReturnType<typeof useAutoMention>;
 	slashCommands: ReturnType<typeof useSlashCommands>;
 	sessionHistory: ReturnType<typeof useSessionHistory>;
-	autoExport: ReturnType<typeof useAutoExport>;
+	exportChat: (
+		messages: ChatMessage[],
+		session: ChatSession,
+	) => Promise<string | null>;
 
 	// Computed values
 	activeAgentLabel: string;
 	availableAgents: AgentInfo[];
 	errorInfo:
-		| ReturnType<typeof useChat>["errorInfo"]
-		| ReturnType<typeof useAgentSession>["errorInfo"];
+		| ReturnType<typeof useMessages>["errorInfo"]
+		| ReturnType<typeof useSession>["errorInfo"];
 	agentUpdateNotification: AgentUpdateNotification | null;
 
 	// Core callbacks
@@ -173,7 +175,7 @@ export function useChatController(
 	// ============================================================
 	const settings = useSettings(plugin);
 
-	const agentSession = useAgentSession(
+	const agentSession = useSession(
 		acpAdapter,
 		plugin.settingsService,
 		vaultPath,
@@ -186,7 +188,7 @@ export function useChatController(
 		isReady: isSessionReady,
 	} = agentSession;
 
-	const chat = useChat(
+	const chatMessages = useMessages(
 		acpAdapter,
 		vaultService,
 		vaultService,
@@ -202,18 +204,84 @@ export function useChatController(
 		},
 	);
 
-	const { messages, isSending } = chat;
+	const { messages, isSending } = chatMessages;
 
 	const permission = usePermission(acpAdapter, messages);
 
 	const mentions = useMentions(vaultService, plugin);
-	const autoMention = useAutoMention(vaultService);
+	
 	const slashCommands = useSlashCommands(
 		session.availableCommands || [],
-		autoMention.toggle,
+		mentions.toggleAutoMention,
 	);
 
-	const autoExport = useAutoExport(plugin);
+	const autoExportIfEnabled = useCallback(
+		async (
+			trigger: "newChat" | "closeChat",
+			triggerMessages: ChatMessage[],
+			triggerSession: ChatSession,
+		): Promise<void> => {
+			const isEnabled =
+				trigger === "newChat"
+					? plugin.settings.exportSettings.autoExportOnNewChat
+					: plugin.settings.exportSettings.autoExportOnCloseChat;
+			if (!isEnabled) return;
+			if (triggerMessages.length === 0) return;
+			if (!triggerSession.sessionId) return;
+
+			try {
+				const exporter = new ChatExporter(plugin);
+				const filePath = await exporter.exportToMarkdown(
+					triggerMessages,
+					triggerSession.agentDisplayName,
+					triggerSession.agentId,
+					triggerSession.sessionId,
+					triggerSession.createdAt,
+					false,
+				);
+				if (filePath) {
+					const context =
+						trigger === "newChat"
+							? "new session"
+							: "closing chat";
+					new Notice(
+						`[Agent Client] Chat exported to ${filePath}`,
+					);
+					logger.log(`Chat auto-exported before ${context}`);
+				}
+			} catch {
+				new Notice("[Agent Client] Failed to export chat");
+			}
+		},
+		[plugin, logger],
+	);
+
+	const exportChat = useCallback(
+		async (
+			exportMessages: ChatMessage[],
+			exportSession: ChatSession,
+		): Promise<string | null> => {
+			if (exportMessages.length === 0) return null;
+			if (!exportSession.sessionId) return null;
+			try {
+				const exporter = new ChatExporter(plugin);
+				const openFile =
+					plugin.settings.exportSettings.openFileAfterExport;
+				return await exporter.exportToMarkdown(
+					exportMessages,
+					exportSession.agentDisplayName,
+					exportSession.agentId,
+					exportSession.sessionId,
+					exportSession.createdAt,
+					openFile,
+				);
+			} catch (error) {
+				logger.error("Export failed:", error);
+				throw error;
+			}
+		},
+		[plugin, logger],
+	);
 
 	// Session history hook with callback for session load
 	const handleSessionLoad = useCallback(
@@ -249,8 +317,8 @@ export function useChatController(
 			"[useChatController] session/load started, ignoring history replay",
 		);
 		setIsLoadingSessionHistory(true);
-		chat.clearMessages();
-	}, [logger, chat]);
+		chatMessages.clearMessages();
+	}, [logger, chatMessages]);
 
 	const handleLoadEnd = useCallback(() => {
 		logger.log(
@@ -265,14 +333,14 @@ export function useChatController(
 		settingsAccess: plugin.settingsService,
 		cwd: vaultPath,
 		onSessionLoad: handleSessionLoad,
-		onMessagesRestore: chat.setMessagesFromLocal,
+		onMessagesRestore: chatMessages.setMessagesFromLocal,
 		onLoadStart: handleLoadStart,
 		onLoadEnd: handleLoadEnd,
 	});
 
 	// Combined error info (session errors take precedence)
 	const errorInfo =
-		sessionErrorInfo || chat.errorInfo || permission.errorInfo;
+		sessionErrorInfo || chatMessages.errorInfo || permission.errorInfo;
 
 	// ============================================================
 	// Local State
@@ -329,7 +397,7 @@ export function useChatController(
 	const handleSendMessage = useCallback(
 		async (content: string, attachments?: AttachedFile[]) => {
 			// Dismiss overlays on send
-			chat.clearError();
+			chatMessages.clearError();
 			setAgentUpdateNotification(null);
 
 			const isFirstMessage = messages.length === 0;
@@ -365,12 +433,12 @@ export function useChatController(
 				}
 			}
 
-			await chat.sendMessage(content, {
+			await chatMessages.sendMessage(content, {
 				activeNote: settings.autoMentionActiveNote
-					? autoMention.activeNote
+					? mentions.activeNote
 					: null,
 				vaultBasePath: vaultPath,
-				isAutoMentionDisabled: autoMention.isDisabled,
+				isAutoMentionDisabled: mentions.isAutoMentionDisabled,
 				images: images.length > 0 ? images : undefined,
 				resourceLinks:
 					resourceLinks.length > 0 ? resourceLinks : undefined,
@@ -388,8 +456,7 @@ export function useChatController(
 			}
 		},
 		[
-			chat,
-			autoMention,
+			chatMessages,
 			messages.length,
 			session.sessionId,
 			sessionHistory,
@@ -402,12 +469,12 @@ export function useChatController(
 
 	const handleStopGeneration = useCallback(async () => {
 		logger.log("Cancelling current operation...");
-		const lastMessage = chat.lastUserMessage;
+		const lastMessage = chatMessages.lastUserMessage;
 		await agentSession.cancelOperation();
 		if (lastMessage) {
 			setRestoredMessage(lastMessage);
 		}
-	}, [logger, agentSession, chat.lastUserMessage]);
+	}, [logger, agentSession, chatMessages.lastUserMessage]);
 
 	const handleNewChat = useCallback(
 		async (requestedAgentId?: string) => {
@@ -421,7 +488,7 @@ export function useChatController(
 			}
 
 			// Cancel ongoing generation before starting new chat
-			if (chat.isSending) {
+			if (chatMessages.isSending) {
 				await agentSession.cancelOperation();
 			}
 
@@ -431,15 +498,11 @@ export function useChatController(
 
 			// Auto-export current chat before starting new one (if has messages)
 			if (messages.length > 0) {
-				await autoExport.autoExportIfEnabled(
-					"newChat",
-					messages,
-					session,
-				);
+				await autoExportIfEnabled("newChat", messages, session);
 			}
 
-			autoMention.toggle(false);
-			chat.clearMessages();
+			mentions.toggleAutoMention(false);
+			chatMessages.clearMessages();
 
 			const newAgentId = isAgentSwitch
 				? requestedAgentId
@@ -453,9 +516,8 @@ export function useChatController(
 			messages,
 			session,
 			logger,
-			autoExport,
-			autoMention,
-			chat,
+			autoExportIfEnabled,
+			chatMessages,
 			agentSession,
 			sessionHistory,
 		],
@@ -499,11 +561,11 @@ export function useChatController(
 
 		// Auto-export current chat before restart (if has messages)
 		if (messages.length > 0) {
-			await autoExport.autoExportIfEnabled("newChat", messages, session);
+			await autoExportIfEnabled("newChat", messages, session);
 		}
 
 		// Clear messages for fresh start
-		chat.clearMessages();
+		chatMessages.clearMessages();
 
 		try {
 			await agentSession.forceRestartAgent();
@@ -512,11 +574,11 @@ export function useChatController(
 			new Notice("[Agent Client] Failed to restart agent");
 			logger.error("Restart error:", error);
 		}
-	}, [logger, messages, session, autoExport, chat, agentSession]);
+	}, [logger, messages, session, autoExportIfEnabled, chatMessages, agentSession]);
 
 	const handleClearError = useCallback(() => {
-		chat.clearError();
-	}, [chat]);
+		chatMessages.clearError();
+	}, [chatMessages]);
 
 	const handleClearAgentUpdate = useCallback(() => {
 		setAgentUpdateNotification(null);
@@ -535,7 +597,7 @@ export function useChatController(
 				logger.log(
 					`[useChatController] Restoring session: ${sessionId}`,
 				);
-				chat.clearMessages();
+				chatMessages.clearMessages();
 				await sessionHistory.restoreSession(sessionId, cwd);
 				new Notice("[Agent Client] Session restored");
 			} catch (error) {
@@ -543,14 +605,14 @@ export function useChatController(
 				logger.error("Session restore error:", error);
 			}
 		},
-		[logger, chat, sessionHistory],
+		[logger, chatMessages, sessionHistory],
 	);
 
 	const handleForkSession = useCallback(
 		async (sessionId: string, cwd: string) => {
 			try {
 				logger.log(`[useChatController] Forking session: ${sessionId}`);
-				chat.clearMessages();
+				chatMessages.clearMessages();
 				await sessionHistory.forkSession(sessionId, cwd);
 				new Notice("[Agent Client] Session forked");
 			} catch (error) {
@@ -558,7 +620,7 @@ export function useChatController(
 				logger.error("Session fork error:", error);
 			}
 		},
-		[logger, chat, sessionHistory],
+		[logger, chatMessages, sessionHistory],
 	);
 
 	const handleDeleteSession = useCallback(
@@ -706,7 +768,7 @@ export function useChatController(
 	// ============================================================
 	// Initialize session on mount
 	useEffect(() => {
-		logger.log("[Debug] Starting connection setup via useAgentSession...");
+		logger.log("[Debug] Starting connection setup via useSession...");
 		void agentSession.createSession(config?.agent || initialAgentId);
 	}, [agentSession.createSession, config?.agent, initialAgentId]);
 
@@ -763,11 +825,11 @@ export function useChatController(
 	// Refs for cleanup (to access latest values in cleanup function)
 	const messagesRef = useRef(messages);
 	const sessionRef = useRef(session);
-	const autoExportRef = useRef(autoExport);
+	const autoExportRef = useRef(autoExportIfEnabled);
 	const closeSessionRef = useRef(agentSession.closeSession);
 	messagesRef.current = messages;
 	sessionRef.current = session;
-	autoExportRef.current = autoExport;
+	autoExportRef.current = autoExportIfEnabled;
 	closeSessionRef.current = agentSession.closeSession;
 
 	// Cleanup on unmount only - auto-export and close session
@@ -777,7 +839,7 @@ export function useChatController(
 				"[useChatController] Cleanup: auto-export and close session",
 			);
 			void (async () => {
-				await autoExportRef.current.autoExportIfEnabled(
+				await autoExportRef.current(
 					"closeChat",
 					messagesRef.current,
 					sessionRef.current,
@@ -821,10 +883,10 @@ export function useChatController(
 				return;
 			}
 
-			// Route message-related updates to useChat
-			chat.handleSessionUpdate(update);
+			// Route message-related updates to useMessages
+			chatMessages.handleSessionUpdate(update);
 
-			// Route session-level updates to useAgentSession
+			// Route session-level updates to useSession
 			if (update.type === "available_commands_update") {
 				agentSession.updateAvailableCommands(update.commands);
 			} else if (update.type === "current_mode_update") {
@@ -844,15 +906,15 @@ export function useChatController(
 		session.sessionId,
 		logger,
 		isLoadingSessionHistory,
-		chat.handleSessionUpdate,
+		chatMessages.handleSessionUpdate,
 		agentSession.updateAvailableCommands,
 		agentSession.updateCurrentMode,
 	]);
 
 	// Register updateMessage callback for permission UI updates
 	useEffect(() => {
-		acpAdapter.setUpdateMessageCallback(chat.updateMessage);
-	}, [acpAdapter, chat.updateMessage]);
+		acpAdapter.setUpdateMessageCallback(chatMessages.updateMessage);
+	}, [acpAdapter, chatMessages.updateMessage]);
 
 	// ============================================================
 	// Effects - Update Check
@@ -914,7 +976,7 @@ export function useChatController(
 
 		const refreshActiveNote = async () => {
 			if (!isMounted) return;
-			await autoMention.updateActiveNote();
+			await mentions.updateActiveNote();
 		};
 
 		const unsubscribe = vaultService.subscribeSelectionChanges(() => {
@@ -927,7 +989,7 @@ export function useChatController(
 			isMounted = false;
 			unsubscribe();
 		};
-	}, [autoMention.updateActiveNote, vaultService]);
+	}, [mentions.updateActiveNote, vaultService]);
 
 	// ============================================================
 	// Return
@@ -951,10 +1013,9 @@ export function useChatController(
 		// Hook returns
 		permission,
 		mentions,
-		autoMention,
 		slashCommands,
 		sessionHistory,
-		autoExport,
+		exportChat,
 
 		// Computed values
 		activeAgentLabel,

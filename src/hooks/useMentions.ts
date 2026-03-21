@@ -37,6 +37,15 @@ export interface UseMentionsReturn {
 
 	/** Close the dropdown */
 	close: () => void;
+
+	/** Currently active note for auto-mention */
+	activeNote: NoteMetadata | null;
+	/** Whether auto-mention is temporarily disabled */
+	isAutoMentionDisabled: boolean;
+	/** Toggle auto-mention enabled/disabled state */
+	toggleAutoMention: (disabled?: boolean) => void;
+	/** Update the active note from the vault */
+	updateActiveNote: () => Promise<void>;
 }
 
 /**
@@ -55,6 +64,8 @@ export function useMentions(
 	const [suggestions, setSuggestions] = useState<NoteMetadata[]>([]);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [context, setContext] = useState<MentionContext | null>(null);
+	const [activeNote, setActiveNote] = useState<NoteMetadata | null>(null);
+	const [isAutoMentionDisabled, setIsAutoMentionDisabled] = useState(false);
 
 	const isOpen = suggestions.length > 0 && context !== null;
 
@@ -117,6 +128,19 @@ export function useMentions(
 		setContext(null);
 	}, []);
 
+	const toggleAutoMention = useCallback((disabled?: boolean) => {
+		if (disabled === undefined) {
+			setIsAutoMentionDisabled((prev) => !prev);
+		} else {
+			setIsAutoMentionDisabled(disabled);
+		}
+	}, []);
+
+	const updateActiveNote = useCallback(async () => {
+		const note = await vaultAccess.getActiveNote();
+		setActiveNote(note);
+	}, [vaultAccess]);
+
 	return {
 		suggestions,
 		selectedIndex,
@@ -126,5 +150,9 @@ export function useMentions(
 		selectSuggestion,
 		navigate,
 		close,
+		activeNote,
+		isAutoMentionDisabled,
+		toggleAutoMention,
+		updateActiveNote,
 	};
 }

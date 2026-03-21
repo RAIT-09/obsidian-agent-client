@@ -19,7 +19,6 @@ import type {
 import type { AttachedFile } from "../types/chat";
 import type { UseMentionsReturn } from "../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../hooks/useSlashCommands";
-import type { UseAutoMentionReturn } from "../hooks/useAutoMention";
 import type { ChatMessage } from "../types/chat";
 import { SuggestionDropdown } from "./SuggestionDropdown";
 import { ErrorOverlay } from "./ErrorOverlay";
@@ -106,8 +105,6 @@ export interface ChatInputProps {
 	mentions: UseMentionsReturn;
 	/** Slash commands hook state and methods */
 	slashCommands: UseSlashCommandsReturn;
-	/** Auto-mention hook state and methods */
-	autoMention: UseAutoMentionReturn;
 	/** Plugin instance */
 	plugin: AgentClientPlugin;
 	/** View instance for event registration */
@@ -182,7 +179,6 @@ export function ChatInput({
 	restoredMessage,
 	mentions,
 	slashCommands,
-	autoMention,
 	plugin,
 	view,
 	onSendMessage,
@@ -1180,19 +1176,19 @@ export function ChatInput({
 				onDrop={(e) => void handleDrop(e)}
 			>
 				{/* Auto-mention Badge */}
-				{autoMentionEnabled && autoMention.activeNote && (
+				{autoMentionEnabled && mentions.activeNote && (
 					<div className="agent-client-auto-mention-inline">
 						<span
-							className={`agent-client-mention-badge ${autoMention.isDisabled ? "agent-client-disabled" : ""}`}
+							className={`agent-client-mention-badge ${mentions.isAutoMentionDisabled ? "agent-client-disabled" : ""}`}
 						>
-							@{autoMention.activeNote.name}
-							{autoMention.activeNote.selection && (
+							@{mentions.activeNote.name}
+							{mentions.activeNote.selection && (
 								<span className="agent-client-selection-indicator">
 									{":"}
-									{autoMention.activeNote.selection.from
+									{mentions.activeNote.selection.from
 										.line + 1}
 									-
-									{autoMention.activeNote.selection.to.line +
+									{mentions.activeNote.selection.to.line +
 										1}
 								</span>
 							)}
@@ -1201,21 +1197,21 @@ export function ChatInput({
 							className="agent-client-auto-mention-toggle-btn"
 							onClick={(e) => {
 								const newDisabledState =
-									!autoMention.isDisabled;
-								autoMention.toggle(newDisabledState);
+									!mentions.isAutoMentionDisabled;
+								mentions.toggleAutoMention(newDisabledState);
 								const iconName = newDisabledState
 									? "x"
 									: "plus";
 								setIcon(e.currentTarget, iconName);
 							}}
 							title={
-								autoMention.isDisabled
+								mentions.isAutoMentionDisabled
 									? "Enable auto-mention"
 									: "Temporarily disable auto-mention"
 							}
 							ref={(el) => {
 								if (el) {
-									const iconName = autoMention.isDisabled
+									const iconName = mentions.isAutoMentionDisabled
 										? "plus"
 										: "x";
 									setIcon(el, iconName);
@@ -1234,7 +1230,7 @@ export function ChatInput({
 						onKeyDown={handleKeyDown}
 						onPaste={(e) => void handlePaste(e)}
 						placeholder={placeholder}
-						className={`agent-client-chat-input-textarea ${autoMentionEnabled && autoMention.activeNote ? "has-auto-mention" : ""}`}
+						className={`agent-client-chat-input-textarea ${autoMentionEnabled && mentions.activeNote ? "has-auto-mention" : ""}`}
 						rows={1}
 						spellCheck={obsidianSpellcheck}
 					/>
