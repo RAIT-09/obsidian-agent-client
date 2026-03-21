@@ -11,16 +11,16 @@ import type {
 	AgentEnvVar,
 	ChatViewLocation,
 } from "../plugin";
-import { normalizeEnvVars } from "../shared/settings-utils";
+import { normalizeEnvVars } from "../utils/settings-utils";
 import {
 	resolveCommandPath,
 	resolveCommandPathInWsl,
-} from "../shared/path-utils";
+} from "../utils/path-utils";
 import {
 	CHAT_FONT_SIZE_MAX,
 	CHAT_FONT_SIZE_MIN,
 	parseChatFontSize,
-} from "../shared/display-settings";
+} from "../utils/display-settings";
 
 export class AgentClientSettingTab extends PluginSettingTab {
 	plugin: AgentClientPlugin;

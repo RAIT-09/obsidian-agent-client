@@ -4,30 +4,30 @@ import { setIcon, DropdownComponent, Notice } from "obsidian";
 
 import type AgentClientPlugin from "../plugin";
 import type { IChatViewHost } from "./types";
-import type { NoteMetadata } from "../domain/ports/vault-access.port";
+import type { NoteMetadata } from "../services/vault-service";
 import type {
 	SlashCommand,
 	SessionModeState,
 	SessionModelState,
 	SessionUsage,
-} from "../domain/models/chat-session";
+} from "../types/session";
 import type {
 	SessionConfigOption,
 	SessionConfigSelectGroup,
-} from "../domain/models/session-update";
-import { flattenConfigSelectOptions } from "../shared/config-option-utils";
-import type { AttachedFile } from "../domain/models/chat-input-state";
+} from "../types/session";
+import { flattenConfigSelectOptions } from "../utils/config-option-utils";
+import type { AttachedFile } from "../types/chat";
 import type { UseMentionsReturn } from "../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../hooks/useSlashCommands";
 import type { UseAutoMentionReturn } from "../hooks/useAutoMention";
-import type { ChatMessage } from "../domain/models/chat-message";
+import type { ChatMessage } from "../types/chat";
 import { SuggestionDropdown } from "./SuggestionDropdown";
 import { ErrorOverlay } from "./ErrorOverlay";
 import { AttachmentPreviewStrip } from "./AttachmentPreviewStrip";
 import { useInputHistory } from "../hooks/useInputHistory";
-import { getLogger } from "../shared/logger";
-import type { ErrorInfo } from "../domain/models/agent-error";
-import type { AgentUpdateNotification } from "../shared/agent-update-checker";
+import { getLogger } from "../utils/logger";
+import type { ErrorInfo } from "../types/errors";
+import type { AgentUpdateNotification } from "../services/update-checker";
 import { useSettings } from "../hooks/useSettings";
 
 // ============================================================================

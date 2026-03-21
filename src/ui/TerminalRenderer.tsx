@@ -1,7 +1,7 @@
 import * as React from "react";
 const { useState, useRef, useEffect } = React;
-import type { ITerminalClient } from "../domain/ports/terminal-client.port";
-import { getLogger } from "../shared/logger";
+import type { ITerminalClient } from "../acp/acp-client";
+import { getLogger } from "../utils/logger";
 import type AgentClientPlugin from "../plugin";
 interface TerminalRendererProps {
 	terminalId: string;

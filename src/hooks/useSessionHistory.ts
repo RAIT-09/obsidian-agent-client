@@ -1,22 +1,22 @@
 import { useState, useCallback, useRef, useMemo } from "react";
-import type { IAgentClient } from "../domain/ports/agent-client.port";
-import type { ISettingsAccess } from "../domain/ports/settings-access.port";
+import type { IAgentClient } from "../acp/acp-client";
+import type { ISettingsAccess } from "../services/settings-service";
 import type {
 	SessionInfo,
 	ListSessionsResult,
 	SavedSessionInfo,
-} from "../domain/models/session-info";
+} from "../types/session";
 import type {
 	ChatSession,
 	SessionModeState,
 	SessionModelState,
-} from "../domain/models/chat-session";
-import type { SessionConfigOption } from "../domain/models/session-update";
-import type { ChatMessage } from "../domain/models/chat-message";
+} from "../types/session";
+import type { SessionConfigOption } from "../types/session";
+import type { ChatMessage } from "../types/chat";
 import {
 	getSessionCapabilityFlags,
 	type SessionCapabilityFlags,
-} from "../shared/session-capability-utils";
+} from "../utils/session-capability-utils";
 
 // ============================================================================
 // Types
@@ -160,7 +160,7 @@ export interface UseSessionHistoryReturn {
 	 */
 	saveSessionMessages: (
 		sessionId: string,
-		messages: import("../domain/models/chat-message").ChatMessage[],
+		messages: import("../types/chat").ChatMessage[],
 	) => void;
 
 	/**
@@ -704,7 +704,7 @@ export function useSessionHistory(
 	const saveSessionMessages = useCallback(
 		(
 			sessionId: string,
-			messages: import("../domain/models/chat-message").ChatMessage[],
+			messages: import("../types/chat").ChatMessage[],
 		) => {
 			if (!session.agentId || messages.length === 0) return;
 

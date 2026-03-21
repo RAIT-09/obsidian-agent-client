@@ -2,19 +2,19 @@ import { useState, useCallback, useMemo } from "react";
 import type {
 	ChatMessage,
 	MessageContent,
-} from "../domain/models/chat-message";
-import type { SessionUpdate } from "../domain/models/session-update";
-import type { IAgentClient } from "../domain/ports/agent-client.port";
-import type { IVaultAccess } from "../domain/ports/vault-access.port";
-import type { NoteMetadata } from "../domain/ports/vault-access.port";
-import type { AuthenticationMethod } from "../domain/models/chat-session";
-import type { ErrorInfo } from "../domain/models/agent-error";
+} from "../types/chat";
+import type { SessionUpdate } from "../types/session";
+import type { IAgentClient } from "../acp/acp-client";
+import type { IVaultAccess } from "../services/vault-service";
+import type { NoteMetadata } from "../services/vault-service";
+import type { AuthenticationMethod } from "../types/session";
+import type { ErrorInfo } from "../types/errors";
 import type {
 	ImagePromptContent,
 	ResourceLinkPromptContent,
-} from "../domain/models/prompt-content";
-import type { IMentionService } from "../shared/mention-utils";
-import { preparePrompt, sendPreparedPrompt } from "../shared/message-service";
+} from "../types/chat";
+import type { IMentionService } from "../utils/mention-utils";
+import { preparePrompt, sendPreparedPrompt } from "../services/message-sender";
 import { Platform } from "obsidian";
 
 // ============================================================================

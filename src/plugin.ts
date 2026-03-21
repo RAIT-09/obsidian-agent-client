@@ -7,35 +7,35 @@ import {
 } from "obsidian";
 import type { Root } from "react-dom/client";
 import * as semver from "semver";
-import { ChatView, VIEW_TYPE_CHAT } from "./components/chat/ChatView";
+import { ChatView, VIEW_TYPE_CHAT } from "./ui/ChatView";
 import {
 	createFloatingChat,
 	FloatingViewContainer,
-} from "./components/chat/FloatingChatView";
-import { FloatingButtonContainer } from "./components/chat/FloatingButton";
-import { ChatViewRegistry } from "./shared/chat-view-registry";
+} from "./ui/FloatingChatView";
+import { FloatingButtonContainer } from "./ui/FloatingButton";
+import { ChatViewRegistry } from "./services/view-registry";
 import {
 	createSettingsStore,
 	type SettingsStore,
-} from "./adapters/obsidian/settings-store.adapter";
-import { AgentClientSettingTab } from "./components/settings/AgentClientSettingTab";
-import { AcpAdapter } from "./adapters/acp/acp.adapter";
+} from "./services/settings-service";
+import { AgentClientSettingTab } from "./ui/AgentClientSettingTab";
+import { AcpAdapter } from "./acp/acp-client";
 import {
 	sanitizeArgs,
 	normalizeEnvVars,
 	normalizeCustomAgent,
 	ensureUniqueCustomAgentIds,
-} from "./shared/settings-utils";
-import { parseChatFontSize } from "./shared/display-settings";
+} from "./utils/settings-utils";
+import { parseChatFontSize } from "./utils/display-settings";
 import {
 	AgentEnvVar,
 	GeminiAgentSettings,
 	ClaudeAgentSettings,
 	CodexAgentSettings,
 	CustomAgentSettings,
-} from "./domain/models/agent-config";
-import type { SavedSessionInfo } from "./domain/models/session-info";
-import { initializeLogger } from "./shared/logger";
+} from "./types/agent";
+import type { SavedSessionInfo } from "./types/session";
+import { initializeLogger } from "./utils/logger";
 
 // Re-export for backward compatibility
 export type { AgentEnvVar, CustomAgentSettings };

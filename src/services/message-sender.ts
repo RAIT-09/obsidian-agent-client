@@ -12,28 +12,28 @@
  * - Handle authentication errors with retry logic
  */
 
-import type { IAgentClient } from "../domain/ports/agent-client.port";
+import type { IAgentClient } from "../acp/acp-client";
 import type {
 	IVaultAccess,
 	NoteMetadata,
 	EditorPosition,
-} from "../domain/ports/vault-access.port";
-import { AcpErrorCode, type AcpError } from "../domain/models/agent-error";
+} from "../services/vault-service";
+import { AcpErrorCode, type AcpError } from "../types/errors";
 import {
 	extractErrorCode,
 	toAcpError,
 	isEmptyResponseError,
-} from "../shared/acp-error-utils";
-import type { AuthenticationMethod } from "../domain/models/chat-session";
+} from "../utils/acp-error-utils";
+import type { AuthenticationMethod } from "../types/session";
 import type {
 	PromptContent,
 	ImagePromptContent,
 	ResourcePromptContent,
 	ResourceLinkPromptContent,
-} from "../domain/models/prompt-content";
-import { extractMentionedNotes, type IMentionService } from "../shared/mention-utils";
-import { convertWindowsPathToWsl } from "../shared/wsl-utils";
-import { buildFileUri } from "../shared/path-utils";
+} from "../types/chat";
+import { extractMentionedNotes, type IMentionService } from "../utils/mention-utils";
+import { convertWindowsPathToWsl } from "../utils/wsl-utils";
+import { buildFileUri } from "../utils/path-utils";
 
 // ============================================================================
 // Types

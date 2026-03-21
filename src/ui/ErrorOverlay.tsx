@@ -1,7 +1,7 @@
 import * as React from "react";
 const { useEffect } = React;
 import { setIcon } from "obsidian";
-import type { ErrorInfo } from "../domain/models/agent-error";
+import type { ErrorInfo } from "../types/errors";
 import { LucideIcon } from "./LucideIcon";
 import type { IChatViewHost } from "./types";
 

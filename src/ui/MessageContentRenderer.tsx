@@ -1,7 +1,7 @@
 import * as React from "react";
 import { setIcon } from "obsidian";
-import type { MessageContent } from "../domain/models/chat-message";
-import type { ITerminalClient } from "../domain/ports/terminal-client.port";
+import type { MessageContent } from "../types/chat";
+import type { ITerminalClient } from "../acp/acp-client";
 import type AgentClientPlugin from "../plugin";
 import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 import { CollapsibleThought } from "./CollapsibleThought";

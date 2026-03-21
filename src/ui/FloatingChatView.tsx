@@ -7,8 +7,8 @@ import type AgentClientPlugin from "../plugin";
 import type {
 	IChatViewContainer,
 	ChatViewType,
-} from "../domain/ports/chat-view-container.port";
-import type { ChatInputState } from "../domain/models/chat-input-state";
+} from "../services/view-registry";
+import type { ChatInputState } from "../types/chat";
 import type { IChatViewHost } from "./types";
 
 // Component imports
@@ -19,7 +19,7 @@ import { InlineHeader } from "./InlineHeader";
 // Hooks imports
 import { useChatController } from "../hooks/useChatController";
 
-import { clampPosition } from "../shared/floating-utils";
+import { clampPosition } from "../utils/floating-utils";
 
 // ============================================================
 // Type Definitions

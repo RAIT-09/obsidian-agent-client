@@ -1,13 +1,13 @@
 import * as React from "react";
 const { useState, useMemo } = React;
 import { FileSystemAdapter } from "obsidian";
-import type { MessageContent } from "../domain/models/chat-message";
-import type { ITerminalClient } from "../domain/ports/terminal-client.port";
+import type { MessageContent } from "../types/chat";
+import type { ITerminalClient } from "../acp/acp-client";
 import type AgentClientPlugin from "../plugin";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { PermissionRequestSection } from "./PermissionRequestSection";
 import { LucideIcon } from "./LucideIcon";
-import { toRelativePath } from "../shared/path-utils";
+import { toRelativePath } from "../utils/path-utils";
 import * as Diff from "diff";
 // import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
 

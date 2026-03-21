@@ -1,6 +1,6 @@
 import type { AgentEnvVar, CustomAgentSettings } from "../plugin";
-import type { BaseAgentSettings } from "../domain/models/agent-config";
-import type { AgentConfig } from "../domain/ports/agent-client.port";
+import type { BaseAgentSettings } from "../types/agent";
+import type { AgentConfig } from "../acp/acp-client";
 
 export const sanitizeArgs = (value: unknown): string[] => {
 	if (Array.isArray(value)) {

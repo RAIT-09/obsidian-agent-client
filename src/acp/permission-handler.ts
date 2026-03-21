@@ -2,10 +2,10 @@ import * as acp from "@agentclientprotocol/sdk";
 import type {
 	MessageContent,
 	PermissionOption,
-} from "../domain/models/chat-message";
-import type { SessionUpdate } from "../domain/models/session-update";
+} from "../types/chat";
+import type { SessionUpdate } from "../types/session";
 import { AcpTypeConverter } from "./type-converter";
-import { getLogger, Logger } from "../shared/logger";
+import { getLogger, Logger } from "../utils/logger";
 
 /**
  * Callbacks that PermissionManager uses to communicate with the outside world.

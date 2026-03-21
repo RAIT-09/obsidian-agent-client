@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { setIcon } from "obsidian";
 import type AgentClientPlugin from "../plugin";
 import { useSettings } from "../hooks/useSettings";
-import { clampPosition } from "../shared/floating-utils";
+import { clampPosition } from "../utils/floating-utils";
 
 interface VaultAdapterWithResourcePath {
 	getResourcePath?: (path: string) => string;

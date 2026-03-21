@@ -1,6 +1,6 @@
 import * as React from "react";
 import { setIcon } from "obsidian";
-import type { AttachedFile } from "../domain/models/chat-input-state";
+import type { AttachedFile } from "../types/chat";
 
 interface AttachmentPreviewStripProps {
 	files: AttachedFile[];

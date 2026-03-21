@@ -1,6 +1,6 @@
 import type AgentClientPlugin from "../plugin";
-import { getLogger } from "../shared/logger";
-import type { PermissionOption } from "../domain/models/chat-message";
+import { getLogger } from "../utils/logger";
+import type { PermissionOption } from "../types/chat";
 
 interface PermissionRequestSectionProps {
 	permissionRequest: {

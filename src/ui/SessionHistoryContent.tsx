@@ -1,7 +1,7 @@
 import * as React from "react";
 const { useState, useCallback } = React;
 import { setIcon } from "obsidian";
-import type { SessionInfo } from "../domain/models/session-info";
+import type { SessionInfo } from "../types/session";
 
 /**
  * Props for SessionHistoryContent component.

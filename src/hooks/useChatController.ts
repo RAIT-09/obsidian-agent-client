@@ -2,18 +2,18 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Notice, FileSystemAdapter, Platform } from "obsidian";
 
 import type AgentClientPlugin from "../plugin";
-import type { AttachedFile } from "../domain/models/chat-input-state";
-import { SessionHistoryModal } from "../components/chat/SessionHistoryModal";
-import { ConfirmDeleteModal } from "../components/chat/ConfirmDeleteModal";
+import type { AttachedFile } from "../types/chat";
+import { SessionHistoryModal } from "../ui/SessionHistoryModal";
+import { ConfirmDeleteModal } from "../ui/ConfirmDeleteModal";
 
 // Service imports
-import { NoteMentionService } from "../adapters/obsidian/mention-service";
-import { getLogger, Logger } from "../shared/logger";
-import { ChatExporter } from "../shared/chat-exporter";
+import { NoteMentionService } from "../services/mention-service";
+import { getLogger, Logger } from "../utils/logger";
+import { ChatExporter } from "../services/chat-exporter";
 
 // Adapter imports
-import { ObsidianVaultAdapter } from "../adapters/obsidian/vault.adapter";
-import type { ITerminalClient } from "../domain/ports/terminal-client.port";
+import { ObsidianVaultAdapter } from "../services/vault-service";
+import type { ITerminalClient } from "../acp/acp-client";
 
 // Hooks imports
 import { useSettings } from "./useSettings";
@@ -30,17 +30,17 @@ import { useSessionHistory } from "./useSessionHistory";
 import type {
 	SessionModeState,
 	SessionModelState,
-} from "../domain/models/chat-session";
-import type { SessionConfigOption } from "../domain/models/session-update";
-import { flattenConfigSelectOptions } from "../shared/config-option-utils";
+} from "../types/session";
+import type { SessionConfigOption } from "../types/session";
+import { flattenConfigSelectOptions } from "../utils/config-option-utils";
 import type {
 	ImagePromptContent,
 	ResourceLinkPromptContent,
-} from "../domain/models/prompt-content";
-import { buildFileUri } from "../shared/path-utils";
-import { convertWindowsPathToWsl } from "../shared/wsl-utils";
-import type { AgentUpdateNotification } from "../shared/agent-update-checker";
-import { checkAgentUpdate } from "../shared/agent-update-checker";
+} from "../types/chat";
+import { buildFileUri } from "../utils/path-utils";
+import { convertWindowsPathToWsl } from "../utils/wsl-utils";
+import type { AgentUpdateNotification } from "../services/update-checker";
+import { checkAgentUpdate } from "../services/update-checker";
 
 // Agent info for display (from plugin.getAvailableAgents())
 interface AgentInfo {

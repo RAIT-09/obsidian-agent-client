@@ -1,4 +1,4 @@
-import type { AgentCapabilities } from "../domain/models/initialize-result";
+import type { AgentCapabilities } from "../types/session";
 
 /**
  * Session capability flags for UI conditional rendering.

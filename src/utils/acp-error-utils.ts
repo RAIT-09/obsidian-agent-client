@@ -12,7 +12,7 @@ import {
 	AcpErrorCode,
 	type AcpError,
 	type ErrorInfo,
-} from "../domain/models/agent-error";
+} from "../types/errors";
 
 // ============================================================================
 // Error Extraction Functions

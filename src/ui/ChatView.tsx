@@ -9,23 +9,23 @@ import {
 import type {
 	IChatViewContainer,
 	ChatViewType,
-} from "../domain/ports/chat-view-container.port";
+} from "../services/view-registry";
 import * as React from "react";
 const { useState, useRef, useEffect, useCallback } = React;
 import { createRoot, Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../plugin";
-import type { ChatInputState } from "../domain/models/chat-input-state";
+import type { ChatInputState } from "../types/chat";
 
 // Component imports
 import { ChatHeader } from "./ChatHeader";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 // Utility imports
-import { getLogger, Logger } from "../shared/logger";
+import { getLogger, Logger } from "../utils/logger";
 
 // Port imports
-import type { ITerminalClient } from "../domain/ports/terminal-client.port";
+import type { ITerminalClient } from "../acp/acp-client";
 
 // Hooks imports
 import { useChatController } from "../hooks/useChatController";

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useMemo } from "react";
-import type { ChatMessage } from "../domain/models/chat-message";
+import type { ChatMessage } from "../types/chat";
 
 export interface UseInputHistoryReturn {
 	/**

@@ -1,7 +1,7 @@
 import type {
 	SessionConfigSelectGroup,
 	SessionConfigSelectOption,
-} from "../domain/models/session-update";
+} from "../types/session";
 
 /**
  * Flatten config select options, handling both flat and grouped options.

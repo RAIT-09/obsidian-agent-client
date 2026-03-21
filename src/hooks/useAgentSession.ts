@@ -7,19 +7,19 @@ import type {
 	SessionUsage,
 	SlashCommand,
 	AuthenticationMethod,
-} from "../domain/models/chat-session";
-import type { SessionConfigOption } from "../domain/models/session-update";
-import { flattenConfigSelectOptions } from "../shared/config-option-utils";
-import type { IAgentClient } from "../domain/ports/agent-client.port";
-import type { ISettingsAccess } from "../domain/ports/settings-access.port";
+} from "../types/session";
+import type { SessionConfigOption } from "../types/session";
+import { flattenConfigSelectOptions } from "../utils/config-option-utils";
+import type { IAgentClient } from "../acp/acp-client";
+import type { ISettingsAccess } from "../services/settings-service";
 import type { AgentClientPluginSettings } from "../plugin";
 import type {
 	BaseAgentSettings,
 	ClaudeAgentSettings,
 	GeminiAgentSettings,
 	CodexAgentSettings,
-} from "../domain/models/agent-config";
-import { toAgentConfig } from "../shared/settings-utils";
+} from "../types/agent";
+import { toAgentConfig } from "../utils/settings-utils";
 
 // ============================================================================
 // Types
