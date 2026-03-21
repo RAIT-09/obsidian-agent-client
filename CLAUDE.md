@@ -1,7 +1,7 @@
 # Agent Client Plugin - LLM Developer Guide
 
 ## Overview
-Obsidian plugin for AI agent interaction (Claude Code, Gemini CLI, custom agents). **React Hooks Architecture**.
+Obsidian plugin for AI agent interaction (Claude Code, Codex, Gemini CLI, custom agents). **ChatPanel + React Hooks Architecture**.
 
 **Tech**: React 19, TypeScript, Obsidian API, Agent Client Protocol (ACP)
 
@@ -9,127 +9,164 @@ Obsidian plugin for AI agent interaction (Claude Code, Gemini CLI, custom agents
 
 ```
 src/
-├── domain/                   # Pure domain models + ports (interfaces)
-│   ├── models/               # agent-config, agent-error, chat-message, chat-session, session-update
-│   └── ports/                # IAgentClient, ISettingsAccess, IVaultAccess
-├── adapters/                 # Interface implementations
-│   ├── acp/                  # ACP protocol (acp.adapter.ts, acp-type-converter.ts)
-│   └── obsidian/             # Platform adapters (vault, settings, mention-service)
+├── types/                    # Type definitions (no logic, no dependencies)
+│   ├── chat.ts               # ChatMessage, MessageContent, PromptContent, AttachedFile
+│   ├── session.ts            # ChatSession, SessionUpdate, SessionInfo, Capabilities
+│   ├── agent.ts              # AgentConfig, agent settings (Claude/Codex/Gemini/Custom)
+│   └── errors.ts             # AcpError, ProcessError, ErrorInfo
+├── acp/                      # ACP protocol (SDK dependency confined here)
+│   ├── acp-client.ts         # Process lifecycle, JSON-RPC, IAgentClient + ITerminalClient
+│   ├── type-converter.ts     # ACP SDK ↔ internal type conversion
+│   ├── permission-handler.ts # Permission queue, auto-approve, Promise resolution
+│   └── terminal-handler.ts   # Terminal process create/output/kill
+├── services/                 # Business logic (non-React)
+│   ├── vault-service.ts      # Vault access + fuzzy search + CM6 selection tracking
+│   ├── settings-service.ts   # Settings persistence, session storage, normalization
+│   ├── session-helpers.ts    # Agent config building, API key injection (pure functions)
+│   ├── message-sender.ts     # Prompt preparation + sending (pure functions)
+│   ├── chat-exporter.ts      # Markdown export with frontmatter
+│   ├── view-registry.ts      # Multi-view management, focus, broadcast
+│   └── update-checker.ts     # Agent/plugin version checking
 ├── hooks/                    # React custom hooks (state + logic)
-│   ├── useAgentSession.ts    # Session lifecycle, agent switching
-│   ├── useChat.ts            # Message sending, session update handling
+│   ├── useSession.ts         # Session lifecycle, config options, optimistic updates
+│   ├── useMessages.ts        # Message state, streaming updates, send/receive
 │   ├── usePermission.ts      # Permission handling
-│   ├── useMentions.ts        # @[[note]] suggestions
+│   ├── useMentions.ts        # @[[note]] suggestions + auto-mention active note
 │   ├── useSlashCommands.ts   # /command suggestions
-│   ├── useAutoMention.ts     # Auto-mention active note
-│   ├── useAutoExport.ts      # Auto-export on new/close
+│   ├── useSessionHistory.ts  # Session list/load/resume/fork
 │   └── useSettings.ts        # Settings subscription
-├── components/               # UI components
-│   ├── chat/                 # ChatView, ChatHeader, ChatMessages, ChatInput, etc.
-│   └── settings/             # AgentClientSettingTab
-├── shared/                   # Utilities
-│   ├── message-service.ts    # prepareMessage, sendPreparedMessage (pure functions)
-│   ├── terminal-manager.ts   # Process spawn, stdout/stderr capture
-│   ├── logger.ts, chat-exporter.ts, mention-utils.ts, etc.
+├── ui/                       # React components
+│   ├── ChatContext.ts        # React Context (plugin, acpClient, vaultService)
+│   ├── ChatPanel.tsx         # Hook aggregation + rendering (core orchestrator)
+│   ├── ChatView.tsx          # Sidebar view (ItemView wrapper)
+│   ├── FloatingChatView.tsx  # Floating window (position/drag/resize)
+│   ├── ChatHeader.tsx        # Header (sidebar + floating variants)
+│   ├── MessageList.tsx       # Message list with auto-scroll
+│   ├── MessageBubble.tsx     # Single message rendering (content dispatch)
+│   ├── ToolCallBlock.tsx     # Tool call + diff display
+│   ├── TerminalBlock.tsx     # Terminal output polling
+│   ├── InputArea.tsx         # Textarea, attachments, mentions, history
+│   ├── InputToolbar.tsx      # Mode/model selectors, usage, send button
+│   └── ...                   # SuggestionPopup, PermissionBanner, ErrorBanner, etc.
+├── utils/                    # Shared utilities
+│   ├── platform.ts           # Shell, WSL, Windows env, command building
+│   ├── paths.ts              # Path resolution, file:// URI
+│   ├── error-utils.ts        # ACP error conversion
+│   ├── mention-parser.ts     # @[[note]] detection/extraction
+│   └── logger.ts             # Debug-mode logger
 ├── plugin.ts                 # Obsidian plugin lifecycle, settings persistence
 └── main.ts                   # Entry point
 ```
 
 ## Key Components
 
-### ChatView (`components/chat/ChatView.tsx`)
-- **Hook Composition**: Combines all hooks (useAgentSession, useChat, usePermission, etc.)
-- **Adapter Instantiation**: Creates AcpAdapter, VaultAdapter, MentionService via useMemo
-- **Callback Registration**: Registers `onSessionUpdate` for unified event handling
-- **Rendering**: Delegates to ChatHeader, ChatMessages, ChatInput
+### ChatPanel (`ui/ChatPanel.tsx`)
+Central orchestrator component. Replaces the former `useChatController` hook.
+- **Hook Composition**: Calls all hooks (useSession, useMessages, usePermission, etc.)
+- **Session Update Routing**: Routes ACP updates to useMessages (message-level) or useSession (session-level)
+- **Callback Registration**: Provides IChatViewContainer callbacks via ref pattern
+- **Workspace Events**: Handles toggle-auto-mention, new-chat-requested, approve/reject-permission, cancel, export
+- **Rendering**: Renders ChatHeader, MessageList, InputArea directly (no prop bag)
+
+### ChatView / FloatingChatView (`ui/ChatView.tsx`, `ui/FloatingChatView.tsx`)
+Thin wrappers that:
+- Create services (AcpClient, VaultService) in lifecycle methods
+- Provide ChatContext (plugin, acpClient, vaultService, settingsService)
+- Render `<ChatPanel variant="sidebar" | "floating" />`
+- Implement IChatViewContainer for broadcast commands
 
 ### Hooks (`hooks/`)
 
-**useAgentSession**: Session lifecycle
-- `createSession()`: Load config, inject API keys, initialize + newSession
-- `switchAgent()`: Change active agent, restart session
+**useSession**: Session lifecycle
+- `createSession()`: Build config, inject API keys, initialize + newSession
+- `restartSession()`: Change active agent, restart session
 - `closeSession()`: Cancel session, disconnect
-- `updateAvailableCommands()`: Handle slash command updates
-- `updateCurrentMode()`: Handle mode change updates
+- `setConfigOption()`: Optimistic update + rollback on error
+- `handleSessionUpdate()`: Handle session-level updates (commands, config, usage)
 
-**useChat**: Messaging and session update handling
-- `sendMessage()`: Prepare (auto-mention, path conversion) → send via IAgentClient
-- `handleNewChat()`: Export if enabled, restart session
-- `handleSessionUpdate()`: Unified handler for all session updates (agent_message_chunk, tool_call, etc.)
+**useMessages**: Messaging and streaming updates
+- `sendMessage()`: Prepare (auto-mention, path conversion) → send via AcpClient
+- `handleSessionUpdate()`: Handle message-level updates (agent_message_chunk, tool_call, etc.)
 - `upsertToolCall()`: Create or update tool call in single `setMessages` callback (avoids race conditions)
 - `updateLastMessage()`: Append text/thought chunks to last assistant message
 - `updateMessage()`: Update specific message by tool call ID
 
 **usePermission**: Permission handling
-- `handlePermissionResponse()`: Respond with selected option
+- `approvePermission()` / `rejectPermission()`: Respond with selected option
 - Auto-approve logic based on settings
 
-**useMentions / useSlashCommands**: Input suggestions
-- Dropdown state management
-- Selection handlers
+**useMentions**: @mention + auto-mention (merged)
+- Dropdown state management + selection
+- Active note tracking + toggle for slash commands
 
-### AcpAdapter (`adapters/acp/acp.adapter.ts`)
-Implements IAgentClient + IAcpClient (terminal ops)
+**useSessionHistory**: Session persistence
+- `restoreSession()`: Load/resume with local message fallback
+- `forkSession()`: Create new branch from existing session
+
+### ACP Client (`acp/acp-client.ts`)
+Implements IAgentClient + ITerminalClient
 
 - **Process**: spawn() with login shell (macOS/Linux -l, Windows shell:true)
 - **Protocol**: JSON-RPC over stdin/stdout via ndJsonStream
-- **Flow**: initialize() → newSession() → sendMessage() → sessionUpdate via `onSessionUpdate`
-- **Updates**: agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan, available_commands_update, current_mode_update
-- **Unified Callback**: Single `onSessionUpdate(callback)` replaces legacy `onMessage`, `onError`, `onPermissionRequest`
-- **Permissions**: Promise-based Map<requestId, resolver>
-- **Terminal**: createTerminal, terminalOutput, killTerminal, releaseTerminal
+- **Flow**: initialize() → newSession() → sendPrompt() → sessionUpdate via `onSessionUpdate`
+- **Updates**: agent_message_chunk, agent_thought_chunk, user_message_chunk, tool_call, tool_call_update, plan, available_commands_update, current_mode_update, session_info_update, usage_update, config_option_update
+- **Unified Callback**: Single `onSessionUpdate(callback)` for all agent events
+- **Permissions**: Promise-based via PermissionHandler
+- **Terminal**: TerminalHandler manages create/output/kill/release
 
-### Obsidian Adapters (`adapters/obsidian/`)
+### Services (`services/`)
 
-**VaultAdapter**: IVaultAccess - searchNotes (fuzzy), getActiveNote, readNote
-**SettingsStore**: ISettingsAccess - Observer pattern, getSnapshot(), subscribe()
-**MentionService**: File index, fuzzy search (basename, path, aliases)
+**VaultService**: Vault access + file index + fuzzy search + CM6 selection tracking
+**SettingsService**: Observer pattern settings store, session storage (data.json + sessions/*.json)
+**session-helpers**: Pure functions — buildAgentConfigWithApiKey, findAgentSettings, getAvailableAgents
+**message-sender**: Pure functions — preparePrompt (auto-mention, context), sendPreparedPrompt (auth retry)
 
-### Message Service (`shared/message-service.ts`)
-Pure functions (non-React):
-- `prepareMessage()`: Auto-mention, convert @[[note]] → paths
-- `sendPreparedMessage()`: Send via IAgentClient, auth retry
+## Types
 
-## Domain Models
-
-### SessionUpdate (`domain/models/session-update.ts`)
+### SessionUpdate (`types/session.ts`)
 Union type for all session update events from the agent:
 
 ```typescript
 type SessionUpdate =
-  | AgentMessageChunkUpdate   // Text chunk from agent's response
-  | AgentThoughtChunkUpdate   // Text chunk from agent's reasoning
-  | ToolCallUpdate            // New tool call event
-  | ToolCallUpdateUpdate      // Update to existing tool call
-  | PlanUpdate                // Agent's task plan
-  | AvailableCommandsUpdate   // Slash commands changed
-  | CurrentModeUpdate         // Mode changed
-  | ErrorUpdate;              // Error from agent operations
+  | AgentMessageChunk        // Text chunk from agent's response
+  | AgentThoughtChunk        // Text chunk from agent's reasoning
+  | UserMessageChunk         // Text chunk from user message (session/load)
+  | ToolCall                 // New tool call event
+  | ToolCallUpdate           // Update to existing tool call
+  | Plan                     // Agent's task plan
+  | AvailableCommandsUpdate  // Slash commands changed
+  | CurrentModeUpdate        // Mode changed
+  | SessionInfoUpdate        // Session metadata changed
+  | UsageUpdate              // Context window usage
+  | ConfigOptionUpdate;      // Config options changed
 ```
 
-This domain type abstracts ACP's `SessionNotification.update.sessionUpdate` values, allowing the application layer to handle events without depending on ACP protocol specifics.
+### Key Interfaces
 
-## Ports (Interfaces)
+Interfaces are defined in their implementation files (no separate port files):
 
 ```typescript
+// acp/acp-client.ts
 interface IAgentClient {
   initialize(config: AgentConfig): Promise<InitializeResult>;
-  newSession(workingDirectory: string): Promise<NewSessionResult>;
+  newSession(workingDirectory: string): Promise<SessionResult>;
   authenticate(methodId: string): Promise<boolean>;
-  sendMessage(sessionId: string, message: string): Promise<void>;
+  sendPrompt(sessionId: string, content: PromptContent[]): Promise<void>;
   cancel(sessionId: string): Promise<void>;
   disconnect(): Promise<void>;
-
-  // Unified callback for all session updates
   onSessionUpdate(callback: (update: SessionUpdate) => void): void;
-
+  onError(callback: (error: ProcessError) => void): void;
   respondToPermission(requestId: string, optionId: string): Promise<void>;
   isInitialized(): boolean;
   getCurrentAgentId(): string | null;
-  setSessionMode(sessionId: string, modeId: string): Promise<void>;
-  setSessionModel(sessionId: string, modelId: string): Promise<void>;
+  setSessionConfigOption(sessionId: string, configId: string, value: string): Promise<SessionConfigOption[]>;
+  listSessions(cwd?: string, cursor?: string): Promise<ListSessionsResult>;
+  loadSession(sessionId: string, cwd: string): Promise<SessionResult>;
+  resumeSession(sessionId: string, cwd: string): Promise<SessionResult>;
+  forkSession(sessionId: string, cwd: string): Promise<SessionResult>;
 }
 
+// services/vault-service.ts
 interface IVaultAccess {
   readNote(path: string): Promise<string>;
   searchNotes(query: string): Promise<NoteMetadata[]>;
@@ -137,21 +174,29 @@ interface IVaultAccess {
   listNotes(): Promise<NoteMetadata[]>;
 }
 
+// services/settings-service.ts
 interface ISettingsAccess {
   getSnapshot(): AgentClientPluginSettings;
   updateSettings(updates: Partial<AgentClientPluginSettings>): Promise<void>;
   subscribe(listener: () => void): () => void;
+  saveSession(info: SavedSessionInfo): Promise<void>;
+  getSavedSessions(agentId?: string, cwd?: string): SavedSessionInfo[];
+  deleteSession(sessionId: string): Promise<void>;
+  saveSessionMessages(sessionId: string, agentId: string, messages: ChatMessage[]): Promise<void>;
+  loadSessionMessages(sessionId: string): Promise<ChatMessage[] | null>;
+  deleteSessionMessages(sessionId: string): Promise<void>;
 }
 ```
 
 ## Development Rules
 
 ### Architecture
-1. **Hooks for state + logic**: No ViewModel, no Use Cases classes
-2. **Pure functions in shared/**: Non-React business logic
-3. **Ports for ACP resistance**: IAgentClient interface isolates protocol changes
-4. **Domain has zero deps**: No `obsidian`, `@agentclientprotocol/sdk`
-5. **Unified callbacks**: Use `onSessionUpdate` for all agent events (not multiple callbacks)
+1. **ChatPanel as orchestrator**: All hooks called in ChatPanel, renders children directly
+2. **Services for non-React logic**: Pure functions and classes in `services/`
+3. **ACP isolation**: All `@agentclientprotocol/sdk` imports confined to `acp/`
+4. **Types have zero deps**: No `obsidian`, no SDK, no React in `types/`
+5. **Unified callbacks**: Use `onSessionUpdate` for all agent events
+6. **Context for services**: plugin, acpClient, vaultService via ChatContext
 
 ### Obsidian Plugin Review (CRITICAL)
 1. No innerHTML/outerHTML - use createEl/createDiv/createSpan
@@ -161,19 +206,22 @@ interface ISettingsAccess {
 5. Minimize `any` - use proper types
 
 ### Naming Conventions
-- Ports: `*.port.ts`
-- Adapters: `*.adapter.ts`
-- Hooks: `use*.ts`
-- Components: `PascalCase.tsx`
-- Utils/Models: `kebab-case.ts`
+- Types: `kebab-case.ts` in `types/`
+- ACP: `kebab-case.ts` in `acp/`
+- Services: `kebab-case.ts` in `services/`
+- Hooks: `use*.ts` in `hooks/`
+- Components: `PascalCase.tsx` in `ui/`
+- Utils: `kebab-case.ts` in `utils/`
 
 ### Code Patterns
 1. React hooks for state management
 2. useCallback/useMemo for performance
-3. useRef for cleanup function access
+3. useRef for cleanup function access and stale closure prevention
 4. Error handling: try-catch async ops
 5. Logging: Logger class (respects debugMode)
 6. **Upsert pattern**: Use `setMessages` functional updates to avoid race conditions with tool_call updates
+7. **Ref pattern for callbacks**: IChatViewContainer callbacks use refs for latest values
+8. **Context value stability**: ChatContext value created once (service instances), wrapped in useMemo
 
 ## Common Tasks
 
@@ -181,46 +229,50 @@ interface ISettingsAccess {
 1. Create `hooks/use[Feature].ts`
 2. Define state with useState/useReducer
 3. Export functions and state
-4. Compose in ChatView.tsx
+4. Call the hook in `ui/ChatPanel.tsx`
+5. Pass state/callbacks to child components as props
 
 ### Add Agent Type
-1. **Optional**: Define config in `domain/models/agent-config.ts`
-2. **Adapter**: Implement IAgentClient in `adapters/[agent]/[agent].adapter.ts`
-3. **Settings**: Add to AgentClientPluginSettings in plugin.ts
-4. **UI**: Update AgentClientSettingTab
+1. Add settings type in `types/agent.ts`
+2. Add config and defaults in `plugin.ts`
+3. Add API key injection in `services/session-helpers.ts`
+4. Update `ui/SettingsTab.ts` for configuration UI
 
 ### Modify Message Types
-1. Update `ChatMessage`/`MessageContent` in `domain/models/chat-message.ts`
+1. Update `ChatMessage`/`MessageContent` in `types/chat.ts`
 2. If adding new session update type:
-   - Add to `SessionUpdate` union in `domain/models/session-update.ts`
-   - Handle in `useChat.handleSessionUpdate()`
-3. Update `AcpAdapter.sessionUpdate()` to emit the new type
-4. Update `MessageContentRenderer` to render new type
+   - Add to `SessionUpdate` union in `types/session.ts`
+   - Handle in `hooks/useMessages.ts` `handleSessionUpdate()`
+3. Update `acp/acp-client.ts` `sessionUpdate()` to emit the new type
+4. Update `ui/MessageBubble.tsx` `ContentBlock` to render new type
 
 ### Add New Session Update Type
-1. Define interface in `domain/models/session-update.ts`
+1. Define interface in `types/session.ts`
 2. Add to `SessionUpdate` union type
-3. Handle in `useChat.handleSessionUpdate()` (for message-level updates)
-4. Or handle in `ChatView` (for session-level updates like `available_commands_update`)
+3. Handle in `hooks/useMessages.ts` `handleSessionUpdate()` (for message-level)
+4. Or handle in `hooks/useSession.ts` `handleSessionUpdate()` (for session-level)
+5. Route in `ui/ChatPanel.tsx` session update effect
 
 ### Debug
 1. Settings → Developer Settings → Debug Mode ON
 2. Open DevTools (Cmd+Option+I / Ctrl+Shift+I)
-3. Filter logs: `[AcpAdapter]`, `[useChat]`, `[NoteMentionService]`
+3. Filter logs: `[AcpAdapter]`, `[useMessages]`, `[VaultService]`, `[ChatPanel]`
 
 ## ACP Protocol
 
 **Communication**: JSON-RPC 2.0 over stdin/stdout
 
-**Methods**: initialize, newSession, authenticate, prompt, cancel, setSessionMode, setSessionModel
-**Notifications**: session/update (agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan, available_commands_update, current_mode_update)
+**Methods**: initialize, newSession, authenticate, prompt, cancel, setSessionConfigOption
+**Notifications**: session/update (agent_message_chunk, agent_thought_chunk, user_message_chunk, tool_call, tool_call_update, plan, available_commands_update, current_mode_update, session_info_update, usage_update, config_option_update)
 **Requests**: requestPermission
+**Session Management** (unstable): session/list, session/load, session/resume, session/fork
 
 **Agents**:
 - Claude Code: `@zed-industries/claude-agent-acp` (ANTHROPIC_API_KEY)
-- Gemini CLI: `@anthropics/gemini-cli-acp` (GOOGLE_API_KEY)
+- Codex: `@zed-industries/codex-acp` (OPENAI_API_KEY)
+- Gemini CLI: `@anthropics/gemini-cli-acp` (GEMINI_API_KEY)
 - Custom: Any ACP-compatible agent
 
 ---
 
-**Last Updated**: December 2025 | **Architecture**: React Hooks | **Version**: 0.4.0
+**Last Updated**: March 2026 | **Architecture**: ChatPanel + React Hooks | **Version**: 0.9.1
