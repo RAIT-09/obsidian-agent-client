@@ -5,8 +5,8 @@ import { Platform } from "obsidian";
 import type {
 	IAgentClient,
 	AgentConfig,
-	InitializeResult,
 } from "../../domain/ports/agent-client.port";
+import type { InitializeResult } from "../../domain/models/initialize-result";
 import type {
 	MessageContent,
 	PermissionOption,

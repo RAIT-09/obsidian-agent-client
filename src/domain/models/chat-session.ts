@@ -7,6 +7,11 @@
  */
 
 import type { SessionConfigOption } from "./session-update";
+import type {
+	PromptCapabilities,
+	AgentCapabilities,
+	AgentInfo,
+} from "./initialize-result";
 
 // ============================================================================
 // Session State
@@ -246,45 +251,21 @@ export interface ChatSession {
 	 * Set during initialization and persists for the session lifetime.
 	 * (Convenience accessor - same as agentCapabilities.promptCapabilities)
 	 */
-	promptCapabilities?: {
-		image?: boolean;
-		audio?: boolean;
-		embeddedContext?: boolean;
-	};
+	promptCapabilities?: PromptCapabilities;
 
 	/**
 	 * Full agent capabilities from initialization.
 	 * Contains loadSession, sessionCapabilities, mcpCapabilities, and promptCapabilities.
 	 * Set during initialization and persists for the session lifetime.
 	 */
-	agentCapabilities?: {
-		loadSession?: boolean;
-		sessionCapabilities?: {
-			resume?: Record<string, unknown>;
-			fork?: Record<string, unknown>;
-			list?: Record<string, unknown>;
-		};
-		mcpCapabilities?: {
-			http?: boolean;
-			sse?: boolean;
-		};
-		promptCapabilities?: {
-			image?: boolean;
-			audio?: boolean;
-			embeddedContext?: boolean;
-		};
-	};
+	agentCapabilities?: AgentCapabilities;
 
 	/**
 	 * Information about the connected agent.
 	 * Contains agent name, title, and version.
 	 * Set during initialization and persists for the session lifetime.
 	 */
-	agentInfo?: {
-		name: string;
-		title?: string;
-		version?: string;
-	};
+	agentInfo?: AgentInfo;
 
 	/** Timestamp when the session was created */
 	createdAt: Date;
