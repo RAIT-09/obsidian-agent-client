@@ -73,7 +73,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		const nodePathSetting = new Setting(containerEl)
 			.setName("Node.js path")
 			.setDesc(
-				"Path to Node.js. Usually leave blank — the login shell automatically picks up nvm/mise/volta. Only needed if node is in a non-standard location (enter absolute path, e.g. /usr/local/bin/node).",
+				"Path to Node.js. Usually leave blank. Only needed if node is in a non-standard location (enter absolute path, e.g. /usr/local/bin/node).",
 			)
 			.addText((text) => {
 				text.setPlaceholder("Leave blank (login shell auto-resolves)")
