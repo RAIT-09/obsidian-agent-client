@@ -34,7 +34,7 @@ import { convertWindowsPathToWsl } from "../utils/platform";
  * for detecting changes (e.g., for React components using useSyncExternalStore).
  *
  * This port will be implemented by adapters that handle the actual
- * storage mechanism (SettingsStore, localStorage, etc.).
+ * storage mechanism (SettingsService, localStorage, etc.).
  */
 export interface ISettingsAccess {
 	/**
@@ -181,7 +181,7 @@ interface SessionMessagesFile {
  *
  * Pattern: Observer/Publisher-Subscriber
  */
-export class SettingsStore implements ISettingsAccess {
+export class SettingsService implements ISettingsAccess {
 	/** Current settings state */
 	private state: AgentClientPluginSettings;
 
@@ -311,7 +311,7 @@ export class SettingsStore implements ISettingsAccess {
 				sessions.unshift(sessionInfo);
 
 				// Remove oldest sessions if exceeding limit
-				if (sessions.length > SettingsStore.MAX_SAVED_SESSIONS) {
+				if (sessions.length > SettingsService.MAX_SAVED_SESSIONS) {
 					sessions.pop();
 				}
 			}
@@ -484,7 +484,7 @@ export class SettingsStore implements ISettingsAccess {
 				!Array.isArray(data.messages)
 			) {
 				console.warn(
-					`[SettingsStore] Invalid session file structure: ${filePath}`,
+					`[SettingsService] Invalid session file structure: ${filePath}`,
 				);
 				return null;
 			}
@@ -492,7 +492,7 @@ export class SettingsStore implements ISettingsAccess {
 			// Version check for future compatibility
 			if (data.version !== 1) {
 				console.warn(
-					`[SettingsStore] Unknown session file version: ${data.version}`,
+					`[SettingsService] Unknown session file version: ${data.version}`,
 				);
 				return null;
 			}
@@ -504,7 +504,7 @@ export class SettingsStore implements ISettingsAccess {
 			}));
 		} catch (error) {
 			console.error(
-				`[SettingsStore] Failed to load session messages: ${error}`,
+				`[SettingsService] Failed to load session messages: ${error}`,
 			);
 			return null;
 		}
@@ -534,12 +534,12 @@ export class SettingsStore implements ISettingsAccess {
  *
  * @param initial - Initial plugin settings
  * @param plugin - Plugin instance for persistence
- * @returns New SettingsStore instance
+ * @returns New SettingsService instance
  */
-export const createSettingsStore = (
+export const createSettingsService = (
 	initial: AgentClientPluginSettings,
 	plugin: AgentClientPlugin,
-) => new SettingsStore(initial, plugin);
+) => new SettingsService(initial, plugin);
 
 // ============================================================================
 // Display Settings (from display-settings.ts)

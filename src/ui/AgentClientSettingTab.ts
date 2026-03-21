@@ -63,7 +63,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		this.renderAgentSelector(containerEl);
 
 		// Subscribe to settings changes to update agent dropdown
-		this.unsubscribe = this.plugin.settingsStore.subscribe(() => {
+		this.unsubscribe = this.plugin.settingsService.subscribe(() => {
 			this.updateAgentDropdown();
 		});
 
@@ -692,7 +692,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		}
 
 		// Get latest settings from store snapshot
-		const settings = this.plugin.settingsStore.getSnapshot();
+		const settings = this.plugin.settingsService.getSnapshot();
 		const currentValue = this.agentSelector.getValue();
 
 		// Only update if different to avoid triggering onChange

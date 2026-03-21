@@ -7,12 +7,11 @@ import { SessionHistoryModal } from "../ui/SessionHistoryModal";
 import { ConfirmDeleteModal } from "../ui/ConfirmDeleteModal";
 
 // Service imports
-import { NoteMentionService } from "../services/mention-service";
 import { getLogger, Logger } from "../utils/logger";
 import { ChatExporter } from "../services/chat-exporter";
 
 // Adapter imports
-import { ObsidianVaultAdapter } from "../services/vault-service";
+import { VaultService } from "../services/vault-service";
 import type { ITerminalClient } from "../acp/acp-client";
 
 // Hooks imports
@@ -74,8 +73,7 @@ export interface UseChatControllerReturn {
 	logger: Logger;
 	vaultPath: string;
 	terminalClient: ITerminalClient;
-	vaultAccessAdapter: ObsidianVaultAdapter;
-	noteMentionService: NoteMentionService;
+	vaultService: VaultService;
 
 	// Settings & State
 	settings: ReturnType<typeof useSettings>;
@@ -156,26 +154,19 @@ export function useChatController(
 		return process.cwd();
 	}, [plugin, options.workingDirectory]);
 
-	const noteMentionService = useMemo(
-		() => new NoteMentionService(plugin),
-		[plugin],
-	);
+	const vaultService = useMemo(() => new VaultService(plugin), [plugin]);
 
-	// Cleanup NoteMentionService when component unmounts
+	// Cleanup VaultService when component unmounts
 	useEffect(() => {
 		return () => {
-			noteMentionService.destroy();
+			vaultService.destroy();
 		};
-	}, [noteMentionService]);
+	}, [vaultService]);
 
 	const acpAdapter = useMemo(
 		() => plugin.getOrCreateAdapter(viewId),
 		[plugin, viewId],
 	);
-
-	const vaultAccessAdapter = useMemo(() => {
-		return new ObsidianVaultAdapter(plugin, noteMentionService);
-	}, [plugin, noteMentionService]);
 
 	// ============================================================
 	// Custom Hooks
@@ -184,7 +175,7 @@ export function useChatController(
 
 	const agentSession = useAgentSession(
 		acpAdapter,
-		plugin.settingsStore,
+		plugin.settingsService,
 		vaultPath,
 		initialAgentId,
 	);
@@ -197,8 +188,8 @@ export function useChatController(
 
 	const chat = useChat(
 		acpAdapter,
-		vaultAccessAdapter,
-		noteMentionService,
+		vaultService,
+		vaultService,
 		{
 			sessionId: session.sessionId,
 			authMethods: session.authMethods,
@@ -215,8 +206,8 @@ export function useChatController(
 
 	const permission = usePermission(acpAdapter, messages);
 
-	const mentions = useMentions(vaultAccessAdapter, plugin);
-	const autoMention = useAutoMention(vaultAccessAdapter);
+	const mentions = useMentions(vaultService, plugin);
+	const autoMention = useAutoMention(vaultService);
 	const slashCommands = useSlashCommands(
 		session.availableCommands || [],
 		autoMention.toggle,
@@ -271,7 +262,7 @@ export function useChatController(
 	const sessionHistory = useSessionHistory({
 		agentClient: acpAdapter,
 		session,
-		settingsAccess: plugin.settingsStore,
+		settingsAccess: plugin.settingsService,
 		cwd: vaultPath,
 		onSessionLoad: handleSessionLoad,
 		onMessagesRestore: chat.setMessagesFromLocal,
@@ -926,7 +917,7 @@ export function useChatController(
 			await autoMention.updateActiveNote();
 		};
 
-		const unsubscribe = vaultAccessAdapter.subscribeSelectionChanges(() => {
+		const unsubscribe = vaultService.subscribeSelectionChanges(() => {
 			void refreshActiveNote();
 		});
 
@@ -936,7 +927,7 @@ export function useChatController(
 			isMounted = false;
 			unsubscribe();
 		};
-	}, [autoMention.updateActiveNote, vaultAccessAdapter]);
+	}, [autoMention.updateActiveNote, vaultService]);
 
 	// ============================================================
 	// Return
@@ -946,8 +937,7 @@ export function useChatController(
 		logger,
 		vaultPath,
 		terminalClient: acpAdapter,
-		vaultAccessAdapter,
-		noteMentionService,
+		vaultService,
 
 		// Settings & State
 		settings,

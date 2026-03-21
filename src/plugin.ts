@@ -15,8 +15,8 @@ import {
 import { FloatingButtonContainer } from "./ui/FloatingButton";
 import { ChatViewRegistry } from "./services/view-registry";
 import {
-	createSettingsStore,
-	type SettingsStore,
+	createSettingsService,
+	type SettingsService,
 } from "./services/settings-service";
 import { AgentClientSettingTab } from "./ui/AgentClientSettingTab";
 import { AcpAdapter } from "./acp/acp-client";
@@ -178,7 +178,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 
 export default class AgentClientPlugin extends Plugin {
 	settings: AgentClientPluginSettings;
-	settingsStore!: SettingsStore;
+	settingsService!: SettingsService;
 
 	/** Registry for all chat view containers (sidebar + floating) */
 	viewRegistry = new ChatViewRegistry();
@@ -201,7 +201,7 @@ export default class AgentClientPlugin extends Plugin {
 		initializeLogger(this.settings);
 
 		// Initialize settings store
-		this.settingsStore = createSettingsStore(this.settings, this);
+		this.settingsService = createSettingsService(this.settings, this);
 
 		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
 
@@ -1235,7 +1235,7 @@ export default class AgentClientPlugin extends Plugin {
 	async saveSettingsAndNotify(nextSettings: AgentClientPluginSettings) {
 		this.settings = nextSettings;
 		await this.saveData(this.settings);
-		this.settingsStore.set(this.settings);
+		this.settingsService.set(this.settings);
 	}
 
 	/**

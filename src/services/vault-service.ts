@@ -1,22 +1,23 @@
 /**
- * Obsidian Vault Adapter
+ * Vault Service
  *
- * Adapter implementing IVaultAccess port for Obsidian's Vault API.
- * Integrates with NoteMentionService for search functionality and
- * wraps Obsidian's file access APIs with domain-friendly interface.
+ * Unified service implementing IVaultAccess port for Obsidian's Vault API.
+ * Combines vault file access, fuzzy search (formerly NoteMentionService),
+ * and editor selection tracking into a single service.
  */
 
 
-import { NoteMentionService } from "./mention-service";
 import type AgentClientPlugin from "../plugin";
 import {
 	TFile,
 	MarkdownView,
+	prepareFuzzySearch,
 	type EventRef,
 	type EditorSelection,
 } from "obsidian";
 import { EditorView } from "@codemirror/view";
 import { Compartment, StateEffect } from "@codemirror/state";
+import { getLogger, Logger } from "../utils/logger";
 
 // ============================================================================
 // Port Types (from vault-access.port.ts)
@@ -70,7 +71,7 @@ export interface NoteMetadata {
  *
  * Provides methods for searching, reading, and listing notes
  * in the Obsidian vault. This port will be implemented by adapters
- * that use Obsidian's Vault API, NoteMentionService, etc.
+ * that use Obsidian's Vault API.
  */
 export interface IVaultAccess {
 	/**
@@ -110,14 +111,18 @@ export interface IVaultAccess {
 }
 
 /**
- * Adapter for accessing Obsidian vault notes.
+ * Unified vault service for note access, fuzzy search, and selection tracking.
  *
- * Implements IVaultAccess port by wrapping Obsidian's Vault API
- * and NoteMentionService, converting between Obsidian's TFile
- * and domain's NoteMetadata types.
+ * Implements IVaultAccess port by wrapping Obsidian's Vault API,
+ * providing built-in fuzzy search (formerly NoteMentionService),
+ * and tracking editor selection state.
  */
-export class ObsidianVaultAdapter implements IVaultAccess {
-	private mentionService: NoteMentionService;
+export class VaultService implements IVaultAccess {
+	private files: TFile[] = [];
+	private lastBuild = 0;
+	private logger: Logger;
+	private vaultEventRefs: ReturnType<typeof this.plugin.app.vault.on>[] = [];
+
 	private currentSelection: {
 		filePath: string;
 		selection: { from: EditorPosition; to: EditorPosition };
@@ -128,12 +133,60 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 	private selectionCompartment: Compartment | null = null;
 	private lastSelectionKey = "";
 
-	constructor(
-		private plugin: AgentClientPlugin,
-		mentionService: NoteMentionService,
-	) {
-		this.mentionService = mentionService;
+	constructor(private plugin: AgentClientPlugin) {
+		// File index init
+		this.logger = getLogger();
+		this.rebuildIndex();
+		this.registerVaultEvents();
+
+		// Selection tracking init
+		this.currentSelection = null;
+		this.selectionListeners = new Set();
 	}
+
+	// ========================================================================
+	// File Index (formerly NoteMentionService)
+	// ========================================================================
+
+	private rebuildIndex() {
+		this.files = this.plugin.app.vault.getMarkdownFiles();
+		this.lastBuild = Date.now();
+		this.logger.log(
+			`[VaultService] Rebuilt index with ${this.files.length} files`,
+		);
+	}
+
+	private registerVaultEvents() {
+		this.vaultEventRefs.push(
+			this.plugin.app.vault.on("create", (file) => {
+				if (file instanceof TFile && file.extension === "md") {
+					this.rebuildIndex();
+				}
+			}),
+		);
+		this.vaultEventRefs.push(
+			this.plugin.app.vault.on("delete", () => this.rebuildIndex()),
+		);
+		this.vaultEventRefs.push(
+			this.plugin.app.vault.on("rename", (file) => {
+				if (file instanceof TFile && file.extension === "md") {
+					this.rebuildIndex();
+				}
+			}),
+		);
+	}
+
+	getAllFiles(): TFile[] {
+		return this.files;
+	}
+
+	getFileByPath(path: string): TFile | null {
+		return this.files.find((file) => file.path === path) || null;
+	}
+
+	// ========================================================================
+	// IVaultAccess Implementation
+	// ========================================================================
 
 	/**
 	 * Read the content of a note.
@@ -154,18 +207,61 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 	 * Search for notes matching a query.
 	 *
 	 * Uses fuzzy search against note names, paths, and aliases.
-	 * Returns up to 5 best matches sorted by relevance.
+	 * Returns up to 20 best matches sorted by relevance.
 	 * If query is empty, returns recently modified files.
 	 *
 	 * @param query - Search query string (can be empty for recent files)
 	 * @returns Promise resolving to array of matching note metadata
 	 */
 	searchNotes(query: string): Promise<NoteMetadata[]> {
-		// Use existing NoteMentionService for fuzzy search
-		const files = this.mentionService.searchNotes(query);
-		return Promise.resolve(
-			files.map((file) => this.convertToMetadata(file)),
+		if (!query.trim()) {
+			const recentFiles = this.files
+				.slice()
+				.sort((a, b) => (b.stat?.mtime || 0) - (a.stat?.mtime || 0))
+				.slice(0, 20);
+			return Promise.resolve(
+				recentFiles.map((file) => this.convertToMetadata(file)),
+			);
+		}
+
+		const fuzzySearch = prepareFuzzySearch(query.trim());
+
+		const scored: Array<{ file: TFile; score: number }> = this.files.map(
+			(file) => {
+				const basename = file.basename;
+				const path = file.path;
+				const fileCache =
+					this.plugin.app.metadataCache.getFileCache(file);
+				const aliases = fileCache?.frontmatter?.aliases as
+					| string[]
+					| string
+					| undefined;
+				const aliasArray: string[] = Array.isArray(aliases)
+					? aliases
+					: aliases
+						? [aliases]
+						: [];
+
+				const searchFields = [basename, path, ...aliasArray];
+				let bestScore = -Infinity;
+
+				for (const field of searchFields) {
+					const match = fuzzySearch(field);
+					if (match && match.score > bestScore) {
+						bestScore = match.score;
+					}
+				}
+
+				return { file, score: bestScore };
+			},
 		);
+
+		const results = scored
+			.filter((item) => item.score > -Infinity)
+			.sort((a, b) => b.score - a.score)
+			.slice(0, 20)
+			.map((item) => this.convertToMetadata(item.file));
+		return Promise.resolve(results);
 	}
 
 	/**
@@ -191,6 +287,21 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 
 		return Promise.resolve(metadata);
 	}
+
+	/**
+	 * List all markdown notes in the vault.
+	 *
+	 * @returns Promise resolving to array of all note metadata
+	 */
+	listNotes(): Promise<NoteMetadata[]> {
+		return Promise.resolve(
+			this.files.map((file) => this.convertToMetadata(file)),
+		);
+	}
+
+	// ========================================================================
+	// Selection Tracking
+	// ========================================================================
 
 	/**
 	 * Subscribe to selection changes for the active markdown editor.
@@ -309,7 +420,7 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 			// 2. A future Obsidian version removes the 'cm' property
 			// 3. The editor is in a different mode (e.g., legacy editor)
 			console.warn(
-				"[ObsidianVaultAdapter] CodeMirror 6 API not available. " +
+				"[VaultService] CodeMirror 6 API not available. " +
 					"Selection change tracking will not work. " +
 					"This may be due to an Obsidian version change.",
 			);
@@ -389,25 +500,35 @@ export class ObsidianVaultAdapter implements IVaultAccess {
 				listener();
 			} catch (error) {
 				console.error(
-					"[ObsidianVaultAdapter] Selection listener error",
+					"[VaultService] Selection listener error",
 					error,
 				);
 			}
 		}
 	}
 
+	// ========================================================================
+	// Lifecycle
+	// ========================================================================
+
 	/**
-	 * List all markdown notes in the vault.
-	 *
-	 * @returns Promise resolving to array of all note metadata
+	 * Clean up all event listeners and tracking.
+	 * Call this when the service is no longer needed.
 	 */
-	listNotes(): Promise<NoteMetadata[]> {
-		// Use existing NoteMentionService to get all files
-		const files = this.mentionService.getAllFiles();
-		return Promise.resolve(
-			files.map((file) => this.convertToMetadata(file)),
-		);
+	destroy(): void {
+		// Clean up vault event listeners (from file index)
+		for (const ref of this.vaultEventRefs) {
+			this.plugin.app.vault.offref(ref);
+		}
+		this.vaultEventRefs = [];
+
+		// Clean up selection tracking
+		this.teardownSelectionTracking();
 	}
+
+	// ========================================================================
+	// Private Helpers
+	// ========================================================================
 
 	/**
 	 * Convert Obsidian TFile to domain NoteMetadata.
