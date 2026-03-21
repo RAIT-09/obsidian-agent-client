@@ -1,7 +1,6 @@
 import * as React from "react";
 const { useState, useRef, useEffect, useCallback, useMemo } = React;
 import { createRoot, type Root } from "react-dom/client";
-import { Notice } from "obsidian";
 
 import type AgentClientPlugin from "../plugin";
 import type {
@@ -9,15 +8,18 @@ import type {
 	ChatViewType,
 } from "../services/view-registry";
 import type { ChatInputState } from "../types/chat";
-import type { IChatViewHost } from "./types";
+
+// Context imports
+import { ChatContextProvider } from "./ChatContext";
 
 // Component imports
-import { MessageList } from "./MessageList";
-import { InputArea } from "./InputArea";
-import { ChatHeader } from "./ChatHeader";
+import { ChatPanel, type ChatPanelCallbacks } from "./ChatPanel";
+
+// Service imports
+import { VaultService } from "../services/vault-service";
 
 // Hooks imports
-import { useChatController } from "../hooks/useChatController";
+import { useSettings } from "../hooks/useSettings";
 
 // ============================================================
 // Helpers
@@ -36,42 +38,6 @@ function clampPosition(
 }
 
 // ============================================================
-// Type Definitions
-// ============================================================
-
-/**
- * Callbacks for FloatingViewContainer to access React component state.
- * These enable the container to implement IChatViewContainer by delegating
- * to the React component's state and handlers.
- */
-interface FloatingViewCallbacks {
-	getDisplayName: () => string;
-	getInputState: () => ChatInputState | null;
-	setInputState: (state: ChatInputState) => void;
-	canSend: () => boolean;
-	sendMessage: () => Promise<boolean>;
-	cancelOperation: () => Promise<void>;
-	focus: () => void;
-	hasFocus: () => boolean;
-	expand: () => void;
-	collapse: () => void;
-}
-
-/**
- * Tracked listener for cleanup on unmount.
- * Uses union type to match IChatViewHost's overloaded registerDomEvent signatures.
- *
- * Note: options is not tracked because current usage sites do not use options.
- * If future code uses options (e.g., { capture: true }), the cleanup will not
- * work correctly. This is acceptable as current usage does not require options.
- */
-interface RegisteredListener {
-	target: Window | Document | HTMLElement;
-	type: string;
-	callback: EventListenerOrEventListenerObject;
-}
-
-// ============================================================
 // FloatingViewContainer Class
 // ============================================================
 
@@ -87,11 +53,13 @@ export class FloatingViewContainer implements IChatViewContainer {
 	private plugin: AgentClientPlugin;
 	private root: Root | null = null;
 	private containerEl: HTMLElement;
-	private callbacks: FloatingViewCallbacks | null = null;
+	private callbacks: ChatPanelCallbacks | null = null;
+	private isExpandedState = false;
+	private containerRefEl: HTMLElement | null = null;
 
 	constructor(plugin: AgentClientPlugin, instanceId: string) {
 		this.plugin = plugin;
-		// viewId format: "floating-chat-{instanceId}" to match useChatController's adapter key
+		// viewId format: "floating-chat-{instanceId}" to match adapter key
 		this.viewId = `floating-chat-${instanceId}`;
 		this.containerEl = document.body.createDiv({
 			cls: "agent-client-floating-view-root",
@@ -114,6 +82,12 @@ export class FloatingViewContainer implements IChatViewContainer {
 				initialPosition={initialPosition}
 				onRegisterCallbacks={(cbs) => {
 					this.callbacks = cbs;
+				}}
+				onExpandedChange={(expanded) => {
+					this.isExpandedState = expanded;
+				}}
+				onContainerRef={(el) => {
+					this.containerRefEl = el;
 				}}
 			/>,
 		);
@@ -153,19 +127,50 @@ export class FloatingViewContainer implements IChatViewContainer {
 
 	focus(): void {
 		// Expand if collapsed, then focus
-		this.callbacks?.focus();
+		if (!this.isExpandedState) {
+			// Dispatch expand event
+			window.dispatchEvent(
+				new CustomEvent("agent-client:expand-floating-chat", {
+					detail: { viewId: this.viewId },
+				}),
+			);
+		}
+		// Focus after next render (expansion may need a frame)
+		requestAnimationFrame(() => {
+			const textarea = this.containerRefEl?.querySelector(
+				"textarea.agent-client-chat-input-textarea",
+			);
+			if (textarea instanceof HTMLTextAreaElement) {
+				textarea.focus();
+			}
+		});
 	}
 
 	hasFocus(): boolean {
-		return this.callbacks?.hasFocus() ?? false;
+		return (
+			this.isExpandedState &&
+			(this.containerRefEl?.contains(document.activeElement) ?? false)
+		);
 	}
 
 	expand(): void {
-		this.callbacks?.expand();
+		if (!this.isExpandedState) {
+			window.dispatchEvent(
+				new CustomEvent("agent-client:expand-floating-chat", {
+					detail: { viewId: this.viewId },
+				}),
+			);
+		}
 	}
 
 	collapse(): void {
-		this.callbacks?.collapse();
+		if (this.isExpandedState) {
+			window.dispatchEvent(
+				new CustomEvent("agent-client:collapse-floating-chat", {
+					detail: { viewId: this.viewId },
+				}),
+			);
+		}
 	}
 
 	getInputState(): ChatInputState | null {
@@ -199,10 +204,12 @@ export class FloatingViewContainer implements IChatViewContainer {
 
 interface FloatingChatComponentProps {
 	plugin: AgentClientPlugin;
-	viewId: string; // Full viewId passed from FloatingViewContainer
+	viewId: string;
 	initialExpanded?: boolean;
 	initialPosition?: { x: number; y: number };
-	onRegisterCallbacks?: (callbacks: FloatingViewCallbacks) => void;
+	onRegisterCallbacks?: (callbacks: ChatPanelCallbacks) => void;
+	onExpandedChange?: (expanded: boolean) => void;
+	onContainerRef?: (el: HTMLDivElement | null) => void;
 }
 
 function FloatingChatComponent({
@@ -211,56 +218,45 @@ function FloatingChatComponent({
 	initialExpanded = false,
 	initialPosition,
 	onRegisterCallbacks,
+	onExpandedChange,
+	onContainerRef,
 }: FloatingChatComponentProps) {
 	// ============================================================
-	// Chat Controller Hook (Centralized Logic)
+	// Services (owned by FloatingViewContainer, created here for context)
 	// ============================================================
-	const controller = useChatController({
-		plugin,
-		viewId, // Use viewId prop directly (already in "floating-chat-{id}" format)
-		workingDirectory: undefined, // Let hook determine from vault
-	});
+	const acpClient = useMemo(
+		() => plugin.getOrCreateAdapter(viewId),
+		[plugin, viewId],
+	);
 
-	const {
-		terminalClient,
-		settings,
-		session,
-		isSessionReady,
-		messages,
-		isSending,
-		isUpdateAvailable,
-		permission,
-		mentions,
-		slashCommands,
-		sessionHistory,
-		activeAgentLabel,
-		availableAgents,
-		errorInfo,
-		agentUpdateNotification,
-		handleSendMessage,
-		handleStopGeneration,
-		handleNewChat,
-		handleExportChat,
-		handleSwitchAgent,
-		handleRestartAgent,
-		handleClearError,
-		handleClearAgentUpdate,
-		handleOpenHistory,
-		handleSetMode,
-		handleSetModel,
-		handleSetConfigOption,
-		inputValue,
-		setInputValue,
-		attachedFiles,
-		setAttachedFiles,
-		restoredMessage,
-		handleRestoredMessageConsumed,
-	} = controller;
+	const vaultService = useMemo(() => new VaultService(plugin), [plugin]);
+
+	// Cleanup VaultService when component unmounts
+	useEffect(() => {
+		return () => {
+			vaultService.destroy();
+		};
+	}, [vaultService]);
+
+	// ============================================================
+	// Context Value
+	// ============================================================
+	const contextValue = useMemo(
+		() => ({
+			plugin,
+			acpClient,
+			vaultService,
+			settingsService: plugin.settingsService,
+		}),
+		[plugin, acpClient, vaultService],
+	);
 
 	// ============================================================
 	// UI State (View-Specific)
 	// ============================================================
+	const settings = useSettings(plugin);
 	const [isExpanded, setIsExpanded] = useState(initialExpanded);
+	const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
 	const [size, setSize] = useState(settings.floatingWindowSize);
 	const [position, setPosition] = useState(() => {
 		if (initialPosition) {
@@ -290,43 +286,20 @@ function FloatingChatComponent({
 	const dragOffset = useRef({ x: 0, y: 0 });
 	const containerRef = useRef<HTMLDivElement>(null);
 
-	const terminalClientRef = useRef(terminalClient);
-
-	// Track registered listeners for cleanup
-	const registeredListenersRef = useRef<RegisteredListener[]>([]);
-
-	// IChatViewHost implementation with listener tracking
-	// Type assertion is used because the implementation handles all overload cases uniformly
-	const viewHost: IChatViewHost = useMemo(
-		() => ({
-			app: plugin.app,
-			registerDomEvent: ((
-				target: Window | Document | HTMLElement,
-				type: string,
-				callback: EventListenerOrEventListenerObject,
-			) => {
-				target.addEventListener(type, callback);
-				// Track for cleanup on unmount
-				// Note: options is not tracked (see RegisteredListener comment)
-				registeredListenersRef.current.push({ target, type, callback });
-			}) as IChatViewHost["registerDomEvent"],
-		}),
-		[plugin.app],
-	);
-
-	// Cleanup registered listeners on unmount
+	// Expose container element for ChatPanel focus tracking
 	useEffect(() => {
-		return () => {
-			for (const {
-				target,
-				type,
-				callback,
-			} of registeredListenersRef.current) {
-				target.removeEventListener(type, callback);
-			}
-			registeredListenersRef.current = [];
-		};
+		setContainerEl(containerRef.current);
 	}, []);
+
+	// Notify parent of expanded state changes
+	useEffect(() => {
+		onExpandedChange?.(isExpanded);
+	}, [isExpanded, onExpandedChange]);
+
+	// Notify parent of container ref
+	useEffect(() => {
+		onContainerRef?.(containerRef.current);
+	}, [onContainerRef, isExpanded]); // re-notify when expanded changes (containerRef may change)
 
 	// Handlers for window management
 	const handleOpenNewFloatingChat = useCallback(() => {
@@ -368,6 +341,28 @@ function FloatingChatComponent({
 			window.removeEventListener(
 				"agent-client:expand-floating-chat" as never,
 				handleExpandRequest as EventListener,
+			);
+		};
+	}, [viewId]);
+
+	// Listen for collapse requests
+	useEffect(() => {
+		const handleCollapseRequest = (
+			event: CustomEvent<{ viewId: string }>,
+		) => {
+			if (event.detail.viewId === viewId) {
+				setIsExpanded(false);
+			}
+		};
+
+		window.addEventListener(
+			"agent-client:collapse-floating-chat" as never,
+			handleCollapseRequest as EventListener,
+		);
+		return () => {
+			window.removeEventListener(
+				"agent-client:collapse-floating-chat" as never,
+				handleCollapseRequest as EventListener,
 			);
 		};
 	}, [viewId]);
@@ -478,274 +473,8 @@ function FloatingChatComponent({
 	}, [isDragging, size.width, size.height]);
 
 	// ============================================================
-	// Callback Registration for IChatViewContainer
-	// ============================================================
-	// Register callbacks for FloatingViewContainer to access React component state
-	// These must match ChatView's sendMessageForBroadcast/canSendForBroadcast functionality
-	useEffect(() => {
-		if (onRegisterCallbacks) {
-			onRegisterCallbacks({
-				getDisplayName: () => activeAgentLabel,
-				getInputState: () => ({
-					text: inputValue,
-					files: attachedFiles,
-				}),
-				setInputState: (state) => {
-					setInputValue(state.text);
-					setAttachedFiles(state.files);
-				},
-				// Match ChatView.canSendForBroadcast exactly
-				canSend: () => {
-					const hasContent =
-						inputValue.trim() !== "" || attachedFiles.length > 0;
-					return (
-						hasContent &&
-						isSessionReady &&
-						!sessionHistory.loading &&
-						!isSending
-					);
-				},
-				// Match ChatView.sendMessageForBroadcast exactly
-				sendMessage: async () => {
-					// Allow sending if there's text OR attachments
-					if (!inputValue.trim() && attachedFiles.length === 0) {
-						return false;
-					}
-					if (!isSessionReady || sessionHistory.loading) {
-						return false;
-					}
-					if (isSending) {
-						return false;
-					}
-
-					// Clear input before sending
-					const messageToSend = inputValue.trim();
-					const filesToSend =
-						attachedFiles.length > 0
-							? [...attachedFiles]
-							: undefined;
-					setInputValue("");
-					setAttachedFiles([]);
-
-					await handleSendMessage(messageToSend, filesToSend);
-					return true;
-				},
-				cancelOperation: handleStopGeneration,
-				// Focus with auto-expand
-				focus: () => {
-					// Expand if collapsed
-					if (!isExpanded) {
-						setIsExpanded(true);
-					}
-					// Focus after next render (expansion may need a frame)
-					requestAnimationFrame(() => {
-						const textarea = containerRef.current?.querySelector(
-							"textarea.agent-client-chat-input-textarea",
-						);
-						if (textarea instanceof HTMLTextAreaElement) {
-							textarea.focus();
-						}
-					});
-				},
-				hasFocus: () =>
-					isExpanded &&
-					(containerRef.current?.contains(document.activeElement) ??
-						false),
-				expand: () => {
-					setIsExpanded(true);
-				},
-				collapse: () => {
-					setIsExpanded(false);
-				},
-			});
-		}
-	}, [
-		onRegisterCallbacks,
-		activeAgentLabel,
-		inputValue,
-		attachedFiles,
-		isSessionReady,
-		isSending,
-		sessionHistory.loading,
-		isExpanded,
-		handleSendMessage,
-		handleStopGeneration,
-	]);
-
-	// ============================================================
-	// Workspace Events (Hotkeys) - same as ChatView.ChatComponent
-	// ============================================================
-
-	// 1. Toggle auto-mention
-	useEffect(() => {
-		const workspace = plugin.app.workspace;
-		type CustomEventCallback = (targetViewId?: string) => void;
-
-		const eventRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on("agent-client:toggle-auto-mention", (targetViewId?: string) => {
-			if (targetViewId && targetViewId !== viewId) return;
-			mentions.toggleAutoMention();
-		});
-
-		return () => {
-			workspace.offref(eventRef);
-		};
-	}, [plugin.app.workspace, mentions.toggleAutoMention, viewId]);
-
-	// 2. New chat requested (from "New chat with [Agent]" command)
-	useEffect(() => {
-		const workspace = plugin.app.workspace;
-
-		const eventRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: (agentId?: string) => void,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on("agent-client:new-chat-requested", (agentId?: string) => {
-			// Only respond if we are the last active view
-			if (
-				plugin.lastActiveChatViewId &&
-				plugin.lastActiveChatViewId !== viewId
-			) {
-				return;
-			}
-			void handleNewChat(agentId);
-		});
-
-		return () => {
-			workspace.offref(eventRef);
-		};
-	}, [
-		plugin.app.workspace,
-		plugin.lastActiveChatViewId,
-		handleNewChat,
-		viewId,
-	]);
-
-	// 3. Permission commands
-	useEffect(() => {
-		const workspace = plugin.app.workspace;
-		type CustomEventCallback = (targetViewId?: string) => void;
-
-		const approveRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on(
-			"agent-client:approve-active-permission",
-			(targetViewId?: string) => {
-				if (targetViewId && targetViewId !== viewId) return;
-				void (async () => {
-					const success = await permission.approveActivePermission();
-					if (!success) {
-						new Notice(
-							"[Agent Client] No active permission request",
-						);
-					}
-				})();
-			},
-		);
-
-		const rejectRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on(
-			"agent-client:reject-active-permission",
-			(targetViewId?: string) => {
-				if (targetViewId && targetViewId !== viewId) return;
-				void (async () => {
-					const success = await permission.rejectActivePermission();
-					if (!success) {
-						new Notice(
-							"[Agent Client] No active permission request",
-						);
-					}
-				})();
-			},
-		);
-
-		const cancelRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on("agent-client:cancel-message", (targetViewId?: string) => {
-			if (targetViewId && targetViewId !== viewId) return;
-			void handleStopGeneration();
-		});
-
-		const exportRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on("agent-client:export-chat", (targetViewId?: string) => {
-			if (targetViewId && targetViewId !== viewId) return;
-			void handleExportChat();
-		});
-
-		return () => {
-			workspace.offref(approveRef);
-			workspace.offref(rejectRef);
-			workspace.offref(cancelRef);
-			workspace.offref(exportRef);
-		};
-	}, [
-		plugin.app.workspace,
-		permission.approveActivePermission,
-		permission.rejectActivePermission,
-		handleStopGeneration,
-		handleExportChat,
-		viewId,
-	]);
-
-	// ============================================================
-	// Focus Tracking (same as ChatView)
-	// ============================================================
-	useEffect(() => {
-		const handleFocus = () => {
-			plugin.setLastActiveChatViewId(viewId);
-		};
-
-		const container = containerRef.current;
-		if (!container) return;
-
-		container.addEventListener("focus", handleFocus, true);
-		container.addEventListener("click", handleFocus);
-
-		// Set as active on mount
-		plugin.setLastActiveChatViewId(viewId);
-
-		return () => {
-			container.removeEventListener("focus", handleFocus, true);
-			container.removeEventListener("click", handleFocus);
-		};
-	}, [plugin, viewId, isExpanded]);
-
-	// ============================================================
 	// Render
 	// ============================================================
-	if (!isExpanded) return null;
-
 	return (
 		<div
 			ref={containerRef}
@@ -755,88 +484,25 @@ function FloatingChatComponent({
 				top: position.y,
 				width: size.width,
 				height: size.height,
+				display: isExpanded ? undefined : "none",
 			}}
 		>
-			<div
-				className="agent-client-floating-header"
-				onMouseDown={onMouseDown}
-			>
-				<ChatHeader
+			<ChatContextProvider value={contextValue}>
+				<ChatPanel
 					variant="floating"
-					agentLabel={activeAgentLabel}
-					availableAgents={availableAgents}
-					currentAgentId={session.agentId}
-					isUpdateAvailable={isUpdateAvailable}
-					hasMessages={messages.length > 0}
-					onAgentChange={(agentId) => void handleSwitchAgent(agentId)}
-					onNewSession={() => void handleNewChat()}
-					onOpenHistory={() => void handleOpenHistory()}
-					onExportChat={() => void handleExportChat()}
-					onRestartAgent={() => void handleRestartAgent()}
-					onOpenNewWindow={handleOpenNewFloatingChat}
+					viewId={viewId}
+					onRegisterCallbacks={onRegisterCallbacks}
 					onMinimize={handleMinimizeWindow}
 					onClose={handleCloseWindow}
+					onOpenNewWindow={handleOpenNewFloatingChat}
+					onFloatingHeaderMouseDown={onMouseDown}
+					containerEl={containerEl}
 				/>
-			</div>
-
-			<div className="agent-client-floating-content">
-				<div className="agent-client-floating-messages-container">
-					<MessageList
-						messages={messages}
-						isSending={isSending}
-						isSessionReady={isSessionReady}
-						isRestoringSession={sessionHistory.loading}
-						agentLabel={activeAgentLabel}
-						plugin={plugin}
-						view={viewHost}
-						terminalClient={terminalClientRef.current}
-						onApprovePermission={permission.approvePermission}
-						hasActivePermission={
-							permission.activePermission != null
-						}
-					/>
-				</div>
-
-				<InputArea
-					isSending={isSending}
-					isSessionReady={isSessionReady}
-					isRestoringSession={sessionHistory.loading}
-					agentLabel={activeAgentLabel}
-					availableCommands={session.availableCommands || []}
-					autoMentionEnabled={settings.autoMentionActiveNote}
-					restoredMessage={restoredMessage}
-					mentions={mentions}
-					slashCommands={slashCommands}
-					plugin={plugin}
-					view={viewHost}
-					onSendMessage={handleSendMessage}
-					onStopGeneration={handleStopGeneration}
-					onRestoredMessageConsumed={handleRestoredMessageConsumed}
-					modes={session.modes}
-					onModeChange={(modeId) => void handleSetMode(modeId)}
-					models={session.models}
-					onModelChange={(modelId) => void handleSetModel(modelId)}
-					configOptions={session.configOptions}
-					onConfigOptionChange={(configId, value) =>
-						void handleSetConfigOption(configId, value)
-					}
-					usage={session.usage}
-					supportsImages={session.promptCapabilities?.image ?? false}
-					agentId={session.agentId}
-					inputValue={inputValue}
-					onInputChange={setInputValue}
-					attachedFiles={attachedFiles}
-					onAttachedFilesChange={setAttachedFiles}
-					errorInfo={errorInfo}
-					onClearError={handleClearError}
-					agentUpdateNotification={agentUpdateNotification}
-					onClearAgentUpdate={handleClearAgentUpdate}
-					messages={messages}
-				/>
-			</div>
+			</ChatContextProvider>
 		</div>
 	);
 }
+
 /**
  * Create a new floating chat view.
  * @param plugin - The plugin instance

@@ -1,26 +1,28 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Notice, FileSystemAdapter, Platform } from "obsidian";
+import * as React from "react";
+const { useState, useRef, useEffect, useMemo, useCallback } = React;
+import { Notice, FileSystemAdapter, Platform, Menu, type MenuItem } from "obsidian";
 
-import type AgentClientPlugin from "../plugin";
-import type { AttachedFile } from "../types/chat";
-import { SessionHistoryModal } from "../ui/SessionHistoryModal";
+import type { AttachedFile, ChatInputState } from "../types/chat";
+import { SessionHistoryModal } from "./SessionHistoryModal";
 
 // Service imports
-import { getLogger, Logger } from "../utils/logger";
+import { getLogger } from "../utils/logger";
 import { ChatExporter } from "../services/chat-exporter";
 
 // Adapter imports
-import { VaultService } from "../services/vault-service";
 import type { ITerminalClient } from "../acp/acp-client";
 
+// Context imports
+import { useChatContext } from "./ChatContext";
+
 // Hooks imports
-import { useSettings } from "./useSettings";
-import { useMentions } from "./useMentions";
-import { useSlashCommands } from "./useSlashCommands";
-import { useSession } from "./useSession";
-import { useMessages } from "./useMessages";
-import { usePermission } from "./usePermission";
-import { useSessionHistory } from "./useSessionHistory";
+import { useSettings } from "../hooks/useSettings";
+import { useMentions } from "../hooks/useMentions";
+import { useSlashCommands } from "../hooks/useSlashCommands";
+import { useSession } from "../hooks/useSession";
+import { useMessages } from "../hooks/useMessages";
+import { usePermission } from "../hooks/usePermission";
+import { useSessionHistory } from "../hooks/useSessionHistory";
 
 // Domain model imports
 import type {
@@ -41,6 +43,12 @@ import { convertWindowsPathToWsl } from "../utils/platform";
 import type { AgentUpdateNotification } from "../services/update-checker";
 import { checkAgentUpdate } from "../services/update-checker";
 
+// Component imports
+import { ChatHeader } from "./ChatHeader";
+import { MessageList } from "./MessageList";
+import { InputArea } from "./InputArea";
+import type { IChatViewHost } from "./types";
+
 function flattenConfigSelectOptions(
 	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],
 ): SessionConfigSelectOption[] {
@@ -49,94 +57,102 @@ function flattenConfigSelectOptions(
 	return (options as SessionConfigSelectGroup[]).flatMap((g) => g.options);
 }
 
-// Agent info for display (from plugin.getAvailableAgents())
-interface AgentInfo {
-	id: string;
-	displayName: string;
+// ============================================================================
+// ChatPanelCallbacks - interface for class-level delegation
+// ============================================================================
+
+/**
+ * Callbacks that ChatPanel registers with its parent container class.
+ * Used by ChatView / FloatingViewContainer to implement IChatViewContainer
+ * by delegating to the React component's state and handlers.
+ */
+export interface ChatPanelCallbacks {
+	getDisplayName: () => string;
+	getInputState: () => ChatInputState | null;
+	setInputState: (state: ChatInputState) => void;
+	canSend: () => boolean;
+	sendMessage: () => Promise<boolean>;
+	cancelOperation: () => Promise<void>;
 }
 
-export interface UseChatControllerOptions {
-	plugin: AgentClientPlugin;
+// ============================================================================
+// ChatPanelProps
+// ============================================================================
+
+export interface ChatPanelProps {
+	variant: "sidebar" | "floating";
 	viewId: string;
 	workingDirectory?: string;
 	initialAgentId?: string;
-	// TODO(code-block): Configuration for future code block chat view
-	config?: {
-		agent?: string;
-		model?: string;
+	config?: { agent?: string; model?: string };
+	onRegisterCallbacks?: (callbacks: ChatPanelCallbacks) => void;
+	/** Called when agent ID changes (sidebar only — persists in Obsidian state) */
+	onAgentIdChanged?: (agentId: string) => void;
+	// Floating-specific
+	onMinimize?: () => void;
+	onClose?: () => void;
+	onOpenNewWindow?: () => void;
+	/** Mouse down handler for floating header drag area */
+	onFloatingHeaderMouseDown?: (e: React.MouseEvent) => void;
+	// Sidebar-specific: Obsidian view host for DOM event registration
+	viewHost?: IChatViewHost;
+	/** External container element for focus tracking (floating uses parent's container) */
+	containerEl?: HTMLElement | null;
+}
+
+// ============================================================================
+// State Definitions
+// ============================================================================
+
+// Type definitions for Obsidian internal APIs (sidebar menu)
+interface AppWithSettings {
+	setting: {
+		open: () => void;
+		openTabById: (id: string) => void;
 	};
 }
 
-export interface UseChatControllerReturn {
-	// Memoized services/adapters
-	logger: Logger;
-	vaultPath: string;
-	terminalClient: ITerminalClient;
-	vaultService: VaultService;
+// Custom event type with targetViewId parameter
+type CustomEventCallback = (targetViewId?: string) => void;
 
-	// Settings & State
-	settings: ReturnType<typeof useSettings>;
-	session: ReturnType<typeof useSession>["session"];
-	isSessionReady: boolean;
-	messages: ReturnType<typeof useMessages>["messages"];
-	isSending: boolean;
-	isUpdateAvailable: boolean;
-	isLoadingSessionHistory: boolean;
+// ============================================================================
+// ChatPanel Component
+// ============================================================================
 
-	// Hook returns
-	permission: ReturnType<typeof usePermission>;
-	mentions: ReturnType<typeof useMentions>;
-	slashCommands: ReturnType<typeof useSlashCommands>;
-	sessionHistory: ReturnType<typeof useSessionHistory>;
-	exportChat: (
-		messages: ChatMessage[],
-		session: ChatSession,
-	) => Promise<string | null>;
+/**
+ * Core chat panel component that encapsulates all chat logic.
+ *
+ * This is the single source of truth for chat state and behavior,
+ * shared between sidebar (ChatView) and floating (FloatingChatView) variants.
+ * It is a 1:1 migration of useChatController into a React component,
+ * with workspace event handlers moved from ChatComponent/FloatingChatComponent.
+ */
+export function ChatPanel({
+	variant,
+	viewId,
+	workingDirectory,
+	initialAgentId,
+	config,
+	onRegisterCallbacks,
+	onAgentIdChanged,
+	onMinimize,
+	onClose,
+	onOpenNewWindow,
+	onFloatingHeaderMouseDown,
+	viewHost: viewHostProp,
+	containerEl: containerElProp,
+}: ChatPanelProps) {
+	// ============================================================
+	// Platform Check
+	// ============================================================
+	if (!Platform.isDesktopApp) {
+		throw new Error("Agent Client is only available on desktop");
+	}
 
-	// Computed values
-	activeAgentLabel: string;
-	availableAgents: AgentInfo[];
-	errorInfo:
-		| ReturnType<typeof useMessages>["errorInfo"]
-		| ReturnType<typeof useSession>["errorInfo"];
-	agentUpdateNotification: AgentUpdateNotification | null;
-
-	// Core callbacks
-	handleSendMessage: (
-		content: string,
-		attachments?: AttachedFile[],
-	) => Promise<void>;
-	handleStopGeneration: () => Promise<void>;
-	handleNewChat: (requestedAgentId?: string) => Promise<void>;
-	handleExportChat: () => Promise<void>;
-	handleSwitchAgent: (agentId: string) => Promise<void>;
-	handleRestartAgent: () => Promise<void>;
-	handleClearError: () => void;
-	handleClearAgentUpdate: () => void;
-	handleRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
-	handleForkSession: (sessionId: string, cwd: string) => Promise<void>;
-	handleDeleteSession: (sessionId: string) => Promise<void>;
-	handleOpenHistory: () => void;
-	handleSetMode: (modeId: string) => Promise<void>;
-	handleSetModel: (modelId: string) => Promise<void>;
-	handleSetConfigOption: (configId: string, value: string) => Promise<void>;
-
-	// Input state (for broadcast commands - sidebar only)
-	inputValue: string;
-	setInputValue: (value: string) => void;
-	attachedFiles: AttachedFile[];
-	setAttachedFiles: (files: AttachedFile[]) => void;
-	restoredMessage: string | null;
-	handleRestoredMessageConsumed: () => void;
-
-	// History modal management
-	historyModalRef: React.RefObject<SessionHistoryModal | null>;
-}
-
-export function useChatController(
-	options: UseChatControllerOptions,
-): UseChatControllerReturn {
-	const { plugin, viewId, initialAgentId, config } = options;
+	// ============================================================
+	// Context
+	// ============================================================
+	const { plugin, acpClient, vaultService } = useChatContext();
 
 	// ============================================================
 	// Memoized Services & Adapters
@@ -144,8 +160,8 @@ export function useChatController(
 	const logger = getLogger();
 
 	const vaultPath = useMemo(() => {
-		if (options.workingDirectory) {
-			return options.workingDirectory;
+		if (workingDirectory) {
+			return workingDirectory;
 		}
 		const adapter = plugin.app.vault.adapter;
 		if (adapter instanceof FileSystemAdapter) {
@@ -153,21 +169,7 @@ export function useChatController(
 		}
 		// Fallback for non-FileSystemAdapter (e.g., mobile)
 		return process.cwd();
-	}, [plugin, options.workingDirectory]);
-
-	const vaultService = useMemo(() => new VaultService(plugin), [plugin]);
-
-	// Cleanup VaultService when component unmounts
-	useEffect(() => {
-		return () => {
-			vaultService.destroy();
-		};
-	}, [vaultService]);
-
-	const acpAdapter = useMemo(
-		() => plugin.getOrCreateAdapter(viewId),
-		[plugin, viewId],
-	);
+	}, [plugin, workingDirectory]);
 
 	// ============================================================
 	// Custom Hooks
@@ -175,7 +177,7 @@ export function useChatController(
 	const settings = useSettings(plugin);
 
 	const agentSession = useSession(
-		acpAdapter,
+		acpClient,
 		plugin.settingsService,
 		vaultPath,
 		initialAgentId,
@@ -188,7 +190,7 @@ export function useChatController(
 	} = agentSession;
 
 	const chatMessages = useMessages(
-		acpAdapter,
+		acpClient,
 		vaultService,
 		vaultService,
 		{
@@ -205,10 +207,10 @@ export function useChatController(
 
 	const { messages, isSending } = chatMessages;
 
-	const permission = usePermission(acpAdapter, messages);
+	const permission = usePermission(acpClient, messages);
 
 	const mentions = useMentions(vaultService, plugin);
-	
+
 	const slashCommands = useSlashCommands(
 		session.availableCommands || [],
 		mentions.toggleAutoMention,
@@ -255,33 +257,6 @@ export function useChatController(
 		[plugin, logger],
 	);
 
-	const exportChat = useCallback(
-		async (
-			exportMessages: ChatMessage[],
-			exportSession: ChatSession,
-		): Promise<string | null> => {
-			if (exportMessages.length === 0) return null;
-			if (!exportSession.sessionId) return null;
-			try {
-				const exporter = new ChatExporter(plugin);
-				const openFile =
-					plugin.settings.exportSettings.openFileAfterExport;
-				return await exporter.exportToMarkdown(
-					exportMessages,
-					exportSession.agentDisplayName,
-					exportSession.agentId,
-					exportSession.sessionId,
-					exportSession.createdAt,
-					openFile,
-				);
-			} catch (error) {
-				logger.error("Export failed:", error);
-				throw error;
-			}
-		},
-		[plugin, logger],
-	);
-
 	// Session history hook with callback for session load
 	const handleSessionLoad = useCallback(
 		(
@@ -291,7 +266,7 @@ export function useChatController(
 			configOptions?: SessionConfigOption[],
 		) => {
 			logger.log(
-				`[useChatController] Session loaded/resumed/forked: ${sessionId}`,
+				`[ChatPanel] Session loaded/resumed/forked: ${sessionId}`,
 				{
 					modes,
 					models,
@@ -313,7 +288,7 @@ export function useChatController(
 
 	const handleLoadStart = useCallback(() => {
 		logger.log(
-			"[useChatController] session/load started, ignoring history replay",
+			"[ChatPanel] session/load started, ignoring history replay",
 		);
 		setIsLoadingSessionHistory(true);
 		chatMessages.clearMessages();
@@ -321,13 +296,13 @@ export function useChatController(
 
 	const handleLoadEnd = useCallback(() => {
 		logger.log(
-			"[useChatController] session/load ended, resuming normal processing",
+			"[ChatPanel] session/load ended, resuming normal processing",
 		);
 		setIsLoadingSessionHistory(false);
 	}, [logger]);
 
 	const sessionHistory = useSessionHistory({
-		agentClient: acpAdapter,
+		agentClient: acpClient,
 		session,
 		settingsAccess: plugin.settingsService,
 		cwd: vaultPath,
@@ -349,7 +324,7 @@ export function useChatController(
 		useState<AgentUpdateNotification | null>(null);
 	const [restoredMessage, setRestoredMessage] = useState<string | null>(null);
 
-	// Input state (for broadcast commands - sidebar only)
+	// Input state (for broadcast commands)
 	const [inputValue, setInputValue] = useState("");
 	const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 
@@ -357,6 +332,7 @@ export function useChatController(
 	// Refs
 	// ============================================================
 	const historyModalRef = useRef<SessionHistoryModal | null>(null);
+	const terminalClientRef = useRef<ITerminalClient>(acpClient);
 
 	// ============================================================
 	// Computed Values
@@ -450,7 +426,7 @@ export function useChatController(
 					content,
 				);
 				logger.log(
-					`[useChatController] Session saved locally: ${session.sessionId}`,
+					`[ChatPanel] Session saved locally: ${session.sessionId}`,
 				);
 			}
 		},
@@ -556,7 +532,7 @@ export function useChatController(
 	);
 
 	const handleRestartAgent = useCallback(async () => {
-		logger.log("[useChatController] Restarting agent process...");
+		logger.log("[ChatPanel] Restarting agent process...");
 
 		// Auto-export current chat before restart (if has messages)
 		if (messages.length > 0) {
@@ -594,7 +570,7 @@ export function useChatController(
 		async (sessionId: string, cwd: string) => {
 			try {
 				logger.log(
-					`[useChatController] Restoring session: ${sessionId}`,
+					`[ChatPanel] Restoring session: ${sessionId}`,
 				);
 				chatMessages.clearMessages();
 				await sessionHistory.restoreSession(sessionId, cwd);
@@ -610,7 +586,7 @@ export function useChatController(
 	const handleForkSession = useCallback(
 		async (sessionId: string, cwd: string) => {
 			try {
-				logger.log(`[useChatController] Forking session: ${sessionId}`);
+				logger.log(`[ChatPanel] Forking session: ${sessionId}`);
 				chatMessages.clearMessages();
 				await sessionHistory.forkSession(sessionId, cwd);
 				new Notice("[Agent Client] Session forked");
@@ -626,7 +602,7 @@ export function useChatController(
 		async (sessionId: string) => {
 			try {
 				logger.log(
-					`[useChatController] Deleting session: ${sessionId}`,
+					`[ChatPanel] Deleting session: ${sessionId}`,
 				);
 				await sessionHistory.deleteSession(sessionId);
 				new Notice("[Agent Client] Session deleted");
@@ -708,6 +684,135 @@ export function useChatController(
 		[agentSession],
 	);
 
+	// ============================================================
+	// Sidebar-specific: handleNewChat wrapper that persists agent ID
+	// ============================================================
+	const handleNewChatWithPersist = useCallback(
+		async (requestedAgentId?: string) => {
+			await handleNewChat(requestedAgentId);
+			// Persist agent ID for this view (survives Obsidian restart)
+			if (requestedAgentId) {
+				onAgentIdChanged?.(requestedAgentId);
+			}
+		},
+		[handleNewChat, onAgentIdChanged],
+	);
+
+	// ============================================================
+	// Sidebar-specific: Header Menu (Obsidian native Menu API)
+	// ============================================================
+	const handleOpenSettings = useCallback(() => {
+		const appWithSettings = plugin.app as unknown as AppWithSettings;
+		appWithSettings.setting.open();
+		appWithSettings.setting.openTabById(plugin.manifest.id);
+	}, [plugin]);
+
+	const handleShowMenu = useCallback(
+		(e: React.MouseEvent<HTMLDivElement>) => {
+			const menu = new Menu();
+
+			// -- Switch agent section --
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("Switch agent").setIsLabel(true);
+			});
+
+			for (const agent of availableAgents) {
+				menu.addItem((item: MenuItem) => {
+					item.setTitle(agent.displayName)
+						.setChecked(agent.id === (session.agentId || ""))
+						.onClick(() => {
+							void handleNewChatWithPersist(agent.id);
+						});
+				});
+			}
+
+			menu.addSeparator();
+
+			// -- Actions section --
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("Open new view")
+					.setIcon("plus")
+					.onClick(() => {
+						void plugin.openNewChatViewWithAgent(
+							plugin.settings.defaultAgentId,
+						);
+					});
+			});
+
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("Restart agent")
+					.setIcon("refresh-cw")
+					.onClick(() => {
+						void handleRestartAgent();
+					});
+			});
+
+			menu.addSeparator();
+
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("Plugin settings")
+					.setIcon("settings")
+					.onClick(() => {
+						handleOpenSettings();
+					});
+			});
+
+			menu.showAtMouseEvent(e.nativeEvent);
+		},
+		[
+			availableAgents,
+			session.agentId,
+			handleNewChatWithPersist,
+			plugin,
+			handleRestartAgent,
+			handleOpenSettings,
+		],
+	);
+
+	// ============================================================
+	// viewHost creation for child components
+	// ============================================================
+	// Track registered listeners for cleanup (floating variant)
+	const registeredListenersRef = useRef<
+		{ target: Window | Document | HTMLElement; type: string; callback: EventListenerOrEventListenerObject }[]
+	>([]);
+
+	const viewHost: IChatViewHost = useMemo(() => {
+		// Sidebar: use the provided viewHost from the ChatView class
+		if (viewHostProp) {
+			return viewHostProp;
+		}
+		// Floating: create a shim with listener tracking
+		return {
+			app: plugin.app,
+			registerDomEvent: ((
+				target: Window | Document | HTMLElement,
+				type: string,
+				callback: EventListenerOrEventListenerObject,
+			) => {
+				target.addEventListener(type, callback);
+				registeredListenersRef.current.push({ target, type, callback });
+			}) as IChatViewHost["registerDomEvent"],
+		};
+	}, [viewHostProp, plugin.app]);
+
+	// Cleanup registered listeners on unmount (floating variant)
+	useEffect(() => {
+		return () => {
+			for (const {
+				target,
+				type,
+				callback,
+			} of registeredListenersRef.current) {
+				target.removeEventListener(type, callback);
+			}
+			registeredListenersRef.current = [];
+		};
+	}, []);
+
+	// ============================================================
+	// Effects - History Modal Props Sync
+	// ============================================================
 	// Update modal props when session history state changes
 	useEffect(() => {
 		if (historyModalRef.current) {
@@ -774,7 +879,7 @@ export function useChatController(
 				).some((o) => o.value === config.model);
 				if (valueExists) {
 					logger.log(
-						"[useChatController] Applying configured model via configOptions:",
+						"[ChatPanel] Applying configured model via configOptions:",
 						config.model,
 					);
 					void agentSession.setConfigOption(
@@ -793,7 +898,7 @@ export function useChatController(
 			);
 			if (modelExists && session.models.currentModelId !== config.model) {
 				logger.log(
-					"[useChatController] Applying configured model:",
+					"[ChatPanel] Applying configured model:",
 					config.model,
 				);
 				void agentSession.setModel(config.model);
@@ -823,7 +928,7 @@ export function useChatController(
 	useEffect(() => {
 		return () => {
 			logger.log(
-				"[useChatController] Cleanup: auto-export and close session",
+				"[ChatPanel] Cleanup: auto-export and close session",
 			);
 			void (async () => {
 				await autoExportRef.current(
@@ -841,11 +946,11 @@ export function useChatController(
 	// ============================================================
 	// Register unified session update callback
 	useEffect(() => {
-		acpAdapter.onSessionUpdate((update) => {
+		acpClient.onSessionUpdate((update) => {
 			// Filter by sessionId - ignore updates from old sessions
 			if (session.sessionId && update.sessionId !== session.sessionId) {
 				logger.log(
-					`[useChatController] Ignoring update for old session: ${update.sessionId} (current: ${session.sessionId})`,
+					`[ChatPanel] Ignoring update for old session: ${update.sessionId} (current: ${session.sessionId})`,
 				);
 				return;
 			}
@@ -889,7 +994,7 @@ export function useChatController(
 			}
 		});
 	}, [
-		acpAdapter,
+		acpClient,
 		session.sessionId,
 		logger,
 		isLoadingSessionHistory,
@@ -900,8 +1005,8 @@ export function useChatController(
 
 	// Register updateMessage callback for permission UI updates
 	useEffect(() => {
-		acpAdapter.setUpdateMessageCallback(chatMessages.updateMessage);
-	}, [acpAdapter, chatMessages.updateMessage]);
+		acpClient.setUpdateMessageCallback(chatMessages.updateMessage);
+	}, [acpClient, chatMessages.updateMessage]);
 
 	// ============================================================
 	// Effects - Update Check
@@ -941,7 +1046,7 @@ export function useChatController(
 		const wasSending = prevIsSendingRef.current;
 		prevIsSendingRef.current = isSending;
 
-		// Save when turn ends (isSending: true → false) and has messages
+		// Save when turn ends (isSending: true -> false) and has messages
 		if (
 			wasSending &&
 			!isSending &&
@@ -950,7 +1055,7 @@ export function useChatController(
 		) {
 			sessionHistory.saveSessionMessages(session.sessionId, messages);
 			logger.log(
-				`[useChatController] Session messages saved: ${session.sessionId}`,
+				`[ChatPanel] Session messages saved: ${session.sessionId}`,
 			);
 		}
 	}, [isSending, session.sessionId, messages, sessionHistory, logger]);
@@ -979,63 +1084,408 @@ export function useChatController(
 	}, [mentions.updateActiveNote, vaultService]);
 
 	// ============================================================
-	// Return
+	// Effects - Workspace Events (Hotkeys)
 	// ============================================================
-	return {
-		// Services & Adapters
-		logger,
-		vaultPath,
-		terminalClient: acpAdapter,
-		vaultService,
 
-		// Settings & State
-		settings,
-		session,
-		isSessionReady,
-		messages,
-		isSending,
-		isUpdateAvailable,
-		isLoadingSessionHistory,
+	// 1. Toggle auto-mention
+	useEffect(() => {
+		const workspace = plugin.app.workspace;
 
-		// Hook returns
-		permission,
-		mentions,
-		slashCommands,
-		sessionHistory,
-		exportChat,
+		const eventRef = (
+			workspace as unknown as {
+				on: (
+					name: string,
+					callback: CustomEventCallback,
+				) => ReturnType<typeof workspace.on>;
+			}
+		).on("agent-client:toggle-auto-mention", (targetViewId?: string) => {
+			// Only respond if this view is the target (or no target specified)
+			if (targetViewId && targetViewId !== viewId) {
+				return;
+			}
+			mentions.toggleAutoMention();
+		});
 
-		// Computed values
-		activeAgentLabel,
-		availableAgents,
-		errorInfo,
-		agentUpdateNotification,
+		return () => {
+			workspace.offref(eventRef);
+		};
+	}, [plugin.app.workspace, mentions.toggleAutoMention, viewId]);
 
-		// Core callbacks
-		handleSendMessage,
-		handleStopGeneration,
+	// 2. New chat requested (from "New chat with [Agent]" command)
+	useEffect(() => {
+		const workspace = plugin.app.workspace;
+
+		const eventRef = (
+			workspace as unknown as {
+				on: (
+					name: string,
+					callback: (agentId?: string) => void,
+				) => ReturnType<typeof workspace.on>;
+			}
+		).on("agent-client:new-chat-requested", (agentId?: string) => {
+			// For sidebar variant, only respond if we are the last active view
+			if (
+				variant === "sidebar" &&
+				plugin.lastActiveChatViewId &&
+				plugin.lastActiveChatViewId !== viewId
+			) {
+				return;
+			}
+			// For floating variant, same check
+			if (
+				variant === "floating" &&
+				plugin.lastActiveChatViewId &&
+				plugin.lastActiveChatViewId !== viewId
+			) {
+				return;
+			}
+			if (variant === "sidebar") {
+				void handleNewChatWithPersist(agentId);
+			} else {
+				void handleNewChat(agentId);
+			}
+		});
+
+		return () => {
+			workspace.offref(eventRef);
+		};
+	}, [
+		plugin.app.workspace,
+		plugin.lastActiveChatViewId,
+		handleNewChatWithPersist,
 		handleNewChat,
+		viewId,
+		variant,
+	]);
+
+	// 3. Permission commands + cancel + export
+	useEffect(() => {
+		const workspace = plugin.app.workspace;
+
+		const approveRef = (
+			workspace as unknown as {
+				on: (
+					name: string,
+					callback: CustomEventCallback,
+				) => ReturnType<typeof workspace.on>;
+			}
+		).on(
+			"agent-client:approve-active-permission",
+			(targetViewId?: string) => {
+				// Only respond if this view is the target (or no target specified)
+				if (targetViewId && targetViewId !== viewId) {
+					return;
+				}
+				void (async () => {
+					const success = await permission.approveActivePermission();
+					if (!success) {
+						new Notice(
+							"[Agent Client] No active permission request",
+						);
+					}
+				})();
+			},
+		);
+
+		const rejectRef = (
+			workspace as unknown as {
+				on: (
+					name: string,
+					callback: CustomEventCallback,
+				) => ReturnType<typeof workspace.on>;
+			}
+		).on(
+			"agent-client:reject-active-permission",
+			(targetViewId?: string) => {
+				// Only respond if this view is the target (or no target specified)
+				if (targetViewId && targetViewId !== viewId) {
+					return;
+				}
+				void (async () => {
+					const success = await permission.rejectActivePermission();
+					if (!success) {
+						new Notice(
+							"[Agent Client] No active permission request",
+						);
+					}
+				})();
+			},
+		);
+
+		const cancelRef = (
+			workspace as unknown as {
+				on: (
+					name: string,
+					callback: CustomEventCallback,
+				) => ReturnType<typeof workspace.on>;
+			}
+		).on("agent-client:cancel-message", (targetViewId?: string) => {
+			// Only respond if this view is the target (or no target specified)
+			if (targetViewId && targetViewId !== viewId) {
+				return;
+			}
+			void handleStopGeneration();
+		});
+
+		const exportRef = (
+			workspace as unknown as {
+				on: (
+					name: string,
+					callback: CustomEventCallback,
+				) => ReturnType<typeof workspace.on>;
+			}
+		).on("agent-client:export-chat", (targetViewId?: string) => {
+			// Only respond if this view is the target (or no target specified)
+			if (targetViewId && targetViewId !== viewId) {
+				return;
+			}
+			void handleExportChat();
+		});
+
+		return () => {
+			workspace.offref(approveRef);
+			workspace.offref(rejectRef);
+			workspace.offref(cancelRef);
+			workspace.offref(exportRef);
+		};
+	}, [
+		plugin.app.workspace,
+		permission.approveActivePermission,
+		permission.rejectActivePermission,
+		handleStopGeneration,
 		handleExportChat,
-		handleSwitchAgent,
-		handleRestartAgent,
-		handleClearError,
-		handleClearAgentUpdate,
-		handleRestoreSession,
-		handleForkSession,
-		handleDeleteSession,
-		handleOpenHistory,
-		handleSetMode,
-		handleSetModel,
-		handleSetConfigOption,
+		viewId,
+	]);
 
-		// Input state
-		inputValue,
-		setInputValue,
-		attachedFiles,
-		setAttachedFiles,
-		restoredMessage,
-		handleRestoredMessageConsumed,
+	// ============================================================
+	// Effects - Focus Tracking
+	// ============================================================
+	const containerRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		const handleFocus = () => {
+			plugin.setLastActiveChatViewId(viewId);
+		};
 
-		// History modal management
-		historyModalRef,
-	};
+		const container = containerElProp ?? containerRef.current;
+		if (!container) return;
+
+		container.addEventListener("focus", handleFocus, true);
+		container.addEventListener("click", handleFocus);
+
+		// Set as active on mount (first opened view becomes active)
+		plugin.setLastActiveChatViewId(viewId);
+
+		return () => {
+			container.removeEventListener("focus", handleFocus, true);
+			container.removeEventListener("click", handleFocus);
+		};
+	}, [plugin, viewId, containerElProp]);
+
+	// ============================================================
+	// Callback Registration for IChatViewContainer
+	// ============================================================
+	// Use refs so callbacks always access latest values
+	const inputValueRef = useRef(inputValue);
+	const attachedFilesRef = useRef(attachedFiles);
+	const isSessionReadyRef = useRef(isSessionReady);
+	const isSendingRef = useRef(isSending);
+	const sessionHistoryLoadingRef = useRef(sessionHistory.loading);
+	const handleSendMessageRef = useRef(handleSendMessage);
+	const handleStopGenerationRef = useRef(handleStopGeneration);
+	inputValueRef.current = inputValue;
+	attachedFilesRef.current = attachedFiles;
+	isSessionReadyRef.current = isSessionReady;
+	isSendingRef.current = isSending;
+	sessionHistoryLoadingRef.current = sessionHistory.loading;
+	handleSendMessageRef.current = handleSendMessage;
+	handleStopGenerationRef.current = handleStopGeneration;
+
+	useEffect(() => {
+		onRegisterCallbacks?.({
+			getDisplayName: () => activeAgentLabel,
+			getInputState: () => ({
+				text: inputValueRef.current,
+				files: attachedFilesRef.current,
+			}),
+			setInputState: (state) => {
+				setInputValue(state.text);
+				setAttachedFiles(state.files);
+			},
+			canSend: () => {
+				const hasContent =
+					inputValueRef.current.trim() !== "" ||
+					attachedFilesRef.current.length > 0;
+				return (
+					hasContent &&
+					isSessionReadyRef.current &&
+					!sessionHistoryLoadingRef.current &&
+					!isSendingRef.current
+				);
+			},
+			sendMessage: async () => {
+				const currentInput = inputValueRef.current;
+				const currentFiles = attachedFilesRef.current;
+				// Allow sending if there's text OR attachments
+				if (!currentInput.trim() && currentFiles.length === 0) {
+					return false;
+				}
+				if (
+					!isSessionReadyRef.current ||
+					sessionHistoryLoadingRef.current
+				) {
+					return false;
+				}
+				if (isSendingRef.current) {
+					return false;
+				}
+
+				// Clear input before sending
+				const messageToSend = currentInput.trim();
+				const filesToSend =
+					currentFiles.length > 0 ? [...currentFiles] : undefined;
+				setInputValue("");
+				setAttachedFiles([]);
+
+				await handleSendMessageRef.current(messageToSend, filesToSend);
+				return true;
+			},
+			cancelOperation: async () => {
+				if (isSendingRef.current) {
+					await handleStopGenerationRef.current();
+				}
+			},
+		});
+	}, [onRegisterCallbacks, activeAgentLabel]);
+
+	// ============================================================
+	// Render
+	// ============================================================
+	const chatFontSizeStyle =
+		settings.displaySettings.fontSize !== null
+			? ({
+					"--ac-chat-font-size": `${settings.displaySettings.fontSize}px`,
+				} as React.CSSProperties)
+			: undefined;
+
+	const headerElement =
+		variant === "sidebar" ? (
+			<ChatHeader
+				variant="sidebar"
+				agentLabel={activeAgentLabel}
+				isUpdateAvailable={isUpdateAvailable}
+				hasHistoryCapability={sessionHistory.canShowSessionHistory}
+				onNewChat={() => void handleNewChatWithPersist()}
+				onExportChat={() => void handleExportChat()}
+				onShowMenu={handleShowMenu}
+				onOpenHistory={handleOpenHistory}
+			/>
+		) : (
+			<ChatHeader
+				variant="floating"
+				agentLabel={activeAgentLabel}
+				availableAgents={availableAgents}
+				currentAgentId={session.agentId}
+				isUpdateAvailable={isUpdateAvailable}
+				hasMessages={messages.length > 0}
+				onAgentChange={(agentId) => void handleSwitchAgent(agentId)}
+				onNewSession={() => void handleNewChat()}
+				onOpenHistory={() => void handleOpenHistory()}
+				onExportChat={() => void handleExportChat()}
+				onRestartAgent={() => void handleRestartAgent()}
+				onOpenNewWindow={onOpenNewWindow}
+				onMinimize={onMinimize}
+				onClose={onClose}
+			/>
+		);
+
+	const messageListElement = (
+		<MessageList
+			messages={messages}
+			isSending={isSending}
+			isSessionReady={isSessionReady}
+			isRestoringSession={sessionHistory.loading}
+			agentLabel={activeAgentLabel}
+			plugin={plugin}
+			view={viewHost}
+			terminalClient={terminalClientRef.current}
+			onApprovePermission={permission.approvePermission}
+			hasActivePermission={permission.activePermission != null}
+		/>
+	);
+
+	const inputAreaElement = (
+		<InputArea
+			isSending={isSending}
+			isSessionReady={isSessionReady}
+			isRestoringSession={sessionHistory.loading}
+			agentLabel={activeAgentLabel}
+			availableCommands={session.availableCommands || []}
+			autoMentionEnabled={settings.autoMentionActiveNote}
+			restoredMessage={restoredMessage}
+			mentions={mentions}
+			slashCommands={slashCommands}
+			plugin={plugin}
+			view={viewHost}
+			onSendMessage={handleSendMessage}
+			onStopGeneration={handleStopGeneration}
+			onRestoredMessageConsumed={handleRestoredMessageConsumed}
+			modes={session.modes}
+			onModeChange={(modeId) => void handleSetMode(modeId)}
+			models={session.models}
+			onModelChange={(modelId) => void handleSetModel(modelId)}
+			configOptions={session.configOptions}
+			onConfigOptionChange={(configId, value) =>
+				void handleSetConfigOption(configId, value)
+			}
+			usage={session.usage}
+			supportsImages={session.promptCapabilities?.image ?? false}
+			agentId={session.agentId}
+			// Controlled component props (for broadcast commands)
+			inputValue={inputValue}
+			onInputChange={setInputValue}
+			attachedFiles={attachedFiles}
+			onAttachedFilesChange={setAttachedFiles}
+			// Error overlay props
+			errorInfo={errorInfo}
+			onClearError={handleClearError}
+			// Agent update notification props
+			agentUpdateNotification={agentUpdateNotification}
+			onClearAgentUpdate={handleClearAgentUpdate}
+			messages={messages}
+		/>
+	);
+
+	if (variant === "floating") {
+		// Floating layout: no wrapper div. Parent agent-client-floating-window is the flex container.
+		// Focus tracking uses containerElProp (from FloatingChatView's containerRef).
+		return (
+			<>
+				<div
+					className="agent-client-floating-header"
+					onMouseDown={onFloatingHeaderMouseDown}
+				>
+					{headerElement}
+				</div>
+				<div className="agent-client-floating-content">
+					<div className="agent-client-floating-messages-container">
+						{messageListElement}
+					</div>
+					{inputAreaElement}
+				</div>
+			</>
+		);
+	}
+
+	// Sidebar layout
+	return (
+		<div
+			ref={containerRef}
+			className="agent-client-chat-view-container"
+			style={chatFontSizeStyle}
+		>
+			{headerElement}
+			{messageListElement}
+			{inputAreaElement}
+		</div>
+	);
 }

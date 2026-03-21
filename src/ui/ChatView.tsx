@@ -1,42 +1,29 @@
 import {
 	ItemView,
 	WorkspaceLeaf,
-	Platform,
-	Notice,
-	Menu,
-	type MenuItem,
 } from "obsidian";
 import type {
 	IChatViewContainer,
 	ChatViewType,
 } from "../services/view-registry";
 import * as React from "react";
-const { useState, useRef, useEffect, useCallback } = React;
+const { useState, useEffect, useMemo } = React;
 import { createRoot, Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../plugin";
 import type { ChatInputState } from "../types/chat";
 
-// Component imports
-import { ChatHeader } from "./ChatHeader";
-import { MessageList } from "./MessageList";
-import { InputArea } from "./InputArea";
 // Utility imports
 import { getLogger, Logger } from "../utils/logger";
 
-// Port imports
-import type { ITerminalClient } from "../acp/acp-client";
+// Context imports
+import { ChatContextProvider } from "./ChatContext";
 
-// Hooks imports
-import { useChatController } from "../hooks/useChatController";
+// Component imports
+import { ChatPanel, type ChatPanelCallbacks } from "./ChatPanel";
 
-// Type definitions for Obsidian internal APIs
-interface AppWithSettings {
-	setting: {
-		open: () => void;
-		openTabById: (id: string) => void;
-	};
-}
+// Service imports
+import { VaultService } from "../services/vault-service";
 
 export const VIEW_TYPE_CHAT = "agent-client-chat-view";
 
@@ -50,567 +37,52 @@ function ChatComponent({
 	viewId: string;
 }) {
 	// ============================================================
-	// Platform Check
-	// ============================================================
-	if (!Platform.isDesktopApp) {
-		throw new Error("Agent Client is only available on desktop");
-	}
-
-	// ============================================================
 	// Agent ID State (synced with Obsidian view state)
-	// Must be defined before useChatController to pass as initialAgentId
 	// ============================================================
 	const [restoredAgentId, setRestoredAgentId] = useState<string | undefined>(
 		view.getInitialAgentId() ?? undefined,
 	);
 
 	// ============================================================
-	// Chat Controller Hook (Centralized Logic)
+	// Context Value
 	// ============================================================
-	const controller = useChatController({
-		plugin,
-		viewId,
-		initialAgentId: restoredAgentId,
-	});
-
-	const {
-		logger,
-		terminalClient,
-		settings,
-		session,
-		isSessionReady,
-		messages,
-		isSending,
-		isUpdateAvailable,
-		permission,
-		mentions,
-		slashCommands,
-		sessionHistory,
-		activeAgentLabel,
-		availableAgents,
-		errorInfo,
-		agentUpdateNotification,
-		handleSendMessage,
-		handleStopGeneration,
-		handleNewChat,
-		handleExportChat,
-		handleRestartAgent,
-		handleClearError,
-		handleClearAgentUpdate,
-		handleOpenHistory,
-		handleSetMode,
-		handleSetModel,
-		handleSetConfigOption,
-		inputValue,
-		setInputValue,
-		attachedFiles,
-		setAttachedFiles,
-		restoredMessage,
-		handleRestoredMessageConsumed,
-	} = controller;
+	const contextValue = useMemo(
+		() => ({
+			plugin,
+			acpClient: view.acpClient,
+			vaultService: view.vaultService,
+			settingsService: plugin.settingsService,
+		}),
+		[plugin, view.acpClient, view.vaultService],
+	);
 
 	// ============================================================
 	// Agent ID Restoration (ChatView-specific)
 	// Subscribe to agentId restoration from Obsidian's setState
-	// Note: logger is now available from controller
 	// ============================================================
 	useEffect(() => {
 		const unsubscribe = view.onAgentIdRestored((agentId) => {
-			logger.log(
-				`[ChatView] Agent ID restored from workspace: ${agentId}`,
-			);
 			setRestoredAgentId(agentId);
 		});
 		return unsubscribe;
-	}, [view, logger]);
-
-	// ============================================================
-	// Focus Tracking (ChatView-specific)
-	// ============================================================
-	useEffect(() => {
-		const handleFocus = () => {
-			plugin.setLastActiveChatViewId(viewId);
-		};
-
-		const container = view.containerEl;
-		container.addEventListener("focus", handleFocus, true);
-		container.addEventListener("click", handleFocus);
-
-		// Set as active on mount (first opened view becomes active)
-		plugin.setLastActiveChatViewId(viewId);
-
-		return () => {
-			container.removeEventListener("focus", handleFocus, true);
-			container.removeEventListener("click", handleFocus);
-		};
-	}, [plugin, viewId, view.containerEl]);
-
-	// ============================================================
-	// Refs
-	// ============================================================
-	const terminalClientRef = useRef<ITerminalClient>(terminalClient);
-	/** Track if initial agent restoration has been performed (prevent re-triggering) */
-	const hasRestoredAgentRef = useRef(false);
-
-	// ============================================================
-	// ChatView-specific Callbacks
-	// ============================================================
-
-	// ChatView-specific handleNewChat wrapper (also persists agent ID via view.setAgentId)
-	// If requestedAgentId is provided, use it; otherwise keep the current agent
-	const handleNewChatWithPersist = useCallback(
-		async (requestedAgentId?: string) => {
-			await handleNewChat(requestedAgentId);
-			// Persist agent ID for this view (survives Obsidian restart)
-			// Use requestedAgentId if provided; otherwise current session.agentId (effectively no-op)
-			if (requestedAgentId) {
-				view.setAgentId(requestedAgentId);
-			}
-		},
-		[handleNewChat, view],
-	);
-
-	const handleOpenSettings = useCallback(() => {
-		const appWithSettings = plugin.app as unknown as AppWithSettings;
-		appWithSettings.setting.open();
-		appWithSettings.setting.openTabById(plugin.manifest.id);
-	}, [plugin]);
-
-	// ============================================================
-	// Header Menu (Obsidian native Menu API)
-	// ============================================================
-	const handleShowMenu = useCallback(
-		(e: React.MouseEvent<HTMLDivElement>) => {
-			const menu = new Menu();
-
-			// -- Switch agent section --
-			menu.addItem((item: MenuItem) => {
-				item.setTitle("Switch agent").setIsLabel(true);
-			});
-
-			for (const agent of availableAgents) {
-				menu.addItem((item: MenuItem) => {
-					item.setTitle(agent.displayName)
-						.setChecked(agent.id === (session.agentId || ""))
-						.onClick(() => {
-							void handleNewChatWithPersist(agent.id);
-						});
-				});
-			}
-
-			menu.addSeparator();
-
-			// -- Actions section --
-			menu.addItem((item: MenuItem) => {
-				item.setTitle("Open new view")
-					.setIcon("plus")
-					.onClick(() => {
-						void plugin.openNewChatViewWithAgent(
-							plugin.settings.defaultAgentId,
-						);
-					});
-			});
-
-			menu.addItem((item: MenuItem) => {
-				item.setTitle("Restart agent")
-					.setIcon("refresh-cw")
-					.onClick(() => {
-						void handleRestartAgent();
-					});
-			});
-
-			menu.addSeparator();
-
-			menu.addItem((item: MenuItem) => {
-				item.setTitle("Plugin settings")
-					.setIcon("settings")
-					.onClick(() => {
-						handleOpenSettings();
-					});
-			});
-
-			menu.showAtMouseEvent(e.nativeEvent);
-		},
-		[
-			availableAgents,
-			session.agentId,
-			handleNewChatWithPersist,
-			plugin,
-			handleRestartAgent,
-			handleOpenSettings,
-		],
-	);
-
-	// ============================================================
-	// Agent ID Restoration Effect (ChatView-specific)
-	// ============================================================
-	// Re-create session when agentId is restored from workspace state
-	// This handles the case where setState() is called after onOpen()
-	// Only runs ONCE for initial restoration (prevents re-triggering on agent switch)
-	useEffect(() => {
-		if (hasRestoredAgentRef.current) return;
-		if (!restoredAgentId) return;
-		if (session.state === "initializing") return;
-
-		hasRestoredAgentRef.current = true;
-
-		if (session.agentId === restoredAgentId) return;
-
-		logger.log(
-			`[ChatView] Switching to restored agent: ${restoredAgentId} (current: ${session.agentId})`,
-		);
-		// Note: useChatController handles session creation, but we need to restart
-		// with the correct agent if it differs
-		void handleNewChat(restoredAgentId);
-	}, [
-		restoredAgentId,
-		session.state,
-		session.agentId,
-		logger,
-		handleNewChat,
-	]);
-
-	// ============================================================
-	// Broadcast Command Callbacks
-	// ============================================================
-	/** Get current input state for broadcast commands */
-	const getInputState = useCallback((): ChatInputState | null => {
-		return {
-			text: inputValue,
-			files: attachedFiles,
-		};
-	}, [inputValue, attachedFiles]);
-
-	/** Set input state from broadcast commands */
-	const setInputState = useCallback(
-		(state: ChatInputState) => {
-			setInputValue(state.text);
-			setAttachedFiles(state.files);
-		},
-		[setInputValue, setAttachedFiles],
-	);
-
-	/** Send message for broadcast commands (returns true if sent) */
-	const sendMessageForBroadcast = useCallback(async (): Promise<boolean> => {
-		// Allow sending if there's text OR attachments
-		if (!inputValue.trim() && attachedFiles.length === 0) {
-			return false;
-		}
-		if (!isSessionReady || sessionHistory.loading) {
-			return false;
-		}
-		if (isSending) {
-			return false;
-		}
-
-		// Clear input before sending
-		const messageToSend = inputValue.trim();
-		const filesToSend =
-			attachedFiles.length > 0 ? [...attachedFiles] : undefined;
-		setInputValue("");
-		setAttachedFiles([]);
-
-		await handleSendMessage(messageToSend, filesToSend);
-		return true;
-	}, [
-		inputValue,
-		attachedFiles,
-		isSessionReady,
-		sessionHistory.loading,
-		isSending,
-		handleSendMessage,
-		setInputValue,
-		setAttachedFiles,
-	]);
-
-	/** Check if this view can send a message */
-	const canSendForBroadcast = useCallback((): boolean => {
-		const hasContent = inputValue.trim() !== "" || attachedFiles.length > 0;
-		return (
-			hasContent &&
-			isSessionReady &&
-			!sessionHistory.loading &&
-			!isSending
-		);
-	}, [
-		inputValue,
-		attachedFiles,
-		isSessionReady,
-		sessionHistory.loading,
-		isSending,
-	]);
-
-	/** Cancel current operation for broadcast commands */
-	const cancelForBroadcast = useCallback(async (): Promise<void> => {
-		if (isSending) {
-			await handleStopGeneration();
-		}
-	}, [isSending, handleStopGeneration]);
-
-	// Register callbacks with ChatView class for broadcast commands
-	useEffect(() => {
-		view.registerInputCallbacks({
-			getDisplayName: () => activeAgentLabel,
-			getInputState,
-			setInputState,
-			sendMessage: sendMessageForBroadcast,
-			canSend: canSendForBroadcast,
-			cancel: cancelForBroadcast,
-		});
-
-		return () => {
-			view.unregisterInputCallbacks();
-		};
-	}, [
-		view,
-		activeAgentLabel,
-		getInputState,
-		setInputState,
-		sendMessageForBroadcast,
-		canSendForBroadcast,
-		cancelForBroadcast,
-	]);
-
-	// ============================================================
-	// Effects - Workspace Events (Hotkeys)
-	// ============================================================
-	// Custom event type with targetViewId parameter
-	type CustomEventCallback = (targetViewId?: string) => void;
-
-	useEffect(() => {
-		const workspace = plugin.app.workspace;
-
-		const eventRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on("agent-client:toggle-auto-mention", (targetViewId?: string) => {
-			// Only respond if this view is the target (or no target specified)
-			if (targetViewId && targetViewId !== viewId) {
-				return;
-			}
-			mentions.toggleAutoMention();
-		});
-
-		return () => {
-			workspace.offref(eventRef);
-		};
-	}, [plugin.app.workspace, mentions.toggleAutoMention, viewId]);
-
-	// Handle new chat request from plugin commands (e.g., "New chat with [Agent]")
-	useEffect(() => {
-		const workspace = plugin.app.workspace;
-
-		// Cast to any to bypass Obsidian's type constraints for custom events
-		const eventRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: (agentId?: string) => void,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on("agent-client:new-chat-requested", (agentId?: string) => {
-			// Note: new-chat-requested targets the last active view, which is handled
-			// by plugin.lastActiveChatViewId - only respond if we are that view
-			if (
-				plugin.lastActiveChatViewId &&
-				plugin.lastActiveChatViewId !== viewId
-			) {
-				return;
-			}
-			void handleNewChatWithPersist(agentId);
-		});
-
-		return () => {
-			workspace.offref(eventRef);
-		};
-	}, [
-		plugin.app.workspace,
-		plugin.lastActiveChatViewId,
-		handleNewChatWithPersist,
-		viewId,
-	]);
-
-	useEffect(() => {
-		const workspace = plugin.app.workspace;
-
-		const approveRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on(
-			"agent-client:approve-active-permission",
-			(targetViewId?: string) => {
-				// Only respond if this view is the target (or no target specified)
-				if (targetViewId && targetViewId !== viewId) {
-					return;
-				}
-				void (async () => {
-					const success = await permission.approveActivePermission();
-					if (!success) {
-						new Notice(
-							"[Agent Client] No active permission request",
-						);
-					}
-				})();
-			},
-		);
-
-		const rejectRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on(
-			"agent-client:reject-active-permission",
-			(targetViewId?: string) => {
-				// Only respond if this view is the target (or no target specified)
-				if (targetViewId && targetViewId !== viewId) {
-					return;
-				}
-				void (async () => {
-					const success = await permission.rejectActivePermission();
-					if (!success) {
-						new Notice(
-							"[Agent Client] No active permission request",
-						);
-					}
-				})();
-			},
-		);
-
-		const cancelRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on("agent-client:cancel-message", (targetViewId?: string) => {
-			// Only respond if this view is the target (or no target specified)
-			if (targetViewId && targetViewId !== viewId) {
-				return;
-			}
-			void handleStopGeneration();
-		});
-
-		const exportRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on("agent-client:export-chat", (targetViewId?: string) => {
-			// Only respond if this view is the target (or no target specified)
-			if (targetViewId && targetViewId !== viewId) {
-				return;
-			}
-			void handleExportChat();
-		});
-
-		return () => {
-			workspace.offref(approveRef);
-			workspace.offref(rejectRef);
-			workspace.offref(cancelRef);
-			workspace.offref(exportRef);
-		};
-	}, [
-		plugin.app.workspace,
-		permission.approveActivePermission,
-		permission.rejectActivePermission,
-		handleStopGeneration,
-		handleExportChat,
-		viewId,
-	]);
+	}, [view]);
 
 	// ============================================================
 	// Render
 	// ============================================================
-	const chatFontSizeStyle =
-		settings.displaySettings.fontSize !== null
-			? ({
-					"--ac-chat-font-size": `${settings.displaySettings.fontSize}px`,
-				} as React.CSSProperties)
-			: undefined;
-
 	return (
-		<div
-			className="agent-client-chat-view-container"
-			style={chatFontSizeStyle}
-		>
-			<ChatHeader
+		<ChatContextProvider value={contextValue}>
+			<ChatPanel
 				variant="sidebar"
-				agentLabel={activeAgentLabel}
-				isUpdateAvailable={isUpdateAvailable}
-				hasHistoryCapability={sessionHistory.canShowSessionHistory}
-				onNewChat={() => void handleNewChatWithPersist()}
-				onExportChat={() => void handleExportChat()}
-				onShowMenu={handleShowMenu}
-				onOpenHistory={handleOpenHistory}
-			/>
-
-			<MessageList
-				messages={messages}
-				isSending={isSending}
-				isSessionReady={isSessionReady}
-				isRestoringSession={sessionHistory.loading}
-				agentLabel={activeAgentLabel}
-				plugin={plugin}
-				view={view}
-				terminalClient={terminalClientRef.current}
-				onApprovePermission={permission.approvePermission}
-				hasActivePermission={permission.activePermission != null}
-			/>
-
-			<InputArea
-				isSending={isSending}
-				isSessionReady={isSessionReady}
-				isRestoringSession={sessionHistory.loading}
-				agentLabel={activeAgentLabel}
-				availableCommands={session.availableCommands || []}
-				autoMentionEnabled={settings.autoMentionActiveNote}
-				restoredMessage={restoredMessage}
-				mentions={mentions}
-				slashCommands={slashCommands}
-				plugin={plugin}
-				view={view}
-				onSendMessage={handleSendMessage}
-				onStopGeneration={handleStopGeneration}
-				onRestoredMessageConsumed={handleRestoredMessageConsumed}
-				modes={session.modes}
-				onModeChange={(modeId) => void handleSetMode(modeId)}
-				models={session.models}
-				onModelChange={(modelId) => void handleSetModel(modelId)}
-				configOptions={session.configOptions}
-				onConfigOptionChange={(configId, value) =>
-					void handleSetConfigOption(configId, value)
+				viewId={viewId}
+				initialAgentId={restoredAgentId}
+				viewHost={view}
+				onRegisterCallbacks={(callbacks) =>
+					view.setCallbacks(callbacks)
 				}
-				usage={session.usage}
-				supportsImages={session.promptCapabilities?.image ?? false}
-				agentId={session.agentId}
-				// Controlled component props (for broadcast commands)
-				inputValue={inputValue}
-				onInputChange={setInputValue}
-				attachedFiles={attachedFiles}
-				onAttachedFilesChange={setAttachedFiles}
-				// Error overlay props
-				errorInfo={errorInfo}
-				onClearError={handleClearError}
-				// Agent update notification props
-				agentUpdateNotification={agentUpdateNotification}
-				onClearAgentUpdate={handleClearAgentUpdate}
-				messages={messages}
+				onAgentIdChanged={(agentId) => view.setAgentId(agentId)}
 			/>
-		</div>
+		</ChatContextProvider>
 	);
 }
 
@@ -618,14 +90,6 @@ function ChatComponent({
 interface ChatViewState extends Record<string, unknown> {
 	initialAgentId?: string;
 }
-
-// Callback types for input state access (broadcast commands)
-type GetDisplayNameCallback = () => string;
-type GetInputStateCallback = () => ChatInputState | null;
-type SetInputStateCallback = (state: ChatInputState) => void;
-type SendMessageCallback = () => Promise<boolean>;
-type CanSendCallback = () => boolean;
-type CancelCallback = () => Promise<void>;
 
 export class ChatView extends ItemView implements IChatViewContainer {
 	private root: Root | null = null;
@@ -641,13 +105,14 @@ export class ChatView extends ItemView implements IChatViewContainer {
 	private agentIdRestoredCallbacks: Set<(agentId: string) => void> =
 		new Set();
 
-	// Callbacks for input state access (broadcast commands)
-	private getDisplayNameCallback: GetDisplayNameCallback | null = null;
-	private getInputStateCallback: GetInputStateCallback | null = null;
-	private setInputStateCallback: SetInputStateCallback | null = null;
-	private sendMessageCallback: SendMessageCallback | null = null;
-	private canSendCallback: CanSendCallback | null = null;
-	private cancelCallback: CancelCallback | null = null;
+	// Services owned by this class (lifecycle managed here)
+	/** @internal Exposed to ChatComponent for context creation */
+	acpClient!: ReturnType<AgentClientPlugin["getOrCreateAdapter"]>;
+	/** @internal Exposed to ChatComponent for context creation */
+	vaultService!: VaultService;
+
+	// Callbacks from ChatPanel for IChatViewContainer delegation
+	private callbacks: ChatPanelCallbacks | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: AgentClientPlugin) {
 		super(leaf);
@@ -731,43 +196,18 @@ export class ChatView extends ItemView implements IChatViewContainer {
 	}
 
 	// ============================================================
-	// Input State Callbacks (for broadcast commands)
+	// Callbacks from ChatPanel
 	// ============================================================
 
 	/**
-	 * Register callbacks for input state access.
-	 * Called by ChatComponent on mount.
+	 * Register callbacks from ChatPanel for IChatViewContainer delegation.
 	 */
-	registerInputCallbacks(callbacks: {
-		getDisplayName: GetDisplayNameCallback;
-		getInputState: GetInputStateCallback;
-		setInputState: SetInputStateCallback;
-		sendMessage: SendMessageCallback;
-		canSend: CanSendCallback;
-		cancel: CancelCallback;
-	}): void {
-		this.getDisplayNameCallback = callbacks.getDisplayName;
-		this.getInputStateCallback = callbacks.getInputState;
-		this.setInputStateCallback = callbacks.setInputState;
-		this.sendMessageCallback = callbacks.sendMessage;
-		this.canSendCallback = callbacks.canSend;
-		this.cancelCallback = callbacks.cancel;
-	}
-
-	/**
-	 * Unregister callbacks when component unmounts.
-	 */
-	unregisterInputCallbacks(): void {
-		this.getDisplayNameCallback = null;
-		this.getInputStateCallback = null;
-		this.setInputStateCallback = null;
-		this.sendMessageCallback = null;
-		this.canSendCallback = null;
-		this.cancelCallback = null;
+	setCallbacks(callbacks: ChatPanelCallbacks): void {
+		this.callbacks = callbacks;
 	}
 
 	getDisplayName(): string {
-		return this.getDisplayNameCallback?.() ?? "Chat";
+		return this.callbacks?.getDisplayName() ?? "Chat";
 	}
 
 	/**
@@ -775,35 +215,35 @@ export class ChatView extends ItemView implements IChatViewContainer {
 	 * Returns null if React component not mounted.
 	 */
 	getInputState(): ChatInputState | null {
-		return this.getInputStateCallback?.() ?? null;
+		return this.callbacks?.getInputState() ?? null;
 	}
 
 	/**
 	 * Set input state (text + images).
 	 */
 	setInputState(state: ChatInputState): void {
-		this.setInputStateCallback?.(state);
+		this.callbacks?.setInputState(state);
 	}
 
 	/**
 	 * Trigger send message. Returns true if message was sent.
 	 */
 	async sendMessage(): Promise<boolean> {
-		return (await this.sendMessageCallback?.()) ?? false;
+		return (await this.callbacks?.sendMessage()) ?? false;
 	}
 
 	/**
 	 * Check if this view can send a message.
 	 */
 	canSend(): boolean {
-		return this.canSendCallback?.() ?? false;
+		return this.callbacks?.canSend() ?? false;
 	}
 
 	/**
 	 * Cancel current operation.
 	 */
 	async cancelOperation(): Promise<void> {
-		await this.cancelCallback?.();
+		await this.callbacks?.cancelOperation();
 	}
 
 	// ============================================================
@@ -870,6 +310,10 @@ export class ChatView extends ItemView implements IChatViewContainer {
 		const container = this.containerEl.children[1];
 		container.empty();
 
+		// Create services owned by this class
+		this.acpClient = this.plugin.getOrCreateAdapter(this.viewId);
+		this.vaultService = new VaultService(this.plugin);
+
 		this.root = createRoot(container);
 		this.root.render(
 			<ChatComponent
@@ -891,12 +335,16 @@ export class ChatView extends ItemView implements IChatViewContainer {
 		// Unregister from plugin's view registry
 		this.plugin.viewRegistry.unregister(this.viewId);
 
-		// Cleanup is handled by React useEffect cleanup in ChatComponent
+		// Cleanup is handled by React useEffect cleanup in ChatPanel
 		// which performs auto-export and closeSession
 		if (this.root) {
 			this.root.unmount();
 			this.root = null;
 		}
+
+		// Cleanup services owned by this class
+		this.vaultService?.destroy();
+
 		// Remove adapter for this view (disconnect process)
 		await this.plugin.removeAdapter(this.viewId);
 	}
