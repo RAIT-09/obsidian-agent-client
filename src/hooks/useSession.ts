@@ -6,8 +6,6 @@ import type {
 	SessionUsage,
 	SlashCommand,
 	AuthenticationMethod,
-} from "../types/session";
-import type {
 	SessionConfigOption,
 	SessionConfigSelectOption,
 	SessionConfigSelectGroup,

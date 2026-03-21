@@ -6,8 +6,6 @@ import type {
 	SessionModeState,
 	SessionModelState,
 	SessionUsage,
-} from "../types/session";
-import type {
 	SessionConfigOption,
 	SessionConfigSelectGroup,
 	SessionConfigSelectOption,

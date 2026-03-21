@@ -7,7 +7,7 @@ import type AgentClientPlugin from "../plugin";
 import { TerminalBlock } from "./TerminalBlock";
 import { PermissionBanner } from "./PermissionBanner";
 import { LucideIcon } from "./shared/IconButton";
-import { toRelativePath } from "../utils/path-utils";
+import { toRelativePath } from "../utils/paths";
 import * as Diff from "diff";
 // import { MarkdownRenderer } from "./shared/MarkdownRenderer";
 

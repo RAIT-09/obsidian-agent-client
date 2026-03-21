@@ -1,12 +1,11 @@
 import * as acp from "@agentclientprotocol/sdk";
-import type { ToolCallContent } from "../types/chat";
-import type { PromptContent } from "../types/chat";
+import type { ToolCallContent, PromptContent } from "../types/chat";
 import type {
 	SessionConfigOption,
 	SessionConfigSelectGroup,
 	SessionConfigSelectOption,
+	SessionResult,
 } from "../types/session";
-import type { SessionResult } from "../types/session";
 
 /**
  * Common shape of ACP session responses.

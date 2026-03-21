@@ -2,7 +2,7 @@ import { spawn, ChildProcess, SpawnOptions } from "child_process";
 import type AgentClientPlugin from "../plugin";
 import { getLogger, Logger } from "../utils/logger";
 import { Platform } from "obsidian";
-import { resolveNodeDirectory } from "../utils/path-utils";
+import { resolveNodeDirectory } from "../utils/paths";
 import { getEnhancedWindowsEnv, prepareShellCommand } from "../utils/platform";
 
 /**

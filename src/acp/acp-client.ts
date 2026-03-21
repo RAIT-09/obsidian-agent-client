@@ -3,26 +3,23 @@ import * as acp from "@agentclientprotocol/sdk";
 import { Platform } from "obsidian";
 
 
-import type { InitializeResult } from "../types/session";
-import type { MessageContent } from "../types/chat";
 import type {
+	InitializeResult,
 	SessionConfigOption,
 	SessionUpdate,
-} from "../types/session";
-import type { PromptContent } from "../types/chat";
-import type { ProcessError } from "../types/errors";
-import type {
 	ListSessionsResult,
 	SessionResult,
+	SlashCommand,
 } from "../types/session";
+import type { MessageContent, PromptContent } from "../types/chat";
+import type { ProcessError } from "../types/errors";
 import { AcpTypeConverter } from "./type-converter";
 import { TerminalManager } from "./terminal-handler";
 import { PermissionManager } from "./permission-handler";
 import { getLogger, Logger } from "../utils/logger";
 import type AgentClientPlugin from "../plugin";
-import type { SlashCommand } from "../types/session";
 import { convertWindowsPathToWsl, getEnhancedWindowsEnv, prepareShellCommand } from "../utils/platform";
-import { resolveNodeDirectory } from "../utils/path-utils";
+import { resolveNodeDirectory } from "../utils/paths";
 
 
 // ============================================================================

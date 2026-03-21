@@ -38,7 +38,7 @@ import type {
 	ImagePromptContent,
 	ResourceLinkPromptContent,
 } from "../types/chat";
-import { buildFileUri } from "../utils/path-utils";
+import { buildFileUri } from "../utils/paths";
 import { convertWindowsPathToWsl } from "../utils/platform";
 import type { AgentUpdateNotification } from "../services/update-checker";
 import { checkAgentUpdate } from "../services/update-checker";
@@ -47,7 +47,7 @@ import { checkAgentUpdate } from "../services/update-checker";
 import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
 import { InputArea } from "./InputArea";
-import type { IChatViewHost } from "./types";
+import type { IChatViewHost } from "./view-host";
 
 function flattenConfigSelectOptions(
 	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],

@@ -15,7 +15,7 @@ import { normalizeEnvVars } from "../services/settings-service";
 import {
 	resolveCommandPath,
 	resolveCommandPathInWsl,
-} from "../utils/path-utils";
+} from "../utils/paths";
 import {
 	CHAT_FONT_SIZE_MAX,
 	CHAT_FONT_SIZE_MIN,

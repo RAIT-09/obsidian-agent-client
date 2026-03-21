@@ -23,7 +23,7 @@ import {
 	extractErrorCode,
 	toAcpError,
 	isEmptyResponseError,
-} from "../utils/acp-error-utils";
+} from "../utils/error-utils";
 import type { AuthenticationMethod } from "../types/session";
 import type {
 	PromptContent,
@@ -31,9 +31,9 @@ import type {
 	ResourcePromptContent,
 	ResourceLinkPromptContent,
 } from "../types/chat";
-import { extractMentionedNotes, type IMentionService } from "../utils/mention-utils";
+import { extractMentionedNotes, type IMentionService } from "../utils/mention-parser";
 import { convertWindowsPathToWsl } from "../utils/platform";
-import { buildFileUri } from "../utils/path-utils";
+import { buildFileUri } from "../utils/paths";
 
 // ============================================================================
 // Types

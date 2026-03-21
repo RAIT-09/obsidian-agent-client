@@ -3,19 +3,18 @@ const { useRef, useState, useEffect, useCallback, useMemo } = React;
 import { setIcon, Notice } from "obsidian";
 
 import type AgentClientPlugin from "../plugin";
-import type { IChatViewHost } from "./types";
+import type { IChatViewHost } from "./view-host";
 import type { NoteMetadata } from "../services/vault-service";
 import type {
 	SlashCommand,
 	SessionModeState,
 	SessionModelState,
 	SessionUsage,
+	SessionConfigOption,
 } from "../types/session";
-import type { SessionConfigOption } from "../types/session";
-import type { AttachedFile } from "../types/chat";
+import type { AttachedFile, ChatMessage } from "../types/chat";
 import type { UseMentionsReturn } from "../hooks/useMentions";
 import type { UseSlashCommandsReturn } from "../hooks/useSlashCommands";
-import type { ChatMessage } from "../types/chat";
 import { SuggestionPopup } from "./SuggestionPopup";
 import { ErrorBanner } from "./ErrorBanner";
 import { AttachmentStrip } from "./shared/AttachmentStrip";

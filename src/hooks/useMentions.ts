@@ -7,7 +7,7 @@ import {
 	detectMention,
 	replaceMention,
 	type MentionContext,
-} from "../utils/mention-utils";
+} from "../utils/mention-parser";
 import type AgentClientPlugin from "../plugin";
 
 export interface UseMentionsReturn {

@@ -2,7 +2,7 @@ import * as React from "react";
 const { useRef, useEffect } = React;
 import { getLogger } from "../utils/logger";
 import type AgentClientPlugin from "../plugin";
-import type { IChatViewHost } from "./types";
+import type { IChatViewHost } from "./view-host";
 import type { NoteMetadata } from "../services/vault-service";
 import type { SlashCommand } from "../types/session";
 

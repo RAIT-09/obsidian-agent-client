@@ -4,7 +4,7 @@ const { useRef, useState, useEffect, useCallback } = React;
 import type { ChatMessage } from "../types/chat";
 import type { ITerminalClient } from "../acp/acp-client";
 import type AgentClientPlugin from "../plugin";
-import type { IChatViewHost } from "./types";
+import type { IChatViewHost } from "./view-host";
 import { setIcon } from "obsidian";
 import { MessageBubble } from "./MessageBubble";
 

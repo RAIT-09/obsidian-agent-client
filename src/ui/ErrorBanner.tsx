@@ -3,7 +3,7 @@ const { useEffect } = React;
 import { setIcon } from "obsidian";
 import type { ErrorInfo, OverlayVariant } from "../types/errors";
 import { LucideIcon } from "./shared/IconButton";
-import type { IChatViewHost } from "./types";
+import type { IChatViewHost } from "./view-host";
 
 export interface ErrorBannerProps {
 	/** Error information to display */

@@ -2,18 +2,14 @@ import { useState, useCallback, useMemo } from "react";
 import type {
 	ChatMessage,
 	MessageContent,
-} from "../types/chat";
-import type { SessionUpdate } from "../types/session";
-import type { IAgentClient } from "../acp/acp-client";
-import type { IVaultAccess } from "../services/vault-service";
-import type { NoteMetadata } from "../services/vault-service";
-import type { AuthenticationMethod } from "../types/session";
-import type { ErrorInfo } from "../types/errors";
-import type {
 	ImagePromptContent,
 	ResourceLinkPromptContent,
 } from "../types/chat";
-import type { IMentionService } from "../utils/mention-utils";
+import type { SessionUpdate, AuthenticationMethod } from "../types/session";
+import type { IAgentClient } from "../acp/acp-client";
+import type { IVaultAccess, NoteMetadata } from "../services/vault-service";
+import type { ErrorInfo } from "../types/errors";
+import type { IMentionService } from "../utils/mention-parser";
 import { preparePrompt, sendPreparedPrompt } from "../services/message-sender";
 import { Platform } from "obsidian";
 

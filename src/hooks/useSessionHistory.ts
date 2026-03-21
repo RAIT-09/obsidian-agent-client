@@ -5,15 +5,13 @@ import type {
 	SessionInfo,
 	ListSessionsResult,
 	SavedSessionInfo,
-} from "../types/session";
-import type {
 	ChatSession,
 	SessionModeState,
 	SessionModelState,
+	SessionConfigOption,
+	AgentCapabilities,
 } from "../types/session";
-import type { SessionConfigOption } from "../types/session";
 import type { ChatMessage } from "../types/chat";
-import type { AgentCapabilities } from "../types/session";
 
 // ============================================================================
 // Session Capability Helpers (from session-capability-utils.ts)
