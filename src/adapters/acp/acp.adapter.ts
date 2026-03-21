@@ -22,7 +22,7 @@ import type {
 	SessionResult,
 } from "../../domain/models/session-info";
 import { AcpTypeConverter } from "./acp-type-converter";
-import { TerminalManager } from "../../shared/terminal-manager";
+import { TerminalManager } from "./terminal-manager";
 import { getLogger, Logger } from "../../shared/logger";
 import type AgentClientPlugin from "../../plugin";
 import type { SlashCommand } from "src/domain/models/chat-session";
@@ -1332,14 +1332,13 @@ export class AcpAdapter implements IAgentClient, ITerminalClient {
 			params,
 		);
 
-		// Use current config's working directory if cwd is not provided
-		const modifiedParams = {
-			...params,
+		const terminalId = this.terminalManager.createTerminal({
+			command: params.command,
+			args: params.args,
 			cwd: params.cwd || this.currentConfig?.workingDirectory || "",
-		};
-		this.logger.log("[AcpAdapter] Using modified params:", modifiedParams);
-
-		const terminalId = this.terminalManager.createTerminal(modifiedParams);
+			env: params.env ?? undefined,
+			outputByteLimit: params.outputByteLimit ?? undefined,
+		});
 		return Promise.resolve({
 			terminalId,
 		});

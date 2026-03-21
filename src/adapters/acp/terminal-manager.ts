@@ -1,11 +1,29 @@
 import { spawn, ChildProcess, SpawnOptions } from "child_process";
-import * as acp from "@agentclientprotocol/sdk";
-import type AgentClientPlugin from "../plugin";
-import { getLogger, Logger } from "./logger";
+import type AgentClientPlugin from "../../plugin";
+import { getLogger, Logger } from "../../shared/logger";
 import { Platform } from "obsidian";
-import { resolveNodeDirectory } from "./path-utils";
-import { getEnhancedWindowsEnv } from "./windows-env";
-import { prepareShellCommand } from "./command-builder";
+import { resolveNodeDirectory } from "../../shared/path-utils";
+import { getEnhancedWindowsEnv } from "../../shared/windows-env";
+import { prepareShellCommand } from "../../shared/command-builder";
+
+/**
+ * Parameters for creating a terminal process.
+ *
+ * This is the TerminalManager's own parameter type, independent of the ACP SDK.
+ * The AcpAdapter is responsible for converting ACP protocol types to this format.
+ */
+interface CreateTerminalParams {
+	/** The command to execute */
+	command: string;
+	/** Command arguments */
+	args?: string[];
+	/** Working directory for the command (absolute path) */
+	cwd?: string;
+	/** Environment variables as name-value pairs */
+	env?: Array<{ name: string; value: string }>;
+	/** Maximum number of output bytes to retain */
+	outputByteLimit?: number;
+}
 
 interface TerminalProcess {
 	id: string;
@@ -29,7 +47,7 @@ export class TerminalManager {
 		this.plugin = plugin;
 	}
 
-	createTerminal(params: acp.CreateTerminalRequest): string {
+	createTerminal(params: CreateTerminalParams): string {
 		const terminalId = crypto.randomUUID();
 
 		// Check current platform
