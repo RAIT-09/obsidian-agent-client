@@ -3,7 +3,6 @@ const { useState, useRef, useEffect } = React;
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 import { getLogger } from "../../shared/logger";
 import type AgentClientPlugin from "../../plugin";
-
 interface TerminalRendererProps {
 	terminalId: string;
 	acpClient: IAcpClient | null;
@@ -102,30 +101,9 @@ export function TerminalRenderer({
 		}
 	}, [isRunning]);
 
-	const showEmojis = plugin.settings.displaySettings.showEmojis;
-
 	return (
 		<div className="agent-client-terminal-renderer">
-			<div className="agent-client-terminal-renderer-header">
-				{showEmojis && "🖥️ "}Terminal {terminalId.slice(0, 8)}
-				{isRunning ? (
-					<span className="agent-client-terminal-status agent-client-running">
-						● RUNNING
-					</span>
-				) : isCancelled ? (
-					<span className="agent-client-terminal-status agent-client-cancelled">
-						● CANCELLED
-					</span>
-				) : (
-					<span className="agent-client-terminal-status agent-client-finished">
-						● FINISHED
-					</span>
-				)}
-			</div>
-
-			<div className="agent-client-terminal-renderer-output">
-				{output || (isRunning ? "Waiting for output..." : "No output")}
-			</div>
+			{output || (isRunning ? "Waiting for output..." : "No output")}
 
 			{exitStatus && (
 				<div

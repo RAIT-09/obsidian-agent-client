@@ -6,6 +6,7 @@ import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../plugin";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { PermissionRequestSection } from "./PermissionRequestSection";
+import { LucideIcon } from "./LucideIcon";
 import { toRelativePath } from "../../shared/path-utils";
 import * as Diff from "diff";
 // import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
@@ -62,31 +63,29 @@ export function ToolCallRenderer({
 	// Get showEmojis setting
 	const showEmojis = plugin.settings.displaySettings.showEmojis;
 
-	// Get icon based on kind
-	const getKindIcon = (kind?: string) => {
-		if (!showEmojis) return null;
-
+	// Get Lucide icon name based on tool kind
+	const getKindIconName = (kind?: string): string => {
 		switch (kind) {
 			case "read":
-				return "📖";
+				return "book-open";
 			case "edit":
-				return "✏️";
+				return "pencil";
 			case "delete":
-				return "🗑️";
+				return "trash";
 			case "move":
-				return "📦";
+				return "folder-open";
 			case "search":
-				return "🔍";
+				return "search";
 			case "execute":
-				return "💻";
+				return "square-terminal";
 			case "think":
-				return "💭";
+				return "message-circle-more";
 			case "fetch":
-				return "🌐";
+				return "globe";
 			case "switch_mode":
-				return "🔄";
+				return "arrow-left-right";
 			default:
-				return "🔧";
+				return "hammer";
 		}
 	};
 
@@ -96,11 +95,20 @@ export function ToolCallRenderer({
 			<div className="agent-client-message-tool-call-header">
 				<div className="agent-client-message-tool-call-title">
 					{showEmojis && (
-						<span className="agent-client-message-tool-call-icon">
-							{getKindIcon(kind)}
-						</span>
+						<LucideIcon
+							name={getKindIconName(kind)}
+							className="agent-client-message-tool-call-icon"
+						/>
 					)}
-					{title}
+					<span className="agent-client-message-tool-call-title-text">
+						{title}
+					</span>
+					{status !== "completed" && (
+						<LucideIcon
+							name={status === "failed" ? "x" : "ellipsis"}
+							className={`agent-client-message-tool-call-status-icon agent-client-status-${status}`}
+						/>
+					)}
 				</div>
 				{kind === "execute" &&
 					rawInput &&
@@ -127,22 +135,7 @@ export function ToolCallRenderer({
 						))}
 					</div>
 				)}
-				<div className="agent-client-message-tool-call-status">
-					Status: {status}
-				</div>
 			</div>
-
-			{/* Kind-specific details */}
-			{/* kind && (
-				<div className="agent-client-message-tool-call-details">
-					<ToolCallDetails
-						kind={kind}
-						locations={locations}
-						rawInput={rawInput}
-						plugin={plugin}
-					/>
-				</div>
-			)*/}
 
 			{/* Tool call content (diffs, terminal output, etc.) */}
 			{toolContent &&
@@ -174,20 +167,6 @@ export function ToolCallRenderer({
 							/>
 						);
 					}
-					/*
-					if (item.type === "content") {
-						// Handle content blocks (text, image, etc.)
-						if ("text" in item.content) {
-							return (
-								<div key={index} className="agent-client-tool-call-content">
-									<MarkdownTextRenderer
-										text={item.content.text}
-										app={plugin.app}
-									/>
-								</div>
-							);
-						}
-						}*/
 					return null;
 				})}
 
@@ -208,211 +187,9 @@ export function ToolCallRenderer({
 	);
 }
 
-/*
-// Details component that switches based on kind
-interface ToolCallDetailsProps {
-	kind: string;
-	locations?: { path: string; line?: number | null }[];
-	rawInput?: { [k: string]: unknown };
-	plugin: AgentClientPlugin;
-}
-
-function ToolCallDetails({
-	kind,
-	locations,
-	rawInput,
-	plugin,
-}: ToolCallDetailsProps) {
-	switch (kind) {
-		case "read":
-			return <ReadDetails locations={locations} plugin={plugin} />;
-		case "edit":
-			return <EditDetails locations={locations} plugin={plugin} />;
-		case "delete":
-			return <DeleteDetails locations={locations} plugin={plugin} />;
-		case "move":
-			return <MoveDetails rawInput={rawInput} plugin={plugin} />;
-		case "search":
-			return <SearchDetails rawInput={rawInput} plugin={plugin} />;
-		case "execute":
-			return <ExecuteDetails rawInput={rawInput} plugin={plugin} />;
-		case "fetch":
-			return <FetchDetails rawInput={rawInput} plugin={plugin} />;
-		default:
-			return null;
-	}
-}
-
-// Individual detail components for each kind
-function ReadDetails({
-	locations,
-	plugin,
-}: {
-	locations?: { path: string; line?: number | null }[];
-	plugin: AgentClientPlugin;
-}) {
-	if (!locations || locations.length === 0) return null;
-
-	return (
-		<div className="agent-client-tool-call-read-details">
-			{locations.map((loc, idx) => (
-				<div key={idx} className="agent-client-tool-call-location">
-					📄 {loc.path}
-					{loc.line !== null && loc.line !== undefined && (
-						<span className="agent-client-tool-call-line">:{loc.line}</span>
-					)}
-				</div>
-			))}
-		</div>
-	);
-}
-
-function EditDetails({
-	locations,
-	plugin,
-}: {
-	locations?: { path: string; line?: number | null }[];
-	plugin: AgentClientPlugin;
-}) {
-	if (!locations || locations.length === 0) return null;
-
-	return (
-		<div className="agent-client-tool-call-edit-details">
-			{locations.map((loc, idx) => (
-				<div key={idx} className="agent-client-tool-call-location">
-					📝 Editing: {loc.path}
-				</div>
-			))}
-		</div>
-	);
-}
-
-function DeleteDetails({
-	locations,
-	plugin,
-}: {
-	locations?: { path: string; line?: number | null }[];
-	plugin: AgentClientPlugin;
-}) {
-	if (!locations || locations.length === 0) return null;
-
-	return (
-		<div className="agent-client-tool-call-delete-details">
-			{locations.map((loc, idx) => (
-				<div key={idx} className="agent-client-tool-call-location">
-					🗑️ Deleting: {loc.path}
-				</div>
-			))}
-		</div>
-	);
-}
-
-function MoveDetails({
-	rawInput,
-	plugin,
-}: {
-	rawInput?: { [k: string]: unknown };
-	plugin: AgentClientPlugin;
-}) {
-	if (!rawInput) return null;
-
-	const elements = [];
-	if (rawInput.from) {
-		elements.push(<div key="from">From: {String(rawInput.from)}</div>);
-	}
-	if (rawInput.to) {
-		elements.push(<div key="to">To: {String(rawInput.to)}</div>);
-	}
-
-	return <div className="agent-client-tool-call-move-details">{elements}</div>;
-}
-
-function SearchDetails({
-	rawInput,
-	plugin,
-}: {
-	rawInput?: { [k: string]: unknown };
-	plugin: AgentClientPlugin;
-}) {
-	if (!rawInput) return null;
-
-	const elements = [];
-	if (rawInput.query) {
-		elements.push(
-			<div key="query" className="agent-client-tool-call-search-query">
-				🔍 Query: "{String(rawInput.query)}"
-			</div>,
-		);
-	}
-	if (rawInput.pattern) {
-		elements.push(
-			<div key="pattern" className="agent-client-tool-call-search-pattern">
-				Pattern: {String(rawInput.pattern)}
-			</div>,
-		);
-	}
-
-	return <div className="agent-client-tool-call-search-details">{elements}</div>;
-}
-
-function ExecuteDetails({
-	rawInput,
-	plugin,
-}: {
-	rawInput?: { [k: string]: unknown };
-	plugin: AgentClientPlugin;
-}) {
-	if (!rawInput) return null;
-
-	const elements = [];
-	if (rawInput.command) {
-		elements.push(
-			<div key="command" className="agent-client-tool-call-execute-command">
-				💻 Command: <code>{String(rawInput.command)}</code>
-			</div>,
-		);
-	}
-	if (rawInput.cwd) {
-		elements.push(
-			<div key="cwd" className="agent-client-tool-call-execute-cwd">
-				Directory: {String(rawInput.cwd)}
-			</div>,
-		);
-	}
-
-	return <div className="agent-client-tool-call-execute-details">{elements}</div>;
-}
-
-function FetchDetails({
-	rawInput,
-	plugin,
-}: {
-	rawInput?: { [k: string]: unknown };
-	plugin: AgentClientPlugin;
-}) {
-	if (!rawInput) return null;
-
-	const elements = [];
-	if (rawInput.url) {
-		elements.push(
-			<div key="url" className="agent-client-tool-call-fetch-url">
-				🌐 URL: {String(rawInput.url)}
-			</div>,
-		);
-	}
-	if (rawInput.query) {
-		elements.push(
-			<div key="query" className="agent-client-tool-call-fetch-query">
-				🔍 Search: "{String(rawInput.query)}"
-			</div>,
-		);
-	}
-
-	return <div className="agent-client-tool-call-fetch-details">{elements}</div>;
-}
-*/
-
+// ============================================================
 // Diff renderer component
+// ============================================================
 interface DiffRendererProps {
 	diff: {
 		type: "diff";
@@ -619,27 +396,17 @@ function DiffRenderer({
 		}
 
 		let lineClass = "agent-client-diff-line";
-		let marker = " ";
 
 		if (line.type === "added") {
 			lineClass += " agent-client-diff-line-added";
-			marker = "+";
 		} else if (line.type === "removed") {
 			lineClass += " agent-client-diff-line-removed";
-			marker = "-";
 		} else {
 			lineClass += " agent-client-diff-line-context";
 		}
 
 		return (
 			<div key={idx} className={lineClass}>
-				<span className="agent-client-diff-line-number agent-client-diff-line-number-old">
-					{line.oldLineNumber ?? ""}
-				</span>
-				<span className="agent-client-diff-line-number agent-client-diff-line-number-new">
-					{line.newLineNumber ?? ""}
-				</span>
-				<span className="agent-client-diff-line-marker">{marker}</span>
 				<span className="agent-client-diff-line-content">
 					{line.wordDiff &&
 					(line.type === "added" || line.type === "removed")

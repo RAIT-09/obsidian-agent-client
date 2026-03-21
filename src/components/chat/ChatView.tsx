@@ -1,4 +1,11 @@
-import { ItemView, WorkspaceLeaf, Platform, Notice, Menu } from "obsidian";
+import {
+	ItemView,
+	WorkspaceLeaf,
+	Platform,
+	Notice,
+	Menu,
+	type MenuItem,
+} from "obsidian";
 import type {
 	IChatViewContainer,
 	ChatViewType,
@@ -174,16 +181,16 @@ function ChatComponent({
 	// Header Menu (Obsidian native Menu API)
 	// ============================================================
 	const handleShowMenu = useCallback(
-		(e: React.MouseEvent<HTMLButtonElement>) => {
+		(e: React.MouseEvent<HTMLDivElement>) => {
 			const menu = new Menu();
 
 			// -- Switch agent section --
-			menu.addItem((item) => {
+			menu.addItem((item: MenuItem) => {
 				item.setTitle("Switch agent").setIsLabel(true);
 			});
 
 			for (const agent of availableAgents) {
-				menu.addItem((item) => {
+				menu.addItem((item: MenuItem) => {
 					item.setTitle(agent.displayName)
 						.setChecked(agent.id === (session.agentId || ""))
 						.onClick(() => {
@@ -195,7 +202,7 @@ function ChatComponent({
 			menu.addSeparator();
 
 			// -- Actions section --
-			menu.addItem((item) => {
+			menu.addItem((item: MenuItem) => {
 				item.setTitle("Open new view")
 					.setIcon("plus")
 					.onClick(() => {
@@ -205,7 +212,7 @@ function ChatComponent({
 					});
 			});
 
-			menu.addItem((item) => {
+			menu.addItem((item: MenuItem) => {
 				item.setTitle("Restart agent")
 					.setIcon("refresh-cw")
 					.onClick(() => {
@@ -215,7 +222,7 @@ function ChatComponent({
 
 			menu.addSeparator();
 
-			menu.addItem((item) => {
+			menu.addItem((item: MenuItem) => {
 				item.setTitle("Plugin settings")
 					.setIcon("settings")
 					.onClick(() => {
@@ -647,6 +654,8 @@ export class ChatView extends ItemView implements IChatViewContainer {
 		super(leaf);
 		this.plugin = plugin;
 		this.logger = getLogger();
+		// Static sidebar view (not navigable) — hides .view-header
+		this.navigation = false;
 		// Use leaf.id if available, otherwise generate UUID
 		this.viewId = (leaf as { id?: string }).id ?? crypto.randomUUID();
 	}

@@ -1,5 +1,6 @@
 import * as React from "react";
-import { HeaderButton } from "./HeaderButton";
+const { useRef, useEffect } = React;
+import { setIcon } from "obsidian";
 
 /**
  * Props for ChatHeader component
@@ -16,18 +17,47 @@ export interface ChatHeaderProps {
 	/** Callback to export the chat */
 	onExportChat: () => void;
 	/** Callback to show the header menu at the click position */
-	onShowMenu: (e: React.MouseEvent<HTMLButtonElement>) => void;
+	onShowMenu: (e: React.MouseEvent<HTMLDivElement>) => void;
 	/** Callback to open session history */
 	onOpenHistory?: () => void;
 }
 
 /**
- * Header component for the chat view.
+ * A single action button matching Obsidian's nav-action-button pattern.
+ * Uses setIcon() to render Lucide icons identically to native sidebar buttons.
+ */
+function NavActionButton({
+	icon,
+	label,
+	onClick,
+}: {
+	icon: string;
+	label: string;
+	onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
+}) {
+	const ref = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (ref.current) {
+			setIcon(ref.current, icon);
+		}
+	}, [icon]);
+
+	return (
+		<div
+			ref={ref}
+			className="clickable-icon nav-action-button"
+			aria-label={label}
+			onClick={onClick}
+		/>
+	);
+}
+
+/**
+ * Header component for the sidebar chat view.
  *
- * Displays:
- * - Agent name
- * - Update notification (if available)
- * - Action buttons (new chat, history, export, settings)
+ * Uses Obsidian's native .nav-header + .nav-buttons-container pattern
+ * to match the look of File Explorer, Bookmarks, and other sidebar panes.
  */
 export function ChatHeader({
 	agentLabel,
@@ -39,38 +69,36 @@ export function ChatHeader({
 	onOpenHistory,
 }: ChatHeaderProps) {
 	return (
-		<div className="agent-client-chat-view-header">
-			<div className="agent-client-chat-view-header-main">
-				<h3 className="agent-client-chat-view-header-title">
+		<div className="nav-header agent-client-chat-view-header">
+			<div className="nav-buttons-container">
+				<span className="agent-client-chat-view-header-title">
 					{agentLabel}
-				</h3>
-			</div>
-			{isUpdateAvailable && (
-				<p className="agent-client-chat-view-header-update">
-					Plugin update available!
-				</p>
-			)}
-			<div className="agent-client-chat-view-header-actions">
-				<HeaderButton
-					iconName="plus"
-					tooltip="New chat"
+				</span>
+				{isUpdateAvailable && (
+					<span className="agent-client-chat-view-header-update">
+						Plugin update available!
+					</span>
+				)}
+				<NavActionButton
+					icon="plus"
+					label="New chat"
 					onClick={onNewChat}
 				/>
 				{onOpenHistory && (
-					<HeaderButton
-						iconName="history"
-						tooltip="Session history"
+					<NavActionButton
+						icon="history"
+						label="Session history"
 						onClick={onOpenHistory}
 					/>
 				)}
-				<HeaderButton
-					iconName="save"
-					tooltip="Export chat to Markdown"
+				<NavActionButton
+					icon="save"
+					label="Export chat to Markdown"
 					onClick={onExportChat}
 				/>
-				<HeaderButton
-					iconName="more-vertical"
-					tooltip="More"
+				<NavActionButton
+					icon="more-vertical"
+					label="More"
 					onClick={onShowMenu}
 				/>
 			</div>

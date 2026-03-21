@@ -8,6 +8,7 @@ import { CollapsibleThought } from "./CollapsibleThought";
 import { TerminalRenderer } from "./TerminalRenderer";
 import { TextWithMentions } from "./TextWithMentions";
 import { ToolCallRenderer } from "./ToolCallRenderer";
+import { LucideIcon } from "./LucideIcon";
 
 interface MessageContentRendererProps {
 	content: MessageContent;
@@ -67,7 +68,13 @@ export function MessageContentRenderer({
 			return (
 				<div className="agent-client-message-plan">
 					<div className="agent-client-message-plan-title">
-						{showEmojis && "📋 "}Plan
+						{showEmojis && (
+						<LucideIcon
+							name="list-checks"
+							className="agent-client-message-plan-label-icon"
+						/>
+					)}
+					Plan
 					</div>
 					{content.entries.map((entry, idx) => (
 						<div
@@ -78,11 +85,16 @@ export function MessageContentRenderer({
 								<span
 									className={`agent-client-message-plan-entry-icon agent-client-status-${entry.status}`}
 								>
-									{entry.status === "completed"
-										? "✓"
-										: entry.status === "in_progress"
-											? "⏳"
-											: "⭕"}
+									<LucideIcon
+										name={
+											entry.status === "completed"
+												? "check"
+												: entry.status ===
+													  "in_progress"
+													? "loader"
+													: "circle"
+										}
+									/>
 								</span>
 							)}{" "}
 							{entry.content}

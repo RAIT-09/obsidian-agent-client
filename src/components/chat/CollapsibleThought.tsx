@@ -2,6 +2,7 @@ import * as React from "react";
 const { useState } = React;
 import type AgentClientPlugin from "../../plugin";
 import { MarkdownTextRenderer } from "./MarkdownTextRenderer";
+import { LucideIcon } from "./LucideIcon";
 
 interface CollapsibleThoughtProps {
 	text: string;
@@ -18,7 +19,13 @@ export function CollapsibleThought({ text, plugin }: CollapsibleThoughtProps) {
 			onClick={() => setIsExpanded(!isExpanded)}
 		>
 			<div className="agent-client-collapsible-thought-header">
-				{showEmojis && "💡"}Thinking
+				{showEmojis && (
+					<LucideIcon
+						name="lightbulb"
+						className="agent-client-collapsible-thought-label-icon"
+					/>
+				)}
+				Thinking
 				<span className="agent-client-collapsible-thought-icon">
 					{isExpanded ? "▼" : "▶"}
 				</span>
