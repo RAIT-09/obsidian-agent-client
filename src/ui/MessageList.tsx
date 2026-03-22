@@ -7,6 +7,7 @@ import type AgentClientPlugin from "../plugin";
 import type { IChatViewHost } from "./view-host";
 import { setIcon } from "obsidian";
 import { MessageBubble } from "./MessageBubble";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 /**
  * Props for MessageList component
@@ -38,11 +39,14 @@ export interface MessageListProps {
 }
 
 /**
- * Messages container component for the chat view.
+ * Messages container component with virtualized rendering.
+ *
+ * Uses @tanstack/react-virtual to only render messages visible in the viewport,
+ * dramatically improving performance for long conversations.
  *
  * Handles:
- * - Message list rendering
- * - Auto-scroll behavior
+ * - Virtualized message list rendering
+ * - Auto-scroll behavior (follows new content when at bottom)
  * - Empty state display
  * - Loading indicator
  */
@@ -61,6 +65,20 @@ export function MessageList({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
 
+	// ============================================================
+	// Virtualizer
+	// ============================================================
+	const virtualizer = useVirtualizer({
+		count: messages.length,
+		getScrollElement: () => containerRef.current,
+		estimateSize: () => 80,
+		overscan: 5,
+	});
+
+	// ============================================================
+	// Scroll management
+	// ============================================================
+
 	/**
 	 * Check if the scroll position is near the bottom.
 	 */
@@ -76,16 +94,6 @@ export function MessageList({
 		return isNearBottom;
 	}, []);
 
-	/**
-	 * Scroll to the bottom of the container.
-	 */
-	const scrollToBottom = useCallback(() => {
-		const container = containerRef.current;
-		if (container) {
-			container.scrollTop = container.scrollHeight;
-		}
-	}, []);
-
 	// Reset scroll state when messages are cleared (new chat)
 	useEffect(() => {
 		if (messages.length === 0) {
@@ -93,17 +101,19 @@ export function MessageList({
 		}
 	}, [messages.length]);
 
-	// Auto-scroll when messages change
+	// Auto-scroll to bottom when new messages arrive or content changes
 	useEffect(() => {
 		if (isAtBottom && messages.length > 0) {
-			// Use setTimeout to ensure DOM has updated
-			window.setTimeout(() => {
-				scrollToBottom();
-			}, 0);
+			// Use requestAnimationFrame to ensure virtualizer has measured
+			requestAnimationFrame(() => {
+				virtualizer.scrollToIndex(messages.length - 1, {
+					align: "end",
+				});
+			});
 		}
-	}, [messages, isAtBottom, scrollToBottom]);
+	}, [messages, isAtBottom, virtualizer]);
 
-	// Set up scroll event listener
+	// Set up scroll event listener for isAtBottom detection
 	useEffect(() => {
 		const container = containerRef.current;
 		if (!container) return;
@@ -118,9 +128,14 @@ export function MessageList({
 		checkIfAtBottom();
 	}, [view, checkIfAtBottom]);
 
-	return (
-		<div ref={containerRef} className="agent-client-chat-view-messages">
-			{messages.length === 0 ? (
+	// ============================================================
+	// Render
+	// ============================================================
+
+	// Empty state
+	if (messages.length === 0) {
+		return (
+			<div ref={containerRef} className="agent-client-chat-view-messages">
 				<div className="agent-client-chat-empty-state">
 					{isRestoringSession
 						? "Restoring session..."
@@ -128,55 +143,85 @@ export function MessageList({
 							? `Connecting to ${agentLabel}...`
 							: `Start a conversation with ${agentLabel}...`}
 				</div>
-			) : (
-				<>
-					{messages.map((message) => (
-						<MessageBubble
+			</div>
+		);
+	}
+
+	const virtualItems = virtualizer.getVirtualItems();
+
+	return (
+		<div ref={containerRef} className="agent-client-chat-view-messages">
+			{/* Virtualized message list */}
+			<div
+				className="agent-client-virtual-list-inner"
+				style={{
+					height: virtualizer.getTotalSize(),
+					position: "relative",
+				}}
+			>
+				{virtualItems.map((virtualItem) => {
+					const message = messages[virtualItem.index];
+					return (
+						<div
 							key={message.id}
-							message={message}
-							plugin={plugin}
-							terminalClient={terminalClient}
-							onApprovePermission={onApprovePermission}
-						/>
-					))}
-					<div
-						className={`agent-client-loading-indicator ${!isSending ? "agent-client-hidden" : ""}`}
-					>
-						<div className="agent-client-loading-dots">
-							<div className="agent-client-loading-dot"></div>
-							<div className="agent-client-loading-dot"></div>
-							<div className="agent-client-loading-dot"></div>
-							<div className="agent-client-loading-dot"></div>
-							<div className="agent-client-loading-dot"></div>
-							<div className="agent-client-loading-dot"></div>
-							<div className="agent-client-loading-dot"></div>
-							<div className="agent-client-loading-dot"></div>
-							<div className="agent-client-loading-dot"></div>
+							ref={virtualizer.measureElement}
+							data-index={virtualItem.index}
+							className="agent-client-virtual-item"
+							style={{
+								position: "absolute",
+								top: 0,
+								left: 0,
+								width: "100%",
+								transform: `translateY(${virtualItem.start}px)`,
+							}}
+						>
+							<MessageBubble
+								message={message}
+								plugin={plugin}
+								terminalClient={terminalClient}
+								onApprovePermission={onApprovePermission}
+							/>
 						</div>
-						{hasActivePermission && (
-							<span className="agent-client-loading-status">
-								Waiting for permission...
-							</span>
-						)}
-					</div>
-					{!isAtBottom && (
-						<button
-							className="agent-client-scroll-to-bottom"
-							onClick={() => {
-								const container = containerRef.current;
-								if (container) {
-									container.scrollTo({
-										top: container.scrollHeight,
-										behavior: "smooth",
-									});
-								}
-							}}
-							ref={(el) => {
-								if (el) setIcon(el, "chevron-down");
-							}}
-						/>
-					)}
-				</>
+					);
+				})}
+			</div>
+
+			{/* Loading indicator — outside virtualizer */}
+			<div
+				className={`agent-client-loading-indicator ${!isSending ? "agent-client-hidden" : ""}`}
+			>
+				<div className="agent-client-loading-dots">
+					<div className="agent-client-loading-dot"></div>
+					<div className="agent-client-loading-dot"></div>
+					<div className="agent-client-loading-dot"></div>
+					<div className="agent-client-loading-dot"></div>
+					<div className="agent-client-loading-dot"></div>
+					<div className="agent-client-loading-dot"></div>
+					<div className="agent-client-loading-dot"></div>
+					<div className="agent-client-loading-dot"></div>
+					<div className="agent-client-loading-dot"></div>
+				</div>
+				{hasActivePermission && (
+					<span className="agent-client-loading-status">
+						Waiting for permission...
+					</span>
+				)}
+			</div>
+
+			{/* Scroll to bottom button */}
+			{!isAtBottom && (
+				<button
+					className="agent-client-scroll-to-bottom"
+					onClick={() => {
+						virtualizer.scrollToIndex(messages.length - 1, {
+							align: "end",
+							behavior: "smooth",
+						});
+					}}
+					ref={(el) => {
+						if (el) setIcon(el, "chevron-down");
+					}}
+				/>
 			)}
 		</div>
 	);

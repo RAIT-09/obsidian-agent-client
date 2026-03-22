@@ -63,7 +63,8 @@ If your plugin does not need CSS, delete this file.
 .agent-client-scroll-to-bottom {
 	position: sticky;
 	bottom: 4px;
-	align-self: center;
+	left: 50%;
+	transform: translateX(-50%);
 	padding: 6px !important;
 	margin: 0 !important;
 	border: none !important;
@@ -466,11 +467,14 @@ If your plugin does not need CSS, delete this file.
 	padding: 16px 8px;
 	overflow-y: auto;
 	overflow-x: hidden;
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
 	font-size: var(--ac-chat-font-size);
 	min-height: 0;
+	position: relative;
+}
+
+/* Virtual item spacing (replaces flex gap: 2px) */
+.agent-client-virtual-item {
+	padding-bottom: 2px;
 }
 
 /* Allow horizontal scroll for wide tables within messages */
