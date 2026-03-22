@@ -341,7 +341,7 @@ function groupContent(
 	return groups;
 }
 
-export function MessageBubble({
+export const MessageBubble = React.memo(function MessageBubble({
 	message,
 	plugin,
 	terminalClient,
@@ -392,4 +392,4 @@ export function MessageBubble({
 			})}
 		</div>
 	);
-}
+});

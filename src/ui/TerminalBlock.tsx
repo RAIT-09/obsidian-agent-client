@@ -9,7 +9,7 @@ interface TerminalBlockProps {
 	plugin: AgentClientPlugin;
 }
 
-export function TerminalBlock({
+export const TerminalBlock = React.memo(function TerminalBlock({
 	terminalId,
 	terminalClient,
 	plugin,
@@ -107,4 +107,4 @@ export function TerminalBlock({
 			)}
 		</div>
 	);
-}
+});

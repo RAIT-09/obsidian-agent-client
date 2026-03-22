@@ -316,19 +316,29 @@ function applyUpsertToolCall(
 	content: ToolCallMessageContent,
 ): ChatMessage[] {
 	let found = false;
-	const updated = prev.map((message) => ({
-		...message,
-		content: message.content.map((c) => {
-			if (
+	const updated = prev.map((message) => {
+		// Only create new object for the message that contains the target tool call
+		const hasTarget = message.content.some(
+			(c) =>
 				c.type === "tool_call" &&
-				c.toolCallId === content.toolCallId
-			) {
-				found = true;
-				return mergeToolCallContent(c, content);
-			}
-			return c;
-		}),
-	}));
+				c.toolCallId === content.toolCallId,
+		);
+		if (!hasTarget) return message; // Preserve reference for React.memo
+
+		found = true;
+		return {
+			...message,
+			content: message.content.map((c) => {
+				if (
+					c.type === "tool_call" &&
+					c.toolCallId === content.toolCallId
+				) {
+					return mergeToolCallContent(c, content);
+				}
+				return c;
+			}),
+		};
+	});
 
 	if (found) {
 		return updated;
@@ -493,18 +503,28 @@ export function useMessages(
 			if (content.type !== "tool_call") return;
 
 			setMessages((prev) =>
-				prev.map((message) => ({
-					...message,
-					content: message.content.map((c) => {
-						if (
+				prev.map((message) => {
+					// Only create new object for the message containing the target tool call
+					const hasTarget = message.content.some(
+						(c) =>
 							c.type === "tool_call" &&
-							c.toolCallId === toolCallId
-						) {
-							return mergeToolCallContent(c, content);
-						}
-						return c;
-					}),
-				})),
+							c.toolCallId === toolCallId,
+					);
+					if (!hasTarget) return message; // Preserve reference for React.memo
+
+					return {
+						...message,
+						content: message.content.map((c) => {
+							if (
+								c.type === "tool_call" &&
+								c.toolCallId === toolCallId
+							) {
+								return mergeToolCallContent(c, content);
+							}
+							return c;
+						}),
+					};
+				}),
 			);
 		},
 		[],

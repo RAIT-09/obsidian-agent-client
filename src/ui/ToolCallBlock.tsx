@@ -22,7 +22,7 @@ interface ToolCallBlockProps {
 	) => Promise<void>;
 }
 
-export function ToolCallBlock({
+export const ToolCallBlock = React.memo(function ToolCallBlock({
 	content,
 	plugin,
 	terminalClient,
@@ -185,7 +185,7 @@ export function ToolCallBlock({
 			)}
 		</div>
 	);
-}
+});
 
 // ============================================================
 // Diff renderer component
