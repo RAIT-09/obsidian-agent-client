@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import type {
 	ChatMessage,
 	MessageContent,
@@ -199,6 +199,200 @@ function mergeToolCallContent(
 }
 
 // ============================================================================
+// Pure state update functions (for batching)
+// ============================================================================
+
+/**
+ * Apply a "last assistant message" update to the messages array.
+ * Creates a new assistant message if needed.
+ */
+function applyUpdateLastMessage(
+	prev: ChatMessage[],
+	content: MessageContent,
+): ChatMessage[] {
+	if (prev.length === 0 || prev[prev.length - 1].role !== "assistant") {
+		const newMessage: ChatMessage = {
+			id: crypto.randomUUID(),
+			role: "assistant",
+			content: [content],
+			timestamp: new Date(),
+		};
+		return [...prev, newMessage];
+	}
+
+	const lastMessage = prev[prev.length - 1];
+	const updatedMessage = { ...lastMessage };
+
+	if (content.type === "text" || content.type === "agent_thought") {
+		const existingContentIndex = updatedMessage.content.findIndex(
+			(c) => c.type === content.type,
+		);
+		if (existingContentIndex >= 0) {
+			const existingContent =
+				updatedMessage.content[existingContentIndex];
+			if (
+				existingContent.type === "text" ||
+				existingContent.type === "agent_thought"
+			) {
+				updatedMessage.content[existingContentIndex] = {
+					type: content.type,
+					text: existingContent.text + content.text,
+				};
+			}
+		} else {
+			updatedMessage.content.push(content);
+		}
+	} else {
+		const existingIndex = updatedMessage.content.findIndex(
+			(c) => c.type === content.type,
+		);
+		if (existingIndex >= 0) {
+			updatedMessage.content[existingIndex] = content;
+		} else {
+			updatedMessage.content.push(content);
+		}
+	}
+
+	return [...prev.slice(0, -1), updatedMessage];
+}
+
+/**
+ * Apply a "last user message" update to the messages array.
+ * Creates a new user message if needed. Used for session/load history replay.
+ */
+function applyUpdateUserMessage(
+	prev: ChatMessage[],
+	content: MessageContent,
+): ChatMessage[] {
+	if (prev.length === 0 || prev[prev.length - 1].role !== "user") {
+		const newMessage: ChatMessage = {
+			id: crypto.randomUUID(),
+			role: "user",
+			content: [content],
+			timestamp: new Date(),
+		};
+		return [...prev, newMessage];
+	}
+
+	const lastMessage = prev[prev.length - 1];
+	const updatedMessage = { ...lastMessage };
+
+	if (content.type === "text") {
+		const existingContentIndex = updatedMessage.content.findIndex(
+			(c) => c.type === "text",
+		);
+		if (existingContentIndex >= 0) {
+			const existingContent =
+				updatedMessage.content[existingContentIndex];
+			if (existingContent.type === "text") {
+				updatedMessage.content[existingContentIndex] = {
+					type: "text",
+					text: existingContent.text + content.text,
+				};
+			}
+		} else {
+			updatedMessage.content.push(content);
+		}
+	} else {
+		const existingIndex = updatedMessage.content.findIndex(
+			(c) => c.type === content.type,
+		);
+		if (existingIndex >= 0) {
+			updatedMessage.content[existingIndex] = content;
+		} else {
+			updatedMessage.content.push(content);
+		}
+	}
+
+	return [...prev.slice(0, -1), updatedMessage];
+}
+
+/**
+ * Apply a tool call upsert to the messages array.
+ * If a tool call with the given ID exists, merges. Otherwise creates new message.
+ */
+function applyUpsertToolCall(
+	prev: ChatMessage[],
+	content: ToolCallMessageContent,
+): ChatMessage[] {
+	let found = false;
+	const updated = prev.map((message) => ({
+		...message,
+		content: message.content.map((c) => {
+			if (
+				c.type === "tool_call" &&
+				c.toolCallId === content.toolCallId
+			) {
+				found = true;
+				return mergeToolCallContent(c, content);
+			}
+			return c;
+		}),
+	}));
+
+	if (found) {
+		return updated;
+	}
+
+	return [
+		...prev,
+		{
+			id: crypto.randomUUID(),
+			role: "assistant" as const,
+			content: [content],
+			timestamp: new Date(),
+		},
+	];
+}
+
+/**
+ * Apply a single session update to the messages array.
+ * Returns the same array reference if no change (session-level updates).
+ */
+function applySingleUpdate(
+	prev: ChatMessage[],
+	update: SessionUpdate,
+): ChatMessage[] {
+	switch (update.type) {
+		case "agent_message_chunk":
+			return applyUpdateLastMessage(prev, {
+				type: "text",
+				text: update.text,
+			});
+		case "agent_thought_chunk":
+			return applyUpdateLastMessage(prev, {
+				type: "agent_thought",
+				text: update.text,
+			});
+		case "user_message_chunk":
+			return applyUpdateUserMessage(prev, {
+				type: "text",
+				text: update.text,
+			});
+		case "tool_call":
+		case "tool_call_update":
+			return applyUpsertToolCall(prev, {
+				type: "tool_call",
+				toolCallId: update.toolCallId,
+				title: update.title,
+				status: update.status || "pending",
+				kind: update.kind,
+				content: update.content,
+				locations: update.locations,
+				rawInput: update.rawInput,
+				permissionRequest: update.permissionRequest,
+			});
+		case "plan":
+			return applyUpdateLastMessage(prev, {
+				type: "plan",
+				entries: update.entries,
+			});
+		default:
+			return prev;
+	}
+}
+
+// ============================================================================
 // Hook Implementation
 // ============================================================================
 
@@ -233,6 +427,48 @@ export function useMessages(
 	const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
 	const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
 
+	// ============================================================
+	// Streaming update batching
+	// ============================================================
+	// Buffer updates and flush on requestAnimationFrame to reduce
+	// React re-renders from per-chunk to per-frame (~60fps).
+	const pendingUpdatesRef = useRef<SessionUpdate[]>([]);
+	const flushScheduledRef = useRef(false);
+
+	const flushPendingUpdates = useCallback(() => {
+		flushScheduledRef.current = false;
+		const updates = pendingUpdatesRef.current;
+		if (updates.length === 0) return;
+		pendingUpdatesRef.current = [];
+
+		setMessages((prev) => {
+			let result = prev;
+			for (const update of updates) {
+				result = applySingleUpdate(result, update);
+			}
+			return result;
+		});
+	}, []);
+
+	const enqueueUpdate = useCallback(
+		(update: SessionUpdate) => {
+			pendingUpdatesRef.current.push(update);
+			if (!flushScheduledRef.current) {
+				flushScheduledRef.current = true;
+				requestAnimationFrame(flushPendingUpdates);
+			}
+		},
+		[flushPendingUpdates],
+	);
+
+	// Clean up on unmount — drop any pending updates
+	useEffect(() => {
+		return () => {
+			pendingUpdatesRef.current = [];
+			flushScheduledRef.current = false;
+		};
+	}, []);
+
 	/**
 	 * Add a new message to the chat.
 	 */
@@ -245,117 +481,7 @@ export function useMessages(
 	 * Creates a new assistant message if needed.
 	 */
 	const updateLastMessage = useCallback((content: MessageContent): void => {
-		setMessages((prev) => {
-			// If no messages or last message is not assistant, create new assistant message
-			if (
-				prev.length === 0 ||
-				prev[prev.length - 1].role !== "assistant"
-			) {
-				const newMessage: ChatMessage = {
-					id: crypto.randomUUID(),
-					role: "assistant",
-					content: [content],
-					timestamp: new Date(),
-				};
-				return [...prev, newMessage];
-			}
-
-			// Update existing last message
-			const lastMessage = prev[prev.length - 1];
-			const updatedMessage = { ...lastMessage };
-
-			if (content.type === "text" || content.type === "agent_thought") {
-				// Append to existing content of same type or create new content
-				const existingContentIndex = updatedMessage.content.findIndex(
-					(c) => c.type === content.type,
-				);
-				if (existingContentIndex >= 0) {
-					const existingContent =
-						updatedMessage.content[existingContentIndex];
-					// Type guard: we know it's text or agent_thought from findIndex condition
-					if (
-						existingContent.type === "text" ||
-						existingContent.type === "agent_thought"
-					) {
-						updatedMessage.content[existingContentIndex] = {
-							type: content.type,
-							text: existingContent.text + content.text,
-						};
-					}
-				} else {
-					updatedMessage.content.push(content);
-				}
-			} else {
-				// Replace or add non-text content
-				const existingIndex = updatedMessage.content.findIndex(
-					(c) => c.type === content.type,
-				);
-
-				if (existingIndex >= 0) {
-					updatedMessage.content[existingIndex] = content;
-				} else {
-					updatedMessage.content.push(content);
-				}
-			}
-
-			return [...prev.slice(0, -1), updatedMessage];
-		});
-	}, []);
-
-	/**
-	 * Update or create the last user message with new content.
-	 * Used for session/load to reconstruct user messages from chunks.
-	 *
-	 * Similar to updateLastMessage but targets "user" role instead of "assistant".
-	 */
-	const updateUserMessage = useCallback((content: MessageContent): void => {
-		setMessages((prev) => {
-			// If no messages or last message is not user, create new user message
-			if (prev.length === 0 || prev[prev.length - 1].role !== "user") {
-				const newMessage: ChatMessage = {
-					id: crypto.randomUUID(),
-					role: "user",
-					content: [content],
-					timestamp: new Date(),
-				};
-				return [...prev, newMessage];
-			}
-
-			// Update existing last message
-			const lastMessage = prev[prev.length - 1];
-			const updatedMessage = { ...lastMessage };
-
-			if (content.type === "text") {
-				// Append to existing text content or create new
-				const existingContentIndex = updatedMessage.content.findIndex(
-					(c) => c.type === "text",
-				);
-				if (existingContentIndex >= 0) {
-					const existingContent =
-						updatedMessage.content[existingContentIndex];
-					if (existingContent.type === "text") {
-						updatedMessage.content[existingContentIndex] = {
-							type: "text",
-							text: existingContent.text + content.text,
-						};
-					}
-				} else {
-					updatedMessage.content.push(content);
-				}
-			} else {
-				// Replace or add non-text content
-				const existingIndex = updatedMessage.content.findIndex(
-					(c) => c.type === content.type,
-				);
-				if (existingIndex >= 0) {
-					updatedMessage.content[existingIndex] = content;
-				} else {
-					updatedMessage.content.push(content);
-				}
-			}
-
-			return [...prev.slice(0, -1), updatedMessage];
-		});
+		setMessages((prev) => applyUpdateLastMessage(prev, content));
 	}, []);
 
 	/**
@@ -393,107 +519,22 @@ export function useMessages(
 	const upsertToolCall = useCallback(
 		(toolCallId: string, content: MessageContent): void => {
 			if (content.type !== "tool_call") return;
-
-			setMessages((prev) => {
-				// Try to find existing tool call
-				let found = false;
-				const updated = prev.map((message) => ({
-					...message,
-					content: message.content.map((c) => {
-						if (
-							c.type === "tool_call" &&
-							c.toolCallId === toolCallId
-						) {
-							found = true;
-							return mergeToolCallContent(c, content);
-						}
-						return c;
-					}),
-				}));
-
-				if (found) {
-					return updated;
-				}
-
-				// Not found - create new message
-				return [
-					...prev,
-					{
-						id: crypto.randomUUID(),
-						role: "assistant" as const,
-						content: [content],
-						timestamp: new Date(),
-					},
-				];
-			});
+			setMessages((prev) => applyUpsertToolCall(prev, content));
 		},
 		[],
 	);
 
 	/**
 	 * Handle a session update from the agent.
-	 * This is the unified handler for all session update events.
-	 *
-	 * Note: available_commands_update and current_mode_update are not handled here
-	 * as they are session-level updates, not message-level updates.
-	 * They should be handled by useSession.
+	 * Updates are batched via requestAnimationFrame for performance.
+	 * Session-level updates (commands, mode, config, usage) are no-ops
+	 * and are handled by useSession via ChatPanel routing.
 	 */
 	const handleSessionUpdate = useCallback(
 		(update: SessionUpdate): void => {
-			switch (update.type) {
-				case "agent_message_chunk":
-					updateLastMessage({
-						type: "text",
-						text: update.text,
-					});
-					break;
-
-				case "agent_thought_chunk":
-					updateLastMessage({
-						type: "agent_thought",
-						text: update.text,
-					});
-					break;
-
-				case "user_message_chunk":
-					updateUserMessage({
-						type: "text",
-						text: update.text,
-					});
-					break;
-
-				case "tool_call":
-				case "tool_call_update":
-					upsertToolCall(update.toolCallId, {
-						type: "tool_call",
-						toolCallId: update.toolCallId,
-						title: update.title,
-						status: update.status || "pending",
-						kind: update.kind,
-						content: update.content,
-						locations: update.locations,
-						rawInput: update.rawInput,
-						permissionRequest: update.permissionRequest,
-					});
-					break;
-
-				case "plan":
-					updateLastMessage({
-						type: "plan",
-						entries: update.entries,
-					});
-					break;
-
-				// Session-level updates are handled elsewhere (useSession)
-				case "available_commands_update":
-				case "current_mode_update":
-				case "session_info_update":
-				case "usage_update":
-					// These are intentionally not handled here
-					break;
-			}
+			enqueueUpdate(update);
 		},
-		[updateLastMessage, upsertToolCall],
+		[enqueueUpdate],
 	);
 
 	/**
