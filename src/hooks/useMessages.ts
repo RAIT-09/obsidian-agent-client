@@ -314,25 +314,44 @@ function applyUpdateUserMessage(
 function applyUpsertToolCall(
 	prev: ChatMessage[],
 	content: ToolCallMessageContent,
+	toolCallIndex: Map<string, number>,
 ): ChatMessage[] {
-	let found = false;
-	const updated = prev.map((message) => {
-		// Only create new object for the message that contains the target tool call
+	// O(1) lookup via index
+	const messageIdx = toolCallIndex.get(content.toolCallId);
+	if (messageIdx !== undefined && messageIdx < prev.length) {
+		const message = prev[messageIdx];
 		const hasTarget = message.content.some(
-			(c) =>
-				c.type === "tool_call" &&
-				c.toolCallId === content.toolCallId,
+			(c) => c.type === "tool_call" && c.toolCallId === content.toolCallId,
 		);
-		if (!hasTarget) return message; // Preserve reference for React.memo
+		if (hasTarget) {
+			const updatedMessage = {
+				...message,
+				content: message.content.map((c) => {
+					if (c.type === "tool_call" && c.toolCallId === content.toolCallId) {
+						return mergeToolCallContent(c, content);
+					}
+					return c;
+				}),
+			};
+			const result = [...prev];
+			result[messageIdx] = updatedMessage;
+			return result;
+		}
+	}
 
+	// Fallback: linear scan (index miss or stale index)
+	let found = false;
+	const updated = prev.map((message, idx) => {
+		const hasTarget = message.content.some(
+			(c) => c.type === "tool_call" && c.toolCallId === content.toolCallId,
+		);
+		if (!hasTarget) return message;
 		found = true;
+		toolCallIndex.set(content.toolCallId, idx); // Fix stale index
 		return {
 			...message,
 			content: message.content.map((c) => {
-				if (
-					c.type === "tool_call" &&
-					c.toolCallId === content.toolCallId
-				) {
+				if (c.type === "tool_call" && c.toolCallId === content.toolCallId) {
 					return mergeToolCallContent(c, content);
 				}
 				return c;
@@ -340,10 +359,10 @@ function applyUpsertToolCall(
 		};
 	});
 
-	if (found) {
-		return updated;
-	}
+	if (found) return updated;
 
+	// Not found: create new message and register in index
+	toolCallIndex.set(content.toolCallId, prev.length);
 	return [
 		...prev,
 		{
@@ -356,12 +375,30 @@ function applyUpsertToolCall(
 }
 
 /**
+ * Rebuild the tool call index from a messages array.
+ */
+function rebuildToolCallIndex(
+	messages: ChatMessage[],
+	toolCallIndex: Map<string, number>,
+): void {
+	toolCallIndex.clear();
+	messages.forEach((msg, msgIdx) => {
+		for (const c of msg.content) {
+			if (c.type === "tool_call") {
+				toolCallIndex.set(c.toolCallId, msgIdx);
+			}
+		}
+	});
+}
+
+/**
  * Apply a single session update to the messages array.
  * Returns the same array reference if no change (session-level updates).
  */
 function applySingleUpdate(
 	prev: ChatMessage[],
 	update: SessionUpdate,
+	toolCallIndex: Map<string, number>,
 ): ChatMessage[] {
 	switch (update.type) {
 		case "agent_message_chunk":
@@ -391,7 +428,7 @@ function applySingleUpdate(
 				locations: update.locations,
 				rawInput: update.rawInput,
 				permissionRequest: update.permissionRequest,
-			});
+			}, toolCallIndex);
 		case "plan":
 			return applyUpdateLastMessage(prev, {
 				type: "plan",
@@ -437,6 +474,9 @@ export function useMessages(
 	const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
 	const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
 
+	// Tool call index: toolCallId → message index for O(1) lookup
+	const toolCallIndexRef = useRef<Map<string, number>>(new Map());
+
 	// ============================================================
 	// Streaming update batching
 	// ============================================================
@@ -454,7 +494,7 @@ export function useMessages(
 		setMessages((prev) => {
 			let result = prev;
 			for (const update of updates) {
-				result = applySingleUpdate(result, update);
+				result = applySingleUpdate(result, update, toolCallIndexRef.current);
 			}
 			return result;
 		});
@@ -476,6 +516,7 @@ export function useMessages(
 		return () => {
 			pendingUpdatesRef.current = [];
 			flushScheduledRef.current = false;
+			toolCallIndexRef.current.clear();
 		};
 	}, []);
 
@@ -502,30 +543,46 @@ export function useMessages(
 		(toolCallId: string, content: MessageContent): void => {
 			if (content.type !== "tool_call") return;
 
-			setMessages((prev) =>
-				prev.map((message) => {
-					// Only create new object for the message containing the target tool call
+			setMessages((prev) => {
+				// O(1) lookup via index
+				const messageIdx = toolCallIndexRef.current.get(toolCallId);
+				if (messageIdx !== undefined && messageIdx < prev.length) {
+					const message = prev[messageIdx];
 					const hasTarget = message.content.some(
-						(c) =>
-							c.type === "tool_call" &&
-							c.toolCallId === toolCallId,
+						(c) => c.type === "tool_call" && c.toolCallId === toolCallId,
 					);
-					if (!hasTarget) return message; // Preserve reference for React.memo
+					if (hasTarget) {
+						const result = [...prev];
+						result[messageIdx] = {
+							...message,
+							content: message.content.map((c) => {
+								if (c.type === "tool_call" && c.toolCallId === toolCallId) {
+									return mergeToolCallContent(c, content);
+								}
+								return c;
+							}),
+						};
+						return result;
+					}
+				}
 
+				// Fallback: linear scan
+				return prev.map((message) => {
+					const hasTarget = message.content.some(
+						(c) => c.type === "tool_call" && c.toolCallId === toolCallId,
+					);
+					if (!hasTarget) return message;
 					return {
 						...message,
 						content: message.content.map((c) => {
-							if (
-								c.type === "tool_call" &&
-								c.toolCallId === toolCallId
-							) {
+							if (c.type === "tool_call" && c.toolCallId === toolCallId) {
 								return mergeToolCallContent(c, content);
 							}
 							return c;
 						}),
 					};
-				}),
-			);
+				});
+			});
 		},
 		[],
 	);
@@ -539,7 +596,7 @@ export function useMessages(
 	const upsertToolCall = useCallback(
 		(toolCallId: string, content: MessageContent): void => {
 			if (content.type !== "tool_call") return;
-			setMessages((prev) => applyUpsertToolCall(prev, content));
+			setMessages((prev) => applyUpsertToolCall(prev, content, toolCallIndexRef.current));
 		},
 		[],
 	);
@@ -562,6 +619,7 @@ export function useMessages(
 	 */
 	const clearMessages = useCallback((): void => {
 		setMessages([]);
+		toolCallIndexRef.current.clear();
 		setLastUserMessage(null);
 		setIsSending(false);
 		setErrorInfo(null);
@@ -591,6 +649,7 @@ export function useMessages(
 			}));
 
 			setMessages(chatMessages);
+			rebuildToolCallIndex(chatMessages, toolCallIndexRef.current);
 			setIsSending(false);
 			setErrorInfo(null);
 		},
@@ -605,6 +664,7 @@ export function useMessages(
 	const setMessagesFromLocal = useCallback(
 		(localMessages: ChatMessage[]): void => {
 			setMessages(localMessages);
+			rebuildToolCallIndex(localMessages, toolCallIndexRef.current);
 			setIsSending(false);
 			setErrorInfo(null);
 		},
