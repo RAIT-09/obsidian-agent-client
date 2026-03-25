@@ -10,7 +10,7 @@ import { getLogger } from "../utils/logger";
 import { ChatExporter } from "../services/chat-exporter";
 
 // Adapter imports
-import type { ITerminalClient } from "../acp/acp-client";
+import type { AcpClient } from "../acp/acp-client";
 
 // Context imports
 import { useChatContext } from "./ChatContext";
@@ -332,7 +332,7 @@ export function ChatPanel({
 	// Refs
 	// ============================================================
 	const historyModalRef = useRef<SessionHistoryModal | null>(null);
-	const terminalClientRef = useRef<ITerminalClient>(acpClient);
+	const terminalClientRef = useRef<AcpClient>(acpClient);
 
 	// ============================================================
 	// Computed Values

@@ -10,7 +10,7 @@ import type {
 	SessionConfigSelectOption,
 	SessionConfigSelectGroup,
 } from "../types/session";
-import type { IAgentClient } from "../acp/acp-client";
+import type { AcpClient } from "../acp/acp-client";
 import type { ISettingsAccess } from "../services/settings-service";
 import {
 	type AgentDisplayInfo,
@@ -181,7 +181,7 @@ function flattenConfigSelectOptions(
  * @param initialAgentId - Optional initial agent ID (from view persistence)
  */
 export function useSession(
-	agentClient: IAgentClient,
+	agentClient: AcpClient,
 	settingsAccess: ISettingsAccess,
 	workingDirectory: string,
 	initialAgentId?: string,

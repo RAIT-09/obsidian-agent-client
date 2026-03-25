@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo } from "react";
-import type { IAgentClient } from "../acp/acp-client";
+import type { AcpClient } from "../acp/acp-client";
 import type { ISettingsAccess } from "../services/settings-service";
 import type {
 	SessionInfo,
@@ -82,7 +82,7 @@ export interface MessagesRestoreCallback {
  */
 export interface UseSessionHistoryOptions {
 	/** Agent client for session operations */
-	agentClient: IAgentClient;
+	agentClient: AcpClient;
 	/** Current session (used to access agentCapabilities and agentId) */
 	session: ChatSession;
 	/** Settings access for local session storage */

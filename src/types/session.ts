@@ -581,7 +581,7 @@ export interface SavedSessionInfo {
  *
  * These types represent the result of agent initialization,
  * including capabilities, agent info, and authentication methods.
- * They are returned by IAgentClient.initialize() and stored
+ * They are returned by AcpClient.initialize() and stored
  * in ChatSession for the session lifetime.
  */
 

@@ -5,7 +5,7 @@ import type {
 	ChatMessage,
 	MessageContent,
 } from "../types/chat";
-import type { ITerminalClient } from "../acp/acp-client";
+import type { AcpClient } from "../acp/acp-client";
 import type AgentClientPlugin from "../plugin";
 import { MarkdownRenderer } from "./shared/MarkdownRenderer";
 import { TerminalBlock } from "./TerminalBlock";
@@ -156,7 +156,7 @@ interface ContentBlockProps {
 	plugin: AgentClientPlugin;
 	messageId?: string;
 	messageRole?: "user" | "assistant";
-	terminalClient?: ITerminalClient;
+	terminalClient?: AcpClient;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (
 		requestId: string,
@@ -292,7 +292,7 @@ function ContentBlock({
 export interface MessageBubbleProps {
 	message: ChatMessage;
 	plugin: AgentClientPlugin;
-	terminalClient?: ITerminalClient;
+	terminalClient?: AcpClient;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (
 		requestId: string,

@@ -6,7 +6,7 @@ import type {
 	ResourceLinkPromptContent,
 } from "../types/chat";
 import type { SessionUpdate, AuthenticationMethod } from "../types/session";
-import type { IAgentClient } from "../acp/acp-client";
+import type { AcpClient } from "../acp/acp-client";
 import type { IVaultAccess, NoteMetadata } from "../services/vault-service";
 import type { ErrorInfo } from "../types/errors";
 import type { IMentionService } from "../utils/mention-parser";
@@ -462,7 +462,7 @@ function applySingleUpdate(
  * @param settingsContext - Settings information (windowsWslMode)
  */
 export function useMessages(
-	agentClient: IAgentClient,
+	agentClient: AcpClient,
 	vaultAccess: IVaultAccess,
 	mentionService: IMentionService,
 	sessionContext: SessionContext,

@@ -2,7 +2,7 @@ import * as React from "react";
 const { useState, useMemo } = React;
 import { FileSystemAdapter } from "obsidian";
 import type { MessageContent } from "../types/chat";
-import type { ITerminalClient } from "../acp/acp-client";
+import type { AcpClient } from "../acp/acp-client";
 import type AgentClientPlugin from "../plugin";
 import { TerminalBlock } from "./TerminalBlock";
 import { PermissionBanner } from "./PermissionBanner";
@@ -14,7 +14,7 @@ import * as Diff from "diff";
 interface ToolCallBlockProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
 	plugin: AgentClientPlugin;
-	terminalClient?: ITerminalClient;
+	terminalClient?: AcpClient;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (
 		requestId: string,

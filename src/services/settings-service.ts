@@ -699,7 +699,7 @@ export const ensureUniqueCustomAgentIds = (
  * Convert BaseAgentSettings to AgentConfig for process execution.
  *
  * Transforms the storage format (BaseAgentSettings) to the runtime format (AgentConfig)
- * needed by IAgentClient.initialize().
+ * needed by AcpClient.initialize().
  *
  * @param settings - Agent settings from plugin configuration
  * @param workingDirectory - Working directory for the agent session

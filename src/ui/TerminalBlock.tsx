@@ -1,11 +1,11 @@
 import * as React from "react";
 const { useState, useRef, useEffect } = React;
-import type { ITerminalClient } from "../acp/acp-client";
+import type { AcpClient } from "../acp/acp-client";
 import { getLogger } from "../utils/logger";
 import type AgentClientPlugin from "../plugin";
 interface TerminalBlockProps {
 	terminalId: string;
-	terminalClient: ITerminalClient | null;
+	terminalClient: AcpClient | null;
 	plugin: AgentClientPlugin;
 }
 

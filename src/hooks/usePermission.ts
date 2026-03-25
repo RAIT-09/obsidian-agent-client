@@ -3,7 +3,7 @@ import type {
 	ChatMessage,
 	PermissionOption,
 } from "../types/chat";
-import type { IAgentClient } from "../acp/acp-client";
+import type { AcpClient } from "../acp/acp-client";
 import type { ErrorInfo } from "../types/errors";
 
 // ============================================================================
@@ -131,7 +131,7 @@ function selectOption(
  * @param messages - Chat messages (from useMessages) to scan for active permissions
  */
 export function usePermission(
-	agentClient: IAgentClient,
+	agentClient: AcpClient,
 	messages: ChatMessage[],
 ): UsePermissionReturn {
 	// Error state
