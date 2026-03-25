@@ -65,29 +65,11 @@ export class AcpHandler {
 
 		switch (update.sessionUpdate) {
 			case "agent_message_chunk":
-				if (update.content.type === "text") {
-					this.sessionUpdateCallback?.({
-						type: "agent_message_chunk",
-						sessionId,
-						text: update.content.text,
-					});
-				}
-				break;
-
 			case "agent_thought_chunk":
-				if (update.content.type === "text") {
-					this.sessionUpdateCallback?.({
-						type: "agent_thought_chunk",
-						sessionId,
-						text: update.content.text,
-					});
-				}
-				break;
-
 			case "user_message_chunk":
 				if (update.content.type === "text") {
 					this.sessionUpdateCallback?.({
-						type: "user_message_chunk",
+						type: update.sessionUpdate,
 						sessionId,
 						text: update.content.text,
 					});
@@ -95,7 +77,7 @@ export class AcpHandler {
 				break;
 
 			case "tool_call":
-			case "tool_call_update": {
+			case "tool_call_update":
 				this.sessionUpdateCallback?.({
 					type: update.sessionUpdate,
 					sessionId,
@@ -110,7 +92,6 @@ export class AcpHandler {
 						| undefined,
 				});
 				break;
-			}
 
 			case "plan":
 				this.sessionUpdateCallback?.({
@@ -120,12 +101,7 @@ export class AcpHandler {
 				});
 				break;
 
-			case "available_commands_update": {
-				this.logger.log(
-					`[AcpHandler] available_commands_update, commands:`,
-					update.availableCommands,
-				);
-
+			case "available_commands_update":
 				this.sessionUpdateCallback?.({
 					type: "available_commands_update",
 					sessionId,
@@ -134,27 +110,16 @@ export class AcpHandler {
 					),
 				});
 				break;
-			}
 
-			case "current_mode_update": {
-				this.logger.log(
-					`[AcpHandler] current_mode_update: ${update.currentModeId}`,
-				);
-
+			case "current_mode_update":
 				this.sessionUpdateCallback?.({
 					type: "current_mode_update",
 					sessionId,
 					currentModeId: update.currentModeId,
 				});
 				break;
-			}
 
-			case "session_info_update": {
-				this.logger.log(`[AcpHandler] session_info_update:`, {
-					title: update.title,
-					updatedAt: update.updatedAt,
-				});
-
+			case "session_info_update":
 				this.sessionUpdateCallback?.({
 					type: "session_info_update",
 					sessionId,
@@ -162,15 +127,8 @@ export class AcpHandler {
 					updatedAt: update.updatedAt,
 				});
 				break;
-			}
 
-			case "usage_update": {
-				this.logger.log(`[AcpHandler] usage_update:`, {
-					size: update.size,
-					used: update.used,
-					cost: update.cost,
-				});
-
+			case "usage_update":
 				this.sessionUpdateCallback?.({
 					type: "usage_update",
 					sessionId,
@@ -179,14 +137,8 @@ export class AcpHandler {
 					cost: update.cost ?? undefined,
 				});
 				break;
-			}
 
-			case "config_option_update": {
-				this.logger.log(
-					`[AcpHandler] config_option_update:`,
-					update.configOptions,
-				);
-
+			case "config_option_update":
 				this.sessionUpdateCallback?.({
 					type: "config_option_update",
 					sessionId,
@@ -195,7 +147,6 @@ export class AcpHandler {
 					),
 				});
 				break;
-			}
 		}
 		return Promise.resolve();
 	}
