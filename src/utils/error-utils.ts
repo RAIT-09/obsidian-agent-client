@@ -192,6 +192,31 @@ export function isEmptyResponseError(error: unknown): boolean {
 }
 
 /**
+ * Extract a user-friendly error hint from stderr output.
+ * Detects common failure patterns like missing API keys.
+ */
+export function extractStderrErrorHint(stderr: string): string | null {
+	if (!stderr) return null;
+
+	if (
+		stderr.includes("API key is missing") ||
+		stderr.includes("LoadAPIKeyError")
+	) {
+		return "The agent's API key may be missing. For custom agents, add the required API key (e.g., ANTHROPIC_API_KEY) in the agent's Environment Variables setting.";
+	}
+
+	if (
+		stderr.includes("authentication") ||
+		stderr.includes("unauthorized") ||
+		stderr.includes("401")
+	) {
+		return "The agent reported an authentication error. Check that your API key or credentials are valid.";
+	}
+
+	return null;
+}
+
+/**
  * Check if error is a "user aborted" error that should be ignored.
  */
 export function isUserAbortedError(error: unknown): boolean {

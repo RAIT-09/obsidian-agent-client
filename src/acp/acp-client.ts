@@ -22,6 +22,7 @@ import {
 	prepareShellCommand,
 } from "../utils/platform";
 import { resolveNodeDirectory } from "../utils/paths";
+import { extractStderrErrorHint } from "../utils/error-utils";
 
 // ============================================================================
 // Port Types (from agent-client.port.ts and terminal-client.port.ts)
@@ -803,7 +804,7 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 				// Allow pending stderr data events to flush before checking
 				await new Promise((r) => setTimeout(r, 100));
 
-				const stderrHint = this.extractStderrErrorHint();
+				const stderrHint = extractStderrErrorHint(this.recentStderr);
 				if (stderrHint) {
 					this.logger.warn(
 						"[AcpClient] Agent returned end_turn with no session updates — detected error in stderr",
@@ -1133,34 +1134,6 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 		} else {
 			return `1. Verify the agent path: Use "which ${commandName}" in Terminal to find the correct path. 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "which node" to find it).`;
 		}
-	}
-
-	/**
-	 * Extract a user-friendly error hint from recent stderr output.
-	 * Detects common failure patterns like missing API keys.
-	 */
-	private extractStderrErrorHint(): string | null {
-		const stderr = this.recentStderr;
-		if (!stderr) return null;
-
-		// Missing API key (OpenCode, Claude Code, etc.)
-		if (
-			stderr.includes("API key is missing") ||
-			stderr.includes("LoadAPIKeyError")
-		) {
-			return "The agent's API key may be missing. For custom agents, add the required API key (e.g., ANTHROPIC_API_KEY) in the agent's Environment Variables setting.";
-		}
-
-		// Authentication failures
-		if (
-			stderr.includes("authentication") ||
-			stderr.includes("unauthorized") ||
-			stderr.includes("401")
-		) {
-			return "The agent reported an authentication error. Check that your API key or credentials are valid.";
-		}
-
-		return null;
 	}
 
 	// ========================================================================
