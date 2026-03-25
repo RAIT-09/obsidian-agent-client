@@ -27,6 +27,8 @@ import {
 	extractStderrErrorHint,
 	getSpawnErrorInfo,
 	getCommandNotFoundSuggestion,
+	isEmptyResponseError,
+	isUserAbortedError,
 } from "../utils/error-utils";
 
 /**
@@ -480,44 +482,10 @@ export class AcpClient {
 				}
 			}
 		} catch (error: unknown) {
-			this.logger.error("[AcpClient] Prompt Error:", error);
-
-			// Check if this is an ignorable error (empty response or user abort)
-			const errorObj = error as Record<string, unknown> | null;
-			if (
-				errorObj &&
-				typeof errorObj === "object" &&
-				"code" in errorObj &&
-				errorObj.code === -32603 &&
-				"data" in errorObj
-			) {
-				const errorData = errorObj.data as Record<
-					string,
-					unknown
-				> | null;
-				if (
-					errorData &&
-					typeof errorData === "object" &&
-					"details" in errorData &&
-					typeof errorData.details === "string"
-				) {
-					// Ignore "empty response text" errors
-					if (errorData.details.includes("empty response text")) {
-						this.logger.log(
-							"[AcpClient] Empty response text error - ignoring",
-						);
-						return;
-					}
-					// Ignore "user aborted" errors (from cancel operation)
-					if (errorData.details.includes("user aborted")) {
-						this.logger.log(
-							"[AcpClient] User aborted request - ignoring",
-						);
-						return;
-					}
-				}
+			if (isEmptyResponseError(error) || isUserAbortedError(error)) {
+				return;
 			}
-
+			this.logger.error("[AcpClient] Prompt Error:", error);
 			throw error;
 		}
 	}
