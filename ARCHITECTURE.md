@@ -2,7 +2,7 @@
 
 ## Overview
 
-This plugin uses **React Hooks + ChatPanel Architecture**. A central `ChatPanel` component composes hooks and renders children directly. Services are injected via React Context. ACP protocol changes are isolated in the `acp/` layer.
+Obsidian plugin for AI agent interaction via ACP. `ChatPanel` component composes React hooks and renders children directly. Services are injected via React Context. ACP protocol details are isolated in the `acp/` layer.
 
 ## Directory Structure
 
@@ -15,7 +15,8 @@ src/
 │   └── errors.ts                   # AcpError, ProcessError, ErrorInfo
 │
 ├── acp/                            # ACP Protocol Layer (SDK dependency confined here)
-│   ├── acp-client.ts               # ACP communication, process lifecycle, IAgentClient
+│   ├── acp-client.ts               # Process lifecycle, UI-facing API (AcpClient class)
+│   ├── acp-handler.ts              # SDK event handler (AcpHandler — sessionUpdate, permissions, terminals)
 │   ├── type-converter.ts           # ACP SDK types ↔ internal types
 │   ├── permission-handler.ts       # Permission queue, auto-approve, Promise resolution
 │   └── terminal-handler.ts         # Terminal process create/output/kill
@@ -94,7 +95,8 @@ src/
 
 | File | Purpose |
 |------|---------|
-| `acp-client.ts` | Process spawn/kill, JSON-RPC communication, session management. Defines `IAgentClient` and `ITerminalClient` interfaces. |
+| `acp-client.ts` | UI-facing API: process spawn/kill, JSON-RPC communication, session management. Owns AcpHandler + managers. |
+| `acp-handler.ts` | SDK-facing: receives sessionUpdate, requestPermission, terminal ops from ClientSideConnection. |
 | `type-converter.ts` | Converts ACP SDK types to internal types (change buffer for protocol updates) |
 | `permission-handler.ts` | Permission request queue, auto-approve, Promise-based resolution |
 | `terminal-handler.ts` | Terminal process create/output/kill, stdout/stderr buffering |
@@ -147,7 +149,7 @@ src/
 ```typescript
 interface ChatContextValue {
   plugin: AgentClientPlugin;
-  acpClient: AcpAdapter;
+  acpClient: AcpClient;
   vaultService: VaultService;
   settingsService: SettingsService;
 }
@@ -232,6 +234,7 @@ ChatView / FloatingChatView
 ┌───────────┴───────────┐
 │     ACP Layer         │
 │   acp-client.ts       │
+│   acp-handler.ts      │
 │   type-converter.ts   │
 │   permission-handler  │
 │   terminal-handler    │
@@ -261,8 +264,8 @@ ChatView / FloatingChatView
 
 ### 4. ACP Isolation
 - All `@agentclientprotocol/sdk` imports confined to `acp/`
+- `AcpClient` (UI-facing) and `AcpHandler` (SDK-facing) separate concerns
 - `type-converter.ts` is the change buffer for protocol updates
-- Interface types (`IAgentClient`) defined alongside implementation
 
 ### 5. Observer Pattern
 - `SettingsService` notifies subscribers on change
@@ -321,9 +324,10 @@ ChatView / FloatingChatView
 
 ### Adding a New Session Update Type
 1. Add interface to `types/session.ts`, add to `SessionUpdate` union
-2. Handle in `hooks/useMessages.ts` `handleSessionUpdate()` (for message-level) or `hooks/useSession.ts` (for session-level)
-3. Convert from ACP type in `acp/type-converter.ts`
-4. Render in `ui/MessageBubble.tsx` if needed
+2. Handle in `acp/acp-handler.ts` `sessionUpdate()` switch
+3. Convert from ACP type in `acp/type-converter.ts` if needed
+4. Handle in `hooks/useMessages.ts` `handleSessionUpdate()` (for message-level) or `hooks/useSession.ts` (for session-level)
+5. Render in `ui/MessageBubble.tsx` if needed
 
 ### Adding a New Agent Type
 1. Add settings type to `types/agent.ts`

@@ -1,7 +1,7 @@
 # Agent Client Plugin - LLM Developer Guide
 
 ## Overview
-Obsidian plugin for AI agent interaction (Claude Code, Codex, Gemini CLI, custom agents). **ChatPanel + React Hooks Architecture**.
+Obsidian plugin for AI agent interaction (Claude Code, Codex, Gemini CLI, custom agents) via ACP.
 
 **Tech**: React 19, TypeScript, Obsidian API, Agent Client Protocol (ACP)
 
@@ -15,7 +15,8 @@ src/
 │   ├── agent.ts              # AgentConfig, agent settings (Claude/Codex/Gemini/Custom)
 │   └── errors.ts             # AcpError, ProcessError, ErrorInfo
 ├── acp/                      # ACP protocol (SDK dependency confined here)
-│   ├── acp-client.ts         # Process lifecycle, JSON-RPC, IAgentClient + ITerminalClient
+│   ├── acp-client.ts         # Process lifecycle, UI-facing API (AcpClient class)
+│   ├── acp-handler.ts        # SDK event handler (sessionUpdate, permissions, terminals)
 │   ├── type-converter.ts     # ACP SDK ↔ internal type conversion
 │   ├── permission-handler.ts # Permission queue, auto-approve, Promise resolution
 │   └── terminal-handler.ts   # Terminal process create/output/kill
@@ -103,16 +104,20 @@ Thin wrappers that:
 - `restoreSession()`: Load/resume with local message fallback
 - `forkSession()`: Create new branch from existing session
 
-### ACP Client (`acp/acp-client.ts`)
-Implements IAgentClient + ITerminalClient
+### ACP Client (`acp/acp-client.ts`) + ACP Handler (`acp/acp-handler.ts`)
+Two classes with distinct roles:
 
-- **Process**: spawn() with login shell (macOS/Linux -l, Windows shell:true)
-- **Protocol**: JSON-RPC over stdin/stdout via ndJsonStream
-- **Flow**: initialize() → newSession() → sendPrompt() → sessionUpdate via `onSessionUpdate`
-- **Updates**: agent_message_chunk, agent_thought_chunk, user_message_chunk, tool_call, tool_call_update, plan, available_commands_update, current_mode_update, session_info_update, usage_update, config_option_update
-- **Unified Callback**: Single `onSessionUpdate(callback)` for all agent events
-- **Permissions**: Promise-based via PermissionHandler
-- **Terminal**: TerminalHandler manages create/output/kill/release
+**AcpClient** — UI-facing API and process lifecycle:
+- spawn() with login shell, JSON-RPC via ndJsonStream
+- initialize() → newSession() → sendPrompt() → cancel() → disconnect()
+- Session management: listSessions, loadSession, resumeSession, forkSession
+- Owns PermissionManager, TerminalManager, AcpHandler
+
+**AcpHandler** — SDK event receiver (called by ClientSideConnection):
+- sessionUpdate: converts ACP types → domain types → callback
+- requestPermission → PermissionManager
+- Terminal operations (create/output/kill/release) → TerminalManager
+- Extension notifications (ignored gracefully)
 
 ### Services (`services/`)
 
@@ -143,29 +148,7 @@ type SessionUpdate =
 
 ### Key Interfaces
 
-Interfaces are defined in their implementation files (no separate port files):
-
 ```typescript
-// acp/acp-client.ts
-interface IAgentClient {
-  initialize(config: AgentConfig): Promise<InitializeResult>;
-  newSession(workingDirectory: string): Promise<SessionResult>;
-  authenticate(methodId: string): Promise<boolean>;
-  sendPrompt(sessionId: string, content: PromptContent[]): Promise<void>;
-  cancel(sessionId: string): Promise<void>;
-  disconnect(): Promise<void>;
-  onSessionUpdate(callback: (update: SessionUpdate) => void): void;
-  onError(callback: (error: ProcessError) => void): void;
-  respondToPermission(requestId: string, optionId: string): Promise<void>;
-  isInitialized(): boolean;
-  getCurrentAgentId(): string | null;
-  setSessionConfigOption(sessionId: string, configId: string, value: string): Promise<SessionConfigOption[]>;
-  listSessions(cwd?: string, cursor?: string): Promise<ListSessionsResult>;
-  loadSession(sessionId: string, cwd: string): Promise<SessionResult>;
-  resumeSession(sessionId: string, cwd: string): Promise<SessionResult>;
-  forkSession(sessionId: string, cwd: string): Promise<SessionResult>;
-}
-
 // services/vault-service.ts
 interface IVaultAccess {
   readNote(path: string): Promise<string>;
@@ -193,7 +176,7 @@ interface ISettingsAccess {
 ### Architecture
 1. **ChatPanel as orchestrator**: All hooks called in ChatPanel, renders children directly
 2. **Services for non-React logic**: Pure functions and classes in `services/`
-3. **ACP isolation**: All `@agentclientprotocol/sdk` imports confined to `acp/`
+3. **ACP isolation**: All `@agentclientprotocol/sdk` imports confined to `acp/`. AcpClient is UI-facing, AcpHandler is SDK-facing.
 4. **Types have zero deps**: No `obsidian`, no SDK, no React in `types/`
 5. **Unified callbacks**: Use `onSessionUpdate` for all agent events
 6. **Context for services**: plugin, acpClient, vaultService via ChatContext
@@ -243,7 +226,7 @@ interface ISettingsAccess {
 2. If adding new session update type:
    - Add to `SessionUpdate` union in `types/session.ts`
    - Handle in `hooks/useMessages.ts` `handleSessionUpdate()`
-3. Update `acp/acp-client.ts` `sessionUpdate()` to emit the new type
+3. Update `acp/acp-handler.ts` `sessionUpdate()` to emit the new type
 4. Update `ui/MessageBubble.tsx` `ContentBlock` to render new type
 
 ### Add New Session Update Type
@@ -256,7 +239,7 @@ interface ISettingsAccess {
 ### Debug
 1. Settings → Developer Settings → Debug Mode ON
 2. Open DevTools (Cmd+Option+I / Ctrl+Shift+I)
-3. Filter logs: `[AcpAdapter]`, `[useMessages]`, `[VaultService]`, `[ChatPanel]`
+3. Filter logs: `[AcpClient]`, `[AcpHandler]`, `[useMessages]`, `[VaultService]`, `[ChatPanel]`
 
 ## ACP Protocol
 
@@ -275,4 +258,4 @@ interface ISettingsAccess {
 
 ---
 
-**Last Updated**: March 2026 | **Architecture**: ChatPanel + React Hooks | **Version**: 0.9.1
+**Last Updated**: March 2026 | **Architecture**: ChatPanel + React Hooks | **Version**: 0.10.0-preview.1
