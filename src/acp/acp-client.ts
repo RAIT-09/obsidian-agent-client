@@ -2,7 +2,6 @@ import { spawn, ChildProcess } from "child_process";
 import * as acp from "@agentclientprotocol/sdk";
 import { Platform } from "obsidian";
 
-
 import type {
 	InitializeResult,
 	SessionConfigOption,
@@ -18,9 +17,12 @@ import { TerminalManager } from "./terminal-handler";
 import { PermissionManager } from "./permission-handler";
 import { getLogger, Logger } from "../utils/logger";
 import type AgentClientPlugin from "../plugin";
-import { convertWindowsPathToWsl, getEnhancedWindowsEnv, prepareShellCommand } from "../utils/platform";
+import {
+	convertWindowsPathToWsl,
+	getEnhancedWindowsEnv,
+	prepareShellCommand,
+} from "../utils/platform";
 import { resolveNodeDirectory } from "../utils/paths";
-
 
 // ============================================================================
 // Port Types (from agent-client.port.ts and terminal-client.port.ts)
@@ -746,14 +748,10 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 	 * Authenticate with the agent using a specific method.
 	 */
 	async authenticate(methodId: string): Promise<boolean> {
-		if (!this.connection) {
-			throw new Error(
-				"Connection not initialized. Call initialize() first.",
-			);
-		}
+		const connection = this.requireConnection();
 
 		try {
-			await this.connection.authenticate({ methodId });
+			await connection.authenticate({ methodId });
 			this.logger.log("[AcpClient] ✅ authenticate ok:", methodId);
 			return true;
 		} catch (error: unknown) {
@@ -769,11 +767,7 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 		sessionId: string,
 		content: PromptContent[],
 	): Promise<void> {
-		if (!this.connection) {
-			throw new Error(
-				"Connection not initialized. Call initialize() first.",
-			);
-		}
+		const connection = this.requireConnection();
 
 		// Reset current message for new assistant response
 		this.resetCurrentMessage();
@@ -790,7 +784,7 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 				`[AcpClient] Sending prompt with ${content.length} content blocks`,
 			);
 
-			const promptResult = await this.connection.prompt({
+			const promptResult = await connection.prompt({
 				sessionId: sessionId,
 				prompt: acpContent,
 			});
@@ -871,33 +865,19 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 	 * Cancel the current operation in a session.
 	 */
 	async cancel(sessionId: string): Promise<void> {
-		if (!this.connection) {
-			this.logger.warn("[AcpClient] Cannot cancel: no connection");
-			return;
-		}
-
 		try {
+			const connection = this.requireConnection();
+
 			this.logger.log(
 				"[AcpClient] Sending session/cancel notification...",
 			);
-
-			await this.connection.cancel({
-				sessionId: sessionId,
-			});
-
+			await connection.cancel({ sessionId });
 			this.logger.log(
 				"[AcpClient] Cancellation request sent successfully",
 			);
-
-			// Cancel all running operations (permission requests + terminals)
-			this.cancelAllOperations();
 		} catch (error) {
-			this.logger.error(
-				"[AcpClient] Failed to send cancellation:",
-				error,
-			);
-
-			// Still cancel all operations even if network cancellation failed
+			this.logger.warn("[AcpClient] Failed to send cancellation:", error);
+		} finally {
 			this.cancelAllOperations();
 		}
 	}
@@ -965,27 +945,20 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 	 * Implementation of IAgentClient.setSessionMode()
 	 */
 	async setSessionMode(sessionId: string, modeId: string): Promise<void> {
-		if (!this.connection) {
-			throw new Error(
-				"Connection not initialized. Call initialize() first.",
-			);
-		}
+		const connection = this.requireConnection();
 
 		this.logger.log(
 			`[AcpClient] Setting session mode to: ${modeId} for session: ${sessionId}`,
 		);
 
 		try {
-			await this.connection.setSessionMode({
+			await connection.setSessionMode({
 				sessionId,
 				modeId,
 			});
 			this.logger.log(`[AcpClient] Session mode set to: ${modeId}`);
 		} catch (error) {
-			this.logger.error(
-				"[AcpClient] Failed to set session mode:",
-				error,
-			);
+			this.logger.error("[AcpClient] Failed to set session mode:", error);
 			throw error;
 		}
 	}
@@ -996,18 +969,14 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 	 * Implementation of IAgentClient.setSessionModel()
 	 */
 	async setSessionModel(sessionId: string, modelId: string): Promise<void> {
-		if (!this.connection) {
-			throw new Error(
-				"Connection not initialized. Call initialize() first.",
-			);
-		}
+		const connection = this.requireConnection();
 
 		this.logger.log(
 			`[AcpClient] Setting session model to: ${modelId} for session: ${sessionId}`,
 		);
 
 		try {
-			await this.connection.unstable_setSessionModel({
+			await connection.unstable_setSessionModel({
 				sessionId,
 				modelId,
 			});
@@ -1033,18 +1002,14 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 		configId: string,
 		value: string,
 	): Promise<SessionConfigOption[]> {
-		if (!this.connection) {
-			throw new Error(
-				"Connection not initialized. Call initialize() first.",
-			);
-		}
+		const connection = this.requireConnection();
 
 		this.logger.log(
 			`[AcpClient] Setting config option: ${configId}=${value} for session: ${sessionId}`,
 		);
 
 		try {
-			const response = await this.connection.setSessionConfigOption({
+			const response = await connection.setSessionConfigOption({
 				sessionId,
 				configId,
 				value,
@@ -1095,11 +1060,7 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 	 * Respond to a permission request from the agent.
 	 */
 	respondToPermission(requestId: string, optionId: string): Promise<void> {
-		if (!this.connection) {
-			throw new Error(
-				"ACP connection not initialized. Call initialize() first.",
-			);
-		}
+		this.requireConnection();
 
 		this.logger.log(
 			"[AcpClient] Responding to permission request:",
@@ -1551,10 +1512,7 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 	 * @param cwd - Working directory
 	 * @returns Promise resolving to session result with modes and models
 	 */
-	async loadSession(
-		sessionId: string,
-		cwd: string,
-	): Promise<SessionResult> {
+	async loadSession(sessionId: string, cwd: string): Promise<SessionResult> {
 		const connection = this.requireConnection();
 
 		try {
@@ -1615,10 +1573,7 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 	 * @param cwd - Working directory
 	 * @returns Promise resolving to session result with new sessionId
 	 */
-	async forkSession(
-		sessionId: string,
-		cwd: string,
-	): Promise<SessionResult> {
+	async forkSession(sessionId: string, cwd: string): Promise<SessionResult> {
 		const connection = this.requireConnection();
 
 		try {
