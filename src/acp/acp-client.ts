@@ -58,34 +58,26 @@ export interface TerminalOutputResult {
  * ACP client for agent communication and process lifecycle management.
  */
 export class AcpClient {
+	// Connection & process
 	private connection: acp.ClientSideConnection | null = null;
 	private agentProcess: ChildProcess | null = null;
-	private logger: Logger;
-
-	// Error callback for process-level errors
-	private errorCallback: ((error: ProcessError) => void) | null = null;
-
-	// Message update callback for permission UI updates
-	private updateMessage: (
-		toolCallId: string,
-		content: MessageContent,
-	) => void;
-
-	// Configuration state
 	private currentConfig: AgentConfig | null = null;
 	private isInitializedFlag = false;
 	private currentAgentId: string | null = null;
 
-	// Shared resources
+	// Callbacks
+	private errorCallback: ((error: ProcessError) => void) | null = null;
+	private updateMessage: (toolCallId: string, content: MessageContent) => void;
+
+	// Delegates
 	private terminalManager: TerminalManager;
 	private permissionManager: PermissionManager;
-
-	// Protocol handler (receives events from ACP SDK)
 	private handler: AcpHandler;
 
-	private currentMessageId: string | null = null;
-	// Captures recent stderr output for error diagnostics
+	// Prompt state (reset per sendPrompt)
 	private recentStderr = "";
+
+	private logger: Logger;
 
 	constructor(private plugin: AgentClientPlugin) {
 		this.logger = getLogger();
@@ -440,8 +432,6 @@ export class AcpClient {
 	): Promise<void> {
 		const connection = this.requireConnection();
 
-		// Reset current message for new assistant response
-		this.resetCurrentMessage();
 		this.handler.resetUpdateCount();
 		this.recentStderr = "";
 
@@ -753,10 +743,6 @@ export class AcpClient {
 			return convertWindowsPathToWsl(cwd);
 		}
 		return cwd;
-	}
-
-	private resetCurrentMessage(): void {
-		this.currentMessageId = null;
 	}
 
 	private cancelAllOperations(): void {
