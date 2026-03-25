@@ -372,67 +372,11 @@ export class AcpClient {
 			this.logger.log(
 				`[AcpClient] ✅ Connected to agent (protocol v${initResult.protocolVersion})`,
 			);
-			this.logger.log(
-				"[AcpClient] Auth methods:",
-				initResult.authMethods,
-			);
-			this.logger.log(
-				"[AcpClient] Agent capabilities:",
-				initResult.agentCapabilities,
-			);
 
-			// Mark as initialized and store agent ID
 			this.isInitializedFlag = true;
 			this.currentAgentId = config.id;
 
-			// Extract capabilities from agent capabilities
-			const promptCaps = initResult.agentCapabilities?.promptCapabilities;
-			const mcpCaps = initResult.agentCapabilities?.mcpCapabilities;
-			const sessionCaps =
-				initResult.agentCapabilities?.sessionCapabilities;
-
-			return {
-				protocolVersion: initResult.protocolVersion,
-				authMethods: initResult.authMethods || [],
-				// Convenience accessor for prompt capabilities
-				promptCapabilities: {
-					image: promptCaps?.image ?? false,
-					audio: promptCaps?.audio ?? false,
-					embeddedContext: promptCaps?.embeddedContext ?? false,
-				},
-				// Full agent capabilities
-				agentCapabilities: {
-					loadSession:
-						initResult.agentCapabilities?.loadSession ?? false,
-					// Session capabilities (unstable features)
-					sessionCapabilities: sessionCaps
-						? {
-								resume: sessionCaps.resume ?? undefined,
-								fork: sessionCaps.fork ?? undefined,
-								list: sessionCaps.list ?? undefined,
-							}
-						: undefined,
-					mcpCapabilities: mcpCaps
-						? {
-								http: mcpCaps.http ?? false,
-								sse: mcpCaps.sse ?? false,
-							}
-						: undefined,
-					promptCapabilities: {
-						image: promptCaps?.image ?? false,
-						audio: promptCaps?.audio ?? false,
-						embeddedContext: promptCaps?.embeddedContext ?? false,
-					},
-				},
-				// Agent implementation info
-				agentInfo: initResult.agentInfo
-					? {
-							name: initResult.agentInfo.name,
-							title: initResult.agentInfo.title ?? undefined,
-							version: initResult.agentInfo.version ?? undefined,
-						}
-					: undefined,
-			};
+			return AcpTypeConverter.toInitializeResult(initResult);
 		} catch (error) {
 			this.logger.error("[AcpClient] Initialization Error:", error);
 

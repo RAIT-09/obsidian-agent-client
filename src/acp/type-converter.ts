@@ -1,6 +1,7 @@
 import * as acp from "@agentclientprotocol/sdk";
 import type { ToolCallContent, PromptContent } from "../types/chat";
 import type {
+	InitializeResult,
 	SessionConfigOption,
 	SessionConfigSelectGroup,
 	SessionConfigSelectOption,
@@ -218,5 +219,55 @@ export class AcpTypeConverter {
 					size: content.size,
 				};
 		}
+	}
+
+	/**
+	 * Convert ACP InitializeResponse to domain InitializeResult.
+	 */
+	static toInitializeResult(
+		initResult: acp.InitializeResponse,
+	): InitializeResult {
+		const promptCaps = initResult.agentCapabilities?.promptCapabilities;
+		const mcpCaps = initResult.agentCapabilities?.mcpCapabilities;
+		const sessionCaps = initResult.agentCapabilities?.sessionCapabilities;
+
+		return {
+			protocolVersion: initResult.protocolVersion,
+			authMethods: initResult.authMethods || [],
+			promptCapabilities: {
+				image: promptCaps?.image ?? false,
+				audio: promptCaps?.audio ?? false,
+				embeddedContext: promptCaps?.embeddedContext ?? false,
+			},
+			agentCapabilities: {
+				loadSession:
+					initResult.agentCapabilities?.loadSession ?? false,
+				sessionCapabilities: sessionCaps
+					? {
+							resume: sessionCaps.resume ?? undefined,
+							fork: sessionCaps.fork ?? undefined,
+							list: sessionCaps.list ?? undefined,
+						}
+					: undefined,
+				mcpCapabilities: mcpCaps
+					? {
+							http: mcpCaps.http ?? false,
+							sse: mcpCaps.sse ?? false,
+						}
+					: undefined,
+				promptCapabilities: {
+					image: promptCaps?.image ?? false,
+					audio: promptCaps?.audio ?? false,
+					embeddedContext: promptCaps?.embeddedContext ?? false,
+				},
+			},
+			agentInfo: initResult.agentInfo
+				? {
+						name: initResult.agentInfo.name,
+						title: initResult.agentInfo.title ?? undefined,
+						version: initResult.agentInfo.version ?? undefined,
+					}
+				: undefined,
+		};
 	}
 }
