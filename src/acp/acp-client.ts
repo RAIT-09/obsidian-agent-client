@@ -14,6 +14,7 @@ import type { ProcessError } from "../types/errors";
 import { AcpTypeConverter } from "./type-converter";
 import { TerminalManager } from "./terminal-handler";
 import { PermissionManager } from "./permission-handler";
+import { AcpHandler } from "./acp-handler";
 import { getLogger, Logger } from "../utils/logger";
 import type AgentClientPlugin from "../plugin";
 import {
@@ -343,10 +344,6 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 	private agentProcess: ChildProcess | null = null;
 	private logger: Logger;
 
-	// Session update callback (unified callback for all session updates)
-	private sessionUpdateCallback: ((update: SessionUpdate) => void) | null =
-		null;
-
 	// Error callback for process-level errors
 	private errorCallback: ((error: ProcessError) => void) | null = null;
 
@@ -360,15 +357,15 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 	private currentConfig: AgentConfig | null = null;
 	private isInitializedFlag = false;
 	private currentAgentId: string | null = null;
-	// ACP protocol handler properties
+
+	// Shared resources
 	private terminalManager: TerminalManager;
 	private permissionManager: PermissionManager;
-	private currentMessageId: string | null = null;
 
-	// Tracks whether any session update was received during the current prompt.
-	// Used to detect silent failures (e.g., missing API keys) where the agent
-	// returns end_turn with no content.
-	private promptSessionUpdateCount = 0;
+	// Protocol handler (receives events from ACP SDK)
+	private handler: AcpHandler;
+
+	private currentMessageId: string | null = null;
 	// Captures recent stderr output for error diagnostics
 	private recentStderr = "";
 
@@ -382,11 +379,19 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 		this.permissionManager = new PermissionManager(
 			{
 				onSessionUpdate: (update) =>
-					this.sessionUpdateCallback?.(update),
+					this.handler.emitSessionUpdate(update),
 				onUpdateMessage: (id, content) =>
 					this.updateMessage(id, content),
 			},
 			false, // autoAllow — updated in initialize()
+		);
+
+		// Initialize protocol handler
+		this.handler = new AcpHandler(
+			this.permissionManager,
+			this.terminalManager,
+			() => this.currentConfig?.workingDirectory ?? "",
+			this.logger,
 		);
 	}
 
@@ -625,7 +630,7 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 		);
 
 		const stream = acp.ndJsonStream(input, output);
-		this.connection = new acp.ClientSideConnection(() => this, stream);
+		this.connection = new acp.ClientSideConnection(() => this.handler, stream);
 
 		try {
 			this.logger.log("[AcpClient] Starting ACP initialization...");
@@ -775,7 +780,7 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 
 		// Reset current message for new assistant response
 		this.resetCurrentMessage();
-		this.promptSessionUpdateCount = 0;
+		this.handler.resetUpdateCount();
 		this.recentStderr = "";
 
 		try {
@@ -802,7 +807,7 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 			// (e.g., missing API key). Some commands like /compact legitimately
 			// return no session updates, so we avoid false positives.
 			if (
-				this.promptSessionUpdateCount === 0 &&
+				!this.handler.hasReceivedUpdates() &&
 				promptResult.stopReason === "end_turn"
 			) {
 				// Allow pending stderr data events to flush before checking
@@ -1047,7 +1052,7 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 	 * - current_mode_update: Mode changed
 	 */
 	onSessionUpdate(callback: (update: SessionUpdate) => void): void {
-		this.sessionUpdateCallback = callback;
+		this.handler.onSessionUpdate(callback);
 	}
 
 	/**
@@ -1101,236 +1106,13 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 		return cwd;
 	}
 
-	// ========================================================================
-	// ACP Client Protocol Handlers
-	// ========================================================================
-
-	/**
-	 * Handle session updates from the ACP protocol.
-	 * This is called by ClientSideConnection when the agent sends updates.
-	 */
-	sessionUpdate(params: acp.SessionNotification): Promise<void> {
-		const update = params.update;
-		const sessionId = params.sessionId;
-		this.promptSessionUpdateCount++;
-		this.logger.log("[AcpClient] sessionUpdate:", { sessionId, update });
-
-		switch (update.sessionUpdate) {
-			case "agent_message_chunk":
-				if (update.content.type === "text") {
-					this.sessionUpdateCallback?.({
-						type: "agent_message_chunk",
-						sessionId,
-						text: update.content.text,
-					});
-				}
-				break;
-
-			case "agent_thought_chunk":
-				if (update.content.type === "text") {
-					this.sessionUpdateCallback?.({
-						type: "agent_thought_chunk",
-						sessionId,
-						text: update.content.text,
-					});
-				}
-				break;
-
-			case "user_message_chunk":
-				// Used for session/load to reconstruct user messages
-				if (update.content.type === "text") {
-					this.sessionUpdateCallback?.({
-						type: "user_message_chunk",
-						sessionId,
-						text: update.content.text,
-					});
-				}
-				// Note: image, resource etc. ContentBlock types are not yet supported
-				break;
-
-			case "tool_call":
-			case "tool_call_update": {
-				this.sessionUpdateCallback?.({
-					type: update.sessionUpdate,
-					sessionId,
-					toolCallId: update.toolCallId,
-					title: update.title ?? undefined,
-					status: update.status || "pending",
-					kind: update.kind ?? undefined,
-					content: AcpTypeConverter.toToolCallContent(update.content),
-					locations: update.locations ?? undefined,
-					rawInput: update.rawInput as
-						| { [k: string]: unknown }
-						| undefined,
-				});
-				break;
-			}
-
-			case "plan":
-				this.sessionUpdateCallback?.({
-					type: "plan",
-					sessionId,
-					entries: update.entries,
-				});
-				break;
-
-			case "available_commands_update": {
-				this.logger.log(
-					`[AcpClient] available_commands_update, commands:`,
-					update.availableCommands,
-				);
-
-				this.sessionUpdateCallback?.({
-					type: "available_commands_update",
-					sessionId,
-					commands: AcpTypeConverter.toSlashCommands(update.availableCommands),
-				});
-				break;
-			}
-
-			case "current_mode_update": {
-				this.logger.log(
-					`[AcpClient] current_mode_update: ${update.currentModeId}`,
-				);
-
-				this.sessionUpdateCallback?.({
-					type: "current_mode_update",
-					sessionId,
-					currentModeId: update.currentModeId,
-				});
-				break;
-			}
-
-			case "session_info_update": {
-				this.logger.log(`[AcpClient] session_info_update:`, {
-					title: update.title,
-					updatedAt: update.updatedAt,
-				});
-
-				this.sessionUpdateCallback?.({
-					type: "session_info_update",
-					sessionId,
-					title: update.title,
-					updatedAt: update.updatedAt,
-				});
-				break;
-			}
-
-			case "usage_update": {
-				this.logger.log(`[AcpClient] usage_update:`, {
-					size: update.size,
-					used: update.used,
-					cost: update.cost,
-				});
-
-				this.sessionUpdateCallback?.({
-					type: "usage_update",
-					sessionId,
-					size: update.size,
-					used: update.used,
-					cost: update.cost ?? undefined,
-				});
-				break;
-			}
-
-			case "config_option_update": {
-				this.logger.log(
-					`[AcpClient] config_option_update:`,
-					update.configOptions,
-				);
-
-				this.sessionUpdateCallback?.({
-					type: "config_option_update",
-					sessionId,
-					configOptions: AcpTypeConverter.toSessionConfigOptions(
-						update.configOptions,
-					),
-				});
-				break;
-			}
-		}
-		return Promise.resolve();
-	}
-
-	/**
-	 * Reset the current message ID.
-	 */
 	private resetCurrentMessage(): void {
 		this.currentMessageId = null;
 	}
 
-	/**
-	 * Cancel all ongoing operations.
-	 */
 	private cancelAllOperations(): void {
 		this.permissionManager.cancelAll();
 		this.terminalManager.killAllTerminals();
-	}
-
-	/**
-	 * Request permission from user for an operation.
-	 * Called by ACP ClientSideConnection dispatch.
-	 */
-	requestPermission(
-		params: acp.RequestPermissionRequest,
-	): Promise<acp.RequestPermissionResponse> {
-		return this.permissionManager.request(params);
-	}
-
-	// ========================================================================
-	// ACP Extension Handlers
-	// ========================================================================
-
-	/**
-	 * Handle custom notifications from agents (ACP extensibility).
-	 *
-	 * ACP agents may send custom notifications prefixed with underscore (e.g.,
-	 * `_kiro.dev/commands/available`). Per the ACP spec, clients SHOULD ignore
-	 * unrecognized notifications. Without this handler, the SDK raises
-	 * `methodNotFound` errors for these notifications.
-	 *
-	 * @see https://agentclientprotocol.com/protocol/extensibility#custom-notifications
-	 */
-	async extNotification(
-		method: string,
-		params: Record<string, unknown>,
-	): Promise<void> {
-		this.logger.log(
-			`[AcpClient] Extension notification received: ${method}`,
-			params,
-		);
-	}
-
-	// ========================================================================
-	// Terminal Operations
-	// ========================================================================
-
-	readTextFile(params: acp.ReadTextFileRequest) {
-		return Promise.resolve({ content: "" });
-	}
-
-	writeTextFile(params: acp.WriteTextFileRequest) {
-		return Promise.resolve({});
-	}
-
-	createTerminal(
-		params: acp.CreateTerminalRequest,
-	): Promise<acp.CreateTerminalResponse> {
-		this.logger.log(
-			"[AcpClient] createTerminal called with params:",
-			params,
-		);
-
-		const terminalId = this.terminalManager.createTerminal({
-			command: params.command,
-			args: params.args,
-			cwd: params.cwd || this.currentConfig?.workingDirectory || "",
-			env: params.env ?? undefined,
-			outputByteLimit: params.outputByteLimit ?? undefined,
-		});
-		return Promise.resolve({
-			terminalId,
-		});
 	}
 
 	/**
@@ -1342,45 +1124,6 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 			throw new Error(`Terminal ${terminalId} not found`);
 		}
 		return Promise.resolve(result);
-	}
-
-	/**
-	 * ACP protocol handler for terminal output.
-	 * Called by ClientSideConnection dispatch. Delegates to getTerminalOutput.
-	 */
-	terminalOutput(
-		params: acp.TerminalOutputRequest,
-	): Promise<acp.TerminalOutputResponse> {
-		return this.getTerminalOutput(params.terminalId);
-	}
-
-	async waitForTerminalExit(
-		params: acp.WaitForTerminalExitRequest,
-	): Promise<acp.WaitForTerminalExitResponse> {
-		return await this.terminalManager.waitForExit(params.terminalId);
-	}
-
-	killTerminal(
-		params: acp.KillTerminalCommandRequest,
-	): Promise<acp.KillTerminalCommandResponse> {
-		const success = this.terminalManager.killTerminal(params.terminalId);
-		if (!success) {
-			throw new Error(`Terminal ${params.terminalId} not found`);
-		}
-		return Promise.resolve({});
-	}
-
-	releaseTerminal(
-		params: acp.ReleaseTerminalRequest,
-	): Promise<acp.ReleaseTerminalResponse> {
-		const success = this.terminalManager.releaseTerminal(params.terminalId);
-		// Don't throw error if terminal not found - it may have been already cleaned up
-		if (!success) {
-			this.logger.log(
-				`[AcpClient] releaseTerminal: Terminal ${params.terminalId} not found (may have been already cleaned up)`,
-			);
-		}
-		return Promise.resolve({});
 	}
 
 	// ========================================================================
