@@ -8,7 +8,6 @@ import type {
 	SessionUpdate,
 	ListSessionsResult,
 	SessionResult,
-	SlashCommand,
 } from "../types/session";
 import type { MessageContent, PromptContent } from "../types/chat";
 import type { ProcessError } from "../types/errors";
@@ -1243,18 +1242,10 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 					update.availableCommands,
 				);
 
-				const commands: SlashCommand[] = (
-					update.availableCommands || []
-				).map((cmd) => ({
-					name: cmd.name,
-					description: cmd.description,
-					hint: cmd.input?.hint ?? null,
-				}));
-
 				this.sessionUpdateCallback?.({
 					type: "available_commands_update",
 					sessionId,
-					commands,
+					commands: AcpTypeConverter.toSlashCommands(update.availableCommands),
 				});
 				break;
 			}

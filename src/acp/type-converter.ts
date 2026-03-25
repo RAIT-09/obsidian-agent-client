@@ -5,6 +5,7 @@ import type {
 	SessionConfigSelectGroup,
 	SessionConfigSelectOption,
 	SessionResult,
+	SlashCommand,
 } from "../types/session";
 
 /**
@@ -40,6 +41,19 @@ export class AcpTypeConverter {
 	 * @param acpContent - Tool call content from ACP protocol
 	 * @returns Domain model tool call content, or undefined if input is null/empty
 	 */
+	/**
+	 * Convert ACP AvailableCommand[] to domain SlashCommand[].
+	 */
+	static toSlashCommands(
+		acpCommands: acp.AvailableCommand[] | undefined | null,
+	): SlashCommand[] {
+		return (acpCommands || []).map((cmd) => ({
+			name: cmd.name,
+			description: cmd.description,
+			hint: cmd.input?.hint ?? null,
+		}));
+	}
+
 	static toToolCallContent(
 		acpContent: acp.ToolCallContent[] | undefined | null,
 	): ToolCallContent[] | undefined {
