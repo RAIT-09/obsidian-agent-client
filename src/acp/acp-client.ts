@@ -22,7 +22,11 @@ import {
 	prepareShellCommand,
 } from "../utils/platform";
 import { resolveNodeDirectory } from "../utils/paths";
-import { extractStderrErrorHint } from "../utils/error-utils";
+import {
+	extractStderrErrorHint,
+	getSpawnErrorInfo,
+	getCommandNotFoundSuggestion,
+} from "../utils/error-utils";
 
 // ============================================================================
 // Port Types (from agent-client.port.ts and terminal-client.port.ts)
@@ -538,7 +542,7 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 				agentId: config.id,
 				errorCode: (error as NodeJS.ErrnoException).code,
 				originalError: error,
-				...this.getErrorInfo(error, command, agentLabel),
+				...getSpawnErrorInfo(error, command, agentLabel, this.plugin.settings.windowsWslMode),
 			};
 
 			this.errorCallback?.(processError);
@@ -561,7 +565,7 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 					exitCode: code,
 					title: "Command Not Found",
 					message: `The command "${command}" could not be found. Please check the path configuration for ${agentLabel}.`,
-					suggestion: this.getCommandNotFoundSuggestion(command),
+					suggestion: getCommandNotFoundSuggestion(command, this.plugin.settings.windowsWslMode),
 				};
 
 				this.errorCallback?.(processError);
@@ -1095,45 +1099,6 @@ export class AcpClient implements IAgentClient, ITerminalClient {
 			return convertWindowsPathToWsl(cwd);
 		}
 		return cwd;
-	}
-
-	/**
-	 * Get error information for process spawn errors.
-	 */
-	private getErrorInfo(
-		error: Error,
-		command: string,
-		agentLabel: string,
-	): { title: string; message: string; suggestion: string } {
-		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-			return {
-				title: "Command Not Found",
-				message: `The command "${command}" could not be found. Please check the path configuration for ${agentLabel}.`,
-				suggestion: this.getCommandNotFoundSuggestion(command),
-			};
-		}
-
-		return {
-			title: "Agent Startup Error",
-			message: `Failed to start ${agentLabel}: ${error.message}`,
-			suggestion: "Please check the agent configuration in settings.",
-		};
-	}
-
-	/**
-	 * Get platform-specific suggestions for command not found errors.
-	 */
-	private getCommandNotFoundSuggestion(command: string): string {
-		const commandName =
-			command.split("/").pop()?.split("\\").pop() || "command";
-
-		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
-			return `1. Verify the agent path: Use "which ${commandName}" in your WSL terminal to find the correct path. 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "which node" to find it).`;
-		} else if (Platform.isWin) {
-			return `1. Verify the agent path: Use "where ${commandName}" in Command Prompt to find the correct path. 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "where node" to find it).`;
-		} else {
-			return `1. Verify the agent path: Use "which ${commandName}" in Terminal to find the correct path. 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "which node" to find it).`;
-		}
 	}
 
 	// ========================================================================

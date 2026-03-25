@@ -8,6 +8,7 @@
  * and provide appropriate titles and suggestions based on error codes.
  */
 
+import { Platform } from "obsidian";
 import {
 	AcpErrorCode,
 	type AcpError,
@@ -227,4 +228,51 @@ export function isUserAbortedError(error: unknown): boolean {
 
 	const message = extractErrorMessage(error);
 	return message.includes("user aborted");
+}
+
+// ============================================================================
+// Process Error Functions
+// ============================================================================
+
+/**
+ * Get error information for process spawn errors.
+ */
+export function getSpawnErrorInfo(
+	error: Error,
+	command: string,
+	agentLabel: string,
+	wslMode: boolean,
+): { title: string; message: string; suggestion: string } {
+	if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+		return {
+			title: "Command Not Found",
+			message: `The command "${command}" could not be found. Please check the path configuration for ${agentLabel}.`,
+			suggestion: getCommandNotFoundSuggestion(command, wslMode),
+		};
+	}
+
+	return {
+		title: "Agent Startup Error",
+		message: `Failed to start ${agentLabel}: ${error.message}`,
+		suggestion: "Please check the agent configuration in settings.",
+	};
+}
+
+/**
+ * Get platform-specific suggestions for command not found errors.
+ */
+export function getCommandNotFoundSuggestion(
+	command: string,
+	wslMode: boolean,
+): string {
+	const commandName =
+		command.split("/").pop()?.split("\\").pop() || "command";
+
+	if (Platform.isWin && wslMode) {
+		return `1. Verify the agent path: Use "which ${commandName}" in your WSL terminal to find the correct path. 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "which node" to find it).`;
+	} else if (Platform.isWin) {
+		return `1. Verify the agent path: Use "where ${commandName}" in Command Prompt to find the correct path. 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "where node" to find it).`;
+	} else {
+		return `1. Verify the agent path: Use "which ${commandName}" in Terminal to find the correct path. 2. If the agent requires Node.js, also check that Node.js path is correctly set in General Settings (use "which node" to find it).`;
+	}
 }
