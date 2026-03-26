@@ -21,7 +21,7 @@ interface ToolCallRendererProps {
 	) => Promise<void>;
 }
 
-export function ToolCallRenderer({
+export const ToolCallRenderer = React.memo(function ToolCallRenderer({
 	content,
 	plugin,
 	acpClient,
@@ -689,4 +689,4 @@ function DiffRenderer({
 			)}
 		</div>
 	);
-}
+});
