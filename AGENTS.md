@@ -251,9 +251,9 @@ interface ISettingsAccess {
 **Session Management** (unstable): session/list, session/load, session/resume, session/fork
 
 **Agents**:
-- Claude Code: `@zed-industries/claude-agent-acp` (ANTHROPIC_API_KEY)
+- Claude Code: `@agentclientprotocol/claude-agent-acp` (ANTHROPIC_API_KEY)
 - Codex: `@zed-industries/codex-acp` (OPENAI_API_KEY)
-- Gemini CLI: `@anthropics/gemini-cli-acp` (GEMINI_API_KEY)
+- Gemini CLI: `@google/gemini-cli` (GEMINI_API_KEY)
 - Custom: Any ACP-compatible agent
 
 ---

@@ -8,7 +8,7 @@ Agent Client supports multiple AI agents. Choose one to start:
 
 | Agent | Provider | Integration |
 |-------|----------|-------------|
-| **[Claude Code](/agent-setup/claude-code)** | Anthropic | via [Zed's SDK adapter](https://github.com/zed-industries/claude-agent-acp) |
+| **[Claude Code](/agent-setup/claude-code)** | Anthropic | via [ACP adapter](https://github.com/agentclientprotocol/claude-agent-acp) |
 | **[Codex](/agent-setup/codex)** | OpenAI | via [Zed's adapter](https://github.com/zed-industries/codex-acp) |
 | **[Gemini CLI](/agent-setup/gemini-cli)** | Google | with `--experimental-acp` option |
 | **[Custom](/agent-setup/custom-agents)** | Various | [Any ACP-compatible agent](https://agentclientprotocol.com/overview/agents) (e.g., OpenCode, Qwen Code, Kiro) |

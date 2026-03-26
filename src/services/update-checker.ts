@@ -41,7 +41,8 @@ export interface AgentUpdateNotification {
  * so we handle both forms.
  */
 const KNOWN_AGENT_PACKAGES: Readonly<Record<string, string>> = {
-	"@zed-industries/claude-agent-acp": "@zed-industries/claude-agent-acp",
+	"@agentclientprotocol/claude-agent-acp":
+		"@agentclientprotocol/claude-agent-acp",
 	"codex-acp": "@zed-industries/codex-acp",
 };
 
@@ -50,7 +51,8 @@ const KNOWN_AGENT_PACKAGES: Readonly<Record<string, string>> = {
  * Used to detect users still running old/renamed packages.
  */
 const DEPRECATED_PACKAGES: Readonly<Record<string, string>> = {
-	"@zed-industries/claude-code-acp": "@zed-industries/claude-agent-acp",
+	"@zed-industries/claude-code-acp": "@agentclientprotocol/claude-agent-acp",
+	"@zed-industries/claude-agent-acp": "@agentclientprotocol/claude-agent-acp",
 };
 
 // ============================================================================
