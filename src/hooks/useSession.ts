@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
+import * as React from "react";
+const { useState, useCallback, useEffect } = React;
 import {
 	flattenConfigSelectOptions,
 	type ChatSession,
@@ -6,8 +7,8 @@ import {
 	type SessionModelState,
 	type SessionUsage,
 	type SlashCommand,
-	type AuthenticationMethod,
 	type SessionConfigOption,
+	type SessionResult,
 } from "../types/session";
 import type { AcpClient } from "../acp/acp-client";
 import type { ISettingsAccess } from "../services/settings-service";
@@ -166,6 +167,102 @@ function applyLegacyValue(
 }
 
 // ============================================================================
+// Config Restore Helpers
+// ============================================================================
+
+/**
+ * Try to restore a saved config option value by category.
+ * Returns updated configOptions if restored, or the original if unchanged.
+ */
+async function tryRestoreConfigOption(
+	agentClient: AcpClient,
+	sessionId: string,
+	configOptions: SessionConfigOption[],
+	category: string,
+	savedValue: string | undefined,
+): Promise<SessionConfigOption[]> {
+	if (!savedValue) return configOptions;
+
+	const option = configOptions.find((o) => o.category === category);
+	if (!option) return configOptions;
+	if (savedValue === option.currentValue) return configOptions;
+	if (
+		!flattenConfigSelectOptions(option.options).some(
+			(o) => o.value === savedValue,
+		)
+	)
+		return configOptions;
+
+	try {
+		return await agentClient.setSessionConfigOption(
+			sessionId,
+			option.id,
+			savedValue,
+		);
+	} catch {
+		return configOptions;
+	}
+}
+
+/**
+ * Restore last used mode/model via legacy APIs.
+ * Only called when configOptions is not available.
+ */
+async function restoreLegacyConfig(
+	agentClient: AcpClient,
+	sessionResult: SessionResult,
+	savedModelId: string | undefined,
+	savedModeId: string | undefined,
+	setSession: React.Dispatch<React.SetStateAction<ChatSession>>,
+): Promise<void> {
+	if (!sessionResult.sessionId) return;
+
+	// Legacy model restore
+	if (sessionResult.models && savedModelId) {
+		if (
+			savedModelId !== sessionResult.models.currentModelId &&
+			sessionResult.models.availableModels.some(
+				(m) => m.modelId === savedModelId,
+			)
+		) {
+			try {
+				await agentClient.setSessionModel(
+					sessionResult.sessionId,
+					savedModelId,
+				);
+				setSession((prev) =>
+					applyLegacyValue(prev, "model", savedModelId),
+				);
+			} catch {
+				// Agent default is fine as fallback
+			}
+		}
+	}
+
+	// Legacy mode restore
+	if (sessionResult.modes && savedModeId) {
+		if (
+			savedModeId !== sessionResult.modes.currentModeId &&
+			sessionResult.modes.availableModes.some(
+				(m) => m.id === savedModeId,
+			)
+		) {
+			try {
+				await agentClient.setSessionMode(
+					sessionResult.sessionId,
+					savedModeId,
+				);
+				setSession((prev) =>
+					applyLegacyValue(prev, "mode", savedModeId),
+				);
+			} catch {
+				// Agent default is fine as fallback
+			}
+		}
+	}
+}
+
+// ============================================================================
 // Hook Implementation
 // ============================================================================
 
@@ -267,51 +364,13 @@ export function useSession(
 					workingDirectory,
 				);
 
-				// Check if initialization is needed
-				// Only initialize if agent is not initialized OR agent ID has changed
-				const needsInitialize =
+				// Initialize connection if needed
+				// (agent not initialized OR agent ID has changed)
+				const initResult =
 					!agentClient.isInitialized() ||
-					agentClient.getCurrentAgentId() !== agentId;
-
-				let authMethods: AuthenticationMethod[] = [];
-				let promptCapabilities:
-					| {
-							image?: boolean;
-							audio?: boolean;
-							embeddedContext?: boolean;
-					  }
-					| undefined;
-				let agentCapabilities:
-					| {
-							loadSession?: boolean;
-							mcpCapabilities?: {
-								http?: boolean;
-								sse?: boolean;
-							};
-							promptCapabilities?: {
-								image?: boolean;
-								audio?: boolean;
-								embeddedContext?: boolean;
-							};
-					  }
-					| undefined;
-				let agentInfo:
-					| {
-							name: string;
-							title?: string;
-							version?: string;
-					  }
-					| undefined;
-
-				if (needsInitialize) {
-					// Initialize connection to agent (spawn process + protocol handshake)
-					const initResult =
-						await agentClient.initialize(agentConfig);
-					authMethods = initResult.authMethods;
-					promptCapabilities = initResult.promptCapabilities;
-					agentCapabilities = initResult.agentCapabilities;
-					agentInfo = initResult.agentInfo;
-				}
+					agentClient.getCurrentAgentId() !== agentId
+						? await agentClient.initialize(agentConfig)
+						: null;
 
 				// Create new session (lightweight operation)
 				const sessionResult =
@@ -322,146 +381,57 @@ export function useSession(
 					...prev,
 					sessionId: sessionResult.sessionId,
 					state: "ready",
-					authMethods: authMethods,
+					authMethods: initResult?.authMethods ?? [],
 					modes: sessionResult.modes,
 					models: sessionResult.models,
 					configOptions: sessionResult.configOptions,
 					// Only update capabilities/info if we re-initialized
 					// Otherwise, keep the previous value (from the same agent)
-					promptCapabilities: needsInitialize
-						? promptCapabilities
+					promptCapabilities: initResult
+						? initResult.promptCapabilities
 						: prev.promptCapabilities,
-					agentCapabilities: needsInitialize
-						? agentCapabilities
+					agentCapabilities: initResult
+						? initResult.agentCapabilities
 						: prev.agentCapabilities,
-					agentInfo: needsInitialize ? agentInfo : prev.agentInfo,
+					agentInfo: initResult
+						? initResult.agentInfo
+						: prev.agentInfo,
 					lastActivityAt: new Date(),
 				}));
 
-				// Restore last used model via configOptions if available
+				// Restore last used config (model/mode)
 				if (sessionResult.configOptions && sessionResult.sessionId) {
-					const modelOption = sessionResult.configOptions.find(
-						(o) => o.category === "model",
+					// Modern path: restore via configOptions
+					let configOptions = sessionResult.configOptions;
+					configOptions = await tryRestoreConfigOption(
+						agentClient,
+						sessionResult.sessionId,
+						configOptions,
+						"model",
+						settings.lastUsedModels[agentId],
 					);
-					if (modelOption) {
-						const savedModelId = settings.lastUsedModels[agentId];
-						if (
-							savedModelId &&
-							savedModelId !== modelOption.currentValue &&
-							flattenConfigSelectOptions(
-								modelOption.options,
-							).some((o) => o.value === savedModelId)
-						) {
-							try {
-								const updatedOptions =
-									await agentClient.setSessionConfigOption(
-										sessionResult.sessionId,
-										modelOption.id,
-										savedModelId,
-									);
-								setSession((prev) => ({
-									...prev,
-									configOptions: updatedOptions,
-								}));
-							} catch {
-								// Agent default is fine as fallback
-							}
-						}
-					}
-
-					// Restore last used mode via configOptions
-					const modeOption = sessionResult.configOptions.find(
-						(o) => o.category === "mode",
+					configOptions = await tryRestoreConfigOption(
+						agentClient,
+						sessionResult.sessionId,
+						configOptions,
+						"mode",
+						settings.lastUsedModes[agentId],
 					);
-					if (modeOption) {
-						const savedModeId = settings.lastUsedModes[agentId];
-						if (
-							savedModeId &&
-							savedModeId !== modeOption.currentValue &&
-							flattenConfigSelectOptions(modeOption.options).some(
-								(o) => o.value === savedModeId,
-							)
-						) {
-							try {
-								const updatedOptions =
-									await agentClient.setSessionConfigOption(
-										sessionResult.sessionId,
-										modeOption.id,
-										savedModeId,
-									);
-								setSession((prev) => ({
-									...prev,
-									configOptions: updatedOptions,
-								}));
-							} catch {
-								// Agent default is fine as fallback
-							}
-						}
+					if (configOptions !== sessionResult.configOptions) {
+						setSession((prev) => ({
+							...prev,
+							configOptions,
+						}));
 					}
-				} else if (sessionResult.models && sessionResult.sessionId) {
-					// Legacy fallback: restore model via setSessionModel
-					const savedModelId = settings.lastUsedModels[agentId];
-					if (
-						savedModelId &&
-						savedModelId !== sessionResult.models.currentModelId &&
-						sessionResult.models.availableModels.some(
-							(m) => m.modelId === savedModelId,
-						)
-					) {
-						try {
-							await agentClient.setSessionModel(
-								sessionResult.sessionId,
-								savedModelId,
-							);
-							setSession((prev) => {
-								if (!prev.models) return prev;
-								return {
-									...prev,
-									models: {
-										...prev.models,
-										currentModelId: savedModelId,
-									},
-								};
-							});
-						} catch {
-							// Agent default model is fine as fallback
-						}
-					}
-				}
-
-				// Legacy fallback: restore mode via setSessionMode
-				if (
-					sessionResult.modes &&
-					sessionResult.sessionId &&
-					!sessionResult.configOptions
-				) {
-					const savedModeId = settings.lastUsedModes[agentId];
-					if (
-						savedModeId &&
-						savedModeId !== sessionResult.modes.currentModeId &&
-						sessionResult.modes.availableModes.some(
-							(m) => m.id === savedModeId,
-						)
-					) {
-						try {
-							await agentClient.setSessionMode(
-								sessionResult.sessionId,
-								savedModeId,
-							);
-							setSession((prev) => {
-								if (!prev.modes) return prev;
-								return {
-									...prev,
-									modes: {
-										...prev.modes,
-										currentModeId: savedModeId,
-									},
-								};
-							});
-						} catch {
-							// Agent default mode is fine as fallback
-						}
-					}
+				} else if (sessionResult.sessionId) {
+					// Legacy path: restore via setSessionMode/setSessionModel
+					await restoreLegacyConfig(
+						agentClient,
+						sessionResult,
+						settings.lastUsedModels[agentId],
+						settings.lastUsedModes[agentId],
+						setSession,
+					);
 				}
 			} catch (error) {
 				// Error - update to error state
