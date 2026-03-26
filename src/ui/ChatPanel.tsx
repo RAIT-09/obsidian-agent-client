@@ -25,13 +25,12 @@ import { usePermission } from "../hooks/usePermission";
 import { useSessionHistory } from "../hooks/useSessionHistory";
 
 // Domain model imports
-import type {
-	ChatSession,
-	SessionModeState,
-	SessionModelState,
-	SessionConfigOption,
-	SessionConfigSelectOption,
-	SessionConfigSelectGroup,
+import {
+	flattenConfigSelectOptions,
+	type ChatSession,
+	type SessionModeState,
+	type SessionModelState,
+	type SessionConfigOption,
 } from "../types/session";
 import type {
 	ChatMessage,
@@ -48,14 +47,6 @@ import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
 import { InputArea } from "./InputArea";
 import type { IChatViewHost } from "./view-host";
-
-function flattenConfigSelectOptions(
-	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],
-): SessionConfigSelectOption[] {
-	if (options.length === 0) return [];
-	if ("value" in options[0]) return options as SessionConfigSelectOption[];
-	return (options as SessionConfigSelectGroup[]).flatMap((g) => g.options);
-}
 
 // ============================================================================
 // ChatPanelCallbacks - interface for class-level delegation

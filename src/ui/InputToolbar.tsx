@@ -2,26 +2,14 @@ import * as React from "react";
 const { useRef, useEffect, useCallback } = React;
 import { setIcon, DropdownComponent } from "obsidian";
 
-import type {
-	SessionModeState,
-	SessionModelState,
-	SessionUsage,
-	SessionConfigOption,
-	SessionConfigSelectGroup,
-	SessionConfigSelectOption,
+import {
+	flattenConfigSelectOptions,
+	type SessionModeState,
+	type SessionModelState,
+	type SessionUsage,
+	type SessionConfigOption,
+	type SessionConfigSelectGroup,
 } from "../types/session";
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function flattenConfigSelectOptions(
-	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],
-): SessionConfigSelectOption[] {
-	if (options.length === 0) return [];
-	if ("value" in options[0]) return options as SessionConfigSelectOption[];
-	return (options as SessionConfigSelectGroup[]).flatMap((g) => g.options);
-}
 
 /** Format token count for display (e.g., 21367 → "21.4K", 200000 → "200K") */
 function formatTokenCount(tokens: number): string {

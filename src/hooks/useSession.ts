@@ -1,14 +1,13 @@
 import { useState, useCallback, useEffect } from "react";
-import type {
-	ChatSession,
-	SessionModeState,
-	SessionModelState,
-	SessionUsage,
-	SlashCommand,
-	AuthenticationMethod,
-	SessionConfigOption,
-	SessionConfigSelectOption,
-	SessionConfigSelectGroup,
+import {
+	flattenConfigSelectOptions,
+	type ChatSession,
+	type SessionModeState,
+	type SessionModelState,
+	type SessionUsage,
+	type SlashCommand,
+	type AuthenticationMethod,
+	type SessionConfigOption,
 } from "../types/session";
 import type { AcpClient } from "../acp/acp-client";
 import type { ISettingsAccess } from "../services/settings-service";
@@ -143,18 +142,6 @@ export interface UseSessionReturn {
 	 * @param value - New value to set
 	 */
 	setConfigOption: (configId: string, value: string) => Promise<void>;
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function flattenConfigSelectOptions(
-	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],
-): SessionConfigSelectOption[] {
-	if (options.length === 0) return [];
-	if ("value" in options[0]) return options as SessionConfigSelectOption[];
-	return (options as SessionConfigSelectGroup[]).flatMap((g) => g.options);
 }
 
 // ============================================================================

@@ -470,6 +470,17 @@ export interface SessionConfigSelectGroup {
 	options: SessionConfigSelectOption[];
 }
 
+/**
+ * Flatten grouped or flat config select options into a single array.
+ */
+export function flattenConfigSelectOptions(
+	options: SessionConfigSelectOption[] | SessionConfigSelectGroup[],
+): SessionConfigSelectOption[] {
+	if (options.length === 0) return [];
+	if ("value" in options[0]) return options as SessionConfigSelectOption[];
+	return (options as SessionConfigSelectGroup[]).flatMap((g) => g.options);
+}
+
 // ============================================================================
 // Union Type
 // ============================================================================
