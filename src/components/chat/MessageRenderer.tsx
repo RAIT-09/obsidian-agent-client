@@ -59,7 +59,7 @@ function groupContent(
 	return groups;
 }
 
-export function MessageRenderer({
+export const MessageRenderer = React.memo(function MessageRenderer({
 	message,
 	plugin,
 	acpClient,
@@ -110,4 +110,4 @@ export function MessageRenderer({
 			})}
 		</div>
 	);
-}
+});
