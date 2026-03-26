@@ -689,4 +689,4 @@ function DiffRenderer({
 			)}
 		</div>
 	);
-});
+}
