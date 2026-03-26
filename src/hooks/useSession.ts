@@ -12,6 +12,7 @@ import type {
 } from "../types/session";
 import type { AcpClient } from "../acp/acp-client";
 import type { ISettingsAccess } from "../services/settings-service";
+import type { ErrorInfo } from "../types/errors";
 import {
 	type AgentDisplayInfo,
 	getDefaultAgentId,
@@ -27,15 +28,6 @@ import {
 // ============================================================================
 
 /**
- * Error information specific to session operations.
- */
-export interface SessionErrorInfo {
-	title: string;
-	message: string;
-	suggestion?: string;
-}
-
-/**
  * Return type for useSession hook.
  */
 export interface UseSessionReturn {
@@ -44,7 +36,7 @@ export interface UseSessionReturn {
 	/** Whether the session is ready for user input */
 	isReady: boolean;
 	/** Error information if session operation failed */
-	errorInfo: SessionErrorInfo | null;
+	errorInfo: ErrorInfo | null;
 
 	/**
 	 * Create a new session with the specified or default agent.
@@ -205,7 +197,7 @@ export function useSession(
 	);
 
 	// Error state
-	const [errorInfo, setErrorInfo] = useState<SessionErrorInfo | null>(null);
+	const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
 
 	// Derived state
 	const isReady = session.state === "ready";
