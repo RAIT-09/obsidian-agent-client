@@ -145,6 +145,27 @@ export interface UseSessionReturn {
 }
 
 // ============================================================================
+// Legacy Config Helpers
+// ============================================================================
+
+/**
+ * Apply a legacy mode/model value to the session state.
+ * Used for both optimistic updates and rollbacks.
+ */
+function applyLegacyValue(
+	prev: ChatSession,
+	kind: "mode" | "model",
+	value: string,
+): ChatSession {
+	if (kind === "mode") {
+		if (!prev.modes) return prev;
+		return { ...prev, modes: { ...prev.modes, currentModeId: value } };
+	}
+	if (!prev.models) return prev;
+	return { ...prev, models: { ...prev.models, currentModelId: value } };
+}
+
+// ============================================================================
 // Hook Implementation
 // ============================================================================
 
@@ -588,61 +609,59 @@ export function useSession(
 	}, []);
 
 	/**
-	 * Set the session mode.
-	 * Sends a request to the agent to change the mode.
+	 * Set a legacy session mode or model.
+	 * Optimistic update with rollback on error.
+	 *
+	 * DEPRECATED: Legacy API for agents that don't support configOptions.
 	 */
-	const setMode = useCallback(
-		async (modeId: string) => {
+	const setLegacyConfigValue = useCallback(
+		async (kind: "mode" | "model", value: string) => {
 			if (!session.sessionId) {
-				console.warn("Cannot set mode: no active session");
+				console.warn(`Cannot set ${kind}: no active session`);
 				return;
 			}
 
-			// Store previous mode for rollback on error
-			const previousModeId = session.modes?.currentModeId;
+			const previousValue =
+				kind === "mode"
+					? session.modes?.currentModeId
+					: session.models?.currentModelId;
 
-			// Optimistic update - update UI immediately
-			setSession((prev) => {
-				if (!prev.modes) return prev;
-				return {
-					...prev,
-					modes: {
-						...prev.modes,
-						currentModeId: modeId,
-					},
-				};
-			});
+			// Optimistic update
+			setSession((prev) => applyLegacyValue(prev, kind, value));
 
 			try {
-				await agentClient.setSessionMode(session.sessionId, modeId);
-				// Per ACP protocol, current_mode_update is only sent when the agent
-				// changes its own mode, not in response to client's setSessionMode.
-				// UI is already updated optimistically above.
+				if (kind === "mode") {
+					await agentClient.setSessionMode(
+						session.sessionId,
+						value,
+					);
+				} else {
+					await agentClient.setSessionModel(
+						session.sessionId,
+						value,
+					);
+				}
 
-				// Persist last used mode for this agent
+				// Persist last used value for this agent
 				if (session.agentId) {
+					const persistKey =
+						kind === "mode"
+							? "lastUsedModes"
+							: "lastUsedModels";
 					const currentSettings = settingsAccess.getSnapshot();
 					void settingsAccess.updateSettings({
-						lastUsedModes: {
-							...currentSettings.lastUsedModes,
-							[session.agentId]: modeId,
+						[persistKey]: {
+							...currentSettings[persistKey],
+							[session.agentId]: value,
 						},
 					});
 				}
 			} catch (error) {
-				console.error("Failed to set mode:", error);
-				// Rollback to previous mode on error
-				if (previousModeId) {
-					setSession((prev) => {
-						if (!prev.modes) return prev;
-						return {
-							...prev,
-							modes: {
-								...prev.modes,
-								currentModeId: previousModeId,
-							},
-						};
-					});
+				console.error(`Failed to set ${kind}:`, error);
+				if (previousValue) {
+					setSession((prev) =>
+						applyLegacyValue(prev, kind, previousValue),
+					);
 				}
 			}
 		},
@@ -650,76 +669,28 @@ export function useSession(
 			agentClient,
 			session.sessionId,
 			session.modes?.currentModeId,
+			session.models?.currentModelId,
 			settingsAccess,
 			session.agentId,
 		],
 	);
 
 	/**
-	 * Set the session model (experimental).
-	 * Sends a request to the agent to change the model.
+	 * DEPRECATED: Use setConfigOption instead.
+	 * Set the session mode.
+	 */
+	const setMode = useCallback(
+		(modeId: string) => setLegacyConfigValue("mode", modeId),
+		[setLegacyConfigValue],
+	);
+
+	/**
+	 * DEPRECATED: Use setConfigOption instead.
+	 * Set the session model.
 	 */
 	const setModel = useCallback(
-		async (modelId: string) => {
-			if (!session.sessionId) {
-				console.warn("Cannot set model: no active session");
-				return;
-			}
-
-			// Store previous model for rollback on error
-			const previousModelId = session.models?.currentModelId;
-
-			// Optimistic update - update UI immediately
-			setSession((prev) => {
-				if (!prev.models) return prev;
-				return {
-					...prev,
-					models: {
-						...prev.models,
-						currentModelId: modelId,
-					},
-				};
-			});
-
-			try {
-				await agentClient.setSessionModel(session.sessionId, modelId);
-				// Note: Unlike modes, there is no dedicated notification for model changes.
-				// UI is already updated optimistically above.
-
-				// Persist last used model for this agent
-				if (session.agentId) {
-					const currentSettings = settingsAccess.getSnapshot();
-					void settingsAccess.updateSettings({
-						lastUsedModels: {
-							...currentSettings.lastUsedModels,
-							[session.agentId]: modelId,
-						},
-					});
-				}
-			} catch (error) {
-				console.error("Failed to set model:", error);
-				// Rollback to previous model on error
-				if (previousModelId) {
-					setSession((prev) => {
-						if (!prev.models) return prev;
-						return {
-							...prev,
-							models: {
-								...prev.models,
-								currentModelId: previousModelId,
-							},
-						};
-					});
-				}
-			}
-		},
-		[
-			agentClient,
-			session.sessionId,
-			session.models?.currentModelId,
-			settingsAccess,
-			session.agentId,
-		],
+		(modelId: string) => setLegacyConfigValue("model", modelId),
+		[setLegacyConfigValue],
 	);
 
 	/**
