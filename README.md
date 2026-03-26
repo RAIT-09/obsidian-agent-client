@@ -57,7 +57,7 @@ Open a terminal (Terminal on macOS/Linux, PowerShell on Windows) and run the fol
 1. **Install an agent and its ACP adapter** (e.g., Claude Code):
    ```bash
    curl -fsSL https://claude.ai/install.sh | bash   # Install Claude Code
-   npm install -g @zed-industries/claude-agent-acp   # Install ACP adapter
+   npm install -g @agentclientprotocol/claude-agent-acp   # Install ACP adapter
    ```
 
 2. **Login** (skip if using API key):

@@ -9,7 +9,7 @@ Open a terminal (Terminal on macOS/Linux, PowerShell on Windows) and run the fol
 1. Install claude-agent-acp:
 
 ```bash
-npm install -g @zed-industries/claude-agent-acp
+npm install -g @agentclientprotocol/claude-agent-acp
 ```
 
 2. Find the installation path:

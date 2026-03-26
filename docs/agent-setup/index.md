@@ -6,7 +6,7 @@ Agent Client supports multiple AI agents through the [Agent Client Protocol (ACP
 
 | Agent | Provider | Package |
 |-------|----------|---------|
-| [Claude Code](./claude-code) | Anthropic | `@zed-industries/claude-agent-acp` |
+| [Claude Code](./claude-code) | Anthropic | `@agentclientprotocol/claude-agent-acp` |
 | [Codex](./codex) | OpenAI | `@zed-industries/codex-acp` |
 | [Gemini CLI](./gemini-cli) | Google | `@google/gemini-cli` |
 | [Custom Agents](./custom-agents) | Various | Any ACP-compatible agent |

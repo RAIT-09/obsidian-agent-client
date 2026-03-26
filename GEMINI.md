@@ -175,7 +175,7 @@ interface ISettingsAccess {
 **Requests**: requestPermission
 
 **Agents**:
-- Claude Code: `@zed-industries/claude-agent-acp` (ANTHROPIC_API_KEY)
+- Claude Code: `@agentclientprotocol/claude-agent-acp` (ANTHROPIC_API_KEY)
 - Gemini CLI: `@anthropics/gemini-cli-acp` (GOOGLE_API_KEY)
 - Custom: Any ACP-compatible agent
 

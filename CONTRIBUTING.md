@@ -210,7 +210,7 @@ For more details, see `CLAUDE.md`.
 
 - Prioritize implementations that conform to the official (stable) ACP specification
 - If implementing draft/experimental specs, please discuss in an issue first
-- Implementations should work with official ACP-compatible agents (e.g., `@zed-industries/claude-agent-acp`)
+- Implementations should work with official ACP-compatible agents (e.g., `@agentclientprotocol/claude-agent-acp`)
 
 ## Questions?
 
