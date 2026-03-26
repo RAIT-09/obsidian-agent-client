@@ -5,8 +5,7 @@ import {
 	type ChatSession,
 	type SessionModeState,
 	type SessionModelState,
-	type SessionUsage,
-	type SlashCommand,
+	type SessionUpdate,
 	type SessionConfigOption,
 	type SessionResult,
 } from "../types/session";
@@ -93,30 +92,11 @@ export interface UseSessionReturn {
 	) => void;
 
 	/**
-	 * Callback to update available slash commands.
-	 * Called by AcpClient when agent sends available_commands_update.
+	 * Handle a session-level update from the agent.
+	 * Processes: available_commands_update, current_mode_update,
+	 * config_option_update, usage_update. Ignores message-level updates.
 	 */
-	updateAvailableCommands: (commands: SlashCommand[]) => void;
-
-	/**
-	 * DEPRECATED: Use updateConfigOptions instead.
-	 *
-	 * Callback to update current mode.
-	 * Called by AcpClient when agent sends current_mode_update.
-	 */
-	updateCurrentMode: (modeId: string) => void;
-
-	/**
-	 * Callback to update config options.
-	 * Called when agent sends config_option_update notification.
-	 */
-	updateConfigOptions: (configOptions: SessionConfigOption[]) => void;
-
-	/**
-	 * Callback to update context window usage.
-	 * Called when agent sends usage_update notification.
-	 */
-	updateUsage: (usage: SessionUsage) => void;
+	handleSessionUpdate: (update: SessionUpdate) => void;
 
 	/**
 	 * DEPRECATED: Use setConfigOption instead.
@@ -548,34 +528,46 @@ export function useSession(
 	}, [settingsAccess]);
 
 	/**
-	 * Update available slash commands.
-	 * Called by AcpClient when receiving available_commands_update.
+	 * Handle a session-level update from the agent.
+	 * Processes session-level update types; ignores message-level updates
+	 * (those are handled by useMessages).
 	 */
-	const updateAvailableCommands = useCallback((commands: SlashCommand[]) => {
-		setSession((prev) => ({
-			...prev,
-			availableCommands: commands,
-		}));
-	}, []);
-
-	/**
-	 * Update current mode.
-	 * Called by AcpClient when receiving current_mode_update.
-	 */
-	const updateCurrentMode = useCallback((modeId: string) => {
-		setSession((prev) => {
-			// Only update if modes exist
-			if (!prev.modes) {
-				return prev;
-			}
-			return {
-				...prev,
-				modes: {
-					...prev.modes,
-					currentModeId: modeId,
-				},
-			};
-		});
+	const handleSessionUpdate = useCallback((update: SessionUpdate) => {
+		switch (update.type) {
+			case "available_commands_update":
+				setSession((prev) => ({
+					...prev,
+					availableCommands: update.commands,
+				}));
+				break;
+			case "current_mode_update":
+				setSession((prev) => {
+					if (!prev.modes) return prev;
+					return {
+						...prev,
+						modes: { ...prev.modes, currentModeId: update.currentModeId },
+					};
+				});
+				break;
+			case "config_option_update":
+				setSession((prev) => ({
+					...prev,
+					configOptions: update.configOptions,
+				}));
+				break;
+			case "usage_update":
+				setSession((prev) => ({
+					...prev,
+					usage: {
+						used: update.used,
+						size: update.size,
+						cost: update.cost ?? undefined,
+					},
+				}));
+				break;
+			// Message-level updates (agent_message_chunk, tool_call, etc.)
+			// are ignored here — useMessages handles them.
+		}
 	}, []);
 
 	/**
@@ -744,29 +736,6 @@ export function useSession(
 		],
 	);
 
-	/**
-	 * Update config options from agent notification.
-	 */
-	const updateConfigOptions = useCallback(
-		(configOptions: SessionConfigOption[]) => {
-			setSession((prev) => ({
-				...prev,
-				configOptions,
-			}));
-		},
-		[],
-	);
-
-	/**
-	 * Update context window usage.
-	 * Called when agent sends usage_update notification.
-	 */
-	const updateUsage = useCallback((usage: SessionUsage) => {
-		setSession((prev) => ({
-			...prev,
-			usage,
-		}));
-	}, []);
 
 	// Register error callback for process-level errors
 	useEffect(() => {
@@ -815,10 +784,7 @@ export function useSession(
 		cancelOperation,
 		getAvailableAgents,
 		updateSessionFromLoad,
-		updateAvailableCommands,
-		updateCurrentMode,
-		updateConfigOptions,
-		updateUsage,
+		handleSessionUpdate,
 		setMode,
 		setModel,
 		setConfigOption,

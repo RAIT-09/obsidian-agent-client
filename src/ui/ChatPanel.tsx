@@ -946,42 +946,12 @@ export function ChatPanel({
 				return;
 			}
 
-			// During session/load, ignore history replay messages but process session-level updates
-			if (isLoadingSessionHistory) {
-				// Only process session-level updates during load
-				if (update.type === "available_commands_update") {
-					agentSession.updateAvailableCommands(update.commands);
-				} else if (update.type === "current_mode_update") {
-					agentSession.updateCurrentMode(update.currentModeId);
-				} else if (update.type === "config_option_update") {
-					agentSession.updateConfigOptions(update.configOptions);
-				} else if (update.type === "usage_update") {
-					agentSession.updateUsage({
-						used: update.used,
-						size: update.size,
-						cost: update.cost ?? undefined,
-					});
-				}
-				// Ignore all message-related updates (history replay)
-				return;
-			}
+			// Session-level updates: always process (even during history replay)
+			agentSession.handleSessionUpdate(update);
 
-			// Route message-related updates to useMessages
-			chatMessages.handleSessionUpdate(update);
-
-			// Route session-level updates to useSession
-			if (update.type === "available_commands_update") {
-				agentSession.updateAvailableCommands(update.commands);
-			} else if (update.type === "current_mode_update") {
-				agentSession.updateCurrentMode(update.currentModeId);
-			} else if (update.type === "config_option_update") {
-				agentSession.updateConfigOptions(update.configOptions);
-			} else if (update.type === "usage_update") {
-				agentSession.updateUsage({
-					used: update.used,
-					size: update.size,
-					cost: update.cost ?? undefined,
-				});
+			// Message-level updates: skip during session/load history replay
+			if (!isLoadingSessionHistory) {
+				chatMessages.handleSessionUpdate(update);
 			}
 		});
 	}, [
@@ -989,9 +959,8 @@ export function ChatPanel({
 		session.sessionId,
 		logger,
 		isLoadingSessionHistory,
+		agentSession.handleSessionUpdate,
 		chatMessages.handleSessionUpdate,
-		agentSession.updateAvailableCommands,
-		agentSession.updateCurrentMode,
 	]);
 
 	// Register updateMessage callback for permission UI updates
