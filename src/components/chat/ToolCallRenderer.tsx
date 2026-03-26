@@ -206,7 +206,7 @@ export const ToolCallRenderer = React.memo(function ToolCallRenderer({
 			)}
 		</div>
 	);
-}
+});
 
 /*
 // Details component that switches based on kind
