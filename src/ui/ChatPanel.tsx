@@ -274,21 +274,6 @@ export function ChatPanel({
 		[logger, agentSession],
 	);
 
-	const handleLoadStart = useCallback(() => {
-		logger.log(
-			"[ChatPanel] session/load started, ignoring history replay",
-		);
-		chatMessages.setIgnoreUpdates(true);
-		chatMessages.clearMessages();
-	}, [logger, chatMessages]);
-
-	const handleLoadEnd = useCallback(() => {
-		logger.log(
-			"[ChatPanel] session/load ended, resuming normal processing",
-		);
-		chatMessages.setIgnoreUpdates(false);
-	}, [logger, chatMessages]);
-
 	const sessionHistory = useSessionHistory({
 		agentClient: acpClient,
 		session,
@@ -296,8 +281,8 @@ export function ChatPanel({
 		cwd: vaultPath,
 		onSessionLoad: handleSessionLoad,
 		onMessagesRestore: chatMessages.setMessagesFromLocal,
-		onLoadStart: handleLoadStart,
-		onLoadEnd: handleLoadEnd,
+		onIgnoreUpdates: chatMessages.setIgnoreUpdates,
+		onClearMessages: chatMessages.clearMessages,
 	});
 
 	// Combined error info (session errors take precedence)

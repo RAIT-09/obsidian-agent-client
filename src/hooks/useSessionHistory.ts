@@ -93,10 +93,10 @@ export interface UseSessionHistoryOptions {
 	onSessionLoad: SessionLoadCallback;
 	/** Callback invoked when messages should be restored from local storage */
 	onMessagesRestore?: MessagesRestoreCallback;
-	/** Callback invoked when session/load starts (to start ignoring history replay) */
-	onLoadStart?: () => void;
-	/** Callback invoked when session/load ends (to stop ignoring history replay) */
-	onLoadEnd?: () => void;
+	/** Control whether useMessages ignores incoming updates (for history replay suppression) */
+	onIgnoreUpdates?: (ignore: boolean) => void;
+	/** Clear messages before restoring from local storage */
+	onClearMessages?: () => void;
 }
 
 /**
@@ -262,8 +262,8 @@ export function useSessionHistory(
 		cwd,
 		onSessionLoad,
 		onMessagesRestore,
-		onLoadStart,
-		onLoadEnd,
+		onIgnoreUpdates,
+		onClearMessages,
 	} = options;
 
 	// Derive capability flags from session.agentCapabilities
@@ -505,7 +505,8 @@ export function useSessionHistory(
 
 					if (localMessages && onMessagesRestore) {
 						// Local messages available: ignore agent replay, restore from local
-						onLoadStart?.();
+						onIgnoreUpdates?.(true);
+						onClearMessages?.();
 						try {
 							const result = await agentClient.loadSession(
 								sessionId,
@@ -519,7 +520,7 @@ export function useSessionHistory(
 							);
 							onMessagesRestore(localMessages);
 						} finally {
-							onLoadEnd?.();
+							onIgnoreUpdates?.(false);
 						}
 					} else {
 						// No local messages: let agent replay flow through to UI
@@ -572,8 +573,8 @@ export function useSessionHistory(
 			onSessionLoad,
 			settingsAccess,
 			onMessagesRestore,
-			onLoadStart,
-			onLoadEnd,
+			onIgnoreUpdates,
+			onClearMessages,
 		],
 	);
 
