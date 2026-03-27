@@ -2,6 +2,8 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import type {
 	ChatMessage,
 	MessageContent,
+	ActivePermission,
+	PermissionOption,
 	ImagePromptContent,
 	ResourceLinkPromptContent,
 } from "../types/chat";
@@ -115,6 +117,19 @@ export interface UseMessagesReturn {
 	 * Used during session/load to skip history replay messages.
 	 */
 	setIgnoreUpdates: (ignore: boolean) => void;
+
+	// Permission state and operations (integrated from usePermission)
+
+	/** Currently active permission request (if any) */
+	activePermission: ActivePermission | null;
+	/** Whether there is an active permission request */
+	hasActivePermission: boolean;
+	/** Approve a specific permission request with the given option */
+	approvePermission: (requestId: string, optionId: string) => Promise<void>;
+	/** Approve the currently active permission (for hotkey handling) */
+	approveActivePermission: () => Promise<boolean>;
+	/** Reject the currently active permission (for hotkey handling) */
+	rejectActivePermission: () => Promise<boolean>;
 }
 
 /**
@@ -433,6 +448,52 @@ function applySingleUpdate(
 }
 
 // ============================================================================
+// Permission Helper Functions
+// ============================================================================
+
+/**
+ * Find the active permission request from messages.
+ */
+function findActivePermission(
+	messages: ChatMessage[],
+): ActivePermission | null {
+	for (const message of messages) {
+		for (const content of message.content) {
+			if (content.type === "tool_call") {
+				const permission = content.permissionRequest;
+				if (permission?.isActive) {
+					return {
+						requestId: permission.requestId,
+						toolCallId: content.toolCallId,
+						options: permission.options,
+					};
+				}
+			}
+		}
+	}
+	return null;
+}
+
+/**
+ * Select an option from the available options based on preferred kinds.
+ */
+function selectOption(
+	options: PermissionOption[],
+	preferredKinds: PermissionOption["kind"][],
+	fallback?: (option: PermissionOption) => boolean,
+): PermissionOption | undefined {
+	for (const kind of preferredKinds) {
+		const match = options.find((opt) => opt.kind === kind);
+		if (match) return match;
+	}
+	if (fallback) {
+		const fallbackOption = options.find(fallback);
+		if (fallbackOption) return fallbackOption;
+	}
+	return options[0];
+}
+
+// ============================================================================
 // Hook Implementation
 // ============================================================================
 
@@ -571,6 +632,53 @@ export function useMessages(
 	const setIgnoreUpdates = useCallback((ignore: boolean): void => {
 		ignoreUpdatesRef.current = ignore;
 	}, []);
+
+	// ============================================================
+	// Permission State & Operations
+	// ============================================================
+
+	const activePermission = useMemo(
+		() => findActivePermission(messages),
+		[messages],
+	);
+
+	const hasActivePermission = activePermission !== null;
+
+	const approvePermission = useCallback(
+		async (requestId: string, optionId: string): Promise<void> => {
+			try {
+				await agentClient.respondToPermission(requestId, optionId);
+			} catch (error) {
+				setErrorInfo({
+					title: "Permission Error",
+					message: `Failed to respond to permission request: ${error instanceof Error ? error.message : String(error)}`,
+				});
+			}
+		},
+		[agentClient],
+	);
+
+	const approveActivePermission = useCallback(async (): Promise<boolean> => {
+		if (!activePermission || activePermission.options.length === 0) return false;
+		const option = selectOption(activePermission.options, ["allow_once", "allow_always"]);
+		if (!option) return false;
+		await approvePermission(activePermission.requestId, option.optionId);
+		return true;
+	}, [activePermission, approvePermission]);
+
+	const rejectActivePermission = useCallback(async (): Promise<boolean> => {
+		if (!activePermission || activePermission.options.length === 0) return false;
+		const option = selectOption(
+			activePermission.options,
+			["reject_once", "reject_always"],
+			(opt) =>
+				opt.name.toLowerCase().includes("reject") ||
+				opt.name.toLowerCase().includes("deny"),
+		);
+		if (!option) return false;
+		await approvePermission(activePermission.requestId, option.optionId);
+		return true;
+	}, [activePermission, approvePermission]);
 
 	/**
 	 * Clear all messages.
@@ -797,5 +905,10 @@ export function useMessages(
 		updateLastMessage,
 		upsertToolCall,
 		setIgnoreUpdates,
+		activePermission,
+		hasActivePermission,
+		approvePermission,
+		approveActivePermission,
+		rejectActivePermission,
 	};
 }

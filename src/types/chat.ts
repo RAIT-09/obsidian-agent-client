@@ -88,6 +88,19 @@ export interface PermissionOption {
 }
 
 /**
+ * Active permission request information.
+ * Derived from messages by scanning for tool_call content with isActive permission.
+ */
+export interface ActivePermission {
+	/** Permission request ID */
+	requestId: string;
+	/** Tool call ID that triggered the request */
+	toolCallId: string;
+	/** Available permission options */
+	options: PermissionOption[];
+}
+
+/**
  * Entry in an agent's plan/task list.
  */
 export interface PlanEntry {

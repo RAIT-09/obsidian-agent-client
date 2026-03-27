@@ -21,7 +21,6 @@ import { useMentions } from "../hooks/useMentions";
 import { useSlashCommands } from "../hooks/useSlashCommands";
 import { useSession } from "../hooks/useSession";
 import { useMessages } from "../hooks/useMessages";
-import { usePermission } from "../hooks/usePermission";
 import { useSessionHistory } from "../hooks/useSessionHistory";
 
 // Domain model imports
@@ -198,7 +197,6 @@ export function ChatPanel({
 
 	const { messages, isSending } = chatMessages;
 
-	const permission = usePermission(acpClient, messages);
 
 	const mentions = useMentions(vaultService, plugin);
 
@@ -287,7 +285,7 @@ export function ChatPanel({
 
 	// Combined error info (session errors take precedence)
 	const errorInfo =
-		sessionErrorInfo || chatMessages.errorInfo || permission.errorInfo;
+		sessionErrorInfo || chatMessages.errorInfo;
 
 	// ============================================================
 	// Local State
@@ -1083,7 +1081,7 @@ export function ChatPanel({
 					return;
 				}
 				void (async () => {
-					const success = await permission.approveActivePermission();
+					const success = await chatMessages.approveActivePermission();
 					if (!success) {
 						new Notice(
 							"[Agent Client] No active permission request",
@@ -1108,7 +1106,7 @@ export function ChatPanel({
 					return;
 				}
 				void (async () => {
-					const success = await permission.rejectActivePermission();
+					const success = await chatMessages.rejectActivePermission();
 					if (!success) {
 						new Notice(
 							"[Agent Client] No active permission request",
@@ -1156,8 +1154,8 @@ export function ChatPanel({
 		};
 	}, [
 		plugin.app.workspace,
-		permission.approveActivePermission,
-		permission.rejectActivePermission,
+		chatMessages.approveActivePermission,
+		chatMessages.rejectActivePermission,
 		handleStopGeneration,
 		handleExportChat,
 		viewId,
@@ -1314,8 +1312,8 @@ export function ChatPanel({
 			plugin={plugin}
 			view={viewHost}
 			terminalClient={terminalClientRef.current}
-			onApprovePermission={permission.approvePermission}
-			hasActivePermission={permission.activePermission != null}
+			onApprovePermission={chatMessages.approvePermission}
+			hasActivePermission={chatMessages.hasActivePermission}
 		/>
 	);
 
