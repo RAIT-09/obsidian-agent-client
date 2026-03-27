@@ -739,7 +739,7 @@ export function useSession(
 
 	// Register error callback for process-level errors
 	useEffect(() => {
-		agentClient.onError((error) => {
+		const unsubscribe = agentClient.onError((error) => {
 			setSession((prev) => ({ ...prev, state: "error" }));
 			setErrorInfo({
 				title: error.title || "Agent Error",
@@ -747,6 +747,7 @@ export function useSession(
 				suggestion: error.suggestion,
 			});
 		});
+		return unsubscribe;
 	}, [agentClient]);
 
 	/**

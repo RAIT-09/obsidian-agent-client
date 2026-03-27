@@ -17,8 +17,9 @@ import type { Logger } from "../utils/logger";
  * It only reacts to events from the agent side.
  */
 export class AcpHandler {
-	private sessionUpdateCallback: ((update: SessionUpdate) => void) | null =
-		null;
+	private sessionUpdateListeners = new Set<
+		(update: SessionUpdate) => void
+	>();
 
 	/** Tracks session updates during a prompt. */
 	private promptSessionUpdateCount = 0;
@@ -44,13 +45,18 @@ export class AcpHandler {
 		return this.promptSessionUpdateCount > 0;
 	}
 
-	onSessionUpdate(callback: (update: SessionUpdate) => void): void {
-		this.sessionUpdateCallback = callback;
+	onSessionUpdate(
+		callback: (update: SessionUpdate) => void,
+	): () => void {
+		this.sessionUpdateListeners.add(callback);
+		return () => this.sessionUpdateListeners.delete(callback);
 	}
 
-	/** Emit a session update. Used by PermissionManager callbacks. */
+	/** Emit a session update to all listeners. Used by PermissionManager callbacks. */
 	emitSessionUpdate(update: SessionUpdate): void {
-		this.sessionUpdateCallback?.(update);
+		for (const listener of this.sessionUpdateListeners) {
+			listener(update);
+		}
 	}
 
 	// ====================================================================
@@ -68,7 +74,7 @@ export class AcpHandler {
 			case "agent_thought_chunk":
 			case "user_message_chunk":
 				if (update.content.type === "text") {
-					this.sessionUpdateCallback?.({
+					this.emitSessionUpdate({
 						type: update.sessionUpdate,
 						sessionId,
 						text: update.content.text,
@@ -78,7 +84,7 @@ export class AcpHandler {
 
 			case "tool_call":
 			case "tool_call_update":
-				this.sessionUpdateCallback?.({
+				this.emitSessionUpdate({
 					type: update.sessionUpdate,
 					sessionId,
 					toolCallId: update.toolCallId,
@@ -94,7 +100,7 @@ export class AcpHandler {
 				break;
 
 			case "plan":
-				this.sessionUpdateCallback?.({
+				this.emitSessionUpdate({
 					type: "plan",
 					sessionId,
 					entries: update.entries,
@@ -102,7 +108,7 @@ export class AcpHandler {
 				break;
 
 			case "available_commands_update":
-				this.sessionUpdateCallback?.({
+				this.emitSessionUpdate({
 					type: "available_commands_update",
 					sessionId,
 					commands: AcpTypeConverter.toSlashCommands(
@@ -112,7 +118,7 @@ export class AcpHandler {
 				break;
 
 			case "current_mode_update":
-				this.sessionUpdateCallback?.({
+				this.emitSessionUpdate({
 					type: "current_mode_update",
 					sessionId,
 					currentModeId: update.currentModeId,
@@ -120,7 +126,7 @@ export class AcpHandler {
 				break;
 
 			case "session_info_update":
-				this.sessionUpdateCallback?.({
+				this.emitSessionUpdate({
 					type: "session_info_update",
 					sessionId,
 					title: update.title,
@@ -129,7 +135,7 @@ export class AcpHandler {
 				break;
 
 			case "usage_update":
-				this.sessionUpdateCallback?.({
+				this.emitSessionUpdate({
 					type: "usage_update",
 					sessionId,
 					size: update.size,
@@ -139,7 +145,7 @@ export class AcpHandler {
 				break;
 
 			case "config_option_update":
-				this.sessionUpdateCallback?.({
+				this.emitSessionUpdate({
 					type: "config_option_update",
 					sessionId,
 					configOptions: AcpTypeConverter.toSessionConfigOptions(

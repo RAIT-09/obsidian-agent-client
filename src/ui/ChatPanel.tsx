@@ -937,7 +937,7 @@ export function ChatPanel({
 	// ============================================================
 	// Register unified session update callback
 	useEffect(() => {
-		acpClient.onSessionUpdate((update) => {
+		const unsubscribe = acpClient.onSessionUpdate((update) => {
 			// Filter by sessionId - ignore updates from old sessions
 			if (session.sessionId && update.sessionId !== session.sessionId) {
 				logger.log(
@@ -954,6 +954,7 @@ export function ChatPanel({
 				chatMessages.handleSessionUpdate(update);
 			}
 		});
+		return unsubscribe;
 	}, [
 		acpClient,
 		session.sessionId,

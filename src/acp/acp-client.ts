@@ -68,7 +68,7 @@ export class AcpClient {
 	private currentAgentId: string | null = null;
 
 	// Callbacks
-	private errorCallback: ((error: ProcessError) => void) | null = null;
+	private errorListeners = new Set<(error: ProcessError) => void>();
 	private updateMessage: (toolCallId: string, content: MessageContent) => void;
 
 	// Delegates
@@ -262,7 +262,9 @@ export class AcpClient {
 				...getSpawnErrorInfo(error, command, agentLabel, this.plugin.settings.windowsWslMode),
 			};
 
-			this.errorCallback?.(processError);
+			for (const listener of this.errorListeners) {
+				listener(processError);
+			}
 		});
 
 		agentProcess.on("exit", (code, signal) => {
@@ -285,7 +287,9 @@ export class AcpClient {
 					suggestion: getCommandNotFoundSuggestion(command, this.plugin.settings.windowsWslMode),
 				};
 
-				this.errorCallback?.(processError);
+				for (const listener of this.errorListeners) {
+					listener(processError);
+				}
 			}
 		});
 
@@ -658,8 +662,10 @@ export class AcpClient {
 	 * - available_commands_update: Slash commands changed
 	 * - current_mode_update: Mode changed
 	 */
-	onSessionUpdate(callback: (update: SessionUpdate) => void): void {
-		this.handler.onSessionUpdate(callback);
+	onSessionUpdate(
+		callback: (update: SessionUpdate) => void,
+	): () => void {
+		return this.handler.onSessionUpdate(callback);
 	}
 
 	/**
@@ -667,9 +673,12 @@ export class AcpClient {
 	 *
 	 * Called when errors occur during agent operations that cannot be
 	 * propagated via exceptions (e.g., process spawn errors, exit code 127).
+	 *
+	 * @returns Unsubscribe function to remove the listener
 	 */
-	onError(callback: (error: ProcessError) => void): void {
-		this.errorCallback = callback;
+	onError(callback: (error: ProcessError) => void): () => void {
+		this.errorListeners.add(callback);
+		return () => this.errorListeners.delete(callback);
 	}
 
 	/**
