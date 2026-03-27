@@ -1285,17 +1285,12 @@ If your plugin does not need CSS, delete this file.
 	max-width: 100%;
 }
 
-.agent-client-markdown-text-renderer .markdown-rendered {
-	font-size: inherit;
-	overflow-wrap: break-word;
-	word-wrap: break-word;
-	word-break: break-word;
-	max-width: 100%;
-}
-
-.agent-client-markdown-text-renderer .markdown-rendered pre {
-	max-width: 100%;
+.agent-client-markdown-text-renderer.markdown-rendered pre,
+.agent-client-markdown-text-renderer.markdown-rendered table,
+.agent-client-markdown-text-renderer.markdown-rendered .mermaid,
+.agent-client-markdown-text-renderer.markdown-rendered svg {
 	overflow-x: auto;
+	display: block;
 }
 
 /* Tool Call Diff Renderer */
