@@ -68,8 +68,7 @@ export class AcpClient {
 	private currentAgentId: string | null = null;
 	private currentSessionId: string | null = null;
 
-	// Callbacks
-	private errorListeners = new Set<(error: ProcessError) => void>();
+	// Callbacks (none — all events flow through onSessionUpdate via AcpHandler)
 
 	// Delegates
 	private terminalManager: TerminalManager;
@@ -245,9 +244,11 @@ export class AcpClient {
 				...getSpawnErrorInfo(error, command, agentLabel, this.plugin.settings.windowsWslMode),
 			};
 
-			for (const listener of this.errorListeners) {
-				listener(processError);
-			}
+			this.handler.emitSessionUpdate({
+				type: "process_error",
+				sessionId: this.currentSessionId ?? "",
+				error: processError,
+			});
 		});
 
 		agentProcess.on("exit", (code, signal) => {
@@ -270,9 +271,11 @@ export class AcpClient {
 					suggestion: getCommandNotFoundSuggestion(command, this.plugin.settings.windowsWslMode),
 				};
 
-				for (const listener of this.errorListeners) {
-					listener(processError);
-				}
+				this.handler.emitSessionUpdate({
+					type: "process_error",
+					sessionId: this.currentSessionId ?? "",
+					error: processError,
+				});
 			}
 		});
 
@@ -652,19 +655,6 @@ export class AcpClient {
 		callback: (update: SessionUpdate) => void,
 	): () => void {
 		return this.handler.onSessionUpdate(callback);
-	}
-
-	/**
-	 * Register callback for error notifications.
-	 *
-	 * Called when errors occur during agent operations that cannot be
-	 * propagated via exceptions (e.g., process spawn errors, exit code 127).
-	 *
-	 * @returns Unsubscribe function to remove the listener
-	 */
-	onError(callback: (error: ProcessError) => void): () => void {
-		this.errorListeners.add(callback);
-		return () => this.errorListeners.delete(callback);
 	}
 
 	/**

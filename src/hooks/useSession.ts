@@ -558,6 +558,14 @@ export function useSession(
 					},
 				}));
 				break;
+			case "process_error":
+				setSession((prev) => ({ ...prev, state: "error" }));
+				setErrorInfo({
+					title: update.error.title || "Agent Error",
+					message: update.error.message || "An error occurred",
+					suggestion: update.error.suggestion,
+				});
+				break;
 			// Message-level updates (agent_message_chunk, tool_call, etc.)
 			// are ignored here — useMessages handles them.
 		}
@@ -735,19 +743,6 @@ export function useSession(
 		],
 	);
 
-
-	// Register error callback for process-level errors
-	useEffect(() => {
-		const unsubscribe = agentClient.onError((error) => {
-			setSession((prev) => ({ ...prev, state: "error" }));
-			setErrorInfo({
-				title: error.title || "Agent Error",
-				message: error.message || "An error occurred",
-				suggestion: error.suggestion,
-			});
-		});
-		return unsubscribe;
-	}, [agentClient]);
 
 	/**
 	 * Update session state after loading/resuming/forking a session.

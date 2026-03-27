@@ -289,6 +289,7 @@ import type {
 	ToolCallStatus,
 	PermissionOption,
 } from "./chat";
+import type { ProcessError } from "./errors";
 
 // ============================================================================
 // Base Type
@@ -440,6 +441,16 @@ export interface ConfigOptionUpdate extends SessionUpdateBase {
 	configOptions: SessionConfigOption[];
 }
 
+/**
+ * Process-level error event.
+ * Emitted when the agent process encounters a system error
+ * (spawn failure, command not found, etc.).
+ */
+export interface ProcessErrorUpdate extends SessionUpdateBase {
+	type: "process_error";
+	error: ProcessError;
+}
+
 // ============================================================================
 // Config Option Types
 // ============================================================================
@@ -516,7 +527,8 @@ export type SessionUpdate =
 	| CurrentModeUpdate
 	| SessionInfoUpdate
 	| UsageUpdate
-	| ConfigOptionUpdate;
+	| ConfigOptionUpdate
+	| ProcessErrorUpdate;
 
 /**
  * Session metadata from session/list response.
