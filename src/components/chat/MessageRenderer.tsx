@@ -1,4 +1,5 @@
 import * as React from "react";
+import { setIcon } from "obsidian";
 import type {
 	ChatMessage,
 	MessageContent,
@@ -6,6 +7,13 @@ import type {
 import type { IAcpClient } from "../../adapters/acp/acp.adapter";
 import type AgentClientPlugin from "../../plugin";
 import { MessageContentRenderer } from "./MessageContentRenderer";
+
+function extractTextContent(contents: MessageContent[]): string {
+	return contents
+		.filter((c) => c.type === "text" || c.type === "text_with_context")
+		.map((c) => ("text" in c ? c.text : ""))
+		.join("\n");
+}
 
 interface MessageRendererProps {
 	message: ChatMessage;
@@ -66,10 +74,34 @@ export const MessageRenderer = React.memo(function MessageRenderer({
 	onApprovePermission,
 }: MessageRendererProps) {
 	const groups = groupContent(message.content);
+	const [copied, setCopied] = React.useState(false);
+	const [hovered, setHovered] = React.useState(false);
+
+	const handleCopy = React.useCallback(() => {
+		const text = extractTextContent(message.content);
+		if (!text) return;
+		void navigator.clipboard.writeText(text).then(() => {
+			setCopied(true);
+			setTimeout(() => setCopied(false), 2000);
+		});
+	}, [message.content]);
+
+	const copyButtonRef = React.useCallback(
+		(el: HTMLButtonElement | null) => {
+			if (el) setIcon(el, copied ? "check" : "copy");
+		},
+		[copied],
+	);
+
+	const hasText = message.content.some(
+		(c) => (c.type === "text" || c.type === "text_with_context") && c.text,
+	);
 
 	return (
 		<div
 			className={`agent-client-message-renderer ${message.role === "user" ? "agent-client-message-user" : "agent-client-message-assistant"}`}
+			onMouseEnter={hasText ? () => setHovered(true) : undefined}
+			onMouseLeave={hasText ? () => setHovered(false) : undefined}
 		>
 			{groups.map((group, idx) => {
 				if (group.type === "attachments") {
@@ -108,6 +140,16 @@ export const MessageRenderer = React.memo(function MessageRenderer({
 					);
 				}
 			})}
+			{hasText && hovered && (
+				<div className="agent-client-message-actions">
+					<button
+						className="agent-client-message-action-button"
+						onClick={handleCopy}
+						aria-label="Copy message"
+						ref={copyButtonRef}
+					/>
+				</div>
+			)}
 		</div>
 	);
 });
