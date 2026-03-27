@@ -1,5 +1,5 @@
 import * as React from "react";
-const { useState } = React;
+const { useState, useCallback } = React;
 import { setIcon } from "obsidian";
 import type {
 	ChatMessage,
@@ -301,6 +301,52 @@ export interface MessageBubbleProps {
 }
 
 /**
+ * Extract plain text from message contents for clipboard copy.
+ */
+function extractTextContent(contents: MessageContent[]): string {
+	return contents
+		.filter((c) => c.type === "text" || c.type === "text_with_context")
+		.map((c) => ("text" in c ? c.text : ""))
+		.join("\n");
+}
+
+/**
+ * Copy button that shows a check icon briefly after copying.
+ * Uses callback ref for Obsidian's setIcon DOM manipulation.
+ */
+function CopyButton({ contents }: { contents: MessageContent[] }) {
+	const [copied, setCopied] = useState(false);
+
+	const handleCopy = useCallback(() => {
+		const text = extractTextContent(contents);
+		if (!text) return;
+		void navigator.clipboard
+			.writeText(text)
+			.then(() => {
+				setCopied(true);
+				setTimeout(() => setCopied(false), 2000);
+			})
+			.catch(() => {});
+	}, [contents]);
+
+	const iconRef = useCallback(
+		(el: HTMLButtonElement | null) => {
+			if (el) setIcon(el, copied ? "check" : "copy");
+		},
+		[copied],
+	);
+
+	return (
+		<button
+			className="agent-client-message-action-button"
+			onClick={handleCopy}
+			aria-label="Copy message"
+			ref={iconRef}
+		/>
+	);
+}
+
+/**
  * Group consecutive image/resource_link contents together for horizontal display.
  * Non-attachment contents are wrapped individually.
  */
@@ -390,6 +436,15 @@ export const MessageBubble = React.memo(function MessageBubble({
 					);
 				}
 			})}
+			{message.content.some(
+				(c) =>
+					(c.type === "text" || c.type === "text_with_context") &&
+					c.text,
+			) && (
+				<div className="agent-client-message-actions">
+					<CopyButton contents={message.content} />
+				</div>
+			)}
 		</div>
 	);
 });
