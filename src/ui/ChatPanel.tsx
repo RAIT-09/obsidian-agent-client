@@ -18,8 +18,7 @@ import { useChatContext } from "./ChatContext";
 // Hooks imports
 import { useSettings } from "../hooks/useSettings";
 import { useSuggestions } from "../hooks/useSuggestions";
-import { useSession } from "../hooks/useSession";
-import { useMessages } from "../hooks/useMessages";
+import { useAgent } from "../hooks/useAgent";
 import { useSessionHistory } from "../hooks/useSessionHistory";
 
 // Domain model imports
@@ -165,36 +164,21 @@ export function ChatPanel({
 	// ============================================================
 	const settings = useSettings(plugin);
 
-	const agentSession = useSession(
+	const agent = useAgent(
 		acpClient,
 		plugin.settingsService,
+		vaultService,
 		vaultPath,
 		initialAgentId,
 	);
 
 	const {
 		session,
-		errorInfo: sessionErrorInfo,
 		isReady: isSessionReady,
-	} = agentSession;
-
-	const chatMessages = useMessages(
-		acpClient,
-		vaultService,
-		vaultService,
-		{
-			sessionId: session.sessionId,
-			authMethods: session.authMethods,
-			promptCapabilities: session.promptCapabilities,
-		},
-		{
-			windowsWslMode: settings.windowsWslMode,
-			maxNoteLength: settings.displaySettings.maxNoteLength,
-			maxSelectionLength: settings.displaySettings.maxSelectionLength,
-		},
-	);
-
-	const { messages, isSending } = chatMessages;
+		messages,
+		isSending,
+		errorInfo,
+	} = agent;
 
 
 	const suggestions = useSuggestions(
@@ -260,14 +244,14 @@ export function ChatPanel({
 					configOptions,
 				},
 			);
-			agentSession.updateSessionFromLoad(
+			agent.updateSessionFromLoad(
 				sessionId,
 				modes,
 				models,
 				configOptions,
 			);
 		},
-		[logger, agentSession],
+		[logger, agent],
 	);
 
 	const sessionHistory = useSessionHistory({
@@ -276,14 +260,12 @@ export function ChatPanel({
 		settingsAccess: plugin.settingsService,
 		cwd: vaultPath,
 		onSessionLoad: handleSessionLoad,
-		onMessagesRestore: chatMessages.setMessagesFromLocal,
-		onIgnoreUpdates: chatMessages.setIgnoreUpdates,
-		onClearMessages: chatMessages.clearMessages,
+		onMessagesRestore: agent.setMessagesFromLocal,
+		onIgnoreUpdates: agent.setIgnoreUpdates,
+		onClearMessages: agent.clearMessages,
 	});
 
-	// Combined error info (session errors take precedence)
-	const errorInfo =
-		sessionErrorInfo || chatMessages.errorInfo;
+
 
 	// ============================================================
 	// Local State
@@ -341,7 +323,7 @@ export function ChatPanel({
 	const handleSendMessage = useCallback(
 		async (content: string, attachments?: AttachedFile[]) => {
 			// Dismiss overlays on send
-			chatMessages.clearError();
+			agent.clearError();
 			setAgentUpdateNotification(null);
 
 			const isFirstMessage = messages.length === 0;
@@ -377,7 +359,7 @@ export function ChatPanel({
 				}
 			}
 
-			await chatMessages.sendMessage(content, {
+			await agent.sendMessage(content, {
 				activeNote: settings.autoMentionActiveNote
 					? suggestions.mentions.activeNote
 					: null,
@@ -400,7 +382,7 @@ export function ChatPanel({
 			}
 		},
 		[
-			chatMessages,
+			agent,
 			messages.length,
 			session.sessionId,
 			sessionHistory,
@@ -413,12 +395,12 @@ export function ChatPanel({
 
 	const handleStopGeneration = useCallback(async () => {
 		logger.log("Cancelling current operation...");
-		const lastMessage = chatMessages.lastUserMessage;
-		await agentSession.cancelOperation();
+		const lastMessage = agent.lastUserMessage;
+		await agent.cancelOperation();
 		if (lastMessage) {
 			setRestoredMessage(lastMessage);
 		}
-	}, [logger, agentSession, chatMessages.lastUserMessage]);
+	}, [logger, agent, agent.lastUserMessage]);
 
 	const handleNewChat = useCallback(
 		async (requestedAgentId?: string) => {
@@ -432,8 +414,8 @@ export function ChatPanel({
 			}
 
 			// Cancel ongoing generation before starting new chat
-			if (chatMessages.isSending) {
-				await agentSession.cancelOperation();
+			if (agent.isSending) {
+				await agent.cancelOperation();
 			}
 
 			logger.log(
@@ -446,12 +428,12 @@ export function ChatPanel({
 			}
 
 			suggestions.mentions.toggleAutoMention(false);
-			chatMessages.clearMessages();
+			agent.clearMessages();
 
 			const newAgentId = isAgentSwitch
 				? requestedAgentId
 				: session.agentId;
-			await agentSession.restartSession(newAgentId);
+			await agent.restartSession(newAgentId);
 
 			// Invalidate session history cache when creating new session
 			sessionHistory.invalidateCache();
@@ -461,8 +443,8 @@ export function ChatPanel({
 			session,
 			logger,
 			autoExportIfEnabled,
-			chatMessages,
-			agentSession,
+			agent,
+			agent,
 			sessionHistory,
 		],
 	);
@@ -509,20 +491,20 @@ export function ChatPanel({
 		}
 
 		// Clear messages for fresh start
-		chatMessages.clearMessages();
+		agent.clearMessages();
 
 		try {
-			await agentSession.forceRestartAgent();
+			await agent.forceRestartAgent();
 			new Notice("[Agent Client] Agent restarted");
 		} catch (error) {
 			new Notice("[Agent Client] Failed to restart agent");
 			logger.error("Restart error:", error);
 		}
-	}, [logger, messages, session, autoExportIfEnabled, chatMessages, agentSession]);
+	}, [logger, messages, session, autoExportIfEnabled, agent, agent]);
 
 	const handleClearError = useCallback(() => {
-		chatMessages.clearError();
-	}, [chatMessages]);
+		agent.clearError();
+	}, [agent]);
 
 	const handleClearAgentUpdate = useCallback(() => {
 		setAgentUpdateNotification(null);
@@ -541,7 +523,7 @@ export function ChatPanel({
 				logger.log(
 					`[ChatPanel] Restoring session: ${sessionId}`,
 				);
-				chatMessages.clearMessages();
+				agent.clearMessages();
 				await sessionHistory.restoreSession(sessionId, cwd);
 				new Notice("[Agent Client] Session restored");
 			} catch (error) {
@@ -549,14 +531,14 @@ export function ChatPanel({
 				logger.error("Session restore error:", error);
 			}
 		},
-		[logger, chatMessages, sessionHistory],
+		[logger, agent, sessionHistory],
 	);
 
 	const handleForkSession = useCallback(
 		async (sessionId: string, cwd: string) => {
 			try {
 				logger.log(`[ChatPanel] Forking session: ${sessionId}`);
-				chatMessages.clearMessages();
+				agent.clearMessages();
 				await sessionHistory.forkSession(sessionId, cwd);
 				new Notice("[Agent Client] Session forked");
 			} catch (error) {
@@ -564,7 +546,7 @@ export function ChatPanel({
 				logger.error("Session fork error:", error);
 			}
 		},
-		[logger, chatMessages, sessionHistory],
+		[logger, agent, sessionHistory],
 	);
 
 	const handleDeleteSession = useCallback(
@@ -634,23 +616,23 @@ export function ChatPanel({
 
 	const handleSetMode = useCallback(
 		async (modeId: string) => {
-			await agentSession.setMode(modeId);
+			await agent.setMode(modeId);
 		},
-		[agentSession],
+		[agent],
 	);
 
 	const handleSetModel = useCallback(
 		async (modelId: string) => {
-			await agentSession.setModel(modelId);
+			await agent.setModel(modelId);
 		},
-		[agentSession],
+		[agent],
 	);
 
 	const handleSetConfigOption = useCallback(
 		async (configId: string, value: string) => {
-			await agentSession.setConfigOption(configId, value);
+			await agent.setConfigOption(configId, value);
 		},
-		[agentSession],
+		[agent],
 	);
 
 	// ============================================================
@@ -830,8 +812,8 @@ export function ChatPanel({
 	// Initialize session on mount
 	useEffect(() => {
 		logger.log("[Debug] Starting connection setup via useSession...");
-		void agentSession.createSession(config?.agent || initialAgentId);
-	}, [agentSession.createSession, config?.agent, initialAgentId]);
+		void agent.createSession(config?.agent || initialAgentId);
+	}, [agent.createSession, config?.agent, initialAgentId]);
 
 	// Apply configured model when session is ready
 	useEffect(() => {
@@ -851,7 +833,7 @@ export function ChatPanel({
 						"[ChatPanel] Applying configured model via configOptions:",
 						config.model,
 					);
-					void agentSession.setConfigOption(
+					void agent.setConfigOption(
 						modelOption.id,
 						config.model,
 					);
@@ -870,7 +852,7 @@ export function ChatPanel({
 					"[ChatPanel] Applying configured model:",
 					config.model,
 				);
-				void agentSession.setModel(config.model);
+				void agent.setModel(config.model);
 			}
 		}
 	}, [
@@ -878,8 +860,8 @@ export function ChatPanel({
 		isSessionReady,
 		session.configOptions,
 		session.models,
-		agentSession.setConfigOption,
-		agentSession.setModel,
+		agent.setConfigOption,
+		agent.setModel,
 		logger,
 	]);
 
@@ -887,11 +869,11 @@ export function ChatPanel({
 	const messagesRef = useRef(messages);
 	const sessionRef = useRef(session);
 	const autoExportRef = useRef(autoExportIfEnabled);
-	const closeSessionRef = useRef(agentSession.closeSession);
+	const closeSessionRef = useRef(agent.closeSession);
 	messagesRef.current = messages;
 	sessionRef.current = session;
 	autoExportRef.current = autoExportIfEnabled;
-	closeSessionRef.current = agentSession.closeSession;
+	closeSessionRef.current = agent.closeSession;
 
 	// Cleanup on unmount only - auto-export and close session
 	useEffect(() => {
@@ -1079,7 +1061,7 @@ export function ChatPanel({
 					return;
 				}
 				void (async () => {
-					const success = await chatMessages.approveActivePermission();
+					const success = await agent.approveActivePermission();
 					if (!success) {
 						new Notice(
 							"[Agent Client] No active permission request",
@@ -1104,7 +1086,7 @@ export function ChatPanel({
 					return;
 				}
 				void (async () => {
-					const success = await chatMessages.rejectActivePermission();
+					const success = await agent.rejectActivePermission();
 					if (!success) {
 						new Notice(
 							"[Agent Client] No active permission request",
@@ -1152,8 +1134,8 @@ export function ChatPanel({
 		};
 	}, [
 		plugin.app.workspace,
-		chatMessages.approveActivePermission,
-		chatMessages.rejectActivePermission,
+		agent.approveActivePermission,
+		agent.rejectActivePermission,
 		handleStopGeneration,
 		handleExportChat,
 		viewId,
@@ -1310,8 +1292,8 @@ export function ChatPanel({
 			plugin={plugin}
 			view={viewHost}
 			terminalClient={terminalClientRef.current}
-			onApprovePermission={chatMessages.approvePermission}
-			hasActivePermission={chatMessages.hasActivePermission}
+			onApprovePermission={agent.approvePermission}
+			hasActivePermission={agent.hasActivePermission}
 		/>
 	);
 
