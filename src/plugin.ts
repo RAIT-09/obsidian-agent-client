@@ -294,8 +294,7 @@ export default class AgentClientPlugin extends Plugin {
 			checkCallback: (checking) => {
 				if (!this.settings.enableFloatingChat) return false;
 				const focused = this.viewRegistry.getFocused();
-				if (!(focused && focused.viewType === "floating"))
-					return false;
+				if (!(focused && focused.viewType === "floating")) return false;
 				if (checking) return true;
 				focused.collapse();
 			},
@@ -307,8 +306,7 @@ export default class AgentClientPlugin extends Plugin {
 			checkCallback: (checking) => {
 				if (!this.settings.enableFloatingChat) return false;
 				const focused = this.viewRegistry.getFocused();
-				if (!(focused && focused.viewType === "floating"))
-					return false;
+				if (!(focused && focused.viewType === "floating")) return false;
 				if (checking) return true;
 				this.closeFloatingChat(focused.viewId);
 			},

@@ -1228,6 +1228,7 @@ If your plugin does not need CSS, delete this file.
 
 /* Message Renderer */
 .agent-client-message-renderer {
+	position: relative;
 	padding: 0 16px;
 	width: 100%;
 	margin: 4px 0;
@@ -1252,6 +1253,53 @@ If your plugin does not need CSS, delete this file.
 	background-color: transparent;
 	border: none;
 	border-radius: 0;
+}
+
+.agent-client-message-renderer.agent-client-message-assistant .agent-client-message-actions {
+	bottom: -8px;
+}
+
+.agent-client-message-actions {
+	position: absolute;
+	bottom: 0px;
+	right: 12px;
+	display: flex;
+	gap: 2px;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.15s ease;
+}
+
+.agent-client-message-renderer:hover .agent-client-message-actions {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.agent-client-message-action-button {
+	background-color: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+	box-shadow: none !important;
+	outline: none !important;
+	appearance: none;
+	padding: 0 !important;
+	margin: 0 !important;
+	min-width: unset !important;
+	min-height: unset !important;
+	cursor: pointer;
+	color: var(--text-muted);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.agent-client-message-action-button:hover {
+	color: var(--interactive-accent);
+}
+
+.agent-client-message-action-button svg {
+	width: 14px;
+	height: 14px;
 }
 
 /* Text with Mentions */
