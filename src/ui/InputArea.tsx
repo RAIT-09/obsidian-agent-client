@@ -13,8 +13,7 @@ import type {
 	SessionConfigOption,
 } from "../types/session";
 import type { AttachedFile, ChatMessage } from "../types/chat";
-import type { UseMentionsReturn } from "../hooks/useMentions";
-import type { UseSlashCommandsReturn } from "../hooks/useSlashCommands";
+import type { UseSuggestionsReturn } from "../hooks/useSuggestions";
 import { SuggestionPopup } from "./SuggestionPopup";
 import { ErrorBanner } from "./ErrorBanner";
 import { AttachmentStrip } from "./shared/AttachmentStrip";
@@ -65,10 +64,8 @@ export interface InputAreaProps {
 	autoMentionEnabled: boolean;
 	/** Message to restore (e.g., after cancellation) */
 	restoredMessage: string | null;
-	/** Mentions hook state and methods */
-	mentions: UseMentionsReturn;
-	/** Slash commands hook state and methods */
-	slashCommands: UseSlashCommandsReturn;
+	/** Input suggestions (mentions + slash commands) */
+	suggestions: UseSuggestionsReturn;
 	/** Plugin instance */
 	plugin: AgentClientPlugin;
 	/** View instance for event registration */
@@ -141,8 +138,7 @@ export function InputArea({
 	availableCommands,
 	autoMentionEnabled,
 	restoredMessage,
-	mentions,
-	slashCommands,
+	suggestions,
 	plugin,
 	view,
 	onSendMessage,
@@ -171,6 +167,7 @@ export function InputArea({
 	// Input history
 	messages,
 }: InputAreaProps) {
+	const { mentions, commands: slashCommands } = suggestions;
 	const logger = getLogger();
 	const settings = useSettings(plugin);
 	const showEmojis = plugin.settings.displaySettings.showEmojis;

@@ -17,8 +17,7 @@ import { useChatContext } from "./ChatContext";
 
 // Hooks imports
 import { useSettings } from "../hooks/useSettings";
-import { useMentions } from "../hooks/useMentions";
-import { useSlashCommands } from "../hooks/useSlashCommands";
+import { useSuggestions } from "../hooks/useSuggestions";
 import { useSession } from "../hooks/useSession";
 import { useMessages } from "../hooks/useMessages";
 import { useSessionHistory } from "../hooks/useSessionHistory";
@@ -198,11 +197,10 @@ export function ChatPanel({
 	const { messages, isSending } = chatMessages;
 
 
-	const mentions = useMentions(vaultService, plugin);
-
-	const slashCommands = useSlashCommands(
+	const suggestions = useSuggestions(
+		vaultService,
+		plugin,
 		session.availableCommands || [],
-		mentions.toggleAutoMention,
 	);
 
 	const autoExportIfEnabled = useCallback(
@@ -381,10 +379,10 @@ export function ChatPanel({
 
 			await chatMessages.sendMessage(content, {
 				activeNote: settings.autoMentionActiveNote
-					? mentions.activeNote
+					? suggestions.mentions.activeNote
 					: null,
 				vaultBasePath: vaultPath,
-				isAutoMentionDisabled: mentions.isAutoMentionDisabled,
+				isAutoMentionDisabled: suggestions.mentions.isAutoMentionDisabled,
 				images: images.length > 0 ? images : undefined,
 				resourceLinks:
 					resourceLinks.length > 0 ? resourceLinks : undefined,
@@ -447,7 +445,7 @@ export function ChatPanel({
 				await autoExportIfEnabled("newChat", messages, session);
 			}
 
-			mentions.toggleAutoMention(false);
+			suggestions.mentions.toggleAutoMention(false);
 			chatMessages.clearMessages();
 
 			const newAgentId = isAgentSwitch
@@ -972,7 +970,7 @@ export function ChatPanel({
 
 		const refreshActiveNote = async () => {
 			if (!isMounted) return;
-			await mentions.updateActiveNote();
+			await suggestions.mentions.updateActiveNote();
 		};
 
 		const unsubscribe = vaultService.subscribeSelectionChanges(() => {
@@ -985,7 +983,7 @@ export function ChatPanel({
 			isMounted = false;
 			unsubscribe();
 		};
-	}, [mentions.updateActiveNote, vaultService]);
+	}, [suggestions.mentions.updateActiveNote, vaultService]);
 
 	// ============================================================
 	// Effects - Workspace Events (Hotkeys)
@@ -1007,13 +1005,13 @@ export function ChatPanel({
 			if (targetViewId && targetViewId !== viewId) {
 				return;
 			}
-			mentions.toggleAutoMention();
+			suggestions.mentions.toggleAutoMention();
 		});
 
 		return () => {
 			workspace.offref(eventRef);
 		};
-	}, [plugin.app.workspace, mentions.toggleAutoMention, viewId]);
+	}, [plugin.app.workspace, suggestions.mentions.toggleAutoMention, viewId]);
 
 	// 2. New chat requested (from "New chat with [Agent]" command)
 	useEffect(() => {
@@ -1326,8 +1324,7 @@ export function ChatPanel({
 			availableCommands={session.availableCommands || []}
 			autoMentionEnabled={settings.autoMentionActiveNote}
 			restoredMessage={restoredMessage}
-			mentions={mentions}
-			slashCommands={slashCommands}
+			suggestions={suggestions}
 			plugin={plugin}
 			view={viewHost}
 			onSendMessage={handleSendMessage}
