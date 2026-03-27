@@ -971,174 +971,113 @@ export function ChatPanel({
 	// Effects - Workspace Events (Hotkeys)
 	// ============================================================
 
-	// 1. Toggle auto-mention
 	useEffect(() => {
 		const workspace = plugin.app.workspace;
-
-		const eventRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on("agent-client:toggle-auto-mention", (targetViewId?: string) => {
-			// Only respond if this view is the target (or no target specified)
-			if (targetViewId && targetViewId !== viewId) {
-				return;
-			}
-			suggestions.mentions.toggleAutoMention();
-		});
-
-		return () => {
-			workspace.offref(eventRef);
+		const ws = workspace as unknown as {
+			on: (
+				name: string,
+				callback: (...args: never[]) => void,
+			) => ReturnType<typeof workspace.on>;
 		};
-	}, [plugin.app.workspace, suggestions.mentions.toggleAutoMention, viewId]);
 
-	// 2. New chat requested (from "New chat with [Agent]" command)
-	useEffect(() => {
-		const workspace = plugin.app.workspace;
+		const refs = [
+			// Toggle auto-mention
+			ws.on(
+				"agent-client:toggle-auto-mention",
+				(targetViewId?: string) => {
+					if (targetViewId && targetViewId !== viewId) return;
+					suggestions.mentions.toggleAutoMention();
+				},
+			),
 
-		const eventRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: (agentId?: string) => void,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on("agent-client:new-chat-requested", (agentId?: string) => {
-			// For sidebar variant, only respond if we are the last active view
-			if (
-				variant === "sidebar" &&
-				plugin.lastActiveChatViewId &&
-				plugin.lastActiveChatViewId !== viewId
-			) {
-				return;
-			}
-			// For floating variant, same check
-			if (
-				variant === "floating" &&
-				plugin.lastActiveChatViewId &&
-				plugin.lastActiveChatViewId !== viewId
-			) {
-				return;
-			}
-			if (variant === "sidebar") {
-				void handleNewChatWithPersist(agentId);
-			} else {
-				void handleNewChat(agentId);
-			}
-		});
+			// New chat requested (from "New chat with [Agent]" command)
+			ws.on(
+				"agent-client:new-chat-requested",
+				(agentId?: string) => {
+					if (
+						plugin.lastActiveChatViewId &&
+						plugin.lastActiveChatViewId !== viewId
+					) {
+						return;
+					}
+					if (variant === "sidebar") {
+						void handleNewChatWithPersist(agentId);
+					} else {
+						void handleNewChat(agentId);
+					}
+				},
+			),
+
+			// Approve active permission
+			ws.on(
+				"agent-client:approve-active-permission",
+				(targetViewId?: string) => {
+					if (targetViewId && targetViewId !== viewId) return;
+					void (async () => {
+						const success =
+							await agent.approveActivePermission();
+						if (!success) {
+							new Notice(
+								"[Agent Client] No active permission request",
+							);
+						}
+					})();
+				},
+			),
+
+			// Reject active permission
+			ws.on(
+				"agent-client:reject-active-permission",
+				(targetViewId?: string) => {
+					if (targetViewId && targetViewId !== viewId) return;
+					void (async () => {
+						const success =
+							await agent.rejectActivePermission();
+						if (!success) {
+							new Notice(
+								"[Agent Client] No active permission request",
+							);
+						}
+					})();
+				},
+			),
+
+			// Cancel current message
+			ws.on(
+				"agent-client:cancel-message",
+				(targetViewId?: string) => {
+					if (targetViewId && targetViewId !== viewId) return;
+					void handleStopGeneration();
+				},
+			),
+
+			// Export chat
+			ws.on(
+				"agent-client:export-chat",
+				(targetViewId?: string) => {
+					if (targetViewId && targetViewId !== viewId) return;
+					void handleExportChat();
+				},
+			),
+		];
 
 		return () => {
-			workspace.offref(eventRef);
+			for (const ref of refs) {
+				workspace.offref(ref);
+			}
 		};
 	}, [
 		plugin.app.workspace,
-		plugin.lastActiveChatViewId,
-		handleNewChatWithPersist,
-		handleNewChat,
 		viewId,
 		variant,
-	]);
-
-	// 3. Permission commands + cancel + export
-	useEffect(() => {
-		const workspace = plugin.app.workspace;
-
-		const approveRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on(
-			"agent-client:approve-active-permission",
-			(targetViewId?: string) => {
-				// Only respond if this view is the target (or no target specified)
-				if (targetViewId && targetViewId !== viewId) {
-					return;
-				}
-				void (async () => {
-					const success = await agent.approveActivePermission();
-					if (!success) {
-						new Notice(
-							"[Agent Client] No active permission request",
-						);
-					}
-				})();
-			},
-		);
-
-		const rejectRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on(
-			"agent-client:reject-active-permission",
-			(targetViewId?: string) => {
-				// Only respond if this view is the target (or no target specified)
-				if (targetViewId && targetViewId !== viewId) {
-					return;
-				}
-				void (async () => {
-					const success = await agent.rejectActivePermission();
-					if (!success) {
-						new Notice(
-							"[Agent Client] No active permission request",
-						);
-					}
-				})();
-			},
-		);
-
-		const cancelRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on("agent-client:cancel-message", (targetViewId?: string) => {
-			// Only respond if this view is the target (or no target specified)
-			if (targetViewId && targetViewId !== viewId) {
-				return;
-			}
-			void handleStopGeneration();
-		});
-
-		const exportRef = (
-			workspace as unknown as {
-				on: (
-					name: string,
-					callback: CustomEventCallback,
-				) => ReturnType<typeof workspace.on>;
-			}
-		).on("agent-client:export-chat", (targetViewId?: string) => {
-			// Only respond if this view is the target (or no target specified)
-			if (targetViewId && targetViewId !== viewId) {
-				return;
-			}
-			void handleExportChat();
-		});
-
-		return () => {
-			workspace.offref(approveRef);
-			workspace.offref(rejectRef);
-			workspace.offref(cancelRef);
-			workspace.offref(exportRef);
-		};
-	}, [
-		plugin.app.workspace,
+		plugin.lastActiveChatViewId,
+		suggestions.mentions.toggleAutoMention,
+		handleNewChatWithPersist,
+		handleNewChat,
 		agent.approveActivePermission,
 		agent.rejectActivePermission,
 		handleStopGeneration,
 		handleExportChat,
-		viewId,
 	]);
 
 	// ============================================================
