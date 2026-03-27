@@ -338,7 +338,7 @@ function CopyButton({ contents }: { contents: MessageContent[] }) {
 
 	return (
 		<button
-			className="agent-client-message-action-button"
+			className="clickable-icon agent-client-message-action-button"
 			onClick={handleCopy}
 			aria-label="Copy message"
 			ref={iconRef}

@@ -1261,8 +1261,8 @@ If your plugin does not need CSS, delete this file.
 
 .agent-client-message-actions {
 	position: absolute;
-	bottom: 0px;
-	right: 12px;
+	bottom: 4px;
+	right: 8px;
 	display: flex;
 	gap: 2px;
 	opacity: 0;
@@ -1276,25 +1276,11 @@ If your plugin does not need CSS, delete this file.
 }
 
 .agent-client-message-action-button {
-	background-color: transparent !important;
-	border: none !important;
-	border-radius: 0 !important;
-	box-shadow: none !important;
-	outline: none !important;
-	appearance: none;
-	padding: 0 !important;
-	margin: 0 !important;
-	min-width: unset !important;
-	min-height: unset !important;
-	cursor: pointer;
 	color: var(--text-muted);
-	display: flex;
-	align-items: center;
-	justify-content: center;
 }
 
 .agent-client-message-action-button:hover {
-	color: var(--interactive-accent);
+	background-color: transparent;
 }
 
 .agent-client-message-action-button svg {
