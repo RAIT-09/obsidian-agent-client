@@ -92,13 +92,6 @@ export interface UseSessionReturn {
 	) => void;
 
 	/**
-	 * Handle a session-level update from the agent.
-	 * Processes: available_commands_update, current_mode_update,
-	 * config_option_update, usage_update. Ignores message-level updates.
-	 */
-	handleSessionUpdate: (update: SessionUpdate) => void;
-
-	/**
 	 * DEPRECATED: Use setConfigOption instead.
 	 *
 	 * Set the session mode.
@@ -570,6 +563,12 @@ export function useSession(
 		}
 	}, []);
 
+	// Subscribe to session-level updates from agent
+	useEffect(() => {
+		const unsubscribe = agentClient.onSessionUpdate(handleSessionUpdate);
+		return unsubscribe;
+	}, [agentClient, handleSessionUpdate]);
+
 	/**
 	 * Set a legacy session mode or model.
 	 * Optimistic update with rollback on error.
@@ -785,7 +784,6 @@ export function useSession(
 		cancelOperation,
 		getAvailableAgents,
 		updateSessionFromLoad,
-		handleSessionUpdate,
 		setMode,
 		setModel,
 		setConfigOption,

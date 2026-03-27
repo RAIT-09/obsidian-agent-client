@@ -66,6 +66,7 @@ export class AcpClient {
 	private currentConfig: AgentConfig | null = null;
 	private isInitializedFlag = false;
 	private currentAgentId: string | null = null;
+	private currentSessionId: string | null = null;
 
 	// Callbacks
 	private errorListeners = new Set<(error: ProcessError) => void>();
@@ -98,6 +99,7 @@ export class AcpClient {
 			this.permissionManager,
 			this.terminalManager,
 			() => this.currentConfig?.workingDirectory ?? "",
+			() => this.currentSessionId,
 			this.logger,
 		);
 	}
@@ -384,10 +386,12 @@ export class AcpClient {
 			this.logger.log(
 				`[AcpClient] Created session: ${response.sessionId}`,
 			);
-			return AcpTypeConverter.toSessionResult(
+			const result = AcpTypeConverter.toSessionResult(
 				response.sessionId,
 				response,
 			);
+			this.currentSessionId = result.sessionId;
+			return result;
 		} catch (error) {
 			this.logger.error("[AcpClient] New Session Error:", error);
 			throw error;
@@ -521,6 +525,7 @@ export class AcpClient {
 		// Reset initialization state
 		this.isInitializedFlag = false;
 		this.currentAgentId = null;
+		this.currentSessionId = null;
 
 		this.logger.log("[AcpClient] Disconnected");
 		return Promise.resolve();
@@ -790,7 +795,9 @@ export class AcpClient {
 			});
 
 			this.logger.log(`[AcpClient] Session loaded: ${sessionId}`);
-			return AcpTypeConverter.toSessionResult(sessionId, response);
+			const result = AcpTypeConverter.toSessionResult(sessionId, response);
+			this.currentSessionId = result.sessionId;
+			return result;
 		} catch (error) {
 			this.logger.error("[AcpClient] Load Session Error:", error);
 			throw error;
@@ -822,7 +829,9 @@ export class AcpClient {
 			});
 
 			this.logger.log(`[AcpClient] Session resumed: ${sessionId}`);
-			return AcpTypeConverter.toSessionResult(sessionId, response);
+			const result = AcpTypeConverter.toSessionResult(sessionId, response);
+			this.currentSessionId = result.sessionId;
+			return result;
 		} catch (error) {
 			this.logger.error("[AcpClient] Resume Session Error:", error);
 			throw error;
@@ -853,10 +862,12 @@ export class AcpClient {
 			this.logger.log(
 				`[AcpClient] Session forked: ${sessionId} -> ${response.sessionId}`,
 			);
-			return AcpTypeConverter.toSessionResult(
+			const result = AcpTypeConverter.toSessionResult(
 				response.sessionId,
 				response,
 			);
+			this.currentSessionId = result.sessionId;
+			return result;
 		} catch (error) {
 			this.logger.error("[AcpClient] Fork Session Error:", error);
 			throw error;

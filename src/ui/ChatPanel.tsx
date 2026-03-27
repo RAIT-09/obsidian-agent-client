@@ -274,14 +274,11 @@ export function ChatPanel({
 		[logger, agentSession],
 	);
 
-	const [isLoadingSessionHistory, setIsLoadingSessionHistory] =
-		useState(false);
-
 	const handleLoadStart = useCallback(() => {
 		logger.log(
 			"[ChatPanel] session/load started, ignoring history replay",
 		);
-		setIsLoadingSessionHistory(true);
+		chatMessages.setIgnoreUpdates(true);
 		chatMessages.clearMessages();
 	}, [logger, chatMessages]);
 
@@ -289,8 +286,8 @@ export function ChatPanel({
 		logger.log(
 			"[ChatPanel] session/load ended, resuming normal processing",
 		);
-		setIsLoadingSessionHistory(false);
-	}, [logger]);
+		chatMessages.setIgnoreUpdates(false);
+	}, [logger, chatMessages]);
 
 	const sessionHistory = useSessionHistory({
 		agentClient: acpClient,
@@ -931,38 +928,6 @@ export function ChatPanel({
 			})();
 		};
 	}, [logger]);
-
-	// ============================================================
-	// Effects - ACP Adapter Callbacks
-	// ============================================================
-	// Register unified session update callback
-	useEffect(() => {
-		const unsubscribe = acpClient.onSessionUpdate((update) => {
-			// Filter by sessionId - ignore updates from old sessions
-			if (session.sessionId && update.sessionId !== session.sessionId) {
-				logger.log(
-					`[ChatPanel] Ignoring update for old session: ${update.sessionId} (current: ${session.sessionId})`,
-				);
-				return;
-			}
-
-			// Session-level updates: always process (even during history replay)
-			agentSession.handleSessionUpdate(update);
-
-			// Message-level updates: skip during session/load history replay
-			if (!isLoadingSessionHistory) {
-				chatMessages.handleSessionUpdate(update);
-			}
-		});
-		return unsubscribe;
-	}, [
-		acpClient,
-		session.sessionId,
-		logger,
-		isLoadingSessionHistory,
-		agentSession.handleSessionUpdate,
-		chatMessages.handleSessionUpdate,
-	]);
 
 	// ============================================================
 	// Effects - Update Check

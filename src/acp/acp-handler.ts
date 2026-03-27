@@ -28,6 +28,7 @@ export class AcpHandler {
 		private permissionManager: PermissionManager,
 		private terminalManager: TerminalManager,
 		private getWorkingDirectory: () => string,
+		private getCurrentSessionId: () => string | null,
 		private logger: Logger,
 	) {}
 
@@ -52,8 +53,12 @@ export class AcpHandler {
 		return () => this.sessionUpdateListeners.delete(callback);
 	}
 
-	/** Emit a session update to all listeners. Used by PermissionManager callbacks. */
+	/** Emit a session update to all listeners. Filters by current sessionId. */
 	emitSessionUpdate(update: SessionUpdate): void {
+		const currentId = this.getCurrentSessionId();
+		if (currentId && update.sessionId !== currentId) {
+			return;
+		}
 		for (const listener of this.sessionUpdateListeners) {
 			listener(update);
 		}

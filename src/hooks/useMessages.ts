@@ -111,11 +111,10 @@ export interface UseMessagesReturn {
 	upsertToolCall: (toolCallId: string, content: MessageContent) => void;
 
 	/**
-	 * Handle a session update from the agent.
-	 * This is the unified handler for all session update events.
-	 * Should be registered with agentClient.onSessionUpdate().
+	 * Set whether to ignore incoming updates.
+	 * Used during session/load to skip history replay messages.
 	 */
-	handleSessionUpdate: (update: SessionUpdate) => void;
+	setIgnoreUpdates: (ignore: boolean) => void;
 }
 
 /**
@@ -471,6 +470,9 @@ export function useMessages(
 	// Tool call index: toolCallId → message index for O(1) lookup
 	const toolCallIndexRef = useRef<Map<string, number>>(new Map());
 
+	// Ignore updates flag (used during session/load to skip history replay)
+	const ignoreUpdatesRef = useRef(false);
+
 	// ============================================================
 	// Streaming update batching
 	// ============================================================
@@ -547,14 +549,28 @@ export function useMessages(
 	 * Handle a session update from the agent.
 	 * Updates are batched via requestAnimationFrame for performance.
 	 * Session-level updates (commands, mode, config, usage) are no-ops
-	 * and are handled by useSession via ChatPanel routing.
+	 * and are handled by useSession independently.
 	 */
 	const handleSessionUpdate = useCallback(
 		(update: SessionUpdate): void => {
+			if (ignoreUpdatesRef.current) return;
 			enqueueUpdate(update);
 		},
 		[enqueueUpdate],
 	);
+
+	// Subscribe to message-level updates from agent
+	useEffect(() => {
+		const unsubscribe = agentClient.onSessionUpdate(handleSessionUpdate);
+		return unsubscribe;
+	}, [agentClient, handleSessionUpdate]);
+
+	/**
+	 * Set whether to ignore incoming updates (used during session/load history replay).
+	 */
+	const setIgnoreUpdates = useCallback((ignore: boolean): void => {
+		ignoreUpdatesRef.current = ignore;
+	}, []);
 
 	/**
 	 * Clear all messages.
@@ -780,6 +796,6 @@ export function useMessages(
 		addMessage,
 		updateLastMessage,
 		upsertToolCall,
-		handleSessionUpdate,
+		setIgnoreUpdates,
 	};
 }
