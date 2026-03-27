@@ -257,13 +257,9 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "open-floating-chat",
 			name: "Open floating chat window",
-			callback: () => {
-				if (!this.settings.enableFloatingChat) {
-					new Notice(
-						"[Agent Client] Floating chat is disabled in settings",
-					);
-					return;
-				}
+			checkCallback: (checking) => {
+				if (!this.settings.enableFloatingChat) return false;
+				if (checking) return true;
 				const instances = this.getFloatingChatInstances();
 				if (instances.length === 0) {
 					this.openNewFloatingChat(true);
@@ -285,13 +281,9 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "open-new-floating-chat",
 			name: "Open new floating chat window",
-			callback: () => {
-				if (!this.settings.enableFloatingChat) {
-					new Notice(
-						"[Agent Client] Floating chat is disabled in settings",
-					);
-					return;
-				}
+			checkCallback: (checking) => {
+				if (!this.settings.enableFloatingChat) return false;
+				if (checking) return true;
 				this.openNewFloatingChat(true);
 			},
 		});
@@ -299,22 +291,26 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "minimize-floating-chat",
 			name: "Minimize floating chat window",
-			callback: () => {
+			checkCallback: (checking) => {
+				if (!this.settings.enableFloatingChat) return false;
 				const focused = this.viewRegistry.getFocused();
-				if (focused && focused.viewType === "floating") {
-					focused.collapse();
-				}
+				if (!(focused && focused.viewType === "floating"))
+					return false;
+				if (checking) return true;
+				focused.collapse();
 			},
 		});
 
 		this.addCommand({
 			id: "close-floating-chat",
 			name: "Close floating chat window",
-			callback: () => {
+			checkCallback: (checking) => {
+				if (!this.settings.enableFloatingChat) return false;
 				const focused = this.viewRegistry.getFocused();
-				if (focused && focused.viewType === "floating") {
-					this.closeFloatingChat(focused.viewId);
-				}
+				if (!(focused && focused.viewType === "floating"))
+					return false;
+				if (checking) return true;
+				this.closeFloatingChat(focused.viewId);
 			},
 		});
 
