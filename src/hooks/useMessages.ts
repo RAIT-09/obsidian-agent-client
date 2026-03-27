@@ -103,12 +103,6 @@ export interface UseMessagesReturn {
 	updateLastMessage: (content: MessageContent) => void;
 
 	/**
-	 * Callback to update a specific message by tool call ID.
-	 * Used by AcpClient for tool call status updates.
-	 */
-	updateMessage: (toolCallId: string, content: MessageContent) => void;
-
-	/**
 	 * Callback to upsert a tool call message.
 	 * If a tool call with the given ID exists, it will be updated.
 	 * Otherwise, a new message will be created.
@@ -451,7 +445,7 @@ function applySingleUpdate(
  * - Sending state (isSending flag)
  * - Message operations (send, add, update)
  *
- * It provides callbacks (addMessage, updateLastMessage, updateMessage) that
+ * It provides callbacks (addMessage, updateLastMessage, upsertToolCall) that
  * should be passed to AcpClient.setMessageCallbacks() for receiving
  * agent responses.
  *
@@ -534,58 +528,6 @@ export function useMessages(
 	const updateLastMessage = useCallback((content: MessageContent): void => {
 		setMessages((prev) => applyUpdateLastMessage(prev, content));
 	}, []);
-
-	/**
-	 * Update a specific message by tool call ID.
-	 * Only updates if the tool call exists in state.
-	 */
-	const updateMessage = useCallback(
-		(toolCallId: string, content: MessageContent): void => {
-			if (content.type !== "tool_call") return;
-
-			setMessages((prev) => {
-				// O(1) lookup via index
-				const messageIdx = toolCallIndexRef.current.get(toolCallId);
-				if (messageIdx !== undefined && messageIdx < prev.length) {
-					const message = prev[messageIdx];
-					const hasTarget = message.content.some(
-						(c) => c.type === "tool_call" && c.toolCallId === toolCallId,
-					);
-					if (hasTarget) {
-						const result = [...prev];
-						result[messageIdx] = {
-							...message,
-							content: message.content.map((c) => {
-								if (c.type === "tool_call" && c.toolCallId === toolCallId) {
-									return mergeToolCallContent(c, content);
-								}
-								return c;
-							}),
-						};
-						return result;
-					}
-				}
-
-				// Fallback: linear scan
-				return prev.map((message) => {
-					const hasTarget = message.content.some(
-						(c) => c.type === "tool_call" && c.toolCallId === toolCallId,
-					);
-					if (!hasTarget) return message;
-					return {
-						...message,
-						content: message.content.map((c) => {
-							if (c.type === "tool_call" && c.toolCallId === toolCallId) {
-								return mergeToolCallContent(c, content);
-							}
-							return c;
-						}),
-					};
-				});
-			});
-		},
-		[],
-	);
 
 	/**
 	 * Upsert a tool call message.
@@ -837,7 +779,6 @@ export function useMessages(
 		clearError,
 		addMessage,
 		updateLastMessage,
-		updateMessage,
 		upsertToolCall,
 		handleSessionUpdate,
 	};

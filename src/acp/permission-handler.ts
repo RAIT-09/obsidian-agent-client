@@ -1,8 +1,5 @@
 import * as acp from "@agentclientprotocol/sdk";
-import type {
-	MessageContent,
-	PermissionOption,
-} from "../types/chat";
+import type { PermissionOption } from "../types/chat";
 import type { SessionUpdate } from "../types/session";
 import { AcpTypeConverter } from "./type-converter";
 import { getLogger, Logger } from "../utils/logger";
@@ -10,15 +7,12 @@ import { getLogger, Logger } from "../utils/logger";
 /**
  * Callbacks that PermissionManager uses to communicate with the outside world.
  *
- * These are injected by AcpClient and wrap the dynamically-set callbacks
- * (sessionUpdateCallback, updateMessage) so that PermissionManager doesn't
- * need to know about AcpClient's lifecycle.
+ * Injected by AcpClient. All UI updates (permission requests, responses,
+ * cancellations) flow through the single onSessionUpdate channel.
  */
 interface PermissionManagerCallbacks {
-	/** Emit a session update event (used to notify UI of new permission requests) */
+	/** Emit a session update event (used for all permission UI notifications) */
 	onSessionUpdate: (update: SessionUpdate) => void;
-	/** Update an existing tool call message (used to reflect permission state changes) */
-	onUpdateMessage: (toolCallId: string, content: MessageContent) => void;
 }
 
 /**
@@ -46,6 +40,7 @@ export class PermissionManager {
 			resolve: (response: acp.RequestPermissionResponse) => void;
 			toolCallId: string;
 			options: PermissionOption[];
+			sessionId: string;
 		}
 	>();
 
@@ -54,6 +49,7 @@ export class PermissionManager {
 		requestId: string;
 		toolCallId: string;
 		options: PermissionOption[];
+		sessionId: string;
 	}> = [];
 
 	constructor(callbacks: PermissionManagerCallbacks, autoAllow: boolean) {
@@ -147,6 +143,7 @@ export class PermissionManager {
 			requestId,
 			toolCallId,
 			options: normalizedOptions,
+			sessionId,
 		});
 
 		// Emit tool_call with permission request via session update callback
@@ -174,6 +171,7 @@ export class PermissionManager {
 				resolve,
 				toolCallId,
 				options: normalizedOptions,
+				sessionId,
 			});
 		});
 	}
@@ -190,11 +188,12 @@ export class PermissionManager {
 			return;
 		}
 
-		const { resolve, toolCallId, options } = request;
+		const { resolve, toolCallId, options, sessionId } = request;
 
-		// Reflect the selection in the UI immediately
-		this.callbacks.onUpdateMessage(toolCallId, {
-			type: "tool_call",
+		// Reflect the selection in the UI via session update
+		this.callbacks.onSessionUpdate({
+			type: "tool_call_update",
+			sessionId,
 			toolCallId,
 			permissionRequest: {
 				requestId,
@@ -202,7 +201,7 @@ export class PermissionManager {
 				selectedOptionId: optionId,
 				isActive: false,
 			},
-		} as MessageContent);
+		});
 
 		resolve({
 			outcome: {
@@ -229,10 +228,11 @@ export class PermissionManager {
 			`[PermissionManager] Cancelling ${this.pendingRequests.size} pending permission requests`,
 		);
 		this.pendingRequests.forEach(
-			({ resolve, toolCallId, options }, requestId) => {
-				// Update UI to show cancelled state
-				this.callbacks.onUpdateMessage(toolCallId, {
-					type: "tool_call",
+			({ resolve, toolCallId, options, sessionId }, requestId) => {
+				// Update UI to show cancelled state via session update
+				this.callbacks.onSessionUpdate({
+					type: "tool_call_update",
+					sessionId,
 					toolCallId,
 					status: "completed",
 					permissionRequest: {
@@ -241,7 +241,7 @@ export class PermissionManager {
 						isCancelled: true,
 						isActive: false,
 					},
-				} as MessageContent);
+				});
 
 				// Resolve the promise with cancelled outcome
 				resolve({
@@ -269,14 +269,15 @@ export class PermissionManager {
 			return;
 		}
 
-		this.callbacks.onUpdateMessage(next.toolCallId, {
-			type: "tool_call",
+		this.callbacks.onSessionUpdate({
+			type: "tool_call_update",
+			sessionId: next.sessionId,
 			toolCallId: next.toolCallId,
 			permissionRequest: {
 				requestId: next.requestId,
 				options: pending.options,
 				isActive: true,
 			},
-		} as MessageContent);
+		});
 	}
 }

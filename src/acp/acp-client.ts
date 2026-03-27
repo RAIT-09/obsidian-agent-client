@@ -9,7 +9,7 @@ import type {
 	ListSessionsResult,
 	SessionResult,
 } from "../types/session";
-import type { MessageContent, PromptContent } from "../types/chat";
+import type { PromptContent } from "../types/chat";
 import type { ProcessError } from "../types/errors";
 import { AcpTypeConverter } from "./type-converter";
 import { TerminalManager } from "./terminal-handler";
@@ -69,7 +69,6 @@ export class AcpClient {
 
 	// Callbacks
 	private errorListeners = new Set<(error: ProcessError) => void>();
-	private updateMessage: (toolCallId: string, content: MessageContent) => void;
 
 	// Delegates
 	private terminalManager: TerminalManager;
@@ -83,8 +82,6 @@ export class AcpClient {
 
 	constructor(private plugin: AgentClientPlugin) {
 		this.logger = getLogger();
-		// Initialize with no-op callback
-		this.updateMessage = () => {};
 
 		// Initialize managers
 		this.terminalManager = new TerminalManager(plugin);
@@ -92,8 +89,6 @@ export class AcpClient {
 			{
 				onSessionUpdate: (update) =>
 					this.handler.emitSessionUpdate(update),
-				onUpdateMessage: (id, content) =>
-					this.updateMessage(id, content),
 			},
 			false, // autoAllow — updated in initialize()
 		);
@@ -105,20 +100,6 @@ export class AcpClient {
 			() => this.currentConfig?.workingDirectory ?? "",
 			this.logger,
 		);
-	}
-
-	/**
-	 * Set the update message callback for permission UI updates.
-	 *
-	 * This callback is used to update tool call messages when permission
-	 * requests are responded to or cancelled.
-	 *
-	 * @param updateMessage - Callback to update a specific message by toolCallId
-	 */
-	setUpdateMessageCallback(
-		updateMessage: (toolCallId: string, content: MessageContent) => void,
-	): void {
-		this.updateMessage = updateMessage;
 	}
 
 	/**

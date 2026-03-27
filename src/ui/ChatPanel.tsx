@@ -964,11 +964,6 @@ export function ChatPanel({
 		chatMessages.handleSessionUpdate,
 	]);
 
-	// Register updateMessage callback for permission UI updates
-	useEffect(() => {
-		acpClient.setUpdateMessageCallback(chatMessages.updateMessage);
-	}, [acpClient, chatMessages.updateMessage]);
-
 	// ============================================================
 	// Effects - Update Check
 	// ============================================================
