@@ -3,7 +3,7 @@ const { useState, useRef, useEffect, useMemo, useCallback } = React;
 import { Notice, FileSystemAdapter, Platform, Menu, type MenuItem } from "obsidian";
 
 import type { AttachedFile, ChatInputState } from "../types/chat";
-import { SessionHistoryModal } from "./SessionHistoryModal";
+import { useHistoryModal } from "../hooks/useHistoryModal";
 
 // Service imports
 import { getLogger } from "../utils/logger";
@@ -282,7 +282,6 @@ export function ChatPanel({
 	// ============================================================
 	// Refs
 	// ============================================================
-	const historyModalRef = useRef<SessionHistoryModal | null>(null);
 	const terminalClientRef = useRef<AcpClient>(acpClient);
 
 	// ============================================================
@@ -514,105 +513,14 @@ export function ChatPanel({
 		setRestoredMessage(null);
 	}, []);
 
-	// ============================================================
-	// Session History Modal Callbacks
-	// ============================================================
-	const handleRestoreSession = useCallback(
-		async (sessionId: string, cwd: string) => {
-			try {
-				logger.log(
-					`[ChatPanel] Restoring session: ${sessionId}`,
-				);
-				agent.clearMessages();
-				await sessionHistory.restoreSession(sessionId, cwd);
-				new Notice("[Agent Client] Session restored");
-			} catch (error) {
-				new Notice("[Agent Client] Failed to restore session");
-				logger.error("Session restore error:", error);
-			}
-		},
-		[logger, agent, sessionHistory],
-	);
-
-	const handleForkSession = useCallback(
-		async (sessionId: string, cwd: string) => {
-			try {
-				logger.log(`[ChatPanel] Forking session: ${sessionId}`);
-				agent.clearMessages();
-				await sessionHistory.forkSession(sessionId, cwd);
-				new Notice("[Agent Client] Session forked");
-			} catch (error) {
-				new Notice("[Agent Client] Failed to fork session");
-				logger.error("Session fork error:", error);
-			}
-		},
-		[logger, agent, sessionHistory],
-	);
-
-	const handleDeleteSession = useCallback(
-		async (sessionId: string) => {
-			try {
-				logger.log(
-					`[ChatPanel] Deleting session: ${sessionId}`,
-				);
-				await sessionHistory.deleteSession(sessionId);
-				new Notice("[Agent Client] Session deleted");
-			} catch (error) {
-				new Notice("[Agent Client] Failed to delete session");
-				logger.error("Session delete error:", error);
-			}
-		},
-		[sessionHistory, logger],
-	);
-
-	const handleLoadMore = useCallback(() => {
-		void sessionHistory.loadMoreSessions();
-	}, [sessionHistory]);
-
-	const handleFetchSessions = useCallback(
-		(cwd?: string) => {
-			void sessionHistory.fetchSessions(cwd);
-		},
-		[sessionHistory],
-	);
-
-	const handleOpenHistory = useCallback(() => {
-		// Create modal if it doesn't exist
-		if (!historyModalRef.current) {
-			historyModalRef.current = new SessionHistoryModal(plugin.app, {
-				sessions: sessionHistory.sessions,
-				loading: sessionHistory.loading,
-				error: sessionHistory.error,
-				hasMore: sessionHistory.hasMore,
-				currentCwd: vaultPath,
-				canList: sessionHistory.canList,
-				canRestore: sessionHistory.canRestore,
-				canFork: sessionHistory.canFork,
-				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
-				localSessionIds: sessionHistory.localSessionIds,
-				isAgentReady: isSessionReady,
-				debugMode: settings.debugMode,
-				onRestoreSession: handleRestoreSession,
-				onForkSession: handleForkSession,
-				onDeleteSession: handleDeleteSession,
-				onLoadMore: handleLoadMore,
-				onFetchSessions: handleFetchSessions,
-			});
-		}
-		historyModalRef.current.open();
-		void sessionHistory.fetchSessions(vaultPath);
-	}, [
-		plugin.app,
+	const { handleOpenHistory } = useHistoryModal(
+		plugin,
+		agent,
 		sessionHistory,
 		vaultPath,
 		isSessionReady,
 		settings.debugMode,
-		handleRestoreSession,
-		handleForkSession,
-		handleDeleteSession,
-		handleLoadMore,
-		handleFetchSessions,
-	]);
+	);
 
 	const handleSetMode = useCallback(
 		async (modeId: string) => {
@@ -760,51 +668,6 @@ export function ChatPanel({
 			registeredListenersRef.current = [];
 		};
 	}, []);
-
-	// ============================================================
-	// Effects - History Modal Props Sync
-	// ============================================================
-	// Update modal props when session history state changes
-	useEffect(() => {
-		if (historyModalRef.current) {
-			historyModalRef.current.updateProps({
-				sessions: sessionHistory.sessions,
-				loading: sessionHistory.loading,
-				error: sessionHistory.error,
-				hasMore: sessionHistory.hasMore,
-				currentCwd: vaultPath,
-				canList: sessionHistory.canList,
-				canRestore: sessionHistory.canRestore,
-				canFork: sessionHistory.canFork,
-				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
-				localSessionIds: sessionHistory.localSessionIds,
-				isAgentReady: isSessionReady,
-				debugMode: settings.debugMode,
-				onRestoreSession: handleRestoreSession,
-				onForkSession: handleForkSession,
-				onDeleteSession: handleDeleteSession,
-				onLoadMore: handleLoadMore,
-				onFetchSessions: handleFetchSessions,
-			});
-		}
-	}, [
-		sessionHistory.sessions,
-		sessionHistory.loading,
-		sessionHistory.error,
-		sessionHistory.hasMore,
-		sessionHistory.canList,
-		sessionHistory.canRestore,
-		sessionHistory.canFork,
-		sessionHistory.isUsingLocalSessions,
-		vaultPath,
-		isSessionReady,
-		settings.debugMode,
-		handleRestoreSession,
-		handleForkSession,
-		handleDeleteSession,
-		handleLoadMore,
-		handleFetchSessions,
-	]);
 
 	// ============================================================
 	// Effects - Session Lifecycle
