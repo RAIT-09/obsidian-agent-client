@@ -83,7 +83,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
 		void navigator.clipboard.writeText(text).then(() => {
 			setCopied(true);
 			setTimeout(() => setCopied(false), 2000);
-		});
+		}).catch(() => {});
 	}, [message.content]);
 
 	const copyButtonRef = React.useCallback(
