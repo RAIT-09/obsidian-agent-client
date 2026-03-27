@@ -1320,30 +1320,38 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 0;
 }
 
+.agent-client-message-renderer.agent-client-message-assistant .agent-client-message-actions {
+	bottom: -8px;
+}
+
 .agent-client-message-actions {
 	position: absolute;
-	bottom: 4px;
-	right: 4px;
+	bottom: 0px;
+	right: 12px;
 	display: flex;
 	gap: 2px;
 }
 
 .agent-client-message-action-button {
-	background: var(--background-primary);
-	border: 1px solid var(--background-modifier-border);
+	background-color: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+	box-shadow: none !important;
+	outline: none !important;
+	appearance: none;
+	padding: 0 !important;
+	margin: 0 !important;
+	min-width: unset !important;
+	min-height: unset !important;
 	cursor: pointer;
 	color: var(--text-muted);
-	padding: 4px;
-	border-radius: 4px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .agent-client-message-action-button:hover {
-	color: var(--text-normal);
-	background-color: var(--background-modifier-hover);
+	color: var(--interactive-accent);
 }
 
 .agent-client-message-action-button svg {
