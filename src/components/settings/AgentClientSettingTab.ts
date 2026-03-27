@@ -366,8 +366,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						const wasEnabled =
 							this.plugin.settings.enableFloatingChat;
-						this.plugin.settings.enableFloatingChat = value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsStore.updateSettings({
+							enableFloatingChat: value,
+						});
 
 						// Handle dynamic toggle of floating chat
 						if (value && !wasEnabled) {
