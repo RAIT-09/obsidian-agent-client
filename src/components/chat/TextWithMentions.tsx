@@ -1,5 +1,6 @@
 import * as React from "react";
 import type AgentClientPlugin from "../../plugin";
+import { formatSelectionRangeLabel } from "../../shared/selection-range";
 
 interface TextWithMentionsProps {
 	text: string;
@@ -9,7 +10,9 @@ interface TextWithMentionsProps {
 		notePath: string;
 		selection?: {
 			fromLine: number;
+			fromColumn: number;
 			toLine: number;
+			toColumn: number;
 		};
 	};
 }
@@ -27,7 +30,7 @@ export function TextWithMentions({
 	// Add auto-mention badge first if provided
 	if (autoMentionContext) {
 		const displayText = autoMentionContext.selection
-			? `@${autoMentionContext.noteName}:${autoMentionContext.selection.fromLine}-${autoMentionContext.selection.toLine}`
+			? `@${autoMentionContext.noteName} ${formatSelectionRangeLabel(autoMentionContext.selection)}`
 			: `@${autoMentionContext.noteName}`;
 
 		parts.push(

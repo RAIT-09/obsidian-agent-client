@@ -154,7 +154,9 @@ export type MessageContent =
 				notePath: string;
 				selection?: {
 					fromLine: number;
+					fromColumn: number;
 					toLine: number;
+					toColumn: number;
 				};
 			};
 	  }

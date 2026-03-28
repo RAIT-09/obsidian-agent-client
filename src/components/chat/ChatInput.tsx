@@ -29,6 +29,10 @@ import { getLogger } from "../../shared/logger";
 import type { ErrorInfo } from "../../domain/models/agent-error";
 import type { AgentUpdateNotification } from "../../shared/agent-update-checker";
 import { useSettings } from "../../hooks/useSettings";
+import {
+	formatSelectionRangeLabel,
+	toDisplaySelectionRange,
+} from "../../shared/selection-range";
 
 // ============================================================================
 // Image Constants
@@ -1176,12 +1180,12 @@ export function ChatInput({
 							@{autoMention.activeNote.name}
 							{autoMention.activeNote.selection && (
 								<span className="agent-client-selection-indicator">
-									{":"}
-									{autoMention.activeNote.selection.from
-										.line + 1}
-									-
-									{autoMention.activeNote.selection.to.line +
-										1}
+									{" "}
+									{formatSelectionRangeLabel(
+										toDisplaySelectionRange(
+											autoMention.activeNote.selection,
+										),
+									)}
 								</span>
 							)}
 						</span>

@@ -5,6 +5,7 @@ import type {
 } from "../domain/models/chat-message";
 import { getLogger, Logger } from "./logger";
 import { TFile } from "obsidian";
+import { formatSelectionRangeLabel } from "./selection-range";
 
 /**
  * Context for content conversion, tracking state across messages.
@@ -293,7 +294,7 @@ session_id: ${sessionId}${tagsLine}
 				if (content.autoMentionContext) {
 					const { noteName, selection } = content.autoMentionContext;
 					if (selection) {
-						exportText += `@[[${noteName}]]:${selection.fromLine}-${selection.toLine}\n`;
+						exportText += `@[[${noteName}]] ${formatSelectionRangeLabel(selection)}\n`;
 					} else {
 						exportText += `@[[${noteName}]]\n`;
 					}

@@ -34,6 +34,12 @@ import type {
 import { extractMentionedNotes, type IMentionService } from "./mention-utils";
 import { convertWindowsPathToWsl } from "./wsl-utils";
 import { buildFileUri } from "./path-utils";
+import {
+	extractSelectionText,
+	formatAutoMentionPrefix,
+	formatSelectionRangeLabel,
+	toDisplaySelectionRange,
+} from "./selection-range";
 
 // ============================================================================
 // Types
@@ -90,7 +96,9 @@ export interface PreparePromptResult {
 		notePath: string;
 		selection?: {
 			fromLine: number;
+			fromColumn: number;
 			toLine: number;
+			toColumn: number;
 		};
 	};
 }
@@ -259,9 +267,12 @@ async function preparePromptWithEmbeddedContext(
 	// This allows @[[note]] to be restored when loading a saved session
 	const autoMentionPrefix =
 		input.activeNote && !input.isAutoMentionDisabled
-			? input.activeNote.selection
-				? `@[[${input.activeNote.name}]]:${input.activeNote.selection.from.line + 1}-${input.activeNote.selection.to.line + 1}\n`
-				: `@[[${input.activeNote.name}]]\n`
+			? formatAutoMentionPrefix(
+					input.activeNote.name,
+					input.activeNote.selection
+						? toDisplaySelectionRange(input.activeNote.selection)
+						: undefined,
+				)
 			: "";
 
 	const agentContent: PromptContent[] = [
@@ -287,9 +298,9 @@ async function preparePromptWithEmbeddedContext(
 					notePath: input.activeNote.path,
 					selection: input.activeNote.selection
 						? {
-								fromLine:
-									input.activeNote.selection.from.line + 1,
-								toLine: input.activeNote.selection.to.line + 1,
+								...toDisplaySelectionRange(
+									input.activeNote.selection,
+								),
 							}
 						: undefined,
 				}
@@ -365,9 +376,12 @@ async function preparePromptWithTextContext(
 	// This allows @[[note]] to be restored when loading a saved session
 	const autoMentionPrefix =
 		input.activeNote && !input.isAutoMentionDisabled
-			? input.activeNote.selection
-				? `@[[${input.activeNote.name}]]:${input.activeNote.selection.from.line + 1}-${input.activeNote.selection.to.line + 1}\n`
-				: `@[[${input.activeNote.name}]]\n`
+			? formatAutoMentionPrefix(
+					input.activeNote.name,
+					input.activeNote.selection
+						? toDisplaySelectionRange(input.activeNote.selection)
+						: undefined,
+				)
 			: "";
 
 	// Build agent message text (context blocks + auto-mention prefix + original message)
@@ -404,9 +418,9 @@ async function preparePromptWithTextContext(
 					notePath: input.activeNote.path,
 					selection: input.activeNote.selection
 						? {
-								fromLine:
-									input.activeNote.selection.from.line + 1,
-								toLine: input.activeNote.selection.to.line + 1,
+								...toDisplaySelectionRange(
+									input.activeNote.selection,
+								),
 							}
 						: undefined,
 				}
@@ -440,23 +454,21 @@ async function buildAutoMentionResource(
 	const uri = buildFileUri(absolutePath);
 
 	if (activeNote.selection) {
-		// Selection exists - send the selected content as a Resource
-		const fromLine = activeNote.selection.from.line + 1;
-		const toLine = activeNote.selection.to.line + 1;
+		const displayRange = toDisplaySelectionRange(activeNote.selection);
+		const rangeLabel = formatSelectionRangeLabel(displayRange);
 
 		try {
 			const content = await vaultAccess.readNote(activeNote.path);
-			const lines = content.split("\n");
-			const selectedLines = lines.slice(
-				activeNote.selection.from.line,
-				activeNote.selection.to.line + 1,
+			let selectedText = extractSelectionText(
+				content,
+				activeNote.selection,
 			);
-			let selectedText = selectedLines.join("\n");
+			const originalLength = selectedText.length;
 
 			if (selectedText.length > maxSelectionLength) {
 				selectedText =
 					selectedText.substring(0, maxSelectionLength) +
-					`\n\n[Note: Truncated from ${selectedLines.join("\n").length} to ${maxSelectionLength} characters]`;
+					`\n\n[Note: Truncated from ${originalLength} to ${maxSelectionLength} characters]`;
 			}
 
 			return [
@@ -477,7 +489,7 @@ async function buildAutoMentionResource(
 				} as ResourcePromptContent,
 				{
 					type: "text",
-					text: `The user has selected lines ${fromLine}-${toLine} in the above note. This is what they are currently focusing on.`,
+					text: `The user has selected ${rangeLabel} in the above note. This is what they are currently focusing on.`,
 				},
 			];
 		} catch (error) {
@@ -488,7 +500,7 @@ async function buildAutoMentionResource(
 			return [
 				{
 					type: "text",
-					text: `The user has selected lines ${fromLine}-${toLine} in ${uri}. If relevant, use the Read tool to examine the specific lines.`,
+					text: `The user has selected ${rangeLabel} in ${uri}. If relevant, use the Read tool to examine the specific range.`,
 				},
 			];
 		}
@@ -521,26 +533,22 @@ async function buildAutoMentionTextContext(
 	}
 
 	if (selection) {
-		const fromLine = selection.from.line + 1;
-		const toLine = selection.to.line + 1;
+		const displayRange = toDisplaySelectionRange(selection);
+		const rangeLabel = formatSelectionRangeLabel(displayRange);
 
 		try {
 			const content = await vaultAccess.readNote(notePath);
-			const lines = content.split("\n");
-			const selectedLines = lines.slice(
-				selection.from.line,
-				selection.to.line + 1,
-			);
-			let selectedText = selectedLines.join("\n");
+			let selectedText = extractSelectionText(content, selection);
+			const originalLength = selectedText.length;
 
 			let truncationNote = "";
 			if (selectedText.length > maxSelectionLength) {
 				selectedText = selectedText.substring(0, maxSelectionLength);
-				truncationNote = `\n\n[Note: The selection was truncated. Original length: ${selectedLines.join("\n").length} characters, showing first ${maxSelectionLength} characters]`;
+				truncationNote = `\n\n[Note: The selection was truncated. Original length: ${originalLength} characters, showing first ${maxSelectionLength} characters]`;
 			}
 
-			return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">
-The user opened the note ${absolutePath} in Obsidian and selected the following text (lines ${fromLine}-${toLine}):
+			return `<obsidian_opened_note selection="${rangeLabel}">
+The user opened the note ${absolutePath} in Obsidian and selected the following text (${rangeLabel}):
 
 ${selectedText}${truncationNote}
 
@@ -548,7 +556,7 @@ This is what the user is currently focusing on.
 </obsidian_opened_note>`;
 		} catch (error) {
 			console.error(`Failed to read selection from ${notePath}:`, error);
-			return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">The user opened the note ${absolutePath} in Obsidian and is focusing on lines ${fromLine}-${toLine}. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the specific lines.</obsidian_opened_note>`;
+			return `<obsidian_opened_note selection="${rangeLabel}">The user opened the note ${absolutePath} in Obsidian and is focusing on ${rangeLabel}. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the specific range.</obsidian_opened_note>`;
 		}
 	}
 
