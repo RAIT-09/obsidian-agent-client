@@ -5,11 +5,7 @@
  * Used by plugin.ts (loadSettings) and SettingsTab.ts.
  */
 
-import type {
-	AgentClientPluginSettings,
-	AgentEnvVar,
-	CustomAgentSettings,
-} from "../plugin";
+import type { AgentEnvVar, CustomAgentSettings } from "../plugin";
 import type { BaseAgentSettings } from "../types/agent";
 import type { AgentConfig } from "../acp/acp-client";
 
