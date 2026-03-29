@@ -33,7 +33,6 @@ import type {
 	SessionConfigOption,
 } from "../types/session";
 import type { AgentDisplayInfo } from "../services/session-helpers";
-import type { NoteMetadata } from "../services/vault-service";
 
 /**
  * Return type for useAgent hook.

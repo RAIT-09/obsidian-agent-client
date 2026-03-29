@@ -24,13 +24,10 @@ import { useSessionHistory } from "../hooks/useSessionHistory";
 // Domain model imports
 import {
 	flattenConfigSelectOptions,
-	type ChatSession,
 	type SessionModeState,
 	type SessionModelState,
 	type SessionConfigOption,
 } from "../types/session";
-import type { ChatMessage } from "../types/chat";
-import type { AgentUpdateNotification } from "../services/update-checker";
 import { checkAgentUpdate } from "../services/update-checker";
 
 // Component imports
@@ -93,9 +90,6 @@ interface AppWithSettings {
 		openTabById: (id: string) => void;
 	};
 }
-
-// Custom event type with targetViewId parameter
-type CustomEventCallback = (targetViewId?: string) => void;
 
 // ============================================================================
 // ChatPanel Component

@@ -24,8 +24,6 @@ import type { IMentionService } from "../utils/mention-parser";
 import { preparePrompt, sendPreparedPrompt } from "../services/message-sender";
 import { Platform } from "obsidian";
 import {
-	applyUpdateLastMessage,
-	applyUpsertToolCall,
 	rebuildToolCallIndex,
 	applySingleUpdate,
 	findActivePermission,
@@ -158,20 +156,6 @@ export function useAgentMessages(
 	const addMessage = useCallback((message: ChatMessage): void => {
 		setMessages((prev) => [...prev, message]);
 	}, []);
-
-	const updateLastMessage = useCallback((content: MessageContent): void => {
-		setMessages((prev) => applyUpdateLastMessage(prev, content));
-	}, []);
-
-	const upsertToolCall = useCallback(
-		(toolCallId: string, content: MessageContent): void => {
-			if (content.type !== "tool_call") return;
-			setMessages((prev) =>
-				applyUpsertToolCall(prev, content, toolCallIndexRef.current),
-			);
-		},
-		[],
-	);
 
 	const setIgnoreUpdates = useCallback((ignore: boolean): void => {
 		ignoreUpdatesRef.current = ignore;
