@@ -11,7 +11,7 @@ import type {
 	CodexAgentSettings,
 } from "../types/agent";
 import type { ChatSession, SessionState } from "../types/session";
-import { toAgentConfig } from "./settings-service";
+import { toAgentConfig } from "./settings-normalizer";
 
 // ============================================================================
 // Types
