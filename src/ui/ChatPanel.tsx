@@ -4,10 +4,10 @@ import { Notice, FileSystemAdapter, Platform, Menu, type MenuItem } from "obsidi
 
 import type { AttachedFile, ChatInputState } from "../types/chat";
 import { useHistoryModal } from "../hooks/useHistoryModal";
+import { useChatActions } from "../hooks/useChatActions";
 
 // Service imports
 import { getLogger } from "../utils/logger";
-import { ChatExporter } from "../services/chat-exporter";
 
 // Adapter imports
 import type { AcpClient } from "../acp/acp-client";
@@ -29,13 +29,7 @@ import {
 	type SessionModelState,
 	type SessionConfigOption,
 } from "../types/session";
-import type {
-	ChatMessage,
-	ImagePromptContent,
-	ResourceLinkPromptContent,
-} from "../types/chat";
-import { buildFileUri } from "../utils/paths";
-import { convertWindowsPathToWsl } from "../utils/platform";
+import type { ChatMessage } from "../types/chat";
 import type { AgentUpdateNotification } from "../services/update-checker";
 import { checkAgentUpdate } from "../services/update-checker";
 
@@ -187,47 +181,6 @@ export function ChatPanel({
 		session.availableCommands || [],
 	);
 
-	const autoExportIfEnabled = useCallback(
-		async (
-			trigger: "newChat" | "closeChat",
-			triggerMessages: ChatMessage[],
-			triggerSession: ChatSession,
-		): Promise<void> => {
-			const isEnabled =
-				trigger === "newChat"
-					? plugin.settings.exportSettings.autoExportOnNewChat
-					: plugin.settings.exportSettings.autoExportOnCloseChat;
-			if (!isEnabled) return;
-			if (triggerMessages.length === 0) return;
-			if (!triggerSession.sessionId) return;
-
-			try {
-				const exporter = new ChatExporter(plugin);
-				const filePath = await exporter.exportToMarkdown(
-					triggerMessages,
-					triggerSession.agentDisplayName,
-					triggerSession.agentId,
-					triggerSession.sessionId,
-					triggerSession.createdAt,
-					false,
-				);
-				if (filePath) {
-					const context =
-						trigger === "newChat"
-							? "new session"
-							: "closing chat";
-					new Notice(
-						`[Agent Client] Chat exported to ${filePath}`,
-					);
-					logger.log(`Chat auto-exported before ${context}`);
-				}
-			} catch {
-				new Notice("[Agent Client] Failed to export chat");
-			}
-		},
-		[plugin, logger],
-	);
-
 	// Session history hook with callback for session load
 	const handleSessionLoad = useCallback(
 		(
@@ -271,9 +224,6 @@ export function ChatPanel({
 	// Local State
 	// ============================================================
 	const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
-	const [agentUpdateNotification, setAgentUpdateNotification] =
-		useState<AgentUpdateNotification | null>(null);
-	const [restoredMessage, setRestoredMessage] = useState<string | null>(null);
 
 	// Input state (for broadcast commands)
 	const [inputValue, setInputValue] = useState("");
@@ -315,203 +265,21 @@ export function ChatPanel({
 	}, [plugin]);
 
 	// ============================================================
-	// Callbacks
+	// Chat Actions
 	// ============================================================
-	const shouldConvertToWsl = Platform.isWin && settings.windowsWslMode;
-
-	const handleSendMessage = useCallback(
-		async (content: string, attachments?: AttachedFile[]) => {
-			// Dismiss overlays on send
-			agent.clearError();
-			setAgentUpdateNotification(null);
-
-			const isFirstMessage = messages.length === 0;
-
-			// Split attachments by kind
-			const images: ImagePromptContent[] = [];
-			const resourceLinks: ResourceLinkPromptContent[] = [];
-
-			if (attachments) {
-				for (const file of attachments) {
-					if (file.kind === "image" && file.data) {
-						images.push({
-							type: "image",
-							data: file.data,
-							mimeType: file.mimeType,
-						});
-					} else if (file.kind === "file" && file.path) {
-						let filePath = file.path;
-						if (shouldConvertToWsl) {
-							filePath = convertWindowsPathToWsl(filePath);
-						}
-						resourceLinks.push({
-							type: "resource_link",
-							uri: buildFileUri(filePath),
-							name:
-								file.name ??
-								file.path.split("/").pop() ??
-								"file",
-							mimeType: file.mimeType || undefined,
-							size: file.size,
-						});
-					}
-				}
-			}
-
-			await agent.sendMessage(content, {
-				activeNote: settings.autoMentionActiveNote
-					? suggestions.mentions.activeNote
-					: null,
-				vaultBasePath: vaultPath,
-				isAutoMentionDisabled: suggestions.mentions.isAutoMentionDisabled,
-				images: images.length > 0 ? images : undefined,
-				resourceLinks:
-					resourceLinks.length > 0 ? resourceLinks : undefined,
-			});
-
-			// Save session metadata locally on first message
-			if (isFirstMessage && session.sessionId) {
-				await sessionHistory.saveSessionLocally(
-					session.sessionId,
-					content,
-				);
-				logger.log(
-					`[ChatPanel] Session saved locally: ${session.sessionId}`,
-				);
-			}
-		},
-		[
-			agent,
-			messages.length,
-			session.sessionId,
-			sessionHistory,
-			logger,
-			settings.autoMentionActiveNote,
-			shouldConvertToWsl,
-			vaultPath,
-		],
+	const actions = useChatActions(
+		plugin, agent, sessionHistory, suggestions,
+		session, messages, settings, vaultPath,
 	);
 
-	const handleStopGeneration = useCallback(async () => {
-		logger.log("Cancelling current operation...");
-		const lastMessage = agent.lastUserMessage;
-		await agent.cancelOperation();
-		if (lastMessage) {
-			setRestoredMessage(lastMessage);
-		}
-	}, [logger, agent, agent.lastUserMessage]);
-
-	const handleNewChat = useCallback(
-		async (requestedAgentId?: string) => {
-			const isAgentSwitch =
-				requestedAgentId && requestedAgentId !== session.agentId;
-
-			// Skip if already empty AND not switching agents
-			if (messages.length === 0 && !isAgentSwitch) {
-				new Notice("[Agent Client] Already a new session");
-				return;
-			}
-
-			// Cancel ongoing generation before starting new chat
-			if (agent.isSending) {
-				await agent.cancelOperation();
-			}
-
-			logger.log(
-				`[Debug] Creating new session${isAgentSwitch ? ` with agent: ${requestedAgentId}` : ""}...`,
-			);
-
-			// Auto-export current chat before starting new one (if has messages)
-			if (messages.length > 0) {
-				await autoExportIfEnabled("newChat", messages, session);
-			}
-
-			suggestions.mentions.toggleAutoMention(false);
-			agent.clearMessages();
-
-			const newAgentId = isAgentSwitch
-				? requestedAgentId
-				: session.agentId;
-			await agent.restartSession(newAgentId);
-
-			// Invalidate session history cache when creating new session
-			sessionHistory.invalidateCache();
-		},
-		[
-			messages,
-			session,
-			logger,
-			autoExportIfEnabled,
-			agent,
-			agent,
-			sessionHistory,
-		],
-	);
-
-	const handleExportChat = useCallback(async () => {
-		if (messages.length === 0) {
-			new Notice("[Agent Client] No messages to export");
-			return;
-		}
-
-		try {
-			const exporter = new ChatExporter(plugin);
-			const openFile = plugin.settings.exportSettings.openFileAfterExport;
-			const filePath = await exporter.exportToMarkdown(
-				messages,
-				session.agentDisplayName,
-				session.agentId,
-				session.sessionId || "unknown",
-				session.createdAt,
-				openFile,
-			);
-			new Notice(`[Agent Client] Chat exported to ${filePath}`);
-		} catch (error) {
-			new Notice("[Agent Client] Failed to export chat");
-			logger.error("Export error:", error);
-		}
-	}, [messages, session, plugin, logger]);
-
-	const handleSwitchAgent = useCallback(
-		async (agentId: string) => {
-			if (agentId !== session.agentId) {
-				await handleNewChat(agentId);
-			}
-		},
-		[session.agentId, handleNewChat],
-	);
-
-	const handleRestartAgent = useCallback(async () => {
-		logger.log("[ChatPanel] Restarting agent process...");
-
-		// Auto-export current chat before restart (if has messages)
-		if (messages.length > 0) {
-			await autoExportIfEnabled("newChat", messages, session);
-		}
-
-		// Clear messages for fresh start
-		agent.clearMessages();
-
-		try {
-			await agent.forceRestartAgent();
-			new Notice("[Agent Client] Agent restarted");
-		} catch (error) {
-			new Notice("[Agent Client] Failed to restart agent");
-			logger.error("Restart error:", error);
-		}
-	}, [logger, messages, session, autoExportIfEnabled, agent, agent]);
-
-	const handleClearError = useCallback(() => {
-		agent.clearError();
-	}, [agent]);
-
-	const handleClearAgentUpdate = useCallback(() => {
-		setAgentUpdateNotification(null);
-	}, []);
-
-	const handleRestoredMessageConsumed = useCallback(() => {
-		setRestoredMessage(null);
-	}, []);
+	const {
+		handleSendMessage, handleStopGeneration, handleNewChat,
+		handleExportChat, handleSwitchAgent, handleRestartAgent,
+		handleSetMode, handleSetModel, handleSetConfigOption,
+		handleClearError, handleClearAgentUpdate, handleRestoredMessageConsumed,
+		restoredMessage, agentUpdateNotification, setAgentUpdateNotification,
+		autoExportIfEnabled,
+	} = actions;
 
 	const { handleOpenHistory } = useHistoryModal(
 		plugin,
@@ -520,27 +288,6 @@ export function ChatPanel({
 		vaultPath,
 		isSessionReady,
 		settings.debugMode,
-	);
-
-	const handleSetMode = useCallback(
-		async (modeId: string) => {
-			await agent.setMode(modeId);
-		},
-		[agent],
-	);
-
-	const handleSetModel = useCallback(
-		async (modelId: string) => {
-			await agent.setModel(modelId);
-		},
-		[agent],
-	);
-
-	const handleSetConfigOption = useCallback(
-		async (configId: string, value: string) => {
-			await agent.setConfigOption(configId, value);
-		},
-		[agent],
 	);
 
 	// ============================================================
