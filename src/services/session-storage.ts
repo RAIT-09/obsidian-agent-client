@@ -40,9 +40,7 @@ interface SessionMessagesFile {
  */
 interface SessionStorageSettingsAccess {
 	getSnapshot(): AgentClientPluginSettings;
-	updateSettings(
-		updates: Partial<AgentClientPluginSettings>,
-	): Promise<void>;
+	updateSettings(updates: Partial<AgentClientPluginSettings>): Promise<void>;
 }
 
 // ============================================================================
