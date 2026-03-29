@@ -784,6 +784,9 @@ export class AcpClient {
 	async loadSession(sessionId: string, cwd: string): Promise<SessionResult> {
 		const connection = this.requireConnection();
 
+		// Set sessionId before await so replay updates pass the sessionId filter
+		this.currentSessionId = sessionId;
+
 		try {
 			this.logger.log(`[AcpClient] Loading session: ${sessionId}...`);
 
@@ -820,6 +823,9 @@ export class AcpClient {
 		cwd: string,
 	): Promise<SessionResult> {
 		const connection = this.requireConnection();
+
+		// Set sessionId before await so any updates pass the sessionId filter
+		this.currentSessionId = sessionId;
 
 		try {
 			this.logger.log(`[AcpClient] Resuming session: ${sessionId}...`);
