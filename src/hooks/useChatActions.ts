@@ -45,10 +45,7 @@ export interface UseChatActionsReturn {
 	// Config actions
 	handleSetMode: (modeId: string) => Promise<void>;
 	handleSetModel: (modelId: string) => Promise<void>;
-	handleSetConfigOption: (
-		configId: string,
-		value: string,
-	) => Promise<void>;
+	handleSetConfigOption: (configId: string, value: string) => Promise<void>;
 
 	// UI state actions
 	handleClearError: () => void;
@@ -58,9 +55,7 @@ export interface UseChatActionsReturn {
 	// State (moved from ChatPanel)
 	restoredMessage: string | null;
 	agentUpdateNotification: AgentUpdateNotification | null;
-	setAgentUpdateNotification: (
-		n: AgentUpdateNotification | null,
-	) => void;
+	setAgentUpdateNotification: (n: AgentUpdateNotification | null) => void;
 
 	// Auto-export (needed by ChatPanel cleanup)
 	autoExportIfEnabled: (
@@ -90,9 +85,7 @@ export function useChatActions(
 	// State (moved from ChatPanel)
 	// ============================================================
 
-	const [restoredMessage, setRestoredMessage] = useState<string | null>(
-		null,
-	);
+	const [restoredMessage, setRestoredMessage] = useState<string | null>(null);
 	const [agentUpdateNotification, setAgentUpdateNotification] =
 		useState<AgentUpdateNotification | null>(null);
 
@@ -126,12 +119,8 @@ export function useChatActions(
 				);
 				if (filePath) {
 					const context =
-						trigger === "newChat"
-							? "new session"
-							: "closing chat";
-					new Notice(
-						`[Agent Client] Chat exported to ${filePath}`,
-					);
+						trigger === "newChat" ? "new session" : "closing chat";
+					new Notice(`[Agent Client] Chat exported to ${filePath}`);
 					logger.log(`Chat auto-exported before ${context}`);
 				}
 			} catch {

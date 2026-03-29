@@ -6,7 +6,6 @@
  * and editor selection tracking into a single service.
  */
 
-
 import type AgentClientPlugin from "../plugin";
 import {
 	TFile,
@@ -499,10 +498,7 @@ export class VaultService implements IVaultAccess {
 			try {
 				listener();
 			} catch (error) {
-				console.error(
-					"[VaultService] Selection listener error",
-					error,
-				);
+				console.error("[VaultService] Selection listener error", error);
 			}
 		}
 	}

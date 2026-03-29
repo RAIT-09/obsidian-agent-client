@@ -1,10 +1,7 @@
 import * as React from "react";
 const { useState, useCallback } = React;
 import { setIcon } from "obsidian";
-import type {
-	ChatMessage,
-	MessageContent,
-} from "../types/chat";
+import type { ChatMessage, MessageContent } from "../types/chat";
 import type { AcpClient } from "../acp/acp-client";
 import type AgentClientPlugin from "../plugin";
 import { MarkdownRenderer } from "./shared/MarkdownRenderer";
@@ -210,12 +207,12 @@ function ContentBlock({
 				<div className="agent-client-message-plan">
 					<div className="agent-client-message-plan-title">
 						{showEmojis && (
-						<LucideIcon
-							name="list-checks"
-							className="agent-client-message-plan-label-icon"
-						/>
-					)}
-					Plan
+							<LucideIcon
+								name="list-checks"
+								className="agent-client-message-plan-label-icon"
+							/>
+						)}
+						Plan
 					</div>
 					{content.entries.map((entry, idx) => (
 						<div
@@ -230,8 +227,7 @@ function ContentBlock({
 										name={
 											entry.status === "completed"
 												? "check"
-												: entry.status ===
-													  "in_progress"
+												: entry.status === "in_progress"
 													? "loader"
 													: "circle"
 										}

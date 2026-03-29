@@ -14,10 +14,7 @@ import type {
 	CustomAgentSettings,
 } from "../plugin";
 import type AgentClientPlugin from "../plugin";
-import type {
-	ChatMessage,
-	MessageContent,
-} from "../types/chat";
+import type { ChatMessage, MessageContent } from "../types/chat";
 import type { SavedSessionInfo } from "../types/session";
 import type { BaseAgentSettings } from "../types/agent";
 import type { AgentConfig } from "../acp/acp-client";
@@ -56,9 +53,7 @@ export interface ISettingsAccess {
 	 * @param updates - Partial settings object with properties to update
 	 * @returns Promise that resolves when settings are saved
 	 */
-	updateSettings(
-		updates: Partial<AgentClientPluginSettings>,
-	): Promise<void>;
+	updateSettings(updates: Partial<AgentClientPluginSettings>): Promise<void>;
 
 	/**
 	 * Subscribe to settings changes.
@@ -135,9 +130,7 @@ export interface ISettingsAccess {
 	 * @param sessionId - Session ID
 	 * @returns Promise that resolves with messages or null if not found
 	 */
-	loadSessionMessages(
-		sessionId: string,
-	): Promise<ChatMessage[] | null>;
+	loadSessionMessages(sessionId: string): Promise<ChatMessage[] | null>;
 
 	/**
 	 * Delete message history file for a session.

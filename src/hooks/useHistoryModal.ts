@@ -35,9 +35,7 @@ export function useHistoryModal(
 	const handleRestoreSession = useCallback(
 		async (sessionId: string, cwd: string) => {
 			try {
-				logger.log(
-					`[ChatPanel] Restoring session: ${sessionId}`,
-				);
+				logger.log(`[ChatPanel] Restoring session: ${sessionId}`);
 				agent.clearMessages();
 				await sessionHistory.restoreSession(sessionId, cwd);
 				new Notice("[Agent Client] Session restored");
@@ -67,9 +65,7 @@ export function useHistoryModal(
 	const handleDeleteSession = useCallback(
 		async (sessionId: string) => {
 			try {
-				logger.log(
-					`[ChatPanel] Deleting session: ${sessionId}`,
-				);
+				logger.log(`[ChatPanel] Deleting session: ${sessionId}`);
 				await sessionHistory.deleteSession(sessionId);
 				new Notice("[Agent Client] Session deleted");
 			} catch (error) {

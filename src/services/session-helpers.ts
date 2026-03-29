@@ -35,9 +35,7 @@ export interface AgentDisplayInfo {
 /**
  * Get the default agent ID from settings (for new views).
  */
-export function getDefaultAgentId(
-	settings: AgentClientPluginSettings,
-): string {
+export function getDefaultAgentId(settings: AgentClientPluginSettings): string {
 	return settings.defaultAgentId || settings.claude.id;
 }
 

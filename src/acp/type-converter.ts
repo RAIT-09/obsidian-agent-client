@@ -240,8 +240,7 @@ export class AcpTypeConverter {
 				embeddedContext: promptCaps?.embeddedContext ?? false,
 			},
 			agentCapabilities: {
-				loadSession:
-					initResult.agentCapabilities?.loadSession ?? false,
+				loadSession: initResult.agentCapabilities?.loadSession ?? false,
 				sessionCapabilities: sessionCaps
 					? {
 							resume: sessionCaps.resume ?? undefined,

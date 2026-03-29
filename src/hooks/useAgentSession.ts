@@ -365,22 +365,14 @@ export function useAgentSession(
 
 			try {
 				if (kind === "mode") {
-					await agentClient.setSessionMode(
-						session.sessionId,
-						value,
-					);
+					await agentClient.setSessionMode(session.sessionId, value);
 				} else {
-					await agentClient.setSessionModel(
-						session.sessionId,
-						value,
-					);
+					await agentClient.setSessionModel(session.sessionId, value);
 				}
 
 				if (session.agentId) {
 					const persistKey =
-						kind === "mode"
-							? "lastUsedModes"
-							: "lastUsedModels";
+						kind === "mode" ? "lastUsedModes" : "lastUsedModels";
 					const currentSettings = settingsAccess.getSnapshot();
 					void settingsAccess.updateSettings({
 						[persistKey]: {

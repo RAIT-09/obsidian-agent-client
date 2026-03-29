@@ -989,11 +989,9 @@ export function InputArea({
 							{mentions.activeNote.selection && (
 								<span className="agent-client-selection-indicator">
 									{":"}
-									{mentions.activeNote.selection.from
-										.line + 1}
-									-
-									{mentions.activeNote.selection.to.line +
+									{mentions.activeNote.selection.from.line +
 										1}
+									-{mentions.activeNote.selection.to.line + 1}
 								</span>
 							)}
 						</span>
@@ -1015,9 +1013,10 @@ export function InputArea({
 							}
 							ref={(el) => {
 								if (el) {
-									const iconName = mentions.isAutoMentionDisabled
-										? "plus"
-										: "x";
+									const iconName =
+										mentions.isAutoMentionDisabled
+											? "plus"
+											: "x";
 									setIcon(el, iconName);
 								}
 							}}
@@ -1054,16 +1053,15 @@ export function InputArea({
 				</div>
 
 				{/* Attachment Preview Strip (images + file references) */}
-				<AttachmentStrip
-					files={attachedFiles}
-					onRemove={removeFile}
-				/>
+				<AttachmentStrip files={attachedFiles} onRemove={removeFile} />
 
 				{/* Input Actions (Config Options / Mode Selector / Model Selector + Send Button) */}
 				<InputToolbar
 					isSending={isSending}
 					isButtonDisabled={isButtonDisabled}
-					hasContent={inputValue.trim() !== "" || attachedFiles.length > 0}
+					hasContent={
+						inputValue.trim() !== "" || attachedFiles.length > 0
+					}
 					onSendOrStop={() => void handleSendOrStop()}
 					modes={modes}
 					onModeChange={onModeChange}

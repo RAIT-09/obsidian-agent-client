@@ -199,8 +199,7 @@ export function applyUpsertToolCall(
 		const message = prev[messageIdx];
 		const hasTarget = message.content.some(
 			(c) =>
-				c.type === "tool_call" &&
-				c.toolCallId === content.toolCallId,
+				c.type === "tool_call" && c.toolCallId === content.toolCallId,
 		);
 		if (hasTarget) {
 			const updatedMessage = {
@@ -226,8 +225,7 @@ export function applyUpsertToolCall(
 	const updated = prev.map((message, idx) => {
 		const hasTarget = message.content.some(
 			(c) =>
-				c.type === "tool_call" &&
-				c.toolCallId === content.toolCallId,
+				c.type === "tool_call" && c.toolCallId === content.toolCallId,
 		);
 		if (!hasTarget) return message;
 		found = true;

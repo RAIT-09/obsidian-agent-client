@@ -12,10 +12,7 @@ interface AttachmentStripProps {
  * - Images: show thumbnail
  * - Files: show file icon with filename
  */
-export function AttachmentStrip({
-	files,
-	onRemove,
-}: AttachmentStripProps) {
+export function AttachmentStrip({ files, onRemove }: AttachmentStripProps) {
 	if (files.length === 0) return null;
 
 	return (

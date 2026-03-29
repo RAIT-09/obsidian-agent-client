@@ -154,8 +154,7 @@ export class PermissionManager {
 			toolCallId: toolCallId,
 			title: toolCallInfo?.title ?? undefined,
 			status: toolCallInfo?.status || "pending",
-			kind:
-				(toolCallInfo?.kind as acp.ToolKind | undefined) ?? undefined,
+			kind: (toolCallInfo?.kind as acp.ToolKind | undefined) ?? undefined,
 			content: AcpTypeConverter.toToolCallContent(
 				toolCallInfo?.content as acp.ToolCallContent[] | undefined,
 			),

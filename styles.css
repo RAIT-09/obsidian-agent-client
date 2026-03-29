@@ -1255,7 +1255,8 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 0;
 }
 
-.agent-client-message-renderer.agent-client-message-assistant .agent-client-message-actions {
+.agent-client-message-renderer.agent-client-message-assistant
+	.agent-client-message-actions {
 	bottom: -8px;
 }
 

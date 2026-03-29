@@ -70,7 +70,10 @@ export interface UseAgentReturn {
 	setConfigOption: (configId: string, value: string) => Promise<void>;
 
 	// Message operations
-	sendMessage: (content: string, options: SendMessageOptions) => Promise<void>;
+	sendMessage: (
+		content: string,
+		options: SendMessageOptions,
+	) => Promise<void>;
 	clearMessages: () => void;
 	setInitialMessages: (
 		history: Array<{

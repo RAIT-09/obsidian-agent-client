@@ -12,10 +12,7 @@ import type {
 	ChatViewLocation,
 } from "../plugin";
 import { normalizeEnvVars } from "../services/settings-service";
-import {
-	resolveCommandPath,
-	resolveCommandPathInWsl,
-} from "../utils/paths";
+import { resolveCommandPath, resolveCommandPathInWsl } from "../utils/paths";
 import {
 	CHAT_FONT_SIZE_MAX,
 	CHAT_FONT_SIZE_MIN,
@@ -83,14 +80,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-		this.addAutoDetectButton(
-			nodePathSetting,
-			"node",
-			async (path) => {
-				this.plugin.settings.nodePath = path;
-				await this.plugin.saveSettings();
-			},
-		);
+		this.addAutoDetectButton(nodePathSetting, "node", async (path) => {
+			this.plugin.settings.nodePath = path;
+			await this.plugin.saveSettings();
+		});
 
 		new Setting(containerEl)
 			.setName("Send message shortcut")
@@ -825,14 +818,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-		this.addAutoDetectButton(
-			geminiPathSetting,
-			"gemini",
-			async (path) => {
-				this.plugin.settings.gemini.command = path;
-				await this.plugin.saveSettings();
-			},
-		);
+		this.addAutoDetectButton(geminiPathSetting, "gemini", async (path) => {
+			this.plugin.settings.gemini.command = path;
+			await this.plugin.saveSettings();
+		});
 
 		new Setting(sectionEl)
 			.setName("Arguments")
@@ -1221,8 +1210,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 	): void {
 		setting.addButton((btn) => {
 			const isWsl = Platform.isWin && this.plugin.settings.windowsWslMode;
-			const lookupCmd =
-				Platform.isWin && !isWsl ? "where" : "which";
+			const lookupCmd = Platform.isWin && !isWsl ? "where" : "which";
 			btn.setButtonText("Auto-detect")
 				.setTooltip(
 					`Run \`${lookupCmd} ${commandName}\` to find the path`,

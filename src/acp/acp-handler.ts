@@ -17,9 +17,7 @@ import type { Logger } from "../utils/logger";
  * It only reacts to events from the agent side.
  */
 export class AcpHandler {
-	private sessionUpdateListeners = new Set<
-		(update: SessionUpdate) => void
-	>();
+	private sessionUpdateListeners = new Set<(update: SessionUpdate) => void>();
 
 	/** Tracks session updates during a prompt. */
 	private promptSessionUpdateCount = 0;
@@ -46,9 +44,7 @@ export class AcpHandler {
 		return this.promptSessionUpdateCount > 0;
 	}
 
-	onSessionUpdate(
-		callback: (update: SessionUpdate) => void,
-	): () => void {
+	onSessionUpdate(callback: (update: SessionUpdate) => void): () => void {
 		this.sessionUpdateListeners.add(callback);
 		return () => this.sessionUpdateListeners.delete(callback);
 	}
@@ -245,9 +241,7 @@ export class AcpHandler {
 	releaseTerminal(
 		params: acp.ReleaseTerminalRequest,
 	): Promise<acp.ReleaseTerminalResponse> {
-		const success = this.terminalManager.releaseTerminal(
-			params.terminalId,
-		);
+		const success = this.terminalManager.releaseTerminal(params.terminalId);
 		if (!success) {
 			this.logger.log(
 				`[AcpHandler] releaseTerminal: Terminal ${params.terminalId} not found (may have been already cleaned up)`,

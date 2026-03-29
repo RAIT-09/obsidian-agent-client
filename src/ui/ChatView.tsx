@@ -1,7 +1,4 @@
-import {
-	ItemView,
-	WorkspaceLeaf,
-} from "obsidian";
+import { ItemView, WorkspaceLeaf } from "obsidian";
 import type {
 	IChatViewContainer,
 	ChatViewType,

@@ -31,7 +31,10 @@ import type {
 	ResourcePromptContent,
 	ResourceLinkPromptContent,
 } from "../types/chat";
-import { extractMentionedNotes, type IMentionService } from "../utils/mention-parser";
+import {
+	extractMentionedNotes,
+	type IMentionService,
+} from "../utils/mention-parser";
 import { convertWindowsPathToWsl } from "../utils/platform";
 import { buildFileUri } from "../utils/paths";
 
@@ -206,7 +209,11 @@ async function readSelection(
 	selection: { from: EditorPosition; to: EditorPosition },
 	vaultAccess: IVaultAccess,
 	maxSelectionLength: number,
-): Promise<{ text: string; wasTruncated: boolean; originalLength: number } | null> {
+): Promise<{
+	text: string;
+	wasTruncated: boolean;
+	originalLength: number;
+} | null> {
 	try {
 		const content = await vaultAccess.readNote(notePath);
 		const lines = content.split("\n");
@@ -349,13 +356,17 @@ async function preparePromptWithEmbeddedContext(
 		if (!file) continue;
 
 		const note = await processNote(
-			file, input.vaultBasePath, vaultAccess,
-			input.convertToWsl ?? false, maxNoteLen,
+			file,
+			input.vaultBasePath,
+			vaultAccess,
+			input.convertToWsl ?? false,
+			maxNoteLen,
 		);
 		if (!note) continue;
 
 		const text = note.wasTruncated
-			? note.content + `\n\n[Note: Truncated from ${note.originalLength} to ${maxNoteLen} characters]`
+			? note.content +
+				`\n\n[Note: Truncated from ${note.originalLength} to ${maxNoteLen} characters]`
 			: note.content;
 
 		resourceBlocks.push({
@@ -373,20 +384,30 @@ async function preparePromptWithEmbeddedContext(
 	const autoMentionBlocks: PromptContent[] = [];
 	if (input.activeNote && !input.isAutoMentionDisabled) {
 		const autoMentionResource = await buildAutoMentionResource(
-			input.activeNote, input.vaultBasePath, vaultAccess,
+			input.activeNote,
+			input.vaultBasePath,
+			vaultAccess,
 			input.convertToWsl ?? false,
 			input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
 		);
 		autoMentionBlocks.push(...autoMentionResource);
 	}
 
-	const autoMentionPrefix = buildAutoMentionPrefix(input.activeNote, input.isAutoMentionDisabled);
+	const autoMentionPrefix = buildAutoMentionPrefix(
+		input.activeNote,
+		input.isAutoMentionDisabled,
+	);
 
 	const agentContent: PromptContent[] = [
 		...resourceBlocks,
 		...autoMentionBlocks,
 		...(input.message || autoMentionPrefix
-			? [{ type: "text" as const, text: autoMentionPrefix + input.message }]
+			? [
+					{
+						type: "text" as const,
+						text: autoMentionPrefix + input.message,
+					},
+				]
 			: []),
 		...(input.images || []),
 		...(input.resourceLinks || []),
@@ -395,7 +416,10 @@ async function preparePromptWithEmbeddedContext(
 	return {
 		displayContent: buildDisplayContent(input),
 		agentContent,
-		autoMentionContext: buildAutoMentionContext(input.activeNote, input.isAutoMentionDisabled),
+		autoMentionContext: buildAutoMentionContext(
+			input.activeNote,
+			input.isAutoMentionDisabled,
+		),
 	};
 }
 
@@ -418,8 +442,11 @@ async function preparePromptWithTextContext(
 		if (!file) continue;
 
 		const note = await processNote(
-			file, input.vaultBasePath, vaultAccess,
-			input.convertToWsl ?? false, maxNoteLen,
+			file,
+			input.vaultBasePath,
+			vaultAccess,
+			input.convertToWsl ?? false,
+			maxNoteLen,
 		);
 		if (!note) continue;
 
@@ -435,19 +462,28 @@ async function preparePromptWithTextContext(
 	// Build auto-mention XML context
 	if (input.activeNote && !input.isAutoMentionDisabled) {
 		const autoMentionContextBlock = await buildAutoMentionTextContext(
-			input.activeNote.path, input.vaultBasePath, vaultAccess,
-			input.convertToWsl ?? false, input.activeNote.selection,
+			input.activeNote.path,
+			input.vaultBasePath,
+			vaultAccess,
+			input.convertToWsl ?? false,
+			input.activeNote.selection,
 			input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
 		);
 		contextBlocks.push(autoMentionContextBlock);
 	}
 
-	const autoMentionPrefix = buildAutoMentionPrefix(input.activeNote, input.isAutoMentionDisabled);
+	const autoMentionPrefix = buildAutoMentionPrefix(
+		input.activeNote,
+		input.isAutoMentionDisabled,
+	);
 
 	// Build agent message text (context blocks + auto-mention prefix + original message)
 	const agentMessageText =
 		contextBlocks.length > 0
-			? contextBlocks.join("\n") + "\n\n" + autoMentionPrefix + input.message
+			? contextBlocks.join("\n") +
+				"\n\n" +
+				autoMentionPrefix +
+				input.message
 			: autoMentionPrefix + input.message;
 
 	const agentContent: PromptContent[] = [
@@ -461,7 +497,10 @@ async function preparePromptWithTextContext(
 	return {
 		displayContent: buildDisplayContent(input),
 		agentContent,
-		autoMentionContext: buildAutoMentionContext(input.activeNote, input.isAutoMentionDisabled),
+		autoMentionContext: buildAutoMentionContext(
+			input.activeNote,
+			input.isAutoMentionDisabled,
+		),
 	};
 }
 
@@ -475,7 +514,11 @@ async function buildAutoMentionResource(
 	convertToWsl: boolean,
 	maxSelectionLength: number,
 ): Promise<PromptContent[]> {
-	const absolutePath = resolveAbsolutePath(activeNote.path, vaultPath, convertToWsl);
+	const absolutePath = resolveAbsolutePath(
+		activeNote.path,
+		vaultPath,
+		convertToWsl,
+	);
 	const uri = buildFileUri(absolutePath);
 
 	if (activeNote.selection) {
@@ -483,17 +526,23 @@ async function buildAutoMentionResource(
 		const toLine = activeNote.selection.to.line + 1;
 
 		const sel = await readSelection(
-			activeNote.path, activeNote.selection, vaultAccess, maxSelectionLength,
+			activeNote.path,
+			activeNote.selection,
+			vaultAccess,
+			maxSelectionLength,
 		);
 		if (!sel) {
-			return [{
-				type: "text",
-				text: `The user has selected lines ${fromLine}-${toLine} in ${uri}. If relevant, use the Read tool to examine the specific lines.`,
-			}];
+			return [
+				{
+					type: "text",
+					text: `The user has selected lines ${fromLine}-${toLine} in ${uri}. If relevant, use the Read tool to examine the specific lines.`,
+				},
+			];
 		}
 
 		const text = sel.wasTruncated
-			? sel.text + `\n\n[Note: Truncated from ${sel.originalLength} to ${maxSelectionLength} characters]`
+			? sel.text +
+				`\n\n[Note: Truncated from ${sel.originalLength} to ${maxSelectionLength} characters]`
 			: sel.text;
 
 		return [
@@ -513,10 +562,12 @@ async function buildAutoMentionResource(
 		];
 	}
 
-	return [{
-		type: "text",
-		text: `The user has opened the note ${uri} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine its content.`,
-	}];
+	return [
+		{
+			type: "text",
+			text: `The user has opened the note ${uri} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine its content.`,
+		},
+	];
 }
 
 /**
@@ -536,7 +587,12 @@ async function buildAutoMentionTextContext(
 		const fromLine = selection.from.line + 1;
 		const toLine = selection.to.line + 1;
 
-		const sel = await readSelection(notePath, selection, vaultAccess, maxSelectionLength);
+		const sel = await readSelection(
+			notePath,
+			selection,
+			vaultAccess,
+			maxSelectionLength,
+		);
 		if (!sel) {
 			return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">The user opened the note ${absolutePath} in Obsidian and is focusing on lines ${fromLine}-${toLine}. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the specific lines.</obsidian_opened_note>`;
 		}

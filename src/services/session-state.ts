@@ -6,7 +6,11 @@
  * and legacy mode/model management.
  */
 
-import type { ChatSession, SessionConfigOption, SessionResult } from "../types/session";
+import type {
+	ChatSession,
+	SessionConfigOption,
+	SessionResult,
+} from "../types/session";
 import { flattenConfigSelectOptions } from "../types/session";
 import type { AcpClient } from "../acp/acp-client";
 import * as React from "react";
@@ -109,9 +113,7 @@ export async function restoreLegacyConfig(
 	if (sessionResult.modes && savedModeId) {
 		if (
 			savedModeId !== sessionResult.modes.currentModeId &&
-			sessionResult.modes.availableModes.some(
-				(m) => m.id === savedModeId,
-			)
+			sessionResult.modes.availableModes.some((m) => m.id === savedModeId)
 		) {
 			try {
 				await agentClient.setSessionMode(

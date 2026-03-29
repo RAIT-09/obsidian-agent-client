@@ -241,7 +241,12 @@ export class AcpClient {
 				agentId: config.id,
 				errorCode: (error as NodeJS.ErrnoException).code,
 				originalError: error,
-				...getSpawnErrorInfo(error, command, agentLabel, this.plugin.settings.windowsWslMode),
+				...getSpawnErrorInfo(
+					error,
+					command,
+					agentLabel,
+					this.plugin.settings.windowsWslMode,
+				),
 			};
 
 			this.handler.emitSessionUpdate({
@@ -268,7 +273,10 @@ export class AcpClient {
 					exitCode: code,
 					title: "Command Not Found",
 					message: `The command "${command}" could not be found. Please check the path configuration for ${agentLabel}.`,
-					suggestion: getCommandNotFoundSuggestion(command, this.plugin.settings.windowsWslMode),
+					suggestion: getCommandNotFoundSuggestion(
+						command,
+						this.plugin.settings.windowsWslMode,
+					),
 				};
 
 				this.handler.emitSessionUpdate({
@@ -332,7 +340,10 @@ export class AcpClient {
 		);
 
 		const stream = acp.ndJsonStream(input, output);
-		this.connection = new acp.ClientSideConnection(() => this.handler, stream);
+		this.connection = new acp.ClientSideConnection(
+			() => this.handler,
+			stream,
+		);
 
 		try {
 			this.logger.log("[AcpClient] Starting ACP initialization...");
@@ -651,9 +662,7 @@ export class AcpClient {
 	 * - available_commands_update: Slash commands changed
 	 * - current_mode_update: Mode changed
 	 */
-	onSessionUpdate(
-		callback: (update: SessionUpdate) => void,
-	): () => void {
+	onSessionUpdate(callback: (update: SessionUpdate) => void): () => void {
 		return this.handler.onSessionUpdate(callback);
 	}
 
@@ -785,7 +794,10 @@ export class AcpClient {
 			});
 
 			this.logger.log(`[AcpClient] Session loaded: ${sessionId}`);
-			const result = AcpTypeConverter.toSessionResult(sessionId, response);
+			const result = AcpTypeConverter.toSessionResult(
+				sessionId,
+				response,
+			);
 			this.currentSessionId = result.sessionId;
 			return result;
 		} catch (error) {
@@ -819,7 +831,10 @@ export class AcpClient {
 			});
 
 			this.logger.log(`[AcpClient] Session resumed: ${sessionId}`);
-			const result = AcpTypeConverter.toSessionResult(sessionId, response);
+			const result = AcpTypeConverter.toSessionResult(
+				sessionId,
+				response,
+			);
 			this.currentSessionId = result.sessionId;
 			return result;
 		} catch (error) {

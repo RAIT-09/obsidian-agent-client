@@ -57,7 +57,10 @@ export interface UseAgentMessagesReturn {
 	lastUserMessage: string | null;
 
 	// Message operations
-	sendMessage: (content: string, options: SendMessageOptions) => Promise<void>;
+	sendMessage: (
+		content: string,
+		options: SendMessageOptions,
+	) => Promise<void>;
 	clearMessages: () => void;
 	setInitialMessages: (
 		history: Array<{
@@ -122,7 +125,11 @@ export function useAgentMessages(
 		setMessages((prev) => {
 			let result = prev;
 			for (const update of updates) {
-				result = applySingleUpdate(result, update, toolCallIndexRef.current);
+				result = applySingleUpdate(
+					result,
+					update,
+					toolCallIndexRef.current,
+				);
 			}
 			return result;
 		});

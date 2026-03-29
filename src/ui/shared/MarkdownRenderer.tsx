@@ -1,6 +1,9 @@
 import * as React from "react";
 const { useRef, useEffect } = React;
-import { Component, MarkdownRenderer as ObsidianMarkdownRenderer } from "obsidian";
+import {
+	Component,
+	MarkdownRenderer as ObsidianMarkdownRenderer,
+} from "obsidian";
 import type AgentClientPlugin from "../../plugin";
 
 interface MarkdownRendererProps {
@@ -8,10 +11,7 @@ interface MarkdownRendererProps {
 	plugin: AgentClientPlugin;
 }
 
-export function MarkdownRenderer({
-	text,
-	plugin,
-}: MarkdownRendererProps) {
+export function MarkdownRenderer({ text, plugin }: MarkdownRendererProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -25,7 +25,13 @@ export function MarkdownRenderer({
 		component.load();
 
 		// Render markdown
-		void ObsidianMarkdownRenderer.render(plugin.app, text, el, "", component);
+		void ObsidianMarkdownRenderer.render(
+			plugin.app,
+			text,
+			el,
+			"",
+			component,
+		);
 
 		// Handle internal link clicks
 		const handleInternalLinkClick = (e: MouseEvent) => {

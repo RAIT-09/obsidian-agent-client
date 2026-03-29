@@ -6,7 +6,6 @@
  * state, authentication, and session metadata.
  */
 
-
 // ============================================================================
 // Session State
 // ============================================================================
@@ -607,7 +606,6 @@ export interface SavedSessionInfo {
  * They are returned by AcpClient.initialize() and stored
  * in ChatSession for the session lifetime.
  */
-
 
 // ============================================================================
 // Agent Capabilities

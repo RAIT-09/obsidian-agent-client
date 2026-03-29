@@ -28,19 +28,35 @@ export function resolveCommandPath(command: string): Promise<string | null> {
 
 	return new Promise((resolve) => {
 		if (Platform.isWin) {
-			execFile("where", [trimmed], { timeout: 5000, windowsHide: true }, (err, stdout) => {
-				if (err) { resolve(null); return; }
-				const resolved = stdout.split("\n")[0].trim();
-				resolve(resolved.length > 0 ? resolved : null);
-			});
+			execFile(
+				"where",
+				[trimmed],
+				{ timeout: 5000, windowsHide: true },
+				(err, stdout) => {
+					if (err) {
+						resolve(null);
+						return;
+					}
+					const resolved = stdout.split("\n")[0].trim();
+					resolve(resolved.length > 0 ? resolved : null);
+				},
+			);
 		} else {
 			const shell = getLoginShell();
 			const escaped = trimmed.replace(/'/g, "'\\''");
-			execFile(shell, ["-l", "-c", `which '${escaped}'`], { timeout: 5000 }, (err, stdout) => {
-				if (err) { resolve(null); return; }
-				const resolved = stdout.split("\n")[0].trim();
-				resolve(resolved.length > 0 ? resolved : null);
-			});
+			execFile(
+				shell,
+				["-l", "-c", `which '${escaped}'`],
+				{ timeout: 5000 },
+				(err, stdout) => {
+					if (err) {
+						resolve(null);
+						return;
+					}
+					const resolved = stdout.split("\n")[0].trim();
+					resolve(resolved.length > 0 ? resolved : null);
+				},
+			);
 		}
 	});
 }
@@ -73,11 +89,19 @@ export function resolveCommandPathInWsl(
 		}
 		const innerCommand = `which '${escaped}'`;
 		args.push("sh", "-c", buildWslShellWrapper(innerCommand));
-		execFile("C:\\Windows\\System32\\wsl.exe", args, { timeout: 5000 }, (err, stdout) => {
-			if (err) { resolve(null); return; }
-			const resolved = stdout.split("\n")[0].trim();
-			resolve(resolved.length > 0 ? resolved : null);
-		});
+		execFile(
+			"C:\\Windows\\System32\\wsl.exe",
+			args,
+			{ timeout: 5000 },
+			(err, stdout) => {
+				if (err) {
+					resolve(null);
+					return;
+				}
+				const resolved = stdout.split("\n")[0].trim();
+				resolve(resolved.length > 0 ? resolved : null);
+			},
+		);
 	});
 }
 

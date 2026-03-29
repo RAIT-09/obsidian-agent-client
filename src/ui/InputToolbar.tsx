@@ -362,9 +362,7 @@ export function InputToolbar({
 							className="agent-client-model-selector"
 							title={
 								models.availableModels.find(
-									(m) =>
-										m.modelId ===
-										models.currentModelId,
+									(m) => m.modelId === models.currentModelId,
 								)?.description ?? "Select model"
 							}
 						>

@@ -1,8 +1,5 @@
 import { useState, useCallback } from "react";
-import type {
-	NoteMetadata,
-	IVaultAccess,
-} from "../services/vault-service";
+import type { NoteMetadata, IVaultAccess } from "../services/vault-service";
 import {
 	detectMention,
 	replaceMention,
@@ -108,7 +105,8 @@ export function useSuggestions(
 	const [activeNote, setActiveNote] = useState<NoteMetadata | null>(null);
 	const [isAutoMentionDisabled, setIsAutoMentionDisabled] = useState(false);
 
-	const mentionIsOpen = mentionSuggestions.length > 0 && mentionContext !== null;
+	const mentionIsOpen =
+		mentionSuggestions.length > 0 && mentionContext !== null;
 
 	// ============================================================
 	// Command State

@@ -9,11 +9,7 @@
  */
 
 import { Platform } from "obsidian";
-import {
-	AcpErrorCode,
-	type AcpError,
-	type ErrorInfo,
-} from "../types/errors";
+import { AcpErrorCode, type AcpError, type ErrorInfo } from "../types/errors";
 
 // ============================================================================
 // Error Extraction Functions

@@ -1,6 +1,12 @@
 import * as React from "react";
 const { useState, useRef, useEffect, useMemo, useCallback } = React;
-import { Notice, FileSystemAdapter, Platform, Menu, type MenuItem } from "obsidian";
+import {
+	Notice,
+	FileSystemAdapter,
+	Platform,
+	Menu,
+	type MenuItem,
+} from "obsidian";
 
 import type { AttachedFile, ChatInputState } from "../types/chat";
 import { useHistoryModal } from "../hooks/useHistoryModal";
@@ -168,7 +174,6 @@ export function ChatPanel({
 		errorInfo,
 	} = agent;
 
-
 	const suggestions = useSuggestions(
 		vaultService,
 		plugin,
@@ -211,8 +216,6 @@ export function ChatPanel({
 		onIgnoreUpdates: agent.setIgnoreUpdates,
 		onClearMessages: agent.clearMessages,
 	});
-
-
 
 	// ============================================================
 	// Local State
@@ -262,16 +265,32 @@ export function ChatPanel({
 	// Chat Actions
 	// ============================================================
 	const actions = useChatActions(
-		plugin, agent, sessionHistory, suggestions,
-		session, messages, settings, vaultPath,
+		plugin,
+		agent,
+		sessionHistory,
+		suggestions,
+		session,
+		messages,
+		settings,
+		vaultPath,
 	);
 
 	const {
-		handleSendMessage, handleStopGeneration, handleNewChat,
-		handleExportChat, handleSwitchAgent, handleRestartAgent,
-		handleSetMode, handleSetModel, handleSetConfigOption,
-		handleClearError, handleClearAgentUpdate, handleRestoredMessageConsumed,
-		restoredMessage, agentUpdateNotification, setAgentUpdateNotification,
+		handleSendMessage,
+		handleStopGeneration,
+		handleNewChat,
+		handleExportChat,
+		handleSwitchAgent,
+		handleRestartAgent,
+		handleSetMode,
+		handleSetModel,
+		handleSetConfigOption,
+		handleClearError,
+		handleClearAgentUpdate,
+		handleRestoredMessageConsumed,
+		restoredMessage,
+		agentUpdateNotification,
+		setAgentUpdateNotification,
 		autoExportIfEnabled,
 	} = actions;
 
@@ -374,7 +393,11 @@ export function ChatPanel({
 	// ============================================================
 	// Track registered listeners for cleanup (floating variant)
 	const registeredListenersRef = useRef<
-		{ target: Window | Document | HTMLElement; type: string; callback: EventListenerOrEventListenerObject }[]
+		{
+			target: Window | Document | HTMLElement;
+			type: string;
+			callback: EventListenerOrEventListenerObject;
+		}[]
 	>([]);
 
 	const viewHost: IChatViewHost = useMemo(() => {
@@ -437,10 +460,7 @@ export function ChatPanel({
 						"[ChatPanel] Applying configured model via configOptions:",
 						config.model,
 					);
-					void agent.setConfigOption(
-						modelOption.id,
-						config.model,
-					);
+					void agent.setConfigOption(modelOption.id, config.model);
 				}
 			}
 			return;
@@ -482,9 +502,7 @@ export function ChatPanel({
 	// Cleanup on unmount only - auto-export and close session
 	useEffect(() => {
 		return () => {
-			logger.log(
-				"[ChatPanel] Cleanup: auto-export and close session",
-			);
+			logger.log("[ChatPanel] Cleanup: auto-export and close session");
 			void (async () => {
 				await autoExportRef.current(
 					"closeChat",
@@ -595,22 +613,19 @@ export function ChatPanel({
 			),
 
 			// New chat requested (from "New chat with [Agent]" command)
-			ws.on(
-				"agent-client:new-chat-requested",
-				(agentId?: string) => {
-					if (
-						plugin.lastActiveChatViewId &&
-						plugin.lastActiveChatViewId !== viewId
-					) {
-						return;
-					}
-					if (variant === "sidebar") {
-						void handleNewChatWithPersist(agentId);
-					} else {
-						void handleNewChat(agentId);
-					}
-				},
-			),
+			ws.on("agent-client:new-chat-requested", (agentId?: string) => {
+				if (
+					plugin.lastActiveChatViewId &&
+					plugin.lastActiveChatViewId !== viewId
+				) {
+					return;
+				}
+				if (variant === "sidebar") {
+					void handleNewChatWithPersist(agentId);
+				} else {
+					void handleNewChat(agentId);
+				}
+			}),
 
 			// Approve active permission
 			ws.on(
@@ -618,8 +633,7 @@ export function ChatPanel({
 				(targetViewId?: string) => {
 					if (targetViewId && targetViewId !== viewId) return;
 					void (async () => {
-						const success =
-							await agent.approveActivePermission();
+						const success = await agent.approveActivePermission();
 						if (!success) {
 							new Notice(
 								"[Agent Client] No active permission request",
@@ -635,8 +649,7 @@ export function ChatPanel({
 				(targetViewId?: string) => {
 					if (targetViewId && targetViewId !== viewId) return;
 					void (async () => {
-						const success =
-							await agent.rejectActivePermission();
+						const success = await agent.rejectActivePermission();
 						if (!success) {
 							new Notice(
 								"[Agent Client] No active permission request",
@@ -647,22 +660,16 @@ export function ChatPanel({
 			),
 
 			// Cancel current message
-			ws.on(
-				"agent-client:cancel-message",
-				(targetViewId?: string) => {
-					if (targetViewId && targetViewId !== viewId) return;
-					void handleStopGeneration();
-				},
-			),
+			ws.on("agent-client:cancel-message", (targetViewId?: string) => {
+				if (targetViewId && targetViewId !== viewId) return;
+				void handleStopGeneration();
+			}),
 
 			// Export chat
-			ws.on(
-				"agent-client:export-chat",
-				(targetViewId?: string) => {
-					if (targetViewId && targetViewId !== viewId) return;
-					void handleExportChat();
-				},
-			),
+			ws.on("agent-client:export-chat", (targetViewId?: string) => {
+				if (targetViewId && targetViewId !== viewId) return;
+				void handleExportChat();
+			}),
 		];
 
 		return () => {
