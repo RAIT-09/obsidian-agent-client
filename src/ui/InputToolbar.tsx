@@ -11,6 +11,72 @@ import {
 	type SessionConfigSelectGroup,
 } from "../types/session";
 
+// ============================================================================
+// Obsidian Dropdown Hook
+// ============================================================================
+
+/**
+ * Hook for managing an Obsidian DropdownComponent lifecycle.
+ * Handles creation, option population, value sync, and cleanup.
+ */
+function useObsidianDropdown(
+	containerRef: React.RefObject<HTMLDivElement | null>,
+	options: Array<{ value: string; label: string }> | undefined,
+	currentValue: string | undefined,
+	onChangeRef: React.RefObject<((value: string) => void) | undefined>,
+): void {
+	const instanceRef = useRef<DropdownComponent | null>(null);
+
+	// Create/destroy dropdown when options change
+	useEffect(() => {
+		const containerEl = containerRef.current;
+		if (!containerEl) return;
+
+		if (!options || options.length <= 1) {
+			if (instanceRef.current) {
+				containerEl.empty();
+				instanceRef.current = null;
+			}
+			return;
+		}
+
+		if (!instanceRef.current) {
+			const dropdown = new DropdownComponent(containerEl);
+			instanceRef.current = dropdown;
+
+			for (const opt of options) {
+				dropdown.addOption(opt.value, opt.label);
+			}
+
+			if (currentValue) {
+				dropdown.setValue(currentValue);
+			}
+
+			dropdown.onChange((value) => {
+				onChangeRef.current?.(value);
+			});
+		}
+
+		return () => {
+			if (instanceRef.current) {
+				containerEl.empty();
+				instanceRef.current = null;
+			}
+		};
+	}, [options, containerRef, onChangeRef, currentValue]);
+
+	// Sync value when it changes externally
+	useEffect(() => {
+		if (instanceRef.current && currentValue) {
+			instanceRef.current.setValue(currentValue);
+		}
+	}, [currentValue]);
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
 /** Format token count for display (e.g., 21367 → "21.4K", 200000 → "200K") */
 function formatTokenCount(tokens: number): string {
 	if (tokens < 1000) return String(tokens);
@@ -62,9 +128,7 @@ export function InputToolbar({
 	// Refs
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
 	const modeDropdownRef = useRef<HTMLDivElement>(null);
-	const modeDropdownInstance = useRef<DropdownComponent | null>(null);
 	const modelDropdownRef = useRef<HTMLDivElement>(null);
-	const modelDropdownInstance = useRef<DropdownComponent | null>(null);
 	const configOptionsRef = useRef<HTMLDivElement>(null);
 	const configDropdownInstances = useRef<Map<string, DropdownComponent>>(
 		new Map(),
@@ -126,119 +190,29 @@ export function InputToolbar({
 		}
 	}, [updateIconColor]);
 
-	// Initialize Mode dropdown (only when availableModes change)
-	const availableModes = modes?.availableModes;
-	const currentModeId = modes?.currentModeId;
+	// Mode dropdown
+	const modeOptions = modes?.availableModes?.map((m) => ({
+		value: m.id,
+		label: m.name,
+	}));
+	useObsidianDropdown(
+		modeDropdownRef,
+		modeOptions,
+		modes?.currentModeId,
+		onModeChangeRef,
+	);
 
-	useEffect(() => {
-		const containerEl = modeDropdownRef.current;
-		if (!containerEl) return;
-
-		// Only show dropdown if there are multiple modes
-		if (!availableModes || availableModes.length <= 1) {
-			// Clean up existing dropdown if modes become unavailable
-			if (modeDropdownInstance.current) {
-				containerEl.empty();
-				modeDropdownInstance.current = null;
-			}
-			return;
-		}
-
-		// Create dropdown if not exists
-		if (!modeDropdownInstance.current) {
-			const dropdown = new DropdownComponent(containerEl);
-			modeDropdownInstance.current = dropdown;
-
-			// Add options
-			for (const mode of availableModes) {
-				dropdown.addOption(mode.id, mode.name);
-			}
-
-			// Set initial value
-			if (currentModeId) {
-				dropdown.setValue(currentModeId);
-			}
-
-			// Handle change - use ref to avoid recreating dropdown on callback change
-			dropdown.onChange((value) => {
-				if (onModeChangeRef.current) {
-					onModeChangeRef.current(value);
-				}
-			});
-		}
-
-		// Cleanup on unmount or when availableModes change
-		return () => {
-			if (modeDropdownInstance.current) {
-				containerEl.empty();
-				modeDropdownInstance.current = null;
-			}
-		};
-	}, [availableModes]);
-
-	// Update dropdown value when currentModeId changes (separate effect)
-	useEffect(() => {
-		if (modeDropdownInstance.current && currentModeId) {
-			modeDropdownInstance.current.setValue(currentModeId);
-		}
-	}, [currentModeId]);
-
-	// Initialize Model dropdown (only when availableModels change)
-	const availableModels = models?.availableModels;
-	const currentModelId = models?.currentModelId;
-
-	useEffect(() => {
-		const containerEl = modelDropdownRef.current;
-		if (!containerEl) return;
-
-		// Only show dropdown if there are multiple models
-		if (!availableModels || availableModels.length <= 1) {
-			// Clean up existing dropdown if models become unavailable
-			if (modelDropdownInstance.current) {
-				containerEl.empty();
-				modelDropdownInstance.current = null;
-			}
-			return;
-		}
-
-		// Create dropdown if not exists
-		if (!modelDropdownInstance.current) {
-			const dropdown = new DropdownComponent(containerEl);
-			modelDropdownInstance.current = dropdown;
-
-			// Add options
-			for (const model of availableModels) {
-				dropdown.addOption(model.modelId, model.name);
-			}
-
-			// Set initial value
-			if (currentModelId) {
-				dropdown.setValue(currentModelId);
-			}
-
-			// Handle change - use ref to avoid recreating dropdown on callback change
-			dropdown.onChange((value) => {
-				if (onModelChangeRef.current) {
-					onModelChangeRef.current(value);
-				}
-			});
-		}
-
-		// Cleanup on unmount or when availableModels change
-		return () => {
-			if (modelDropdownInstance.current) {
-				containerEl.empty();
-				modelDropdownInstance.current = null;
-			}
-		};
-	}, [availableModels]);
-
-	// Update dropdown value when currentModelId changes (separate effect)
-	useEffect(() => {
-		if (modelDropdownInstance.current && currentModelId) {
-			modelDropdownInstance.current.setValue(currentModelId);
-		}
-	}, [currentModelId]);
+	// Model dropdown
+	const modelOptions = models?.availableModels?.map((m) => ({
+		value: m.modelId,
+		label: m.name,
+	}));
+	useObsidianDropdown(
+		modelDropdownRef,
+		modelOptions,
+		models?.currentModelId,
+		onModelChangeRef,
+	);
 
 	// Initialize configOptions dropdowns (dynamic, replaces mode/model when present)
 	useEffect(() => {
