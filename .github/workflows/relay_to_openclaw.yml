@@ -10,7 +10,7 @@ name: Relay to OpenClaw
 
 on:
   issues:
-    types: [opened]
+    types: [opened, reopened]
   issue_comment:
     types: [created]
   pull_request_target:
