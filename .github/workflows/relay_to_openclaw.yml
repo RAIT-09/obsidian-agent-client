@@ -1,9 +1,9 @@
 # Relay GitHub events to OpenClaw via webhook
-# OpenClaw translates the event into Japanese and posts it to Discord
+# OpenClaw translates the event into Japanese and posts it to Discord as an embed
 #
 # Required secrets:
-#   OPENCLAW_WEBHOOK_URL - OpenClaw hooks endpoint URL
-#   OPENCLAW_HOOKS_TOKEN - Bearer token for OpenClaw hooks authentication
+#   OPENCLAW_WEBHOOK_URL   - OpenClaw hooks endpoint URL
+#   OPENCLAW_HOOKS_TOKEN   - Bearer token for OpenClaw hooks authentication
 #   OPENCLAW_DISCORD_CHANNEL - Discord channel ID for delivery
 
 name: Relay to OpenClaw
@@ -33,27 +33,25 @@ jobs:
           OPENCLAW_HOOKS_TOKEN: ${{ secrets.OPENCLAW_HOOKS_TOKEN }}
           OPENCLAW_DISCORD_CHANNEL: ${{ secrets.OPENCLAW_DISCORD_CHANNEL }}
         run: |
-          # Extract only the fields we need to avoid 413
+          EVENT_NAME="${{ github.event_name }}"
+          REPO="${{ github.repository }}"
+          NUMBER=$(echo "$GH_EVENT" | jq -r '.issue.number // .pull_request.number // .discussion.number // ""')
           TITLE=$(echo "$GH_EVENT" | jq -r '.issue.title // .pull_request.title // .discussion.title // ""')
-          BODY=$(echo "$GH_EVENT" | jq -r '.comment.body // .issue.body // .pull_request.body // .discussion.body // ""')
+          BODY=$(echo "$GH_EVENT" | jq -r '.comment.body // .issue.body // .pull_request.body // .discussion.body // ""' | head -c 4000)
           URL=$(echo "$GH_EVENT" | jq -r '.comment.html_url // .issue.html_url // .pull_request.html_url // .discussion.html_url // ""')
           USER=$(echo "$GH_EVENT" | jq -r '.sender.login // ""')
 
           jq -n \
-            --arg msg "GitHub ${{ github.event_name }} on ${{ github.repository }}
-
-          user: $USER
-          title: $TITLE
-          body: $BODY
-          url: $URL
-
-          You are a translator. Your ONLY job is to translate the above content into Japanese word-for-word. Rules:
-          1. Translate the ENTIRE body text. Do NOT summarize, shorten, paraphrase, or omit any part.
-          2. Preserve all formatting, line breaks, code blocks, and links from the original.
-          3. Output ONLY the translation — no commentary, no preamble, no summary." \
+            --arg event "$EVENT_NAME" \
+            --arg repo "$REPO" \
+            --arg number "$NUMBER" \
+            --arg title "$TITLE" \
+            --arg user "$USER" \
+            --arg url "$URL" \
+            --arg body "$BODY" \
             --arg ch "discord" \
             --arg to "$OPENCLAW_DISCORD_CHANNEL" \
-            '{message: $msg, deliver: true, channel: $ch, to: $to, name: "GitHub", agentId: "github-hook"}' | \
+            '{message: ("event: " + $event + "\nrepo: " + $repo + "\nnumber: #" + $number + "\ntitle: " + $title + "\nauthor: " + $user + "\nurl: " + $url + "\n\nbody:\n" + $body), deliver: false, channel: $ch, to: $to, name: "GitHub", agentId: "github-hook"}' | \
           curl -sf -X POST \
             "${OPENCLAW_WEBHOOK_URL}/hooks/agent" \
             -H "Authorization: Bearer ${OPENCLAW_HOOKS_TOKEN}" \
