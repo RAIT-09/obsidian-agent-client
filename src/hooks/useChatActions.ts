@@ -199,12 +199,15 @@ export function useChatActions(
 			}
 		},
 		[
-			agent,
+			agent.clearError,
+			agent.sendMessage,
 			messages.length,
 			session.sessionId,
-			sessionHistory,
+			sessionHistory.saveSessionLocally,
 			logger,
 			settings.autoMentionActiveNote,
+			suggestions.mentions.activeNote,
+			suggestions.mentions.isAutoMentionDisabled,
 			shouldConvertToWsl,
 			vaultPath,
 		],
@@ -217,7 +220,7 @@ export function useChatActions(
 		if (lastMessage) {
 			setRestoredMessage(lastMessage);
 		}
-	}, [logger, agent, agent.lastUserMessage]);
+	}, [logger, agent.cancelOperation, agent.lastUserMessage]);
 
 	const handleNewChat = useCallback(
 		async (requestedAgentId?: string) => {
@@ -260,9 +263,12 @@ export function useChatActions(
 			session,
 			logger,
 			autoExportIfEnabled,
-			agent,
-			suggestions.mentions,
-			sessionHistory,
+			agent.isSending,
+			agent.cancelOperation,
+			agent.clearMessages,
+			agent.restartSession,
+			suggestions.mentions.toggleAutoMention,
+			sessionHistory.invalidateCache,
 		],
 	);
 
@@ -317,7 +323,7 @@ export function useChatActions(
 			new Notice("[Agent Client] Failed to restart agent");
 			logger.error("Restart error:", error);
 		}
-	}, [logger, messages, session, autoExportIfEnabled, agent]);
+	}, [logger, messages, session, autoExportIfEnabled, agent.clearMessages, agent.forceRestartAgent]);
 
 	// ============================================================
 	// Config Actions
@@ -327,21 +333,21 @@ export function useChatActions(
 		async (modeId: string) => {
 			await agent.setMode(modeId);
 		},
-		[agent],
+		[agent.setMode],
 	);
 
 	const handleSetModel = useCallback(
 		async (modelId: string) => {
 			await agent.setModel(modelId);
 		},
-		[agent],
+		[agent.setModel],
 	);
 
 	const handleSetConfigOption = useCallback(
 		async (configId: string, value: string) => {
 			await agent.setConfigOption(configId, value);
 		},
-		[agent],
+		[agent.setConfigOption],
 	);
 
 	// ============================================================
@@ -350,7 +356,7 @@ export function useChatActions(
 
 	const handleClearError = useCallback(() => {
 		agent.clearError();
-	}, [agent]);
+	}, [agent.clearError]);
 
 	const handleClearAgentUpdate = useCallback(() => {
 		setAgentUpdateNotification(null);
