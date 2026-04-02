@@ -6,7 +6,7 @@
  */
 
 import * as React from "react";
-const { useState, useCallback, useEffect } = React;
+const { useState, useCallback, useEffect, useMemo } = React;
 
 import type { SessionUpdate } from "../types/session";
 import type { AcpClient } from "../acp/acp-client";
@@ -163,46 +163,77 @@ export function useAgent(
 	// Return
 	// ============================================================
 
-	return {
-		// Session state
-		session: agentSession.session,
-		isReady: agentSession.isReady,
+	return useMemo(
+		() => ({
+			// Session state
+			session: agentSession.session,
+			isReady: agentSession.isReady,
 
-		// Message state
-		messages: agentMessages.messages,
-		isSending: agentMessages.isSending,
-		lastUserMessage: agentMessages.lastUserMessage,
+			// Message state
+			messages: agentMessages.messages,
+			isSending: agentMessages.isSending,
+			lastUserMessage: agentMessages.lastUserMessage,
 
-		// Combined error
-		errorInfo,
+			// Combined error
+			errorInfo,
 
-		// Session lifecycle
-		createSession: agentSession.createSession,
-		restartSession: agentSession.restartSession,
-		closeSession: agentSession.closeSession,
-		forceRestartAgent: agentSession.forceRestartAgent,
-		cancelOperation: agentSession.cancelOperation,
-		getAvailableAgents: agentSession.getAvailableAgents,
-		updateSessionFromLoad: agentSession.updateSessionFromLoad,
+			// Session lifecycle
+			createSession: agentSession.createSession,
+			restartSession: agentSession.restartSession,
+			closeSession: agentSession.closeSession,
+			forceRestartAgent: agentSession.forceRestartAgent,
+			cancelOperation: agentSession.cancelOperation,
+			getAvailableAgents: agentSession.getAvailableAgents,
+			updateSessionFromLoad: agentSession.updateSessionFromLoad,
 
-		// Config
-		setMode: agentSession.setMode,
-		setModel: agentSession.setModel,
-		setConfigOption: agentSession.setConfigOption,
+			// Config
+			setMode: agentSession.setMode,
+			setModel: agentSession.setModel,
+			setConfigOption: agentSession.setConfigOption,
 
-		// Message operations
-		sendMessage: agentMessages.sendMessage,
-		clearMessages: agentMessages.clearMessages,
-		setInitialMessages: agentMessages.setInitialMessages,
-		setMessagesFromLocal: agentMessages.setMessagesFromLocal,
-		clearError: agentMessages.clearError,
-		setIgnoreUpdates: agentMessages.setIgnoreUpdates,
+			// Message operations
+			sendMessage: agentMessages.sendMessage,
+			clearMessages: agentMessages.clearMessages,
+			setInitialMessages: agentMessages.setInitialMessages,
+			setMessagesFromLocal: agentMessages.setMessagesFromLocal,
+			clearError: agentMessages.clearError,
+			setIgnoreUpdates: agentMessages.setIgnoreUpdates,
 
-		// Permission
-		activePermission: agentMessages.activePermission,
-		hasActivePermission: agentMessages.hasActivePermission,
-		approvePermission: agentMessages.approvePermission,
-		approveActivePermission: agentMessages.approveActivePermission,
-		rejectActivePermission: agentMessages.rejectActivePermission,
-	};
+			// Permission
+			activePermission: agentMessages.activePermission,
+			hasActivePermission: agentMessages.hasActivePermission,
+			approvePermission: agentMessages.approvePermission,
+			approveActivePermission: agentMessages.approveActivePermission,
+			rejectActivePermission: agentMessages.rejectActivePermission,
+		}),
+		[
+			agentSession.session,
+			agentSession.isReady,
+			agentMessages.messages,
+			agentMessages.isSending,
+			agentMessages.lastUserMessage,
+			errorInfo,
+			agentSession.createSession,
+			agentSession.restartSession,
+			agentSession.closeSession,
+			agentSession.forceRestartAgent,
+			agentSession.cancelOperation,
+			agentSession.getAvailableAgents,
+			agentSession.updateSessionFromLoad,
+			agentSession.setMode,
+			agentSession.setModel,
+			agentSession.setConfigOption,
+			agentMessages.sendMessage,
+			agentMessages.clearMessages,
+			agentMessages.setInitialMessages,
+			agentMessages.setMessagesFromLocal,
+			agentMessages.clearError,
+			agentMessages.setIgnoreUpdates,
+			agentMessages.activePermission,
+			agentMessages.hasActivePermission,
+			agentMessages.approvePermission,
+			agentMessages.approveActivePermission,
+			agentMessages.rejectActivePermission,
+		],
+	);
 }
