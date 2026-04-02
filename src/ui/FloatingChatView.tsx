@@ -54,6 +54,7 @@ export class FloatingViewContainer implements IChatViewContainer {
 	private root: Root | null = null;
 	private containerEl: HTMLElement;
 	private callbacks: ChatPanelCallbacks | null = null;
+	private setExpanded: ((expanded: boolean) => void) | null = null;
 	private isExpandedState = false;
 	private containerRefEl: HTMLElement | null = null;
 
@@ -82,6 +83,9 @@ export class FloatingViewContainer implements IChatViewContainer {
 				initialPosition={initialPosition}
 				onRegisterCallbacks={(cbs) => {
 					this.callbacks = cbs;
+				}}
+				onRegisterExpanded={(fn) => {
+					this.setExpanded = fn;
 				}}
 				onExpandedChange={(expanded) => {
 					this.isExpandedState = expanded;
@@ -128,12 +132,8 @@ export class FloatingViewContainer implements IChatViewContainer {
 	focus(): void {
 		// Expand if collapsed, then focus
 		if (!this.isExpandedState) {
-			// Dispatch expand event
-			window.dispatchEvent(
-				new CustomEvent("agent-client:expand-floating-chat", {
-					detail: { viewId: this.viewId },
-				}),
-			);
+			this.isExpandedState = true;
+			this.setExpanded?.(true);
 		}
 		// Focus after next render (expansion may need a frame)
 		requestAnimationFrame(() => {
@@ -155,21 +155,15 @@ export class FloatingViewContainer implements IChatViewContainer {
 
 	expand(): void {
 		if (!this.isExpandedState) {
-			window.dispatchEvent(
-				new CustomEvent("agent-client:expand-floating-chat", {
-					detail: { viewId: this.viewId },
-				}),
-			);
+			this.isExpandedState = true;
+			this.setExpanded?.(true);
 		}
 	}
 
 	collapse(): void {
 		if (this.isExpandedState) {
-			window.dispatchEvent(
-				new CustomEvent("agent-client:collapse-floating-chat", {
-					detail: { viewId: this.viewId },
-				}),
-			);
+			this.isExpandedState = false;
+			this.setExpanded?.(false);
 		}
 	}
 
@@ -208,6 +202,9 @@ interface FloatingChatComponentProps {
 	initialExpanded?: boolean;
 	initialPosition?: { x: number; y: number };
 	onRegisterCallbacks?: (callbacks: ChatPanelCallbacks) => void;
+	onRegisterExpanded?: (
+		setExpanded: (expanded: boolean) => void,
+	) => void;
 	onExpandedChange?: (expanded: boolean) => void;
 	onContainerRef?: (el: HTMLDivElement | null) => void;
 }
@@ -218,6 +215,7 @@ function FloatingChatComponent({
 	initialExpanded = false,
 	initialPosition,
 	onRegisterCallbacks,
+	onRegisterExpanded,
 	onExpandedChange,
 	onContainerRef,
 }: FloatingChatComponentProps) {
@@ -256,6 +254,12 @@ function FloatingChatComponent({
 	// ============================================================
 	const settings = useSettings(plugin);
 	const [isExpanded, setIsExpanded] = useState(initialExpanded);
+
+	// Register setIsExpanded with the class so it can call expand/collapse directly
+	useEffect(() => {
+		onRegisterExpanded?.(setIsExpanded);
+	}, [onRegisterExpanded]);
+
 	const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
 	const [size, setSize] = useState(settings.floatingWindowSize);
 	const [position, setPosition] = useState(() => {
@@ -322,50 +326,6 @@ function FloatingChatComponent({
 	const handleCloseWindow = useCallback(() => {
 		plugin.closeFloatingChat(viewId);
 	}, [plugin, viewId]);
-
-	// Listen for expand requests
-	useEffect(() => {
-		const handleExpandRequest = (
-			event: CustomEvent<{ viewId: string }>,
-		) => {
-			if (event.detail.viewId === viewId) {
-				setIsExpanded(true);
-			}
-		};
-
-		window.addEventListener(
-			"agent-client:expand-floating-chat" as never,
-			handleExpandRequest as EventListener,
-		);
-		return () => {
-			window.removeEventListener(
-				"agent-client:expand-floating-chat" as never,
-				handleExpandRequest as EventListener,
-			);
-		};
-	}, [viewId]);
-
-	// Listen for collapse requests
-	useEffect(() => {
-		const handleCollapseRequest = (
-			event: CustomEvent<{ viewId: string }>,
-		) => {
-			if (event.detail.viewId === viewId) {
-				setIsExpanded(false);
-			}
-		};
-
-		window.addEventListener(
-			"agent-client:collapse-floating-chat" as never,
-			handleCollapseRequest as EventListener,
-		);
-		return () => {
-			window.removeEventListener(
-				"agent-client:collapse-floating-chat" as never,
-				handleCollapseRequest as EventListener,
-			);
-		};
-	}, [viewId]);
 
 	// Sync manual resizing with state
 	useEffect(() => {

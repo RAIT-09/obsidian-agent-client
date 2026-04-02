@@ -603,11 +603,10 @@ export default class AgentClientPlugin extends Plugin {
 	 * @param viewId - The viewId in "floating-chat-{id}" format (from getFloatingChatInstances())
 	 */
 	expandFloatingChat(viewId: string): void {
-		window.dispatchEvent(
-			new CustomEvent("agent-client:expand-floating-chat", {
-				detail: { viewId },
-			}),
-		);
+		const view = this.viewRegistry.get(viewId);
+		if (view) {
+			view.expand();
+		}
 	}
 
 	/**
