@@ -191,3 +191,73 @@ export const toAgentConfig = (
 		workingDirectory,
 	};
 };
+
+// ============================================================================
+// Settings Loading Helpers
+// ============================================================================
+
+/** Extract a string value, falling back to default if not a string */
+export function str(raw: unknown, fallback: string): string {
+	return typeof raw === "string" ? raw : fallback;
+}
+
+/** Extract a boolean value, falling back to default if not a boolean */
+export function bool(raw: unknown, fallback: boolean): boolean {
+	return typeof raw === "boolean" ? raw : fallback;
+}
+
+/** Extract a number value with optional minimum, falling back to default */
+export function num(
+	raw: unknown,
+	fallback: number,
+	min?: number,
+): number {
+	if (typeof raw !== "number") return fallback;
+	if (min !== undefined && raw < min) return fallback;
+	return raw;
+}
+
+/** Extract a value that must be one of the valid options */
+export function enumVal<T extends string>(
+	raw: unknown,
+	valid: T[],
+	fallback: T,
+): T {
+	return valid.includes(raw as T) ? (raw as T) : fallback;
+}
+
+/** Extract a plain object, or return null */
+export function obj(
+	raw: unknown,
+): Record<string, unknown> | null {
+	return raw && typeof raw === "object" && !Array.isArray(raw)
+		? (raw as Record<string, unknown>)
+		: null;
+}
+
+/** Extract a Record<string, string> with validated entries */
+export function strRecord(raw: unknown): Record<string, string> {
+	const result: Record<string, string> = {};
+	const o = obj(raw);
+	if (!o) return result;
+	for (const [key, value] of Object.entries(o)) {
+		if (
+			typeof key === "string" &&
+			key.length > 0 &&
+			typeof value === "string" &&
+			value.length > 0
+		) {
+			result[key] = value;
+		}
+	}
+	return result;
+}
+
+/** Extract an {x, y} point, or return null if invalid */
+export function xyPoint(
+	raw: unknown,
+): { x: number; y: number } | null {
+	const o = obj(raw);
+	if (!o || typeof o.x !== "number" || typeof o.y !== "number") return null;
+	return { x: o.x as number, y: o.y as number };
+}

@@ -5,7 +5,6 @@ import {
 	Notice,
 	requestUrl,
 } from "obsidian";
-import type { Root } from "react-dom/client";
 import * as semver from "semver";
 import { ChatView, VIEW_TYPE_CHAT } from "./ui/ChatView";
 import {
@@ -26,6 +25,13 @@ import {
 	normalizeCustomAgent,
 	ensureUniqueCustomAgentIds,
 	parseChatFontSize,
+	str,
+	bool,
+	num,
+	enumVal,
+	obj,
+	strRecord,
+	xyPoint,
 } from "./services/settings-normalizer";
 import {
 	AgentEnvVar,
@@ -187,11 +193,6 @@ export default class AgentClientPlugin extends Plugin {
 	private _acpClients: Map<string, AcpClient> = new Map();
 	/** Floating button container (independent from chat view instances) */
 	private floatingButton: FloatingButtonContainer | null = null;
-	/** Map of viewId to floating chat roots and containers (legacy, being migrated to viewRegistry) */
-	private floatingChatInstances: Map<
-		string,
-		{ root: Root; container: HTMLElement }
-	> = new Map();
 	/** Counter for generating unique floating chat instance IDs */
 	private floatingChatCounter = 0;
 
@@ -355,9 +356,6 @@ export default class AgentClientPlugin extends Plugin {
 
 		// Clear registry (sidebar views are managed by Obsidian workspace)
 		this.viewRegistry.clear();
-
-		// Clear legacy storage
-		this.floatingChatInstances.clear();
 	}
 
 	/**
@@ -579,11 +577,6 @@ export default class AgentClientPlugin extends Plugin {
 			initialExpanded,
 			initialPosition,
 		);
-		// Store by viewId for consistent lookup
-		this.floatingChatInstances.set(container.viewId, {
-			root: null as unknown as Root,
-			container: container.getContainerEl(),
-		});
 	}
 
 	/**
@@ -595,8 +588,6 @@ export default class AgentClientPlugin extends Plugin {
 		if (container && container instanceof FloatingViewContainer) {
 			container.unmount();
 		}
-		// Also remove from legacy floatingChatInstances if present
-		this.floatingChatInstances.delete(viewId);
 	}
 
 	/**
@@ -857,366 +848,119 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		const rawSettings = ((await this.loadData()) ?? {}) as Record<
-			string,
-			unknown
-		>;
+		const raw = ((await this.loadData()) ?? {}) as Record<string, unknown>;
+		const D = DEFAULT_SETTINGS;
 
-		const claudeFromRaw =
-			typeof rawSettings.claude === "object" &&
-			rawSettings.claude !== null
-				? (rawSettings.claude as Record<string, unknown>)
-				: {};
-		const codexFromRaw =
-			typeof rawSettings.codex === "object" && rawSettings.codex !== null
-				? (rawSettings.codex as Record<string, unknown>)
-				: {};
-		const geminiFromRaw =
-			typeof rawSettings.gemini === "object" &&
-			rawSettings.gemini !== null
-				? (rawSettings.gemini as Record<string, unknown>)
-				: {};
+		// Extract agent sub-objects
+		const rc = obj(raw.claude) ?? {};
+		const rk = obj(raw.codex) ?? {};
+		const rg = obj(raw.gemini) ?? {};
+		const re = obj(raw.exportSettings) ?? {};
+		const rd = obj(raw.displaySettings) ?? {};
 
-		const resolvedClaudeArgs = sanitizeArgs(claudeFromRaw.args);
-		const resolvedClaudeEnv = normalizeEnvVars(claudeFromRaw.env);
-		const resolvedCodexArgs = sanitizeArgs(codexFromRaw.args);
-		const resolvedCodexEnv = normalizeEnvVars(codexFromRaw.env);
-		const resolvedGeminiArgs = sanitizeArgs(geminiFromRaw.args);
-		const resolvedGeminiEnv = normalizeEnvVars(geminiFromRaw.env);
-		const customAgents = Array.isArray(rawSettings.customAgents)
+		// Normalize custom agents
+		const customAgents = Array.isArray(raw.customAgents)
 			? ensureUniqueCustomAgentIds(
-					rawSettings.customAgents.map((agent: unknown) => {
-						const agentObj =
-							typeof agent === "object" && agent !== null
-								? (agent as Record<string, unknown>)
-								: {};
-						return normalizeCustomAgent(agentObj);
-					}),
+					raw.customAgents.map((a: unknown) =>
+						normalizeCustomAgent(obj(a) ?? {}),
+					),
 				)
 			: [];
 
+		// Migration: defaultAgentId ← activeAgentId (old name)
 		const availableAgentIds = [
-			DEFAULT_SETTINGS.claude.id,
-			DEFAULT_SETTINGS.codex.id,
-			DEFAULT_SETTINGS.gemini.id,
-			...customAgents.map((agent) => agent.id),
+			D.claude.id,
+			D.codex.id,
+			D.gemini.id,
+			...customAgents.map((a) => a.id),
 		];
-		// Migration: support both old activeAgentId and new defaultAgentId
 		const rawDefaultId =
-			typeof rawSettings.defaultAgentId === "string"
-				? rawSettings.defaultAgentId.trim()
-				: typeof rawSettings.activeAgentId === "string"
-					? rawSettings.activeAgentId.trim()
-					: "";
-		const fallbackDefaultId =
-			availableAgentIds.find((id) => id.length > 0) ||
-			DEFAULT_SETTINGS.claude.id;
+			str(raw.defaultAgentId, "") || str(raw.activeAgentId, "");
 		const defaultAgentId =
-			availableAgentIds.includes(rawDefaultId) && rawDefaultId.length > 0
+			rawDefaultId && availableAgentIds.includes(rawDefaultId)
 				? rawDefaultId
-				: fallbackDefaultId;
+				: availableAgentIds[0] || D.claude.id;
 
 		this.settings = {
 			claude: {
-				id: DEFAULT_SETTINGS.claude.id,
-				displayName:
-					typeof claudeFromRaw.displayName === "string" &&
-					claudeFromRaw.displayName.trim().length > 0
-						? claudeFromRaw.displayName.trim()
-						: DEFAULT_SETTINGS.claude.displayName,
-				apiKey:
-					typeof claudeFromRaw.apiKey === "string"
-						? claudeFromRaw.apiKey
-						: DEFAULT_SETTINGS.claude.apiKey,
+				id: D.claude.id, // Fixed — never from raw
+				displayName: str(rc.displayName, D.claude.displayName),
+				apiKey: str(rc.apiKey, D.claude.apiKey),
+				// Migration: claude.command ← claudeCodeAcpCommandPath (old name)
 				command:
-					typeof claudeFromRaw.command === "string" &&
-					claudeFromRaw.command.trim().length > 0
-						? claudeFromRaw.command.trim()
-						: typeof rawSettings.claudeCodeAcpCommandPath ===
-									"string" &&
-							  rawSettings.claudeCodeAcpCommandPath.trim()
-									.length > 0
-							? rawSettings.claudeCodeAcpCommandPath.trim()
-							: DEFAULT_SETTINGS.claude.command,
-				args: resolvedClaudeArgs.length > 0 ? resolvedClaudeArgs : [],
-				env: resolvedClaudeEnv.length > 0 ? resolvedClaudeEnv : [],
+					str(rc.command, "") ||
+					str(raw.claudeCodeAcpCommandPath, "") ||
+					D.claude.command,
+				args: sanitizeArgs(rc.args),
+				env: normalizeEnvVars(rc.env),
 			},
 			codex: {
-				id: DEFAULT_SETTINGS.codex.id,
-				displayName:
-					typeof codexFromRaw.displayName === "string" &&
-					codexFromRaw.displayName.trim().length > 0
-						? codexFromRaw.displayName.trim()
-						: DEFAULT_SETTINGS.codex.displayName,
-				apiKey:
-					typeof codexFromRaw.apiKey === "string"
-						? codexFromRaw.apiKey
-						: DEFAULT_SETTINGS.codex.apiKey,
-				command:
-					typeof codexFromRaw.command === "string" &&
-					codexFromRaw.command.trim().length > 0
-						? codexFromRaw.command.trim()
-						: DEFAULT_SETTINGS.codex.command,
-				args: resolvedCodexArgs.length > 0 ? resolvedCodexArgs : [],
-				env: resolvedCodexEnv.length > 0 ? resolvedCodexEnv : [],
+				id: D.codex.id,
+				displayName: str(rk.displayName, D.codex.displayName),
+				apiKey: str(rk.apiKey, D.codex.apiKey),
+				command: str(rk.command, "") || D.codex.command,
+				args: sanitizeArgs(rk.args),
+				env: normalizeEnvVars(rk.env),
 			},
 			gemini: {
-				id: DEFAULT_SETTINGS.gemini.id,
-				displayName:
-					typeof geminiFromRaw.displayName === "string" &&
-					geminiFromRaw.displayName.trim().length > 0
-						? geminiFromRaw.displayName.trim()
-						: DEFAULT_SETTINGS.gemini.displayName,
-				apiKey:
-					typeof geminiFromRaw.apiKey === "string"
-						? geminiFromRaw.apiKey
-						: DEFAULT_SETTINGS.gemini.apiKey,
+				id: D.gemini.id,
+				displayName: str(rg.displayName, D.gemini.displayName),
+				apiKey: str(rg.apiKey, D.gemini.apiKey),
+				// Migration: gemini.command ← geminiCommandPath (old name)
 				command:
-					typeof geminiFromRaw.command === "string" &&
-					geminiFromRaw.command.trim().length > 0
-						? geminiFromRaw.command.trim()
-						: typeof rawSettings.geminiCommandPath === "string" &&
-							  rawSettings.geminiCommandPath.trim().length > 0
-							? rawSettings.geminiCommandPath.trim()
-							: DEFAULT_SETTINGS.gemini.command,
-				args:
-					resolvedGeminiArgs.length > 0
-						? resolvedGeminiArgs
-						: DEFAULT_SETTINGS.gemini.args,
-				env: resolvedGeminiEnv.length > 0 ? resolvedGeminiEnv : [],
+					str(rg.command, "") ||
+					str(raw.geminiCommandPath, "") ||
+					D.gemini.command,
+				args: sanitizeArgs(rg.args).length > 0
+					? sanitizeArgs(rg.args)
+					: D.gemini.args,
+				env: normalizeEnvVars(rg.env),
 			},
-			customAgents: customAgents,
+			customAgents,
 			defaultAgentId,
-			autoAllowPermissions:
-				typeof rawSettings.autoAllowPermissions === "boolean"
-					? rawSettings.autoAllowPermissions
-					: DEFAULT_SETTINGS.autoAllowPermissions,
-			autoMentionActiveNote:
-				typeof rawSettings.autoMentionActiveNote === "boolean"
-					? rawSettings.autoMentionActiveNote
-					: DEFAULT_SETTINGS.autoMentionActiveNote,
-			debugMode:
-				typeof rawSettings.debugMode === "boolean"
-					? rawSettings.debugMode
-					: DEFAULT_SETTINGS.debugMode,
-			nodePath:
-				typeof rawSettings.nodePath === "string" &&
-				rawSettings.nodePath.trim().length > 0
-					? rawSettings.nodePath.trim()
-					: DEFAULT_SETTINGS.nodePath,
-			exportSettings: (() => {
-				const rawExport = rawSettings.exportSettings as
-					| Record<string, unknown>
-					| null
-					| undefined;
-				if (rawExport && typeof rawExport === "object") {
-					return {
-						defaultFolder:
-							typeof rawExport.defaultFolder === "string"
-								? rawExport.defaultFolder
-								: DEFAULT_SETTINGS.exportSettings.defaultFolder,
-						filenameTemplate:
-							typeof rawExport.filenameTemplate === "string"
-								? rawExport.filenameTemplate
-								: DEFAULT_SETTINGS.exportSettings
-										.filenameTemplate,
-						autoExportOnNewChat:
-							typeof rawExport.autoExportOnNewChat === "boolean"
-								? rawExport.autoExportOnNewChat
-								: DEFAULT_SETTINGS.exportSettings
-										.autoExportOnNewChat,
-						autoExportOnCloseChat:
-							typeof rawExport.autoExportOnCloseChat === "boolean"
-								? rawExport.autoExportOnCloseChat
-								: DEFAULT_SETTINGS.exportSettings
-										.autoExportOnCloseChat,
-						openFileAfterExport:
-							typeof rawExport.openFileAfterExport === "boolean"
-								? rawExport.openFileAfterExport
-								: DEFAULT_SETTINGS.exportSettings
-										.openFileAfterExport,
-						includeImages:
-							typeof rawExport.includeImages === "boolean"
-								? rawExport.includeImages
-								: DEFAULT_SETTINGS.exportSettings.includeImages,
-						imageLocation:
-							rawExport.imageLocation === "obsidian" ||
-							rawExport.imageLocation === "custom" ||
-							rawExport.imageLocation === "base64"
-								? rawExport.imageLocation
-								: DEFAULT_SETTINGS.exportSettings.imageLocation,
-						imageCustomFolder:
-							typeof rawExport.imageCustomFolder === "string"
-								? rawExport.imageCustomFolder
-								: DEFAULT_SETTINGS.exportSettings
-										.imageCustomFolder,
-						frontmatterTag:
-							typeof rawExport.frontmatterTag === "string"
-								? rawExport.frontmatterTag
-								: DEFAULT_SETTINGS.exportSettings
-										.frontmatterTag,
-					};
-				}
-				return DEFAULT_SETTINGS.exportSettings;
-			})(),
-			windowsWslMode:
-				typeof rawSettings.windowsWslMode === "boolean"
-					? rawSettings.windowsWslMode
-					: DEFAULT_SETTINGS.windowsWslMode,
-			windowsWslDistribution:
-				typeof rawSettings.windowsWslDistribution === "string"
-					? rawSettings.windowsWslDistribution
-					: DEFAULT_SETTINGS.windowsWslDistribution,
-			sendMessageShortcut:
-				rawSettings.sendMessageShortcut === "enter" ||
-				rawSettings.sendMessageShortcut === "cmd-enter"
-					? rawSettings.sendMessageShortcut
-					: DEFAULT_SETTINGS.sendMessageShortcut,
-			chatViewLocation:
-				rawSettings.chatViewLocation === "right-tab" ||
-				rawSettings.chatViewLocation === "right-split" ||
-				rawSettings.chatViewLocation === "editor-tab" ||
-				rawSettings.chatViewLocation === "editor-split"
-					? rawSettings.chatViewLocation
-					: DEFAULT_SETTINGS.chatViewLocation,
-			displaySettings: (() => {
-				const rawDisplay = rawSettings.displaySettings as
-					| Record<string, unknown>
-					| null
-					| undefined;
-				if (rawDisplay && typeof rawDisplay === "object") {
-					return {
-						autoCollapseDiffs:
-							typeof rawDisplay.autoCollapseDiffs === "boolean"
-								? rawDisplay.autoCollapseDiffs
-								: DEFAULT_SETTINGS.displaySettings
-										.autoCollapseDiffs,
-						diffCollapseThreshold:
-							typeof rawDisplay.diffCollapseThreshold ===
-								"number" && rawDisplay.diffCollapseThreshold > 0
-								? rawDisplay.diffCollapseThreshold
-								: DEFAULT_SETTINGS.displaySettings
-										.diffCollapseThreshold,
-						maxNoteLength:
-							typeof rawDisplay.maxNoteLength === "number" &&
-							rawDisplay.maxNoteLength >= 1
-								? rawDisplay.maxNoteLength
-								: DEFAULT_SETTINGS.displaySettings
-										.maxNoteLength,
-						maxSelectionLength:
-							typeof rawDisplay.maxSelectionLength === "number" &&
-							rawDisplay.maxSelectionLength >= 1
-								? rawDisplay.maxSelectionLength
-								: DEFAULT_SETTINGS.displaySettings
-										.maxSelectionLength,
-						showEmojis:
-							typeof rawDisplay.showEmojis === "boolean"
-								? rawDisplay.showEmojis
-								: DEFAULT_SETTINGS.displaySettings.showEmojis,
-						fontSize: parseChatFontSize(rawDisplay.fontSize),
-					};
-				}
-				return DEFAULT_SETTINGS.displaySettings;
-			})(),
-			savedSessions: Array.isArray(rawSettings.savedSessions)
-				? (rawSettings.savedSessions as SavedSessionInfo[])
-				: DEFAULT_SETTINGS.savedSessions,
-			lastUsedModels: (() => {
-				const raw = rawSettings.lastUsedModels;
-				if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-					const result: Record<string, string> = {};
-					for (const [key, value] of Object.entries(
-						raw as Record<string, unknown>,
-					)) {
-						if (
-							typeof key === "string" &&
-							key.length > 0 &&
-							typeof value === "string" &&
-							value.length > 0
-						) {
-							result[key] = value;
-						}
-					}
-					return result;
-				}
-				return DEFAULT_SETTINGS.lastUsedModels;
-			})(),
-			lastUsedModes: (() => {
-				const raw = rawSettings.lastUsedModes;
-				if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-					const result: Record<string, string> = {};
-					for (const [key, value] of Object.entries(
-						raw as Record<string, unknown>,
-					)) {
-						if (
-							typeof key === "string" &&
-							key.length > 0 &&
-							typeof value === "string" &&
-							value.length > 0
-						) {
-							result[key] = value;
-						}
-					}
-					return result;
-				}
-				return DEFAULT_SETTINGS.lastUsedModes;
-			})(),
-			// Migration: support old showFloatingButton → new enableFloatingChat
-			enableFloatingChat:
-				typeof rawSettings.enableFloatingChat === "boolean"
-					? rawSettings.enableFloatingChat
-					: typeof rawSettings.showFloatingButton === "boolean"
-						? rawSettings.showFloatingButton
-						: DEFAULT_SETTINGS.enableFloatingChat,
-			floatingButtonImage:
-				typeof rawSettings.floatingButtonImage === "string"
-					? rawSettings.floatingButtonImage
-					: DEFAULT_SETTINGS.floatingButtonImage,
+			autoAllowPermissions: bool(raw.autoAllowPermissions, D.autoAllowPermissions),
+			autoMentionActiveNote: bool(raw.autoMentionActiveNote, D.autoMentionActiveNote),
+			debugMode: bool(raw.debugMode, D.debugMode),
+			nodePath: str(raw.nodePath, D.nodePath),
+			exportSettings: {
+				defaultFolder: str(re.defaultFolder, D.exportSettings.defaultFolder),
+				filenameTemplate: str(re.filenameTemplate, D.exportSettings.filenameTemplate),
+				autoExportOnNewChat: bool(re.autoExportOnNewChat, D.exportSettings.autoExportOnNewChat),
+				autoExportOnCloseChat: bool(re.autoExportOnCloseChat, D.exportSettings.autoExportOnCloseChat),
+				openFileAfterExport: bool(re.openFileAfterExport, D.exportSettings.openFileAfterExport),
+				includeImages: bool(re.includeImages, D.exportSettings.includeImages),
+				imageLocation: enumVal(re.imageLocation, ["obsidian", "custom", "base64"], D.exportSettings.imageLocation),
+				imageCustomFolder: str(re.imageCustomFolder, D.exportSettings.imageCustomFolder),
+				frontmatterTag: str(re.frontmatterTag, D.exportSettings.frontmatterTag),
+			},
+			windowsWslMode: bool(raw.windowsWslMode, D.windowsWslMode),
+			windowsWslDistribution: str(raw.windowsWslDistribution, D.windowsWslDistribution as string),
+			sendMessageShortcut: enumVal(raw.sendMessageShortcut, ["enter", "cmd-enter"], D.sendMessageShortcut),
+			chatViewLocation: enumVal(raw.chatViewLocation, ["right-tab", "right-split", "editor-tab", "editor-split"], D.chatViewLocation),
+			displaySettings: {
+				autoCollapseDiffs: bool(rd.autoCollapseDiffs, D.displaySettings.autoCollapseDiffs),
+				diffCollapseThreshold: num(rd.diffCollapseThreshold, D.displaySettings.diffCollapseThreshold, 1),
+				maxNoteLength: num(rd.maxNoteLength, D.displaySettings.maxNoteLength, 1),
+				maxSelectionLength: num(rd.maxSelectionLength, D.displaySettings.maxSelectionLength, 1),
+				showEmojis: bool(rd.showEmojis, D.displaySettings.showEmojis),
+				fontSize: parseChatFontSize(rd.fontSize),
+			},
+			savedSessions: Array.isArray(raw.savedSessions)
+				? (raw.savedSessions as SavedSessionInfo[])
+				: D.savedSessions,
+			lastUsedModels: strRecord(raw.lastUsedModels),
+			lastUsedModes: strRecord(raw.lastUsedModes),
+			// Migration: enableFloatingChat ← showFloatingButton (old name)
+			enableFloatingChat: bool(raw.enableFloatingChat, bool(raw.showFloatingButton, D.enableFloatingChat)),
+			floatingButtonImage: str(raw.floatingButtonImage, D.floatingButtonImage),
 			floatingWindowSize: (() => {
-				const raw = rawSettings.floatingWindowSize as
-					| { width?: number; height?: number }
-					| null
-					| undefined;
-				if (
-					raw &&
-					typeof raw === "object" &&
-					typeof raw.width === "number" &&
-					typeof raw.height === "number"
-				) {
-					return { width: raw.width, height: raw.height };
-				}
-				return DEFAULT_SETTINGS.floatingWindowSize;
+				const s = obj(raw.floatingWindowSize);
+				return s && typeof s.width === "number" && typeof s.height === "number"
+					? { width: s.width as number, height: s.height as number }
+					: D.floatingWindowSize;
 			})(),
-			floatingWindowPosition: (() => {
-				const raw = rawSettings.floatingWindowPosition as
-					| { x?: number; y?: number }
-					| null
-					| undefined;
-				if (
-					raw &&
-					typeof raw === "object" &&
-					typeof raw.x === "number" &&
-					typeof raw.y === "number"
-				) {
-					return { x: raw.x, y: raw.y };
-				}
-				return null;
-			})(),
-			floatingButtonPosition: (() => {
-				const raw = rawSettings.floatingButtonPosition as
-					| { x?: number; y?: number }
-					| null
-					| undefined;
-				if (
-					raw &&
-					typeof raw === "object" &&
-					typeof raw.x === "number" &&
-					typeof raw.y === "number"
-				) {
-					return { x: raw.x, y: raw.y };
-				}
-				return null;
-			})(),
+			floatingWindowPosition: xyPoint(raw.floatingWindowPosition),
+			floatingButtonPosition: xyPoint(raw.floatingButtonPosition),
 		};
 
 		this.ensureDefaultAgentId();
@@ -1227,9 +971,7 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	async saveSettingsAndNotify(nextSettings: AgentClientPluginSettings) {
-		this.settings = nextSettings;
-		await this.saveData(this.settings);
-		this.settingsService.set(this.settings);
+		await this.settingsService.updateSettings(nextSettings);
 	}
 
 	/**
