@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import type { NoteMetadata, IVaultAccess } from "../services/vault-service";
 import {
 	detectMention,
@@ -286,8 +286,8 @@ export function useSuggestions(
 	// Return
 	// ============================================================
 
-	return {
-		mentions: {
+	const mentions = useMemo(
+		() => ({
 			suggestions: mentionSuggestions,
 			selectedIndex: mentionSelectedIndex,
 			isOpen: mentionIsOpen,
@@ -300,8 +300,25 @@ export function useSuggestions(
 			isAutoMentionDisabled,
 			toggleAutoMention,
 			updateActiveNote,
-		},
-		commands: {
+		}),
+		[
+			mentionSuggestions,
+			mentionSelectedIndex,
+			mentionIsOpen,
+			mentionContext,
+			mentionUpdateSuggestions,
+			mentionSelectSuggestion,
+			mentionNavigate,
+			mentionClose,
+			activeNote,
+			isAutoMentionDisabled,
+			toggleAutoMention,
+			updateActiveNote,
+		],
+	);
+
+	const commands = useMemo(
+		() => ({
 			suggestions: commandSuggestions,
 			selectedIndex: commandSelectedIndex,
 			isOpen: commandIsOpen,
@@ -309,6 +326,17 @@ export function useSuggestions(
 			selectSuggestion: commandSelectSuggestion,
 			navigate: commandNavigate,
 			close: commandClose,
-		},
-	};
+		}),
+		[
+			commandSuggestions,
+			commandSelectedIndex,
+			commandIsOpen,
+			commandUpdateSuggestions,
+			commandSelectSuggestion,
+			commandNavigate,
+			commandClose,
+		],
+	);
+
+	return useMemo(() => ({ mentions, commands }), [mentions, commands]);
 }
