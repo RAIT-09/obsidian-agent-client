@@ -105,11 +105,12 @@ We use `eslint-plugin-obsidianmd` for Obsidian-specific rules and `typescript-es
 
 ### File Naming Conventions
 
-- **Ports**: `*.port.ts`
-- **Adapters**: `*.adapter.ts`
-- **Hooks**: `use*.ts`
-- **Components**: `PascalCase.tsx`
-- **Utils/Models**: `kebab-case.ts`
+- **Types**: `kebab-case.ts` in `types/`
+- **ACP**: `kebab-case.ts` in `acp/`
+- **Services**: `kebab-case.ts` in `services/`
+- **Hooks**: `use*.ts` in `hooks/`
+- **Components**: `PascalCase.tsx` in `ui/`
+- **Utilities**: `kebab-case.ts` in `utils/`
 
 ## Branch Naming
 
@@ -186,25 +187,23 @@ Please ensure these pass locally before submitting.
 
 ```
 src/
-├── domain/         # Pure domain models + ports (interfaces)
-│   ├── models/     # agent-config, chat-message, session-update, etc.
-│   └── ports/      # IAgentClient, ISettingsAccess, IVaultAccess
-├── adapters/       # Interface implementations
-│   ├── acp/        # ACP protocol implementation
-│   └── obsidian/   # Obsidian-specific implementations
-├── hooks/          # React custom hooks (state + logic)
-├── components/     # UI components
-└── shared/         # Utility functions
+├── types/          # Pure type definitions (no logic, no dependencies)
+├── acp/            # ACP protocol layer (SDK confined here)
+├── services/       # Non-React business logic + pure functions
+├── hooks/          # React custom hooks (useAgent facade + sub-hooks)
+├── ui/             # React components (ChatPanel orchestrator)
+└── utils/          # Shared utility functions
 ```
 
 ### Architecture Principles
 
-1. **Hooks for state and logic** — No ViewModel or Use Case classes
-2. **Pure functions in shared/** — Non-React business logic
-3. **Ports absorb protocol changes** — IAgentClient interface provides isolation
-4. **Domain has zero dependencies** — No `obsidian` or `@agentclientprotocol/sdk` imports
+1. **useAgent as facade** — Composes useAgentSession + useAgentMessages. Single `onSessionUpdate` subscription.
+2. **Services have zero React imports** — Pure functions and classes in `services/`
+3. **ACP isolation** — All `@agentclientprotocol/sdk` imports confined to `acp/`
+4. **Types have zero deps** — No `obsidian`, no SDK, no React in `types/`
+5. **Single event channel** — All agent events flow through `onSessionUpdate`. No special callback paths.
 
-For more details, see `CLAUDE.md`.
+For more details, see `ARCHITECTURE.md`.
 
 ## ACP Notes
 
