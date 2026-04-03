@@ -30,11 +30,15 @@ import { useSessionHistory } from "../hooks/useSessionHistory";
 // Domain model imports
 import {
 	flattenConfigSelectOptions,
+	type SlashCommand,
 	type SessionModeState,
 	type SessionModelState,
 	type SessionConfigOption,
 } from "../types/session";
 import { checkAgentUpdate } from "../services/update-checker";
+
+/** Stable empty array for useSuggestions when no commands available */
+const EMPTY_COMMANDS: SlashCommand[] = [];
 
 // Component imports
 import { ChatHeader } from "./ChatHeader";
@@ -177,7 +181,7 @@ export function ChatPanel({
 	const suggestions = useSuggestions(
 		vaultService,
 		plugin,
-		session.availableCommands || [],
+		session.availableCommands || EMPTY_COMMANDS,
 	);
 
 	// Session history hook with callback for session load
