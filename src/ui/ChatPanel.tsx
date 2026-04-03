@@ -203,7 +203,7 @@ export function ChatPanel({
 				configOptions,
 			);
 		},
-		[logger, agent],
+		[logger, agent.updateSessionFromLoad],
 	);
 
 	const sessionHistory = useSessionHistory({
