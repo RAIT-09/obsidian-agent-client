@@ -202,9 +202,7 @@ interface FloatingChatComponentProps {
 	initialExpanded?: boolean;
 	initialPosition?: { x: number; y: number };
 	onRegisterCallbacks?: (callbacks: ChatPanelCallbacks) => void;
-	onRegisterExpanded?: (
-		setExpanded: (expanded: boolean) => void,
-	) => void;
+	onRegisterExpanded?: (setExpanded: (expanded: boolean) => void) => void;
 	onExpandedChange?: (expanded: boolean) => void;
 	onContainerRef?: (el: HTMLDivElement | null) => void;
 }

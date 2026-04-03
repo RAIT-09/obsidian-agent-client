@@ -571,12 +571,7 @@ export default class AgentClientPlugin extends Plugin {
 		// instanceId is just the counter (e.g., "0", "1", "2")
 		// FloatingViewContainer will create viewId as "floating-chat-{instanceId}"
 		const instanceId = String(this.floatingChatCounter++);
-		createFloatingChat(
-			this,
-			instanceId,
-			initialExpanded,
-			initialPosition,
-		);
+		createFloatingChat(this, instanceId, initialExpanded, initialPosition);
 	}
 
 	/**
@@ -910,37 +905,98 @@ export default class AgentClientPlugin extends Plugin {
 					str(rg.command, "") ||
 					str(raw.geminiCommandPath, "") ||
 					D.gemini.command,
-				args: sanitizeArgs(rg.args).length > 0
-					? sanitizeArgs(rg.args)
-					: D.gemini.args,
+				args:
+					sanitizeArgs(rg.args).length > 0
+						? sanitizeArgs(rg.args)
+						: D.gemini.args,
 				env: normalizeEnvVars(rg.env),
 			},
 			customAgents,
 			defaultAgentId,
-			autoAllowPermissions: bool(raw.autoAllowPermissions, D.autoAllowPermissions),
-			autoMentionActiveNote: bool(raw.autoMentionActiveNote, D.autoMentionActiveNote),
+			autoAllowPermissions: bool(
+				raw.autoAllowPermissions,
+				D.autoAllowPermissions,
+			),
+			autoMentionActiveNote: bool(
+				raw.autoMentionActiveNote,
+				D.autoMentionActiveNote,
+			),
 			debugMode: bool(raw.debugMode, D.debugMode),
 			nodePath: str(raw.nodePath, D.nodePath),
 			exportSettings: {
-				defaultFolder: str(re.defaultFolder, D.exportSettings.defaultFolder),
-				filenameTemplate: str(re.filenameTemplate, D.exportSettings.filenameTemplate),
-				autoExportOnNewChat: bool(re.autoExportOnNewChat, D.exportSettings.autoExportOnNewChat),
-				autoExportOnCloseChat: bool(re.autoExportOnCloseChat, D.exportSettings.autoExportOnCloseChat),
-				openFileAfterExport: bool(re.openFileAfterExport, D.exportSettings.openFileAfterExport),
-				includeImages: bool(re.includeImages, D.exportSettings.includeImages),
-				imageLocation: enumVal(re.imageLocation, ["obsidian", "custom", "base64"], D.exportSettings.imageLocation),
-				imageCustomFolder: str(re.imageCustomFolder, D.exportSettings.imageCustomFolder),
-				frontmatterTag: str(re.frontmatterTag, D.exportSettings.frontmatterTag),
+				defaultFolder: str(
+					re.defaultFolder,
+					D.exportSettings.defaultFolder,
+				),
+				filenameTemplate: str(
+					re.filenameTemplate,
+					D.exportSettings.filenameTemplate,
+				),
+				autoExportOnNewChat: bool(
+					re.autoExportOnNewChat,
+					D.exportSettings.autoExportOnNewChat,
+				),
+				autoExportOnCloseChat: bool(
+					re.autoExportOnCloseChat,
+					D.exportSettings.autoExportOnCloseChat,
+				),
+				openFileAfterExport: bool(
+					re.openFileAfterExport,
+					D.exportSettings.openFileAfterExport,
+				),
+				includeImages: bool(
+					re.includeImages,
+					D.exportSettings.includeImages,
+				),
+				imageLocation: enumVal(
+					re.imageLocation,
+					["obsidian", "custom", "base64"],
+					D.exportSettings.imageLocation,
+				),
+				imageCustomFolder: str(
+					re.imageCustomFolder,
+					D.exportSettings.imageCustomFolder,
+				),
+				frontmatterTag: str(
+					re.frontmatterTag,
+					D.exportSettings.frontmatterTag,
+				),
 			},
 			windowsWslMode: bool(raw.windowsWslMode, D.windowsWslMode),
-			windowsWslDistribution: str(raw.windowsWslDistribution, D.windowsWslDistribution as string),
-			sendMessageShortcut: enumVal(raw.sendMessageShortcut, ["enter", "cmd-enter"], D.sendMessageShortcut),
-			chatViewLocation: enumVal(raw.chatViewLocation, ["right-tab", "right-split", "editor-tab", "editor-split"], D.chatViewLocation),
+			windowsWslDistribution: str(
+				raw.windowsWslDistribution,
+				D.windowsWslDistribution as string,
+			),
+			sendMessageShortcut: enumVal(
+				raw.sendMessageShortcut,
+				["enter", "cmd-enter"],
+				D.sendMessageShortcut,
+			),
+			chatViewLocation: enumVal(
+				raw.chatViewLocation,
+				["right-tab", "right-split", "editor-tab", "editor-split"],
+				D.chatViewLocation,
+			),
 			displaySettings: {
-				autoCollapseDiffs: bool(rd.autoCollapseDiffs, D.displaySettings.autoCollapseDiffs),
-				diffCollapseThreshold: num(rd.diffCollapseThreshold, D.displaySettings.diffCollapseThreshold, 1),
-				maxNoteLength: num(rd.maxNoteLength, D.displaySettings.maxNoteLength, 1),
-				maxSelectionLength: num(rd.maxSelectionLength, D.displaySettings.maxSelectionLength, 1),
+				autoCollapseDiffs: bool(
+					rd.autoCollapseDiffs,
+					D.displaySettings.autoCollapseDiffs,
+				),
+				diffCollapseThreshold: num(
+					rd.diffCollapseThreshold,
+					D.displaySettings.diffCollapseThreshold,
+					1,
+				),
+				maxNoteLength: num(
+					rd.maxNoteLength,
+					D.displaySettings.maxNoteLength,
+					1,
+				),
+				maxSelectionLength: num(
+					rd.maxSelectionLength,
+					D.displaySettings.maxSelectionLength,
+					1,
+				),
 				showEmojis: bool(rd.showEmojis, D.displaySettings.showEmojis),
 				fontSize: parseChatFontSize(rd.fontSize),
 			},
@@ -950,11 +1006,19 @@ export default class AgentClientPlugin extends Plugin {
 			lastUsedModels: strRecord(raw.lastUsedModels),
 			lastUsedModes: strRecord(raw.lastUsedModes),
 			// Migration: enableFloatingChat ← showFloatingButton (old name)
-			enableFloatingChat: bool(raw.enableFloatingChat, bool(raw.showFloatingButton, D.enableFloatingChat)),
-			floatingButtonImage: str(raw.floatingButtonImage, D.floatingButtonImage),
+			enableFloatingChat: bool(
+				raw.enableFloatingChat,
+				bool(raw.showFloatingButton, D.enableFloatingChat),
+			),
+			floatingButtonImage: str(
+				raw.floatingButtonImage,
+				D.floatingButtonImage,
+			),
 			floatingWindowSize: (() => {
 				const s = obj(raw.floatingWindowSize);
-				return s && typeof s.width === "number" && typeof s.height === "number"
+				return s &&
+					typeof s.width === "number" &&
+					typeof s.height === "number"
 					? { width: s.width, height: s.height }
 					: D.floatingWindowSize;
 			})(),

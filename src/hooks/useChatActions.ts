@@ -323,7 +323,14 @@ export function useChatActions(
 			new Notice("[Agent Client] Failed to restart agent");
 			logger.error("Restart error:", error);
 		}
-	}, [logger, messages, session, autoExportIfEnabled, agent.clearMessages, agent.forceRestartAgent]);
+	}, [
+		logger,
+		messages,
+		session,
+		autoExportIfEnabled,
+		agent.clearMessages,
+		agent.forceRestartAgent,
+	]);
 
 	// ============================================================
 	// Config Actions

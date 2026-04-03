@@ -207,11 +207,7 @@ export function bool(raw: unknown, fallback: boolean): boolean {
 }
 
 /** Extract a number value with optional minimum, falling back to default */
-export function num(
-	raw: unknown,
-	fallback: number,
-	min?: number,
-): number {
+export function num(raw: unknown, fallback: number, min?: number): number {
 	if (typeof raw !== "number") return fallback;
 	if (min !== undefined && raw < min) return fallback;
 	return raw;
@@ -227,9 +223,7 @@ export function enumVal<T extends string>(
 }
 
 /** Extract a plain object, or return null */
-export function obj(
-	raw: unknown,
-): Record<string, unknown> | null {
+export function obj(raw: unknown): Record<string, unknown> | null {
 	return raw && typeof raw === "object" && !Array.isArray(raw)
 		? (raw as Record<string, unknown>)
 		: null;
@@ -254,9 +248,7 @@ export function strRecord(raw: unknown): Record<string, string> {
 }
 
 /** Extract an {x, y} point, or return null if invalid */
-export function xyPoint(
-	raw: unknown,
-): { x: number; y: number } | null {
+export function xyPoint(raw: unknown): { x: number; y: number } | null {
 	const o = obj(raw);
 	if (!o || typeof o.x !== "number" || typeof o.y !== "number") return null;
 	return { x: o.x, y: o.y };

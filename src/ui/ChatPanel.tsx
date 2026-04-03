@@ -568,7 +568,13 @@ export function ChatPanel({
 				`[ChatPanel] Session messages saved: ${session.sessionId}`,
 			);
 		}
-	}, [isSending, session.sessionId, messages, sessionHistory.saveSessionMessages, logger]);
+	}, [
+		isSending,
+		session.sessionId,
+		messages,
+		sessionHistory.saveSessionMessages,
+		logger,
+	]);
 
 	// ============================================================
 	// Effects - Auto-mention Active Note Tracking
