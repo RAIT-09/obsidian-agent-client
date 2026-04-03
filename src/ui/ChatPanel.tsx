@@ -593,6 +593,20 @@ export function ChatPanel({
 	// Effects - Workspace Events (Hotkeys)
 	// ============================================================
 
+	// Refs for workspace event handlers (avoids re-registering on every render)
+	const handleNewChatWithPersistRef = useRef(handleNewChatWithPersist);
+	const handleNewChatRef = useRef(handleNewChat);
+	const approveActivePermissionRef = useRef(agent.approveActivePermission);
+	const rejectActivePermissionRef = useRef(agent.rejectActivePermission);
+	const handleStopGenerationRef = useRef(handleStopGeneration);
+	const handleExportChatRef = useRef(handleExportChat);
+	handleNewChatWithPersistRef.current = handleNewChatWithPersist;
+	handleNewChatRef.current = handleNewChat;
+	approveActivePermissionRef.current = agent.approveActivePermission;
+	rejectActivePermissionRef.current = agent.rejectActivePermission;
+	handleStopGenerationRef.current = handleStopGeneration;
+	handleExportChatRef.current = handleExportChat;
+
 	useEffect(() => {
 		const workspace = plugin.app.workspace;
 		const ws = workspace as unknown as {
@@ -621,9 +635,9 @@ export function ChatPanel({
 					return;
 				}
 				if (variant === "sidebar") {
-					void handleNewChatWithPersist(agentId);
+					void handleNewChatWithPersistRef.current(agentId);
 				} else {
-					void handleNewChat(agentId);
+					void handleNewChatRef.current(agentId);
 				}
 			}),
 
@@ -633,7 +647,8 @@ export function ChatPanel({
 				(targetViewId?: string) => {
 					if (targetViewId && targetViewId !== viewId) return;
 					void (async () => {
-						const success = await agent.approveActivePermission();
+						const success =
+							await approveActivePermissionRef.current();
 						if (!success) {
 							new Notice(
 								"[Agent Client] No active permission request",
@@ -649,7 +664,8 @@ export function ChatPanel({
 				(targetViewId?: string) => {
 					if (targetViewId && targetViewId !== viewId) return;
 					void (async () => {
-						const success = await agent.rejectActivePermission();
+						const success =
+							await rejectActivePermissionRef.current();
 						if (!success) {
 							new Notice(
 								"[Agent Client] No active permission request",
@@ -662,13 +678,13 @@ export function ChatPanel({
 			// Cancel current message
 			ws.on("agent-client:cancel-message", (targetViewId?: string) => {
 				if (targetViewId && targetViewId !== viewId) return;
-				void handleStopGeneration();
+				void handleStopGenerationRef.current();
 			}),
 
 			// Export chat
 			ws.on("agent-client:export-chat", (targetViewId?: string) => {
 				if (targetViewId && targetViewId !== viewId) return;
-				void handleExportChat();
+				void handleExportChatRef.current();
 			}),
 		];
 
@@ -679,16 +695,10 @@ export function ChatPanel({
 		};
 	}, [
 		plugin.app.workspace,
+		plugin.lastActiveChatViewId,
 		viewId,
 		variant,
-		plugin.lastActiveChatViewId,
 		suggestions.mentions.toggleAutoMention,
-		handleNewChatWithPersist,
-		handleNewChat,
-		agent.approveActivePermission,
-		agent.rejectActivePermission,
-		handleStopGeneration,
-		handleExportChat,
 	]);
 
 	// ============================================================
@@ -725,14 +735,12 @@ export function ChatPanel({
 	const isSendingRef = useRef(isSending);
 	const sessionHistoryLoadingRef = useRef(sessionHistory.loading);
 	const handleSendMessageRef = useRef(handleSendMessage);
-	const handleStopGenerationRef = useRef(handleStopGeneration);
 	inputValueRef.current = inputValue;
 	attachedFilesRef.current = attachedFiles;
 	isSessionReadyRef.current = isSessionReady;
 	isSendingRef.current = isSending;
 	sessionHistoryLoadingRef.current = sessionHistory.loading;
 	handleSendMessageRef.current = handleSendMessage;
-	handleStopGenerationRef.current = handleStopGeneration;
 
 	useEffect(() => {
 		onRegisterCallbacks?.({
