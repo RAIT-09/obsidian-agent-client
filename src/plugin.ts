@@ -571,7 +571,7 @@ export default class AgentClientPlugin extends Plugin {
 		// instanceId is just the counter (e.g., "0", "1", "2")
 		// FloatingViewContainer will create viewId as "floating-chat-{instanceId}"
 		const instanceId = String(this.floatingChatCounter++);
-		const container = createFloatingChat(
+		createFloatingChat(
 			this,
 			instanceId,
 			initialExpanded,
@@ -955,7 +955,7 @@ export default class AgentClientPlugin extends Plugin {
 			floatingWindowSize: (() => {
 				const s = obj(raw.floatingWindowSize);
 				return s && typeof s.width === "number" && typeof s.height === "number"
-					? { width: s.width as number, height: s.height as number }
+					? { width: s.width, height: s.height }
 					: D.floatingWindowSize;
 			})(),
 			floatingWindowPosition: xyPoint(raw.floatingWindowPosition),

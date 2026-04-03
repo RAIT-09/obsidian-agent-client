@@ -259,5 +259,5 @@ export function xyPoint(
 ): { x: number; y: number } | null {
 	const o = obj(raw);
 	if (!o || typeof o.x !== "number" || typeof o.y !== "number") return null;
-	return { x: o.x as number, y: o.y as number };
+	return { x: o.x, y: o.y };
 }
