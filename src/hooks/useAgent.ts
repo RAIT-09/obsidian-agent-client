@@ -62,7 +62,7 @@ export interface UseAgentReturn {
 		modes?: SessionModeState,
 		models?: SessionModelState,
 		configOptions?: SessionConfigOption[],
-	) => void;
+	) => Promise<void>;
 
 	// Config
 	setMode: (modeId: string) => Promise<void>;

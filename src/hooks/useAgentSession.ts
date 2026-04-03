@@ -53,7 +53,7 @@ export interface UseAgentSessionReturn {
 		modes?: SessionModeState,
 		models?: SessionModelState,
 		configOptions?: SessionConfigOption[],
-	) => void;
+	) => Promise<void>;
 
 	// Config
 	setMode: (modeId: string) => Promise<void>;
@@ -332,7 +332,7 @@ export function useAgentSession(
 	}, [settingsAccess]);
 
 	const updateSessionFromLoad = useCallback(
-		(
+		async (
 			sessionId: string,
 			modes?: SessionModeState,
 			models?: SessionModelState,
@@ -347,8 +347,45 @@ export function useAgentSession(
 				configOptions: configOptions ?? prev.configOptions,
 				lastActivityAt: new Date(),
 			}));
+
+			// Restore last used config (model/mode) — same logic as createSession
+			const s = sessionRef.current;
+			const settings = settingsAccess.getSnapshot();
+			const agentId = s.agentId;
+
+			if (configOptions && sessionId) {
+				let restored = configOptions;
+				restored = await tryRestoreConfigOption(
+					agentClient,
+					sessionId,
+					restored,
+					"model",
+					settings.lastUsedModels[agentId],
+				);
+				restored = await tryRestoreConfigOption(
+					agentClient,
+					sessionId,
+					restored,
+					"mode",
+					settings.lastUsedModes[agentId],
+				);
+				if (restored !== configOptions) {
+					setSession((prev) => ({
+						...prev,
+						configOptions: restored,
+					}));
+				}
+			} else if (sessionId && modes) {
+				await restoreLegacyConfig(
+					agentClient,
+					{ sessionId, modes, models, configOptions: undefined },
+					settings.lastUsedModels[agentId],
+					settings.lastUsedModes[agentId],
+					setSession,
+				);
+			}
 		},
-		[],
+		[agentClient, settingsAccess],
 	);
 
 	// ============================================================

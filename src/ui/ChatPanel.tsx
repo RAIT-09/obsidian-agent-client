@@ -200,7 +200,7 @@ export function ChatPanel({
 					configOptions,
 				},
 			);
-			agent.updateSessionFromLoad(
+			void agent.updateSessionFromLoad(
 				sessionId,
 				modes,
 				models,
