@@ -64,6 +64,7 @@ export function MessageList({
 }: MessageListProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
+	const prevIsSendingRef = useRef(false);
 
 	// ============================================================
 	// Virtualizer
@@ -101,9 +102,33 @@ export function MessageList({
 		}
 	}, [messages.length]);
 
+	// Track when user just sent a message (for smooth scroll)
+	const scrollSmoothRef = useRef(false);
+	useEffect(() => {
+		if (isSending && !prevIsSendingRef.current) {
+			// User just sent a message — next scroll should be smooth
+			scrollSmoothRef.current = true;
+		}
+		prevIsSendingRef.current = isSending;
+	}, [isSending]);
+
 	// Auto-scroll to bottom when new messages arrive or content changes
 	useEffect(() => {
-		if (isAtBottom && messages.length > 0) {
+		if (messages.length === 0) return;
+
+		if (scrollSmoothRef.current) {
+			// User sent a message — smooth scroll regardless of isAtBottom
+			scrollSmoothRef.current = false;
+			requestAnimationFrame(() => {
+				virtualizer.scrollToIndex(messages.length - 1, {
+					align: "end",
+					behavior: "smooth",
+				});
+			});
+			return;
+		}
+
+		if (isAtBottom) {
 			// Use requestAnimationFrame to ensure virtualizer has measured
 			requestAnimationFrame(() => {
 				virtualizer.scrollToIndex(messages.length - 1, {
