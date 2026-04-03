@@ -13,7 +13,6 @@ import type {
 } from "../types/session";
 import { flattenConfigSelectOptions } from "../types/session";
 import type { AcpClient } from "../acp/acp-client";
-import * as React from "react";
 
 // ============================================================================
 // Legacy Config Helpers
@@ -83,7 +82,7 @@ export async function restoreLegacyConfig(
 	sessionResult: SessionResult,
 	savedModelId: string | undefined,
 	savedModeId: string | undefined,
-	setSession: React.Dispatch<React.SetStateAction<ChatSession>>,
+	setSession: (updater: (prev: ChatSession) => ChatSession) => void,
 ): Promise<void> {
 	if (!sessionResult.sessionId) return;
 
