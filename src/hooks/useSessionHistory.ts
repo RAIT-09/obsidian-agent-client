@@ -741,33 +741,53 @@ export function useSessionHistory(
 		[session.agentId, settingsAccess],
 	);
 
-	return {
-		sessions,
-		loading,
-		error,
-		hasMore: nextCursor !== undefined,
+	return useMemo(
+		() => ({
+			sessions,
+			loading,
+			error,
+			hasMore: nextCursor !== undefined,
 
-		// Capability flags
-		// Show session history UI if any session capability is available
-		canShowSessionHistory:
-			capabilities.canList ||
-			capabilities.canLoad ||
-			capabilities.canResume ||
+			// Capability flags
+			canShowSessionHistory:
+				capabilities.canList ||
+				capabilities.canLoad ||
+				capabilities.canResume ||
+				capabilities.canFork,
+			canRestore: capabilities.canLoad || capabilities.canResume,
+			canFork: capabilities.canFork,
+			canList: capabilities.canList,
+			isUsingLocalSessions: !capabilities.canList,
+			localSessionIds,
+
+			// Methods
+			fetchSessions,
+			loadMoreSessions,
+			restoreSession,
+			forkSession,
+			deleteSession,
+			saveSessionLocally,
+			saveSessionMessages,
+			invalidateCache,
+		}),
+		[
+			sessions,
+			loading,
+			error,
+			nextCursor,
+			capabilities.canList,
+			capabilities.canLoad,
+			capabilities.canResume,
 			capabilities.canFork,
-		canRestore: capabilities.canLoad || capabilities.canResume,
-		canFork: capabilities.canFork,
-		canList: capabilities.canList,
-		isUsingLocalSessions: !capabilities.canList,
-		localSessionIds,
-
-		// Methods
-		fetchSessions,
-		loadMoreSessions,
-		restoreSession,
-		forkSession,
-		deleteSession,
-		saveSessionLocally,
-		saveSessionMessages,
-		invalidateCache,
-	};
+			localSessionIds,
+			fetchSessions,
+			loadMoreSessions,
+			restoreSession,
+			forkSession,
+			deleteSession,
+			saveSessionLocally,
+			saveSessionMessages,
+			invalidateCache,
+		],
+	);
 }

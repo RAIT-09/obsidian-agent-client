@@ -44,7 +44,7 @@ export function useHistoryModal(
 				logger.error("Session restore error:", error);
 			}
 		},
-		[logger, agent, sessionHistory],
+		[logger, agent.clearMessages, sessionHistory.restoreSession],
 	);
 
 	const handleForkSession = useCallback(
@@ -59,7 +59,7 @@ export function useHistoryModal(
 				logger.error("Session fork error:", error);
 			}
 		},
-		[logger, agent, sessionHistory],
+		[logger, agent.clearMessages, sessionHistory.forkSession],
 	);
 
 	const handleDeleteSession = useCallback(
@@ -73,18 +73,18 @@ export function useHistoryModal(
 				logger.error("Session delete error:", error);
 			}
 		},
-		[sessionHistory, logger],
+		[sessionHistory.deleteSession, logger],
 	);
 
 	const handleLoadMore = useCallback(() => {
 		void sessionHistory.loadMoreSessions();
-	}, [sessionHistory]);
+	}, [sessionHistory.loadMoreSessions]);
 
 	const handleFetchSessions = useCallback(
 		(cwd?: string) => {
 			void sessionHistory.fetchSessions(cwd);
 		},
-		[sessionHistory],
+		[sessionHistory.fetchSessions],
 	);
 
 	const handleOpenHistory = useCallback(() => {
@@ -114,7 +114,16 @@ export function useHistoryModal(
 		void sessionHistory.fetchSessions(vaultPath);
 	}, [
 		plugin.app,
-		sessionHistory,
+		sessionHistory.sessions,
+		sessionHistory.loading,
+		sessionHistory.error,
+		sessionHistory.hasMore,
+		sessionHistory.canList,
+		sessionHistory.canRestore,
+		sessionHistory.canFork,
+		sessionHistory.isUsingLocalSessions,
+		sessionHistory.localSessionIds,
+		sessionHistory.fetchSessions,
 		vaultPath,
 		isSessionReady,
 		debugMode,
