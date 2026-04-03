@@ -1106,9 +1106,11 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		new Setting(blockEl)
 			.setName("Path")
-			.setDesc("Absolute path to the custom agent.")
+			.setDesc(
+				"Command name or path to the custom agent. Use just the command name to let the login shell resolve it, or enter an absolute path.",
+			)
 			.addText((text) => {
-				text.setPlaceholder("Absolute path to custom agent")
+				text.setPlaceholder("Command name or path")
 					.setValue(agent.command)
 					.onChange(async (value) => {
 						this.plugin.settings.customAgents[index].command =
