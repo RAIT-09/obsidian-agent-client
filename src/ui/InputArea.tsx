@@ -884,13 +884,6 @@ export function InputArea({
 			const newValue = e.target.value;
 			const cursorPosition = e.target.selectionStart || 0;
 
-			logger.log(
-				"[DEBUG] Input changed:",
-				newValue,
-				"cursor:",
-				cursorPosition,
-			);
-
 			onInputChange(newValue);
 
 			// Hide hint overlay when user modifies the input

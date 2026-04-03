@@ -19,28 +19,23 @@ export function detectMention(
 	cursorPosition: number,
 ): MentionContext | null {
 	const logger = getLogger();
-	logger.log("[DEBUG] detectMention called with:", { text, cursorPosition });
 
 	if (cursorPosition < 0 || cursorPosition > text.length) {
-		logger.log("[DEBUG] Invalid cursor position");
+		logger.log("[detectMention] Invalid cursor position:", cursorPosition);
 		return null;
 	}
 
 	// Get text up to cursor position
 	const textUpToCursor = text.slice(0, cursorPosition);
-	logger.log("[DEBUG] Text up to cursor:", textUpToCursor);
 
 	// Find the last @ symbol
 	const atIndex = textUpToCursor.lastIndexOf("@");
-	logger.log("[DEBUG] @ index found:", atIndex);
 	if (atIndex === -1) {
-		logger.log("[DEBUG] No @ symbol found");
 		return null;
 	}
 
 	// Get the token after @
 	const afterAt = textUpToCursor.slice(atIndex + 1);
-	logger.log("[DEBUG] Text after @:", afterAt);
 
 	// Trigger on @ and allow typing query directly
 	let query = "";
@@ -58,9 +53,6 @@ export function detectMention(
 			const closingBracketsPos = atIndex + 1 + closingBrackets + 1; // +1 for second ]
 			if (cursorPosition > closingBracketsPos) {
 				// Cursor is after ]], no longer a mention
-				logger.log(
-					"[DEBUG] Cursor is after closing ]], stopping mention detection",
-				);
 				return null;
 			}
 			// Complete bracket format
@@ -75,7 +67,6 @@ export function detectMention(
 			afterAt.includes("\t") ||
 			afterAt.includes("\n")
 		) {
-			logger.log("[DEBUG] Mention ended by whitespace (simple format)");
 			return null;
 		}
 		query = afterAt;
@@ -87,7 +78,7 @@ export function detectMention(
 		end: endPos,
 		query: query,
 	};
-	logger.log("[DEBUG] Mention context created:", mentionContext);
+	logger.log("[detectMention] Mention context:", mentionContext);
 	return mentionContext;
 }
 
