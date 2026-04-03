@@ -6,7 +6,7 @@
  */
 
 import * as React from "react";
-const { useState, useCallback } = React;
+const { useState, useCallback, useRef } = React;
 
 import type {
 	ChatSession,
@@ -96,6 +96,10 @@ export function useAgentSession(
 	);
 
 	const isReady = session.state === "ready";
+
+	// Ref for accessing latest session in callbacks without deps
+	const sessionRef = useRef(session);
+	sessionRef.current = session;
 
 	// ============================================================
 	// Session Update Handler (session-level only)
@@ -284,9 +288,10 @@ export function useAgentSession(
 	);
 
 	const closeSession = useCallback(async () => {
-		if (session.sessionId) {
+		const s = sessionRef.current;
+		if (s.sessionId) {
 			try {
-				await agentClient.cancel(session.sessionId);
+				await agentClient.cancel(s.sessionId);
 			} catch (error) {
 				console.warn("Failed to cancel session:", error);
 			}
@@ -301,24 +306,25 @@ export function useAgentSession(
 			sessionId: null,
 			state: "disconnected",
 		}));
-	}, [agentClient, session.sessionId]);
+	}, [agentClient]);
 
 	const forceRestartAgent = useCallback(async () => {
-		const currentAgentId = session.agentId;
+		const currentAgentId = sessionRef.current.agentId;
 		await agentClient.disconnect();
 		await createSession(currentAgentId);
-	}, [agentClient, session.agentId, createSession]);
+	}, [agentClient, createSession]);
 
 	const cancelOperation = useCallback(async () => {
-		if (!session.sessionId) return;
+		const s = sessionRef.current;
+		if (!s.sessionId) return;
 		try {
-			await agentClient.cancel(session.sessionId);
+			await agentClient.cancel(s.sessionId);
 			setSession((prev) => ({ ...prev, state: "ready" }));
 		} catch (error) {
 			console.warn("Failed to cancel operation:", error);
 			setSession((prev) => ({ ...prev, state: "ready" }));
 		}
-	}, [agentClient, session.sessionId]);
+	}, [agentClient]);
 
 	const getAvailableAgents = useCallback(() => {
 		const settings = settingsAccess.getSnapshot();
@@ -351,33 +357,34 @@ export function useAgentSession(
 
 	const setLegacyConfigValue = useCallback(
 		async (kind: "mode" | "model", value: string) => {
-			if (!session.sessionId) {
+			const s = sessionRef.current;
+			if (!s.sessionId) {
 				console.warn(`Cannot set ${kind}: no active session`);
 				return;
 			}
 
 			const previousValue =
 				kind === "mode"
-					? session.modes?.currentModeId
-					: session.models?.currentModelId;
+					? s.modes?.currentModeId
+					: s.models?.currentModelId;
 
 			setSession((prev) => applyLegacyValue(prev, kind, value));
 
 			try {
 				if (kind === "mode") {
-					await agentClient.setSessionMode(session.sessionId, value);
+					await agentClient.setSessionMode(s.sessionId, value);
 				} else {
-					await agentClient.setSessionModel(session.sessionId, value);
+					await agentClient.setSessionModel(s.sessionId, value);
 				}
 
-				if (session.agentId) {
+				if (s.agentId) {
 					const persistKey =
 						kind === "mode" ? "lastUsedModes" : "lastUsedModels";
 					const currentSettings = settingsAccess.getSnapshot();
 					void settingsAccess.updateSettings({
 						[persistKey]: {
 							...currentSettings[persistKey],
-							[session.agentId]: value,
+							[s.agentId]: value,
 						},
 					});
 				}
@@ -390,14 +397,7 @@ export function useAgentSession(
 				}
 			}
 		},
-		[
-			agentClient,
-			session.sessionId,
-			session.modes?.currentModeId,
-			session.models?.currentModelId,
-			settingsAccess,
-			session.agentId,
-		],
+		[agentClient, settingsAccess],
 	);
 
 	const setMode = useCallback(
@@ -412,12 +412,13 @@ export function useAgentSession(
 
 	const setConfigOption = useCallback(
 		async (configId: string, value: string) => {
-			if (!session.sessionId) {
+			const s = sessionRef.current;
+			if (!s.sessionId) {
 				console.warn("Cannot set config option: no active session");
 				return;
 			}
 
-			const previousConfigOptions = session.configOptions;
+			const previousConfigOptions = s.configOptions;
 
 			setSession((prev) => {
 				if (!prev.configOptions) return prev;
@@ -433,7 +434,7 @@ export function useAgentSession(
 
 			try {
 				const updatedOptions = await agentClient.setSessionConfigOption(
-					session.sessionId,
+					s.sessionId,
 					configId,
 					value,
 				);
@@ -445,21 +446,21 @@ export function useAgentSession(
 				const changedOption = updatedOptions.find(
 					(o) => o.id === configId,
 				);
-				if (changedOption?.category === "model" && session.agentId) {
+				if (changedOption?.category === "model" && s.agentId) {
 					const currentSettings = settingsAccess.getSnapshot();
 					void settingsAccess.updateSettings({
 						lastUsedModels: {
 							...currentSettings.lastUsedModels,
-							[session.agentId]: value,
+							[s.agentId]: value,
 						},
 					});
 				}
-				if (changedOption?.category === "mode" && session.agentId) {
+				if (changedOption?.category === "mode" && s.agentId) {
 					const currentSettings = settingsAccess.getSnapshot();
 					void settingsAccess.updateSettings({
 						lastUsedModes: {
 							...currentSettings.lastUsedModes,
-							[session.agentId]: value,
+							[s.agentId]: value,
 						},
 					});
 				}
@@ -473,13 +474,7 @@ export function useAgentSession(
 				}
 			}
 		},
-		[
-			agentClient,
-			session.sessionId,
-			session.configOptions,
-			settingsAccess,
-			session.agentId,
-		],
+		[agentClient, settingsAccess],
 	);
 
 	// ============================================================
