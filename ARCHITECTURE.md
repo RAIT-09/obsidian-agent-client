@@ -2,62 +2,67 @@
 
 ## Overview
 
-Obsidian plugin for AI agent interaction via ACP. `ChatPanel` component composes React hooks and renders children directly. Services are injected via React Context. ACP protocol details are isolated in the `acp/` layer.
+Obsidian plugin for AI agent interaction via ACP. `useAgent` facade hook composes sub-hooks (`useAgentSession` + `useAgentMessages`) and subscribes to a single `onSessionUpdate` channel. `ChatPanel` orchestrates hooks and renders children directly. Services are injected via React Context. ACP protocol details are isolated in the `acp/` layer.
 
 ## Directory Structure
 
 ```
 src/
-├── types/                          # Type Definitions (no logic)
-│   ├── chat.ts                     # ChatMessage, MessageContent, PromptContent, AttachedFile
-│   ├── session.ts                  # ChatSession, SessionUpdate, SessionInfo, Capabilities
+├── types/                          # Type Definitions (no logic, no dependencies)
+│   ├── chat.ts                     # ChatMessage, MessageContent, PromptContent, AttachedFile, ActivePermission
+│   ├── session.ts                  # ChatSession, SessionUpdate (12-type union), SessionInfo, Capabilities
 │   ├── agent.ts                    # AgentConfig, agent settings (Claude/Gemini/Codex/Custom)
 │   └── errors.ts                   # AcpError, ProcessError, ErrorInfo
 │
 ├── acp/                            # ACP Protocol Layer (SDK dependency confined here)
 │   ├── acp-client.ts               # Process lifecycle, UI-facing API (AcpClient class)
-│   ├── acp-handler.ts              # SDK event handler (AcpHandler — sessionUpdate, permissions, terminals)
+│   ├── acp-handler.ts              # SDK event handler + sessionId filter + listener broadcast
 │   ├── type-converter.ts           # ACP SDK types ↔ internal types
 │   ├── permission-handler.ts       # Permission queue, auto-approve, Promise resolution
 │   └── terminal-handler.ts         # Terminal process create/output/kill
 │
-├── services/                       # Business Logic (non-React)
+├── services/                       # Business Logic (non-React, no React imports)
 │   ├── vault-service.ts            # Vault access + fuzzy search + CM6 selection tracking
-│   ├── settings-service.ts         # Settings persistence, session storage, normalization
+│   ├── settings-service.ts         # Reactive settings store (observer pattern only)
+│   ├── session-storage.ts          # Session metadata + message file I/O (sessions/*.json)
+│   ├── settings-normalizer.ts      # Settings validation helpers (str, bool, num, enumVal, etc.)
 │   ├── session-helpers.ts          # Agent config building, API key injection (pure functions)
+│   ├── session-state.ts            # Session state updates (legacy mode/model, config restore)
+│   ├── message-state.ts            # Message array transforms (upsert, merge, streaming apply)
 │   ├── message-sender.ts           # Prompt preparation + sending (pure functions)
 │   ├── chat-exporter.ts            # Markdown export with frontmatter
 │   ├── view-registry.ts            # Multi-view management, focus, broadcast
 │   └── update-checker.ts           # Agent/plugin version checking
 │
 ├── hooks/                          # React Custom Hooks (state + logic)
-│   ├── useSession.ts               # Session lifecycle, create/close/restart, config options
-│   ├── useMessages.ts              # Message state, send/receive, streaming updates
-│   ├── usePermission.ts            # Permission request handling
-│   ├── useMentions.ts              # @[[note]] suggestions + auto-mention active note
-│   ├── useSlashCommands.ts         # /command suggestions
-│   ├── useSessionHistory.ts        # Session list/load/resume/fork
+│   ├── useAgent.ts                 # Facade: composes useAgentSession + useAgentMessages
+│   ├── useAgentSession.ts          # Session lifecycle, config options, optimistic updates
+│   ├── useAgentMessages.ts         # Message state, streaming (RAF batch), permissions
+│   ├── useSuggestions.ts           # @[[note]] mentions + /command suggestions (unified)
+│   ├── useSessionHistory.ts        # Session list/load/resume/fork, 5-min cache
+│   ├── useChatActions.ts           # Business callbacks (send, newChat, export, restart, etc.)
+│   ├── useHistoryModal.ts          # Session history modal lifecycle
 │   └── useSettings.ts              # Settings subscription (useSyncExternalStore)
 │
 ├── ui/                             # React Components
-│   ├── ChatContext.ts              # React Context (plugin, acpClient, vaultService)
-│   ├── ChatPanel.tsx               # Hook aggregation + rendering (replaces useChatController)
+│   ├── ChatContext.ts              # React Context (plugin, acpClient, vaultService, settingsService)
+│   ├── ChatPanel.tsx               # Orchestrator: calls hooks, workspace events, rendering
 │   ├── ChatView.tsx                # Sidebar view (ItemView + Context Provider)
 │   ├── FloatingChatView.tsx        # Floating window (position/drag/resize + Context Provider)
 │   ├── FloatingButton.tsx          # Draggable launch button
 │   ├── ChatHeader.tsx              # Header (sidebar + floating variants)
-│   ├── MessageList.tsx             # Message list with auto-scroll
-│   ├── MessageBubble.tsx           # Single message (content type dispatch)
-│   ├── ToolCallBlock.tsx           # Tool call display + diff
+│   ├── MessageList.tsx             # Virtualized message list (@tanstack/react-virtual)
+│   ├── MessageBubble.tsx           # Single message (content dispatch, copy button)
+│   ├── ToolCallBlock.tsx           # Tool call display + diff (word-level highlighting)
 │   ├── TerminalBlock.tsx           # Terminal output polling
 │   ├── InputArea.tsx               # Textarea, attachments, mentions, history
-│   ├── InputToolbar.tsx            # Mode/model selectors, usage, send button
+│   ├── InputToolbar.tsx            # Config/mode/model selectors, usage, send button
 │   ├── SuggestionPopup.tsx         # Mention/command dropdown
 │   ├── PermissionBanner.tsx        # Permission request buttons
 │   ├── ErrorBanner.tsx             # Error/notification overlay
 │   ├── SessionHistoryModal.tsx     # Session history modal (list + confirm delete)
 │   ├── SettingsTab.ts              # Plugin settings UI
-│   ├── types.ts                    # IChatViewHost interface
+│   ├── view-host.ts                # IChatViewHost interface
 │   └── shared/
 │       ├── IconButton.tsx           # Icon button + Lucide icon wrapper
 │       ├── MarkdownRenderer.tsx     # Obsidian markdown rendering
@@ -82,8 +87,8 @@ src/
 
 | File | Contents |
 |------|----------|
-| `chat.ts` | ChatMessage, MessageContent (9-type union), Role, ToolCallStatus, ToolKind, AttachedFile, PromptContent |
-| `session.ts` | ChatSession, SessionState, SessionUpdate (11-type union), SessionConfigOption, Capabilities, SessionInfo |
+| `chat.ts` | ChatMessage, MessageContent (8+ type union), Role, ToolCallStatus, ToolKind, AttachedFile, ActivePermission, PromptContent |
+| `session.ts` | ChatSession, SessionState, SessionUpdate (12-type union incl. ProcessErrorUpdate), SessionConfigOption, Capabilities, SessionInfo |
 | `agent.ts` | AgentEnvVar, BaseAgentSettings, ClaudeAgentSettings, GeminiAgentSettings, CodexAgentSettings |
 | `errors.ts` | AcpErrorCode, AcpError, ProcessError, ErrorInfo |
 
@@ -95,26 +100,30 @@ src/
 
 | File | Purpose |
 |------|---------|
-| `acp-client.ts` | UI-facing API: process spawn/kill, JSON-RPC communication, session management. Owns AcpHandler + managers. |
-| `acp-handler.ts` | SDK-facing: receives sessionUpdate, requestPermission, terminal ops from ClientSideConnection. |
+| `acp-client.ts` | UI-facing API: process spawn/kill, JSON-RPC communication, session management. Owns AcpHandler + managers. Single exit point: `onSessionUpdate` (multiple listeners via Set). |
+| `acp-handler.ts` | SDK-facing: receives sessionUpdate, requestPermission, terminal ops. Filters by `currentSessionId`. Broadcasts to all listeners. |
 | `type-converter.ts` | Converts ACP SDK types to internal types (change buffer for protocol updates) |
-| `permission-handler.ts` | Permission request queue, auto-approve, Promise-based resolution |
+| `permission-handler.ts` | Permission request queue, auto-approve, Promise-based resolution. All UI updates via `onSessionUpdate` (no separate callback path). |
 | `terminal-handler.ts` | Terminal process create/output/kill, stdout/stderr buffering |
 
-**Key design**: When the ACP protocol changes, only files in this directory need updating.
+**Key design**: All agent events (messages, session updates, permissions, errors) flow through a single `onSessionUpdate` channel. No special paths.
 
 ---
 
 ### 3. Services Layer (`src/services/`)
 
-**Purpose**: Non-React business logic. Classes and pure functions.
+**Purpose**: Non-React business logic. Classes and pure functions. **No React imports.**
 
 | File | Purpose |
 |------|---------|
-| `vault-service.ts` | `VaultService` class — vault note access, fuzzy search, CM6 selection tracking. Exports `IVaultAccess`, `NoteMetadata`, `EditorPosition`. |
-| `settings-service.ts` | `SettingsService` class — settings persistence (data.json), session storage (sessions/*.json), observer pattern. Exports `ISettingsAccess`. |
+| `vault-service.ts` | `VaultService` class — vault note access, fuzzy search, CM6 selection tracking. Exports `IVaultAccess`, `NoteMetadata`. |
+| `settings-service.ts` | `SettingsService` class — reactive settings store (observer pattern). Delegates session storage to `SessionStorage`. Exports `ISettingsAccess`. |
+| `session-storage.ts` | `SessionStorage` class — session metadata CRUD (in plugin settings) + message file I/O (sessions/*.json). |
+| `settings-normalizer.ts` | Pure functions — settings validation helpers (`str`, `bool`, `num`, `enumVal`, `obj`, `strRecord`, `xyPoint`), `toAgentConfig`, `parseChatFontSize`. |
 | `session-helpers.ts` | Pure functions — agent config building, API key injection, agent settings resolution |
-| `message-sender.ts` | Pure functions — prompt preparation (mention expansion, context building), sending with auth retry |
+| `session-state.ts` | Pure functions — legacy mode/model application, config option restoration |
+| `message-state.ts` | Pure functions — message array transforms (streaming apply, tool call upsert with O(1) index, permission scanning) |
+| `message-sender.ts` | Pure functions — prompt preparation (embedded context vs XML text, shared helpers), sending with auth retry |
 | `chat-exporter.ts` | `ChatExporter` class — markdown export with frontmatter, image handling |
 | `view-registry.ts` | `ChatViewRegistry` class — multi-view focus tracking, broadcast commands. Exports `IChatViewContainer`. |
 | `update-checker.ts` | Agent version checking via npm registry |
@@ -123,16 +132,17 @@ src/
 
 ### 4. Hooks Layer (`src/hooks/`)
 
-**Purpose**: React state management. Each hook owns a specific domain of state.
+**Purpose**: React state management. Hook composition via useAgent facade.
 
 | Hook | Responsibility |
 |------|---------------|
-| `useSession` | Session lifecycle (create/close/restart), mode/model/configOption, optimistic updates |
-| `useMessages` | Message state, streaming updates (agent_message_chunk, tool_call, etc.), send/receive |
-| `usePermission` | Permission request detection, approve/reject |
-| `useMentions` | @[[note]] dropdown + auto-mention active note tracking (merged) |
-| `useSlashCommands` | /command dropdown filtering and selection |
-| `useSessionHistory` | Session list/load/resume/fork, local session storage, 5-min cache |
+| `useAgent` | Facade: composes useAgentSession + useAgentMessages. Single `onSessionUpdate` subscription. Return is `useMemo`-wrapped. |
+| `useAgentSession` | Session lifecycle (create/close/restart), mode/model/configOption with optimistic updates. Uses `sessionRef` pattern. |
+| `useAgentMessages` | Message state, RAF-batched streaming, permissions (activePermission derivation, approve/reject) |
+| `useSuggestions` | @[[note]] mentions + /command suggestions (unified). Return is `useMemo`-wrapped. |
+| `useSessionHistory` | Session list/load/resume/fork, local session storage, 5-min cache. Return is `useMemo`-wrapped. |
+| `useChatActions` | Business callbacks (send, newChat, export, restart, config changes). Individual method deps for stability. |
+| `useHistoryModal` | Session history modal lifecycle (lazy creation, props sync) |
 | `useSettings` | Settings subscription via useSyncExternalStore |
 
 **Dependency Rule**: Hooks import from `types/`, `acp/`, `services/`, `utils/`. Never from `ui/`.
@@ -156,9 +166,9 @@ interface ChatContextValue {
 ```
 
 **ChatPanel** is the central orchestrator:
-- Calls all hooks (useSession, useMessages, usePermission, useMentions, useSlashCommands, useSessionHistory, useSettings)
-- Manages session update routing (ACP → hooks)
-- Handles workspace events, message persistence, cleanup
+- Calls hooks: useAgent, useSuggestions, useSessionHistory, useChatActions, useHistoryModal, useSettings
+- Does NOT route session updates (useAgent handles that internally)
+- Handles workspace events via ref pattern (stable event registration)
 - Renders ChatHeader, MessageList, InputArea directly
 
 **ChatView** (sidebar) and **FloatingChatView** (floating window) are thin wrappers:
@@ -174,17 +184,17 @@ ChatView / FloatingChatView
   └── ChatContextProvider
         └── ChatPanel (variant="sidebar" | "floating")
               ├── ChatHeader (variant-based rendering)
-              ├── MessageList
-              │     └── MessageBubble (per message)
-              │           ├── ToolCallBlock → PermissionBanner
-              │           ├── TerminalBlock
+              ├── MessageList (virtualized via @tanstack/react-virtual)
+              │     └── MessageBubble (per message, React.memo)
+              │           ├── ToolCallBlock (React.memo) → PermissionBanner
+              │           ├── TerminalBlock (React.memo)
               │           └── MarkdownRenderer
               ├── InputArea
               │     ├── SuggestionPopup (mentions / commands)
               │     ├── ErrorBanner
               │     ├── AttachmentStrip
-              │     └── InputToolbar (mode/model/usage/send)
-              └── SessionHistoryModal (imperative, via ref)
+              │     └── InputToolbar (config/mode/model/usage/send)
+              └── SessionHistoryModal (imperative, via useHistoryModal)
 ```
 
 ---
@@ -217,15 +227,20 @@ ChatView / FloatingChatView
                               ↓ calls hooks
 ┌─────────────────────────────┴───────────────────────────────┐
 │                       Hooks Layer                            │
-│  useSession, useMessages, usePermission, useMentions,        │
-│  useSlashCommands, useSessionHistory, useSettings            │
+│  useAgent (facade) → useAgentSession + useAgentMessages      │
+│  useSuggestions, useSessionHistory, useChatActions,           │
+│  useHistoryModal, useSettings                                │
 └───────────┬─────────────────────────────┬───────────────────┘
             ↓ calls                       ↓ reads types
 ┌───────────┴───────────┐   ┌─────────────┴───────────────────┐
 │   Services Layer      │   │        Types Layer               │
 │   VaultService        │   │   chat.ts, session.ts,           │
 │   SettingsService     │   │   agent.ts, errors.ts            │
-│   session-helpers     │   └─────────────────────────────────┘
+│   SessionStorage      │   └─────────────────────────────────┘
+│   settings-normalizer │
+│   session-helpers      │
+│   session-state       │
+│   message-state       │
 │   message-sender      │
 │   chat-exporter       │
 │   view-registry       │
@@ -247,33 +262,44 @@ ChatView / FloatingChatView
 
 ## Design Patterns
 
-### 1. ChatPanel Pattern (Component-as-Orchestrator)
-- Central component calls all hooks and renders children directly
-- Replaces the "god hook" pattern (useChatController)
-- No massive return object — props flow directly to JSX
+### 1. useAgent Facade Pattern
+- `useAgent` composes `useAgentSession` + `useAgentMessages`
+- Single `onSessionUpdate` subscription, dispatches to both sub-hooks
+- ChatPanel calls useAgent, not sub-hooks directly
+- Return is `useMemo`-wrapped for referential stability
 
 ### 2. React Context for Services
 - `ChatContext` provides plugin, acpClient, vaultService, settingsService
 - Value is stable (service instances don't change)
 - Eliminates prop drilling for shared dependencies
 
-### 3. Custom Hooks for State
-- Each hook owns a specific state domain
-- Composable and independently testable
-- No inter-hook dependencies (communication via ChatPanel)
+### 3. Single Event Channel
+- All agent events flow through `onSessionUpdate` (messages, session updates, permissions, errors)
+- No special callback paths (onUpdateMessage, onError removed)
+- AcpHandler filters by `currentSessionId` before broadcasting
 
 ### 4. ACP Isolation
 - All `@agentclientprotocol/sdk` imports confined to `acp/`
 - `AcpClient` (UI-facing) and `AcpHandler` (SDK-facing) separate concerns
 - `type-converter.ts` is the change buffer for protocol updates
 
-### 5. Observer Pattern
+### 5. Performance Patterns
+- **useMemo for return stability**: useAgent, useSuggestions, useSessionHistory wrap returns in useMemo
+- **sessionRef pattern**: useAgentSession stores session in useRef, reads in callbacks without adding to deps
+- **Individual method deps**: useChatActions uses `agent.sendMessage` not `agent` object in deps
+- **Workspace event refs**: ChatPanel stores handler callbacks in refs, keeping useEffect deps minimal
+- **RAF batching**: useAgentMessages batches streaming updates per animation frame
+- **React.memo**: MessageBubble, ToolCallBlock, TerminalBlock for skip-render optimization
+- **Virtual scroll**: MessageList uses @tanstack/react-virtual
+- **O(1) tool call index**: Map<string, number> for tool call upsert
+
+### 6. Observer Pattern
 - `SettingsService` notifies subscribers on change
 - React components use `useSyncExternalStore`
 
-### 6. Ref Pattern for Callbacks
+### 7. Ref Pattern for Callbacks
 - IChatViewContainer callbacks use refs for latest values
-- Prevents stale closures in broadcast command handlers
+- Workspace event handlers use refs to avoid re-registration
 - Unmount cleanup uses refs to access latest state
 
 ---
@@ -281,22 +307,22 @@ ChatView / FloatingChatView
 ## Key Benefits
 
 ### 1. Flat and Readable
-- 4 layers (types → acp/services → hooks → ui) instead of 5
+- 4 layers (types → acp/services → hooks → ui)
 - No port/adapter indirection
-- File names reflect functionality (MessageBubble, ToolCallBlock, ErrorBanner)
+- File names reflect functionality
 
 ### 2. ACP Change Resistance
 - Only `acp/` directory needs changes for protocol updates
 - `type-converter.ts` localizes type mapping changes
 
 ### 3. Easy Feature Addition
-- New hook: create in `hooks/`, call in `ChatPanel`, pass to child
-- New message type: add to `types/session.ts`, handle in `useMessages`, render in `MessageBubble`
+- New hook: create in `hooks/`, call in `ChatPanel`, wrap return in `useMemo`
+- New message type: add to `types/session.ts`, handle in `useAgentMessages` or `message-state.ts`, render in `MessageBubble`
 - New agent: add settings in `plugin.ts`, configure in `SettingsTab`
 
 ### 4. Maintainability
-- ~20,400 lines across 50 files
-- Services testable without React
+- ~19,800 lines across 56 files
+- Services testable without React (zero React imports)
 - Clear dependency direction (no circular dependencies)
 
 ---
@@ -321,13 +347,15 @@ ChatView / FloatingChatView
 2. Define state with useState/useReducer
 3. Call the hook in `ui/ChatPanel.tsx`
 4. Pass state/callbacks to child components as props
+5. Wrap return object in `useMemo` if passed as dependency to other hooks
 
 ### Adding a New Session Update Type
 1. Add interface to `types/session.ts`, add to `SessionUpdate` union
 2. Handle in `acp/acp-handler.ts` `sessionUpdate()` switch
 3. Convert from ACP type in `acp/type-converter.ts` if needed
-4. Handle in `hooks/useMessages.ts` `handleSessionUpdate()` (for message-level) or `hooks/useSession.ts` (for session-level)
-5. Render in `ui/MessageBubble.tsx` if needed
+4. Handle in `hooks/useAgentSession.ts` `handleSessionUpdate()` (for session-level)
+5. Or handle via `applySingleUpdate()` in `services/message-state.ts` (for message-level)
+6. No routing needed in ChatPanel — useAgent handles dispatch internally
 
 ### Adding a New Agent Type
 1. Add settings type to `types/agent.ts`
@@ -348,3 +376,15 @@ Refactored from Port/Adapter Architecture to simplified layered architecture:
 - **Merged**: VaultAdapter + MentionService → VaultService, useMentions + useAutoMention → useMentions
 - **Removed**: useChatController (god hook → ChatPanel component), Port files (no implementation swapping planned)
 - **Result**: 76 → 50 files, 5 → 4 layers, flat directory structure
+
+### April 2026: Simplification & Performance Refactoring
+
+Refactored data flow, hooks, services, and performance:
+
+- **ACP wiring**: 3 exit points (onSessionUpdate, onError, setUpdateMessageCallback) → 1 (onSessionUpdate only). Multiple listeners via Set. SessionId filter in AcpHandler.
+- **Hook consolidation**: 7 hooks → 4 public hooks. useSession + useMessages + usePermission → useAgent (facade) + useAgentSession + useAgentMessages. useMentions + useSlashCommands → useSuggestions. New: useChatActions, useHistoryModal.
+- **ChatPanel slimmed**: 1,483 → 936 lines. Session update routing removed (moved to useAgent). Business callbacks extracted to useChatActions. History modal extracted to useHistoryModal. Workspace events stabilized with refs.
+- **Services split**: settings-service.ts (722 lines) → settings-service (285) + session-storage (267) + settings-normalizer (264). Pure functions extracted: message-state.ts, session-state.ts.
+- **plugin.ts cleaned**: loadSettings compressed with helper functions (370 → 120 lines). Legacy floatingChatInstances removed. Double-save fixed.
+- **Performance**: useMemo on hook returns (useAgent, useSuggestions, useSessionHistory). sessionRef pattern in useAgentSession. Individual method deps in useChatActions. Workspace event handler refs in ChatPanel.
+- **Result**: 50 → 56 files, ~19,800 lines. Single event channel. All hooks stabilized.
