@@ -48,11 +48,12 @@ export class ChangeDirectoryModal extends Modal {
 		const browseButton = inputRow.createEl("button", {
 			text: "Browse...",
 		});
-		browseButton.addEventListener("click", async () => {
-			const selectedPath = await this.openFolderPicker();
-			if (selectedPath) {
-				inputEl.value = selectedPath;
-			}
+		browseButton.addEventListener("click", () => {
+			void this.openFolderPicker().then((selectedPath) => {
+				if (selectedPath) {
+					inputEl.value = selectedPath;
+				}
+			});
 		});
 
 		// Focus and select all text

@@ -273,7 +273,6 @@ export function useSessionHistory(
 		agentClient,
 		session,
 		settingsAccess,
-		cwd,
 		agentCwd,
 		onSessionLoad,
 		onMessagesRestore,
