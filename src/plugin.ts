@@ -75,6 +75,8 @@ export interface AgentClientPluginSettings {
 	defaultAgentId: string;
 	autoAllowPermissions: boolean;
 	autoMentionActiveNote: boolean;
+	/** Show OS system notifications on response completion and permission requests */
+	enableSystemNotifications: boolean;
 	debugMode: boolean;
 	nodePath: string;
 	exportSettings: {
@@ -147,6 +149,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	defaultAgentId: "claude-code-acp",
 	autoAllowPermissions: false,
 	autoMentionActiveNote: true,
+	enableSystemNotifications: true,
 	debugMode: false,
 	nodePath: "",
 	exportSettings: {
@@ -897,6 +900,10 @@ export default class AgentClientPlugin extends Plugin {
 			autoMentionActiveNote: bool(
 				raw.autoMentionActiveNote,
 				D.autoMentionActiveNote,
+			),
+			enableSystemNotifications: bool(
+				raw.enableSystemNotifications,
+				D.enableSystemNotifications,
 			),
 			debugMode: bool(raw.debugMode, D.debugMode),
 			nodePath: str(raw.nodePath, D.nodePath),

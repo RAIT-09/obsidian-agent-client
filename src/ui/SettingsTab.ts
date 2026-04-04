@@ -426,6 +426,26 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		// ─────────────────────────────────────────────────────────────────────
+		// Notifications
+		// ─────────────────────────────────────────────────────────────────────
+
+		new Setting(containerEl).setName("Notifications").setHeading();
+
+		new Setting(containerEl)
+			.setName("System notifications")
+			.setDesc(
+				"Show OS notifications when the agent completes a response or requests permission. Notifications are suppressed while Obsidian is focused.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableSystemNotifications)
+					.onChange(async (value) => {
+						this.plugin.settings.enableSystemNotifications = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		// ─────────────────────────────────────────────────────────────────────
 		// Windows WSL Settings (Windows only)
 		// ─────────────────────────────────────────────────────────────────────
 

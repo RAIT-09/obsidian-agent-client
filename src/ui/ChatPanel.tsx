@@ -637,13 +637,48 @@ export function ChatPanel({
 			logger.log(
 				`[ChatPanel] Session messages saved: ${session.sessionId}`,
 			);
+
+			// System notification on response completion
+			if (settings.enableSystemNotifications && !document.hasFocus()) {
+				new Notification("Agent Client", {
+					body: `${activeAgentLabel} has completed the response.`,
+				});
+			}
 		}
 	}, [
 		isSending,
 		session.sessionId,
 		messages,
 		sessionHistory.saveSessionMessages,
+		settings.enableSystemNotifications,
+		activeAgentLabel,
 		logger,
+	]);
+
+	// ============================================================
+	// Effects - System Notification on Permission Request
+	// ============================================================
+	const prevHasActivePermissionRef = useRef<boolean>(false);
+
+	useEffect(() => {
+		const wasActive = prevHasActivePermissionRef.current;
+		prevHasActivePermissionRef.current = agent.hasActivePermission;
+
+		// Notify when permission transitions from inactive to active
+		if (
+			!wasActive &&
+			agent.hasActivePermission &&
+			settings.enableSystemNotifications &&
+			!document.hasFocus()
+		) {
+			new Notification("Agent Client", {
+				body: `${activeAgentLabel} is requesting permission.`,
+			});
+		}
+	}, [
+		agent.hasActivePermission,
+		settings.enableSystemNotifications,
+		activeAgentLabel,
 	]);
 
 	// ============================================================
