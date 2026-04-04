@@ -724,9 +724,7 @@ export function useSessionHistory(
 			// Optimistic update
 			setSessions((prev) =>
 				prev.map((s) =>
-					s.sessionId === sessionId
-						? { ...s, title: newTitle }
-						: s,
+					s.sessionId === sessionId ? { ...s, title: newTitle } : s,
 				),
 			);
 

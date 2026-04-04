@@ -46,7 +46,12 @@ export function useHistoryModal(
 				logger.error("Session restore error:", error);
 			}
 		},
-		[logger, agent.clearMessages, sessionHistory.restoreSession, onAgentCwdChange],
+		[
+			logger,
+			agent.clearMessages,
+			sessionHistory.restoreSession,
+			onAgentCwdChange,
+		],
 	);
 
 	const handleForkSession = useCallback(
@@ -62,7 +67,12 @@ export function useHistoryModal(
 				logger.error("Session fork error:", error);
 			}
 		},
-		[logger, agent.clearMessages, sessionHistory.forkSession, onAgentCwdChange],
+		[
+			logger,
+			agent.clearMessages,
+			sessionHistory.forkSession,
+			onAgentCwdChange,
+		],
 	);
 
 	const handleDeleteSession = useCallback(

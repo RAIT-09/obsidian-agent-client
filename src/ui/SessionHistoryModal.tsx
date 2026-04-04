@@ -562,13 +562,9 @@ function SessionHistoryContent({
 			const currentTitle = targetSession?.title ?? "Untitled Session";
 			const sessionCwd = targetSession?.cwd ?? currentCwd;
 
-			const modal = new EditTitleModal(
-				app,
-				currentTitle,
-				(newTitle) => {
-					void onEditTitle(sessionId, newTitle, sessionCwd);
-				},
-			);
+			const modal = new EditTitleModal(app, currentTitle, (newTitle) => {
+				void onEditTitle(sessionId, newTitle, sessionCwd);
+			});
 			modal.open();
 		},
 		[app, sessions, currentCwd, onEditTitle],
