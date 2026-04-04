@@ -76,6 +76,23 @@ export function useHistoryModal(
 		[sessionHistory.deleteSession, logger],
 	);
 
+	const handleEditTitle = useCallback(
+		async (sessionId: string, newTitle: string, sessionCwd: string) => {
+			try {
+				await sessionHistory.updateSessionTitle(
+					sessionId,
+					newTitle,
+					sessionCwd,
+				);
+				new Notice("[Agent Client] Title updated");
+			} catch (error) {
+				new Notice("[Agent Client] Failed to update title");
+				logger.error("Title update error:", error);
+			}
+		},
+		[sessionHistory.updateSessionTitle, logger],
+	);
+
 	const handleLoadMore = useCallback(() => {
 		void sessionHistory.loadMoreSessions();
 	}, [sessionHistory.loadMoreSessions]);
@@ -106,6 +123,7 @@ export function useHistoryModal(
 				onRestoreSession: handleRestoreSession,
 				onForkSession: handleForkSession,
 				onDeleteSession: handleDeleteSession,
+				onEditTitle: handleEditTitle,
 				onLoadMore: handleLoadMore,
 				onFetchSessions: handleFetchSessions,
 			});
@@ -130,6 +148,7 @@ export function useHistoryModal(
 		handleRestoreSession,
 		handleForkSession,
 		handleDeleteSession,
+		handleEditTitle,
 		handleLoadMore,
 		handleFetchSessions,
 	]);
@@ -153,6 +172,7 @@ export function useHistoryModal(
 				onRestoreSession: handleRestoreSession,
 				onForkSession: handleForkSession,
 				onDeleteSession: handleDeleteSession,
+				onEditTitle: handleEditTitle,
 				onLoadMore: handleLoadMore,
 				onFetchSessions: handleFetchSessions,
 			});
@@ -172,6 +192,7 @@ export function useHistoryModal(
 		handleRestoreSession,
 		handleForkSession,
 		handleDeleteSession,
+		handleEditTitle,
 		handleLoadMore,
 		handleFetchSessions,
 	]);

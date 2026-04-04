@@ -1772,6 +1772,10 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-accent);
 }
 
+.agent-client-session-history-edit-icon:hover {
+	color: var(--text-accent);
+}
+
 .agent-client-session-history-loading,
 .agent-client-session-history-empty,
 .agent-client-session-history-error {
@@ -1927,6 +1931,18 @@ If your plugin does not need CSS, delete this file.
 }
 
 .agent-client-confirm-delete-buttons {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+/* Edit title modal */
+.agent-client-edit-title-input {
+	width: 100%;
+	margin-bottom: 16px;
+}
+
+.agent-client-edit-title-buttons {
 	display: flex;
 	justify-content: flex-end;
 	gap: 8px;

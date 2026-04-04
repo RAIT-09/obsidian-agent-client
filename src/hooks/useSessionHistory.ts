@@ -164,6 +164,18 @@ export interface UseSessionHistoryReturn {
 	deleteSession: (sessionId: string) => Promise<void>;
 
 	/**
+	 * Update the title of a saved session.
+	 * @param sessionId - Session to update
+	 * @param newTitle - New title string
+	 * @param sessionCwd - Original cwd of the session (used when creating a new local entry)
+	 */
+	updateSessionTitle: (
+		sessionId: string,
+		newTitle: string,
+		sessionCwd: string,
+	) => Promise<void>;
+
+	/**
 	 * Save session metadata locally.
 	 * Called when the first message is sent in a new session.
 	 * @param sessionId - Session ID to save
@@ -695,6 +707,67 @@ export function useSessionHistory(
 	);
 
 	/**
+	 * Update the title of a saved session.
+	 * Updates both local state and persistent storage.
+	 */
+	const updateSessionTitle = useCallback(
+		async (sessionId: string, newTitle: string, sessionCwd: string) => {
+			// Read current title for potential rollback
+			const savedSessions = settingsAccess.getSavedSessions();
+			const existing = savedSessions.find(
+				(s) => s.sessionId === sessionId,
+			);
+			const previousTitle = existing?.title;
+
+			// Optimistic update
+			setSessions((prev) =>
+				prev.map((s) =>
+					s.sessionId === sessionId
+						? { ...s, title: newTitle }
+						: s,
+				),
+			);
+
+			try {
+				if (existing) {
+					await settingsAccess.saveSession({
+						...existing,
+						title: newTitle,
+						updatedAt: new Date().toISOString(),
+					});
+				} else {
+					// Session exists only on agent side — create local entry
+					// Use sessionCwd (from SessionInfo) instead of hook's cwd
+					await settingsAccess.saveSession({
+						sessionId,
+						agentId: session.agentId,
+						cwd: sessionCwd,
+						title: newTitle,
+						createdAt: new Date().toISOString(),
+						updatedAt: new Date().toISOString(),
+					});
+				}
+
+				invalidateCache();
+			} catch (err) {
+				// Rollback optimistic update
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.sessionId === sessionId
+							? { ...s, title: previousTitle }
+							: s,
+					),
+				);
+				const errorMessage =
+					err instanceof Error ? err.message : String(err);
+				setError(`Failed to update title: ${errorMessage}`);
+				throw err;
+			}
+		},
+		[settingsAccess, session.agentId, invalidateCache],
+	);
+
+	/**
 	 * Save session metadata locally.
 	 * Called when the first message is sent in a new session.
 	 */
@@ -766,6 +839,7 @@ export function useSessionHistory(
 			restoreSession,
 			forkSession,
 			deleteSession,
+			updateSessionTitle,
 			saveSessionLocally,
 			saveSessionMessages,
 			invalidateCache,
@@ -785,6 +859,7 @@ export function useSessionHistory(
 			restoreSession,
 			forkSession,
 			deleteSession,
+			updateSessionTitle,
 			saveSessionLocally,
 			saveSessionMessages,
 			invalidateCache,

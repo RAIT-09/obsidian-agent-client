@@ -85,6 +85,91 @@ class ConfirmDeleteModal extends Modal {
 }
 
 // ============================================================
+// EditTitleModal (internal)
+// ============================================================
+
+/**
+ * Modal for editing a session title.
+ *
+ * Displays a text input pre-filled with the current title.
+ * Calls onSave callback with the new title when user clicks Save.
+ */
+class EditTitleModal extends Modal {
+	private currentTitle: string;
+	private onSave: (newTitle: string) => void | Promise<void>;
+
+	constructor(
+		app: App,
+		currentTitle: string,
+		onSave: (newTitle: string) => void | Promise<void>,
+	) {
+		super(app);
+		this.currentTitle = currentTitle;
+		this.onSave = onSave;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		contentEl.createEl("h2", { text: "Edit session title" });
+
+		const inputEl = contentEl.createEl("input", {
+			type: "text",
+			cls: "agent-client-edit-title-input",
+			attr: { maxlength: "100" },
+		});
+		// createEl sets HTML attribute; explicit assignment sets DOM property (displayed value)
+		inputEl.value = this.currentTitle;
+
+		// Focus and select all text for easy replacement
+		setTimeout(() => {
+			inputEl.focus();
+			inputEl.select();
+		}, 10);
+
+		// Enter key to save
+		inputEl.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") {
+				e.preventDefault();
+				this.saveAndClose(inputEl.value);
+			}
+		});
+
+		const buttonContainer = contentEl.createDiv({
+			cls: "agent-client-edit-title-buttons",
+		});
+
+		buttonContainer
+			.createEl("button", { text: "Cancel" })
+			.addEventListener("click", () => {
+				this.close();
+			});
+
+		buttonContainer
+			.createEl("button", {
+				text: "Save",
+				cls: "mod-cta",
+			})
+			.addEventListener("click", () => {
+				this.saveAndClose(inputEl.value);
+			});
+	}
+
+	private saveAndClose(rawValue: string) {
+		const value = rawValue.trim();
+		if (!value) return;
+		this.close();
+		void this.onSave(value);
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
+// ============================================================
 // SessionHistoryContent (internal)
 // ============================================================
 
@@ -131,6 +216,12 @@ interface SessionHistoryContentProps {
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
 	/** Callback when a session is deleted */
 	onDeleteSession: (sessionId: string) => void | Promise<void>;
+	/** Callback when a session title is edited */
+	onEditTitle: (
+		sessionId: string,
+		newTitle: string,
+		sessionCwd: string,
+	) => void | Promise<void>;
 	/** Callback to load more sessions (pagination) */
 	onLoadMore: () => void;
 	/** Callback to fetch sessions with filter */
@@ -302,6 +393,7 @@ function SessionItem({
 	onRestoreSession,
 	onForkSession,
 	onDeleteSession,
+	onEditTitle,
 	onClose,
 }: {
 	session: SessionInfo;
@@ -311,6 +403,7 @@ function SessionItem({
 	onRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
 	onDeleteSession: (sessionId: string) => void | Promise<void>;
+	onEditTitle: (sessionId: string) => void;
 	onClose: () => void;
 }) {
 	const handleRestore = useCallback(() => {
@@ -326,6 +419,10 @@ function SessionItem({
 	const handleDelete = useCallback(() => {
 		void onDeleteSession(session.sessionId);
 	}, [session.sessionId, onDeleteSession]);
+
+	const handleEditTitle = useCallback(() => {
+		onEditTitle(session.sessionId);
+	}, [session.sessionId, onEditTitle]);
 
 	return (
 		<div className="agent-client-session-history-item">
@@ -353,6 +450,12 @@ function SessionItem({
 			</div>
 
 			<div className="agent-client-session-history-item-actions">
+				<IconButton
+					iconName="pencil"
+					label="Edit session title"
+					className="agent-client-session-history-action-icon agent-client-session-history-edit-icon"
+					onClick={handleEditTitle}
+				/>
 				{canRestore && (
 					<IconButton
 						iconName="play"
@@ -407,6 +510,7 @@ function SessionHistoryContent({
 	onRestoreSession,
 	onForkSession,
 	onDeleteSession,
+	onEditTitle,
 	onLoadMore,
 	onFetchSessions,
 	onClose,
@@ -447,6 +551,27 @@ function SessionHistoryContent({
 			confirmModal.open();
 		},
 		[app, sessions, onDeleteSession],
+	);
+
+	// Open edit title modal for a session
+	const handleEditWithModal = useCallback(
+		(sessionId: string) => {
+			const targetSession = sessions.find(
+				(s) => s.sessionId === sessionId,
+			);
+			const currentTitle = targetSession?.title ?? "Untitled Session";
+			const sessionCwd = targetSession?.cwd ?? currentCwd;
+
+			const modal = new EditTitleModal(
+				app,
+				currentTitle,
+				(newTitle) => {
+					void onEditTitle(sessionId, newTitle, sessionCwd);
+				},
+			);
+			modal.open();
+		},
+		[app, sessions, currentCwd, onEditTitle],
 	);
 
 	// Filter sessions based on hideNonLocalSessions setting
@@ -589,6 +714,7 @@ function SessionHistoryContent({
 									onDeleteSession={
 										handleDeleteWithConfirmation
 									}
+									onEditTitle={handleEditWithModal}
 									onClose={onClose}
 								/>
 							))}
