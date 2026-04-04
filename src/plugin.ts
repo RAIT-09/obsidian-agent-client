@@ -217,7 +217,7 @@ export default class AgentClientPlugin extends Plugin {
 
 		this.addCommand({
 			id: "open-chat-view",
-			name: "Open agent chat",
+			name: "Open chat view",
 			callback: () => {
 				void this.activateView();
 			},
@@ -256,8 +256,8 @@ export default class AgentClientPlugin extends Plugin {
 
 		// Floating chat window commands
 		this.addCommand({
-			id: "open-floating-chat",
-			name: "Open floating chat window",
+			id: "open-floating-chat-view",
+			name: "Open floating chat view",
 			checkCallback: (checking) => {
 				if (!this.settings.enableFloatingChat) return false;
 				if (checking) return true;
@@ -280,8 +280,8 @@ export default class AgentClientPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: "open-new-floating-chat",
-			name: "Open new floating chat window",
+			id: "open-new-floating-chat-view",
+			name: "Open new floating chat view",
 			checkCallback: (checking) => {
 				if (!this.settings.enableFloatingChat) return false;
 				if (checking) return true;
@@ -290,8 +290,8 @@ export default class AgentClientPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: "minimize-floating-chat",
-			name: "Minimize floating chat window",
+			id: "minimize-floating-chat-view",
+			name: "Minimize floating chat view",
 			checkCallback: (checking) => {
 				if (!this.settings.enableFloatingChat) return false;
 				const focused = this.viewRegistry.getFocused();
@@ -302,8 +302,8 @@ export default class AgentClientPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: "close-floating-chat",
-			name: "Close floating chat window",
+			id: "close-floating-chat-view",
+			name: "Close floating chat view",
 			checkCallback: (checking) => {
 				if (!this.settings.enableFloatingChat) return false;
 				const focused = this.viewRegistry.getFocused();
@@ -632,20 +632,6 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	/**
-	 * Open chat view and switch to specified agent
-	 */
-	private async openChatWithAgent(agentId: string): Promise<void> {
-		await this.activateView();
-
-		// Trigger new chat with specific agent
-		// Pass agentId so ChatComponent knows to force new session even if empty
-		this.app.workspace.trigger(
-			"agent-client:new-chat-requested" as "quit",
-			agentId,
-		);
-	}
-
-	/**
 	 * Register commands for each configured agent
 	 */
 	private registerAgentCommands(): void {
@@ -653,10 +639,14 @@ export default class AgentClientPlugin extends Plugin {
 
 		for (const agent of agents) {
 			this.addCommand({
-				id: `open-chat-with-${agent.id}`,
-				name: `New chat with ${agent.displayName}`,
-				callback: async () => {
-					await this.openChatWithAgent(agent.id);
+				id: `switch-agent-to-${agent.id}`,
+				name: `Switch agent to ${agent.displayName}`,
+				callback: () => {
+					this.app.workspace.trigger(
+						"agent-client:new-chat-requested" as "quit",
+						this.lastActiveChatViewId,
+						agent.id,
+					);
 				},
 			});
 		}
@@ -726,6 +716,7 @@ export default class AgentClientPlugin extends Plugin {
 			callback: () => {
 				this.app.workspace.trigger(
 					"agent-client:new-chat-requested" as "quit",
+					this.lastActiveChatViewId,
 				);
 			},
 		});

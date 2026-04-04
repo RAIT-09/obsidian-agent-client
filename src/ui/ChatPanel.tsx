@@ -706,20 +706,18 @@ export function ChatPanel({
 				},
 			),
 
-			// New chat requested (from "New chat with [Agent]" command)
-			ws.on("agent-client:new-chat-requested", (agentId?: string) => {
-				if (
-					plugin.lastActiveChatViewId &&
-					plugin.lastActiveChatViewId !== viewId
-				) {
-					return;
-				}
-				if (variant === "sidebar") {
-					void handleNewChatWithPersistRef.current(agentId);
-				} else {
-					void handleNewChatRef.current(agentId);
-				}
-			}),
+			// New chat requested (from "New chat" or "Switch agent to" commands)
+			ws.on(
+				"agent-client:new-chat-requested",
+				(targetViewId?: string, agentId?: string) => {
+					if (targetViewId && targetViewId !== viewId) return;
+					if (variant === "sidebar") {
+						void handleNewChatWithPersistRef.current(agentId);
+					} else {
+						void handleNewChatRef.current(agentId);
+					}
+				},
+			),
 
 			// Approve active permission
 			ws.on(
