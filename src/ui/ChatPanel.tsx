@@ -157,6 +157,11 @@ export function ChatPanel({
 		return process.cwd();
 	}, [plugin, workingDirectory]);
 
+	// Agent working directory — defaults to vault path.
+	// Separated from vaultPath so it can be changed independently in the future
+	// (e.g., "New chat in directory..." feature).
+	const agentCwd = vaultPath;
+
 	// ============================================================
 	// Custom Hooks
 	// ============================================================
@@ -166,7 +171,7 @@ export function ChatPanel({
 		acpClient,
 		plugin.settingsService,
 		vaultService,
-		vaultPath,
+		agentCwd,
 		initialAgentId,
 	);
 
