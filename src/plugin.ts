@@ -721,6 +721,16 @@ export default class AgentClientPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: "new-chat",
+			name: "New chat",
+			callback: () => {
+				this.app.workspace.trigger(
+					"agent-client:new-chat-requested" as "quit",
+				);
+			},
+		});
+
+		this.addCommand({
 			id: "cancel-current-message",
 			name: "Cancel current message",
 			callback: () => {
