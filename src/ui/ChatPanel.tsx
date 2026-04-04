@@ -354,7 +354,7 @@ export function ChatPanel({
 			// -- Actions section --
 			menu.addItem((item: MenuItem) => {
 				item.setTitle("Open new view")
-					.setIcon("plus")
+					.setIcon("copy-plus")
 					.onClick(() => {
 						void plugin.openNewChatViewWithAgent(
 							plugin.settings.defaultAgentId,
