@@ -48,7 +48,10 @@ export function MarkdownRenderer({ text, plugin }: MarkdownRendererProps) {
 				const rawHref = link.getAttribute("data-href");
 				if (rawHref) {
 					const href = decodeURIComponent(rawHref);
-					if (vaultBasePath && href.startsWith(vaultBasePath + "/")) {
+					if (
+						vaultBasePath &&
+						href.startsWith(vaultBasePath + "/")
+					) {
 						// Absolute vault path → convert to relative
 						const relativePath = href.slice(
 							vaultBasePath.length + 1,
