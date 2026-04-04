@@ -330,7 +330,7 @@ export function ChatPanel({
 		appWithSettings.setting.openTabById(plugin.manifest.id);
 	}, [plugin]);
 
-	const handleShowMenu = useCallback(
+	const handleShowSidebarMenu = useCallback(
 		(e: React.MouseEvent<HTMLDivElement>) => {
 			const menu = new Menu();
 
@@ -387,6 +387,76 @@ export function ChatPanel({
 			session.agentId,
 			handleNewChatWithPersist,
 			plugin,
+			handleRestartAgent,
+			handleOpenSettings,
+		],
+	);
+
+	const handleShowFloatingMenu = useCallback(
+		(e: React.MouseEvent<HTMLElement>) => {
+			const menu = new Menu();
+
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("New chat")
+					.setIcon("plus")
+					.onClick(() => {
+						void handleNewChat();
+					});
+			});
+
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("Session history")
+					.setIcon("history")
+					.onClick(() => {
+						void handleOpenHistory();
+					});
+			});
+
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("Export chat to Markdown")
+					.setIcon("save")
+					.onClick(() => {
+						void handleExportChat();
+					});
+			});
+
+			menu.addSeparator();
+
+			if (onOpenNewWindow) {
+				menu.addItem((item: MenuItem) => {
+					item.setTitle("Open new floating chat")
+						.setIcon("copy-plus")
+						.onClick(() => {
+							onOpenNewWindow();
+						});
+				});
+			}
+
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("Restart agent")
+					.setIcon("refresh-cw")
+					.onClick(() => {
+						void handleRestartAgent();
+					});
+			});
+
+			menu.addSeparator();
+
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("Plugin settings")
+					.setIcon("settings")
+					.onClick(() => {
+						handleOpenSettings();
+					});
+			});
+
+			menu.showAtMouseEvent(e.nativeEvent);
+		},
+		[
+			handleNewChat,
+			handleOpenHistory,
+			handleExportChat,
+			onOpenNewWindow,
 			handleRestartAgent,
 			handleOpenSettings,
 		],
@@ -828,7 +898,7 @@ export function ChatPanel({
 				hasHistoryCapability={sessionHistory.canShowSessionHistory}
 				onNewChat={() => void handleNewChatWithPersist()}
 				onExportChat={() => void handleExportChat()}
-				onShowMenu={handleShowMenu}
+				onShowMenu={handleShowSidebarMenu}
 				onOpenHistory={handleOpenHistory}
 			/>
 		) : (
@@ -838,13 +908,8 @@ export function ChatPanel({
 				availableAgents={availableAgents}
 				currentAgentId={session.agentId}
 				isUpdateAvailable={isUpdateAvailable}
-				hasMessages={messages.length > 0}
 				onAgentChange={(agentId) => void handleSwitchAgent(agentId)}
-				onNewSession={() => void handleNewChat()}
-				onOpenHistory={() => void handleOpenHistory()}
-				onExportChat={() => void handleExportChat()}
-				onRestartAgent={() => void handleRestartAgent()}
-				onOpenNewWindow={onOpenNewWindow}
+				onShowMenu={handleShowFloatingMenu}
 				onMinimize={onMinimize}
 				onClose={onClose}
 			/>

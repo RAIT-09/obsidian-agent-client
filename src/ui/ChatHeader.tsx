@@ -42,20 +42,10 @@ export interface FloatingHeaderProps {
 	currentAgentId: string;
 	/** Whether a plugin update is available */
 	isUpdateAvailable: boolean;
-	/** Whether there are messages to export */
-	hasMessages: boolean;
 	/** Callback to switch agent */
 	onAgentChange: (agentId: string) => void;
-	/** Callback to create a new chat session */
-	onNewSession: () => void;
-	/** Callback to open session history */
-	onOpenHistory: () => void;
-	/** Callback to export the chat */
-	onExportChat: () => void;
-	/** Callback to restart agent */
-	onRestartAgent: () => void;
-	/** Callback to open new window (floating only) */
-	onOpenNewWindow?: () => void;
+	/** Callback to show the More menu at the click position */
+	onShowMenu: (e: React.MouseEvent<HTMLElement>) => void;
 	/** Callback to minimize window (floating only) */
 	onMinimize?: () => void;
 	/** Callback to close and terminate window (floating only) */
@@ -177,13 +167,8 @@ function FloatingHeader({
 	availableAgents,
 	currentAgentId,
 	isUpdateAvailable,
-	hasMessages,
 	onAgentChange,
-	onNewSession,
-	onOpenHistory,
-	onExportChat,
-	onRestartAgent,
-	onOpenNewWindow,
+	onShowMenu,
 	onMinimize,
 	onClose,
 }: FloatingHeaderProps) {
@@ -274,32 +259,10 @@ function FloatingHeader({
 			)}
 			<div className="agent-client-inline-header-actions">
 				<HeaderButton
-					iconName="plus"
-					tooltip="New session"
-					onClick={onNewSession}
+					iconName="more-vertical"
+					tooltip="More"
+					onClick={onShowMenu}
 				/>
-				<HeaderButton
-					iconName="history"
-					tooltip="Session history"
-					onClick={onOpenHistory}
-				/>
-				<HeaderButton
-					iconName="save"
-					tooltip="Export chat to Markdown"
-					onClick={onExportChat}
-				/>
-				{/* <HeaderButton
-					iconName="rotate-cw"
-					tooltip="Restart agent"
-					onClick={onRestartAgent}
-				/> */}
-				{onOpenNewWindow && (
-					<HeaderButton
-						iconName="copy-plus"
-						tooltip="Open new floating chat"
-						onClick={onOpenNewWindow}
-					/>
-				)}
 				{onMinimize && (
 					<HeaderButton
 						iconName="minimize-2"
