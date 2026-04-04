@@ -87,8 +87,10 @@ export interface UseSessionHistoryOptions {
 	session: ChatSession;
 	/** Settings access for local session storage */
 	settingsAccess: ISettingsAccess;
-	/** Working directory (vault path) for session operations */
+	/** Vault root path — used for session list filtering */
 	cwd: string;
+	/** Agent working directory — used for saving new session metadata */
+	agentCwd: string;
 	/** Callback invoked when a session is loaded/resumed/forked */
 	onSessionLoad: SessionLoadCallback;
 	/** Callback invoked when messages should be restored from local storage */
@@ -272,6 +274,7 @@ export function useSessionHistory(
 		session,
 		settingsAccess,
 		cwd,
+		agentCwd,
 		onSessionLoad,
 		onMessagesRestore,
 		onIgnoreUpdates,
@@ -783,13 +786,13 @@ export function useSessionHistory(
 			await settingsAccess.saveSession({
 				sessionId,
 				agentId: session.agentId,
-				cwd,
+				cwd: agentCwd,
 				title,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			});
 		},
-		[session.agentId, cwd, settingsAccess],
+		[session.agentId, agentCwd, settingsAccess],
 	);
 
 	/**

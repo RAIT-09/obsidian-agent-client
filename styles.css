@@ -1948,6 +1948,54 @@ If your plugin does not need CSS, delete this file.
 	gap: 8px;
 }
 
+/* Change directory modal */
+.agent-client-change-dir-description {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	margin-bottom: 12px;
+}
+
+.agent-client-change-dir-input-row {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 16px;
+}
+
+.agent-client-change-dir-input {
+	flex: 1;
+}
+
+/* Agent cwd banner (shown when working outside vault) */
+.agent-client-cwd-banner {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.agent-client-cwd-banner-icon {
+	flex-shrink: 0;
+}
+
+.agent-client-cwd-banner-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.agent-client-cwd-banner-path {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.agent-client-change-dir-buttons {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
 /* ===== Floating Chat Button ===== */
 /* Floating button & menu root — higher z-index, always above windows */
 .agent-client-floating-button-root {

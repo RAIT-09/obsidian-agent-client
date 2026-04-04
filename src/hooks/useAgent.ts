@@ -51,8 +51,8 @@ export interface UseAgentReturn {
 	errorInfo: ErrorInfo | null;
 
 	// Session lifecycle
-	createSession: (overrideAgentId?: string) => Promise<void>;
-	restartSession: (newAgentId?: string) => Promise<void>;
+	createSession: (overrideAgentId?: string, overrideCwd?: string) => Promise<void>;
+	restartSession: (newAgentId?: string, overrideCwd?: string) => Promise<void>;
 	closeSession: () => Promise<void>;
 	forceRestartAgent: () => Promise<void>;
 	cancelOperation: () => Promise<void>;

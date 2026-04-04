@@ -5,12 +5,14 @@ import {
 	FileSystemAdapter,
 	Platform,
 	Menu,
+	setIcon,
 	type MenuItem,
 } from "obsidian";
 
 import type { AttachedFile, ChatInputState } from "../types/chat";
 import { useHistoryModal } from "../hooks/useHistoryModal";
 import { useChatActions } from "../hooks/useChatActions";
+import { ChangeDirectoryModal } from "./ChangeDirectoryModal";
 
 // Service imports
 import { getLogger } from "../utils/logger";
@@ -158,9 +160,8 @@ export function ChatPanel({
 	}, [plugin, workingDirectory]);
 
 	// Agent working directory — defaults to vault path.
-	// Separated from vaultPath so it can be changed independently in the future
-	// (e.g., "New chat in directory..." feature).
-	const agentCwd = vaultPath;
+	// Can be changed independently via "New chat in directory..." action.
+	const [agentCwd, setAgentCwd] = useState(vaultPath);
 
 	// ============================================================
 	// Custom Hooks
@@ -220,6 +221,7 @@ export function ChatPanel({
 		session,
 		settingsAccess: plugin.settingsService,
 		cwd: vaultPath,
+		agentCwd,
 		onSessionLoad: handleSessionLoad,
 		onMessagesRestore: agent.setMessagesFromLocal,
 		onIgnoreUpdates: agent.setIgnoreUpdates,
@@ -310,6 +312,7 @@ export function ChatPanel({
 		vaultPath,
 		isSessionReady,
 		settings.debugMode,
+		setAgentCwd,
 	);
 
 	// ============================================================
@@ -334,6 +337,27 @@ export function ChatPanel({
 		appWithSettings.setting.open();
 		appWithSettings.setting.openTabById(plugin.manifest.id);
 	}, [plugin]);
+
+	const handleNewChatInDirectory = useCallback(
+		async (directory: string) => {
+			// Auto-export current chat before switching
+			if (messages.length > 0) {
+				await autoExportIfEnabled("newChat", messages, session);
+			}
+			agent.clearMessages();
+			setAgentCwd(directory);
+			await agent.restartSession(undefined, directory);
+			sessionHistory.invalidateCache();
+		},
+		[
+			messages,
+			session,
+			autoExportIfEnabled,
+			agent.clearMessages,
+			agent.restartSession,
+			sessionHistory.invalidateCache,
+		],
+	);
 
 	const handleShowSidebarMenu = useCallback(
 		(e: React.MouseEvent<HTMLDivElement>) => {
@@ -375,6 +399,21 @@ export function ChatPanel({
 					});
 			});
 
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("New chat in directory...")
+					.setIcon("folder-open")
+					.onClick(() => {
+						const modal = new ChangeDirectoryModal(
+							plugin.app,
+							agentCwd,
+							(directory) => {
+								void handleNewChatInDirectory(directory);
+							},
+						);
+						modal.open();
+					});
+			});
+
 			menu.addSeparator();
 
 			menu.addItem((item: MenuItem) => {
@@ -393,6 +432,8 @@ export function ChatPanel({
 			handleNewChatWithPersist,
 			plugin,
 			handleRestartAgent,
+			agentCwd,
+			handleNewChatInDirectory,
 			handleOpenSettings,
 		],
 	);
@@ -445,6 +486,21 @@ export function ChatPanel({
 					});
 			});
 
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("New chat in directory...")
+					.setIcon("folder-open")
+					.onClick(() => {
+						const modal = new ChangeDirectoryModal(
+							plugin.app,
+							agentCwd,
+							(directory) => {
+								void handleNewChatInDirectory(directory);
+							},
+						);
+						modal.open();
+					});
+			});
+
 			menu.addSeparator();
 
 			menu.addItem((item: MenuItem) => {
@@ -463,6 +519,8 @@ export function ChatPanel({
 			handleExportChat,
 			onOpenNewWindow,
 			handleRestartAgent,
+			agentCwd,
+			handleNewChatInDirectory,
 			handleOpenSettings,
 		],
 	);
@@ -953,6 +1011,19 @@ export function ChatPanel({
 			/>
 		);
 
+	const cwdBanner =
+		agentCwd !== vaultPath ? (
+			<div className="agent-client-cwd-banner" title={agentCwd}>
+				<span
+					className="agent-client-cwd-banner-icon"
+					ref={(el) => {
+						if (el) setIcon(el, "folder-open");
+					}}
+				/>
+				<span className="agent-client-cwd-banner-path">{agentCwd}</span>
+			</div>
+		) : null;
+
 	const messageListElement = (
 		<MessageList
 			messages={messages}
@@ -1020,6 +1091,7 @@ export function ChatPanel({
 				>
 					{headerElement}
 				</div>
+				{cwdBanner}
 				<div className="agent-client-floating-content">
 					<div className="agent-client-floating-messages-container">
 						{messageListElement}
@@ -1038,6 +1110,7 @@ export function ChatPanel({
 			style={chatFontSizeStyle}
 		>
 			{headerElement}
+			{cwdBanner}
 			{messageListElement}
 			{inputAreaElement}
 		</div>

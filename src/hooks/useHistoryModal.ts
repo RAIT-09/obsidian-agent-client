@@ -26,6 +26,7 @@ export function useHistoryModal(
 	vaultPath: string,
 	isSessionReady: boolean,
 	debugMode: boolean,
+	onAgentCwdChange?: (cwd: string) => void,
 ): {
 	handleOpenHistory: () => void;
 } {
@@ -38,13 +39,14 @@ export function useHistoryModal(
 				logger.log(`[ChatPanel] Restoring session: ${sessionId}`);
 				agent.clearMessages();
 				await sessionHistory.restoreSession(sessionId, cwd);
+				onAgentCwdChange?.(cwd);
 				new Notice("[Agent Client] Session restored");
 			} catch (error) {
 				new Notice("[Agent Client] Failed to restore session");
 				logger.error("Session restore error:", error);
 			}
 		},
-		[logger, agent.clearMessages, sessionHistory.restoreSession],
+		[logger, agent.clearMessages, sessionHistory.restoreSession, onAgentCwdChange],
 	);
 
 	const handleForkSession = useCallback(
@@ -53,13 +55,14 @@ export function useHistoryModal(
 				logger.log(`[ChatPanel] Forking session: ${sessionId}`);
 				agent.clearMessages();
 				await sessionHistory.forkSession(sessionId, cwd);
+				onAgentCwdChange?.(cwd);
 				new Notice("[Agent Client] Session forked");
 			} catch (error) {
 				new Notice("[Agent Client] Failed to fork session");
 				logger.error("Session fork error:", error);
 			}
 		},
-		[logger, agent.clearMessages, sessionHistory.forkSession],
+		[logger, agent.clearMessages, sessionHistory.forkSession, onAgentCwdChange],
 	);
 
 	const handleDeleteSession = useCallback(

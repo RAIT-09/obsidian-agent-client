@@ -42,8 +42,8 @@ export interface UseAgentSessionReturn {
 	isReady: boolean;
 
 	// Session lifecycle
-	createSession: (overrideAgentId?: string) => Promise<void>;
-	restartSession: (newAgentId?: string) => Promise<void>;
+	createSession: (overrideAgentId?: string, overrideCwd?: string) => Promise<void>;
+	restartSession: (newAgentId?: string, overrideCwd?: string) => Promise<void>;
 	closeSession: () => Promise<void>;
 	forceRestartAgent: () => Promise<void>;
 	cancelOperation: () => Promise<void>;
@@ -160,7 +160,8 @@ export function useAgentSession(
 	// ============================================================
 
 	const createSession = useCallback(
-		async (overrideAgentId?: string) => {
+		async (overrideAgentId?: string, overrideCwd?: string) => {
+			const effectiveCwd = overrideCwd || workingDirectory;
 			const settings = settingsAccess.getSnapshot();
 			const agentId = overrideAgentId || getDefaultAgentId(settings);
 			const currentAgent = getCurrentAgent(settings, agentId);
@@ -203,7 +204,7 @@ export function useAgentSession(
 					settings,
 					agentSettings,
 					agentId,
-					workingDirectory,
+					effectiveCwd,
 				);
 
 				const initResult =
@@ -213,7 +214,7 @@ export function useAgentSession(
 						: null;
 
 				const sessionResult =
-					await agentClient.newSession(workingDirectory);
+					await agentClient.newSession(effectiveCwd);
 
 				setSession((prev) => ({
 					...prev,
@@ -281,8 +282,8 @@ export function useAgentSession(
 	);
 
 	const restartSession = useCallback(
-		async (newAgentId?: string) => {
-			await createSession(newAgentId);
+		async (newAgentId?: string, overrideCwd?: string) => {
+			await createSession(newAgentId, overrideCwd);
 		},
 		[createSession],
 	);
