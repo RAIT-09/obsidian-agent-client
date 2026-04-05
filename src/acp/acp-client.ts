@@ -208,14 +208,16 @@ export class AcpClient {
 		);
 
 		// Spawn the agent process
-		// detached: true creates a new process group, allowing us to kill
-		// the entire process tree (agent + child processes) with process.kill(-pid)
+		// detached: true (Unix only) creates a new process group, allowing us to kill
+		// the entire process tree (agent + child processes) with process.kill(-pid).
+		// On Windows, detached: true opens a new console window, so we skip it
+		// and use taskkill /T instead for tree kill.
 		const agentProcess = spawn(spawnCommand, spawnArgs, {
 			stdio: ["pipe", "pipe", "pipe"],
 			env: baseEnv,
 			cwd: config.workingDirectory,
 			shell: needsShell,
-			detached: true,
+			detached: !Platform.isWin,
 		});
 		this.agentProcess = agentProcess;
 
@@ -526,8 +528,13 @@ export class AcpClient {
 		this.logger.log(`[AcpClient] Killing process tree (PID: ${pid})`);
 
 		try {
-			if (pid) {
-				// Kill the entire process group (negative PID)
+			if (Platform.isWin && pid) {
+				// Windows: taskkill /T kills the entire process tree
+				spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
+					stdio: "ignore",
+				});
+			} else if (pid) {
+				// Unix: kill the entire process group (negative PID)
 				// Requires detached: true on spawn to create a process group
 				process.kill(-pid, "SIGTERM");
 			} else {
