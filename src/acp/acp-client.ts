@@ -118,11 +118,7 @@ export class AcpClient {
 
 		// Clean up existing process if any (e.g., when switching agents)
 		if (this.agentProcess) {
-			this.logger.log(
-				`[AcpClient] Killing existing process (PID: ${this.agentProcess.pid})`,
-			);
-			this.agentProcess.kill();
-			this.agentProcess = null;
+			this.killProcessTree();
 		}
 
 		// Clean up existing connection
@@ -212,11 +208,14 @@ export class AcpClient {
 		);
 
 		// Spawn the agent process
+		// detached: true creates a new process group, allowing us to kill
+		// the entire process tree (agent + child processes) with process.kill(-pid)
 		const agentProcess = spawn(spawnCommand, spawnArgs, {
 			stdio: ["pipe", "pipe", "pipe"],
 			env: baseEnv,
 			cwd: config.workingDirectory,
 			shell: needsShell,
+			detached: true,
 		});
 		this.agentProcess = agentProcess;
 
@@ -515,6 +514,38 @@ export class AcpClient {
 	}
 
 	/**
+	 * Kill the agent process and its entire process tree.
+	 * Uses process.kill(-pid) to send SIGTERM to the process group
+	 * (requires detached: true on spawn). Falls back to regular kill.
+	 * On Windows, uses taskkill /T for tree kill.
+	 */
+	private killProcessTree(): void {
+		if (!this.agentProcess) return;
+
+		const pid = this.agentProcess.pid;
+		this.logger.log(`[AcpClient] Killing process tree (PID: ${pid})`);
+
+		try {
+			if (pid) {
+				// Kill the entire process group (negative PID)
+				// Requires detached: true on spawn to create a process group
+				process.kill(-pid, "SIGTERM");
+			} else {
+				this.agentProcess.kill();
+			}
+		} catch {
+			// Fallback: kill just the direct process
+			try {
+				this.agentProcess.kill();
+			} catch {
+				// Process may already be dead
+			}
+		}
+
+		this.agentProcess = null;
+	}
+
+	/**
 	 * Disconnect from the agent and clean up resources.
 	 */
 	disconnect(): Promise<void> {
@@ -523,14 +554,8 @@ export class AcpClient {
 		// Cancel all pending operations
 		this.cancelAllOperations();
 
-		// Kill the agent process
-		if (this.agentProcess) {
-			this.logger.log(
-				`[AcpClient] Killing agent process (PID: ${this.agentProcess.pid})`,
-			);
-			this.agentProcess.kill();
-			this.agentProcess = null;
-		}
+		// Kill the agent process tree
+		this.killProcessTree();
 
 		// Clear connection and config references
 		this.connection = null;

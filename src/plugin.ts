@@ -359,6 +359,12 @@ export default class AgentClientPlugin extends Plugin {
 
 		// Clear registry (sidebar views are managed by Obsidian workspace)
 		this.viewRegistry.clear();
+
+		// Disconnect all ACP clients (kill agent processes)
+		for (const [, client] of this._acpClients) {
+			client.disconnect().catch(() => {});
+		}
+		this._acpClients.clear();
 	}
 
 	/**
