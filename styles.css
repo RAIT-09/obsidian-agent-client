@@ -1413,7 +1413,7 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 6px 12px;
+	padding: 3px 12px;
 	background-color: var(--background-secondary-alt);
 	border-top: 1px solid var(--background-modifier-border);
 	cursor: pointer;
@@ -1432,9 +1432,15 @@ If your plugin does not need CSS, delete this file.
 }
 
 .agent-client-diff-expand-icon {
-	font-size: 0.8em;
+	display: flex;
+	align-items: center;
 	color: var(--text-muted);
 	margin-left: 8px;
+}
+
+.agent-client-diff-expand-icon svg {
+	width: 14px;
+	height: 14px;
 }
 
 /* Tool Call Details */

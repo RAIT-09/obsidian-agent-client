@@ -449,9 +449,10 @@ function DiffRenderer({
 							? `${remainingLines} more lines`
 							: "Collapse"}
 					</span>
-					<span className="agent-client-diff-expand-icon">
-						{isCollapsed ? "▶" : "▲"}
-					</span>
+					<LucideIcon
+						name={isCollapsed ? "chevron-right" : "chevron-up"}
+						className="agent-client-diff-expand-icon"
+					/>
 				</div>
 			)}
 		</div>
