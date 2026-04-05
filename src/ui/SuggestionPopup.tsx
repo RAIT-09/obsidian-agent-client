@@ -100,7 +100,7 @@ export function SuggestionPopup({
 			const note = item as NoteMetadata;
 			return (
 				<div
-					key={note.path}
+					key={`mention-${index}`}
 					className={`agent-client-mention-dropdown-item ${isSelected ? "agent-client-selected" : ""} ${hasBorder ? "agent-client-has-border" : ""}`}
 					onClick={() => onSelect(note)}
 					onMouseEnter={() => {
@@ -120,7 +120,7 @@ export function SuggestionPopup({
 			const command = item as SlashCommand;
 			return (
 				<div
-					key={command.name}
+					key={`command-${index}`}
 					className={`agent-client-mention-dropdown-item ${isSelected ? "agent-client-selected" : ""} ${hasBorder ? "agent-client-has-border" : ""}`}
 					onClick={() => onSelect(command)}
 					onMouseEnter={() => {
