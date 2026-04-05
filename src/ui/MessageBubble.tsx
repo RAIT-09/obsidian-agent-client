@@ -131,9 +131,10 @@ function CollapsibleThought({ text, plugin }: CollapsibleThoughtProps) {
 					/>
 				)}
 				Thinking
-				<span className="agent-client-collapsible-thought-icon">
-					{isExpanded ? "▼" : "▶"}
-				</span>
+				<LucideIcon
+					name={isExpanded ? "chevron-down" : "chevron-right"}
+					className="agent-client-collapsible-thought-icon"
+				/>
 			</div>
 			{isExpanded && (
 				<div className="agent-client-collapsible-thought-content">
