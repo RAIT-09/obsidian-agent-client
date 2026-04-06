@@ -27,7 +27,7 @@ Each guide covers installation, path configuration, and authentication.
 ## Step 3: Start Chatting
 
 1. Click the **robot icon** in the left ribbon, or
-2. Open the command palette (`Cmd/Ctrl + P`) and search for **"Open agent chat"**
+2. Open the command palette (`Cmd/Ctrl + P`) and search for **"Open chat view"**
 
 The chat panel opens in the right sidebar. Type a message and press Enter!
 
