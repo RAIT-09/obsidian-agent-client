@@ -80,7 +80,7 @@ Gemini CLI natively supports ACP, so no additional adapter is required.
 
 ## Verify Setup
 
-1. Click the robot icon in the ribbon or use the command palette: **"Open agent chat"**
+1. Click the robot icon in the ribbon or use the command palette: **"Open chat view"**
 2. Switch to Gemini CLI from the agent dropdown in the chat header
 3. Try sending a message to verify the connection
 
