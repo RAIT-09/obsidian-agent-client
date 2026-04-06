@@ -1,6 +1,6 @@
 # Agent Setup Overview
 
-Agent Client supports multiple AI agents through the [Agent Client Protocol (ACP)](https://github.com/zed-industries/agent-client-protocol). This section covers how to set up each supported agent.
+Agent Client supports multiple AI agents through the [Agent Client Protocol (ACP)](https://github.com/agentclientprotocol/agent-client-protocol). This section covers how to set up each supported agent.
 
 ## Supported Agents
 
