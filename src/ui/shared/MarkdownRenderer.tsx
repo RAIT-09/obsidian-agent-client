@@ -68,9 +68,7 @@ export function MarkdownRenderer({ text, plugin }: MarkdownRendererProps) {
 
 					if (
 						normalizedVaultBase &&
-						normalizedHref.startsWith(
-							normalizedVaultBase + "/",
-						)
+						normalizedHref.startsWith(normalizedVaultBase + "/")
 					) {
 						// Absolute vault path → convert to relative
 						const relativePath = normalizedHref.slice(
