@@ -4,7 +4,10 @@ import {
 	Component,
 	FileSystemAdapter,
 	MarkdownRenderer as ObsidianMarkdownRenderer,
+	Platform,
 } from "obsidian";
+import { convertWslPathToWindows } from "../../utils/platform";
+import { isAbsolutePath } from "../../utils/paths";
 import type AgentClientPlugin from "../../plugin";
 
 interface MarkdownRendererProps {
@@ -40,6 +43,12 @@ export function MarkdownRenderer({ text, plugin }: MarkdownRendererProps) {
 				? plugin.app.vault.adapter.getBasePath()
 				: null;
 
+		// Prepare normalized vault base path for comparison (forward slashes)
+		const isWslMode = Platform.isWin && plugin.settings.windowsWslMode;
+		const normalizedVaultBase = vaultBasePath
+			? vaultBasePath.replace(/\\/g, "/").replace(/\/+$/, "")
+			: null;
+
 		const handleInternalLinkClick = (e: MouseEvent) => {
 			const target = e.target as HTMLElement;
 			const link = target.closest("a.internal-link");
@@ -47,17 +56,31 @@ export function MarkdownRenderer({ text, plugin }: MarkdownRendererProps) {
 				e.preventDefault();
 				const rawHref = link.getAttribute("data-href");
 				if (rawHref) {
-					const href = decodeURIComponent(rawHref);
-					if (vaultBasePath && href.startsWith(vaultBasePath + "/")) {
+					let href = decodeURIComponent(rawHref);
+
+					// WSL mode: convert /mnt/c/... paths to Windows format
+					if (isWslMode && href.startsWith("/mnt/")) {
+						href = convertWslPathToWindows(href);
+					}
+
+					// Normalize for comparison (forward slashes)
+					const normalizedHref = href.replace(/\\/g, "/");
+
+					if (
+						normalizedVaultBase &&
+						normalizedHref.startsWith(
+							normalizedVaultBase + "/",
+						)
+					) {
 						// Absolute vault path → convert to relative
-						const relativePath = href.slice(
-							vaultBasePath.length + 1,
+						const relativePath = normalizedHref.slice(
+							normalizedVaultBase.length + 1,
 						);
 						void plugin.app.workspace.openLinkText(
 							relativePath,
 							"",
 						);
-					} else if (!href.startsWith("/")) {
+					} else if (!isAbsolutePath(href)) {
 						// Already relative or wiki-link style — pass through
 						void plugin.app.workspace.openLinkText(href, "");
 					}

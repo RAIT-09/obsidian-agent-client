@@ -197,6 +197,24 @@ export function convertWindowsPathToWsl(windowsPath: string): string {
 }
 
 /**
+ * Convert WSL path to Windows path format.
+ * Example: /mnt/c/Users/name/vault → C:\Users\name\vault
+ *
+ * Note: This function is only called in WSL mode on Windows.
+ */
+export function convertWslPathToWindows(wslPath: string): string {
+	const match = wslPath.match(/^\/mnt\/([a-zA-Z])\/(.*)/);
+
+	if (match) {
+		const driveLetter = match[1].toUpperCase();
+		const pathPart = match[2].replace(/\//g, "\\");
+		return `${driveLetter}:\\${pathPart}`;
+	}
+
+	return wslPath;
+}
+
+/**
  * Build a WSL shell wrapper that sources ~/.profile, detects the user's
  * $SHELL, and falls back to /bin/sh for non-POSIX shells (fish, elvish,
  * nushell, xonsh).
