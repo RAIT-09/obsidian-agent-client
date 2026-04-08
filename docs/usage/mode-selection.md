@@ -25,4 +25,4 @@ Available modes depend on the active agent. Not all agents support multiple mode
 
 ## Mode Persistence
 
-The selected mode persists for the current session. Starting a new chat resets to the default mode.
+The selected mode persists for the current session. Your preference is remembered across sessions.
