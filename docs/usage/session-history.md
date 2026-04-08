@@ -20,6 +20,7 @@ Depending on the agent's capabilities, you can perform the following actions:
 
 | Action | Description |
 |--------|-------------|
+| **Edit title** | Rename the session from the history modal |
 | **Restore** | Resume the session where you left off |
 | **Fork** | Create a new branch from that point in the conversation |
 | **Delete** | Remove the session from history |
