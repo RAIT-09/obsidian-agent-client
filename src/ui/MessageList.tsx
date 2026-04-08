@@ -64,6 +64,7 @@ export function MessageList({
 }: MessageListProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
+	const isAtBottomRef = useRef(true);
 	const prevIsSendingRef = useRef(false);
 
 	// ============================================================
@@ -75,6 +76,15 @@ export function MessageList({
 		estimateSize: () => 80,
 		overscan: 5,
 	});
+
+	// Suppress scroll position correction when user has scrolled up.
+	// By default, the virtualizer adjusts scrollTop when an item before
+	// the scroll offset changes size (to keep visible content stable).
+	// During streaming, this causes the viewport to creep down as the
+	// last message grows. Our auto-scroll effect handles following new
+	// content when isAtBottom, so corrections are only needed there.
+	virtualizer.shouldAdjustScrollPositionOnItemSizeChange = () =>
+		isAtBottomRef.current;
 
 	// ============================================================
 	// Scroll management
@@ -91,6 +101,7 @@ export function MessageList({
 		const isNearBottom =
 			container.scrollTop + container.clientHeight >=
 			container.scrollHeight - threshold;
+		isAtBottomRef.current = isNearBottom;
 		setIsAtBottom(isNearBottom);
 		return isNearBottom;
 	}, []);
@@ -99,6 +110,7 @@ export function MessageList({
 	useEffect(() => {
 		if (messages.length === 0) {
 			setIsAtBottom(true);
+			isAtBottomRef.current = true;
 		}
 	}, [messages.length]);
 
@@ -128,7 +140,7 @@ export function MessageList({
 			return;
 		}
 
-		if (isAtBottom) {
+		if (isAtBottomRef.current) {
 			// Use requestAnimationFrame to ensure virtualizer has measured
 			requestAnimationFrame(() => {
 				virtualizer.scrollToIndex(messages.length - 1, {
@@ -136,7 +148,7 @@ export function MessageList({
 				});
 			});
 		}
-	}, [messages, isAtBottom, virtualizer]);
+	}, [messages, virtualizer]);
 
 	// Set up scroll event listener for isAtBottom detection
 	useEffect(() => {
