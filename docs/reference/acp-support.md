@@ -27,6 +27,7 @@ Methods the plugin can call on agents.
 | `session/list` | ✅ Supported | Unstable API |
 | `session/resume` | ✅ Supported | Unstable API |
 | `session/fork` | ✅ Supported | Unstable API |
+| `session/set_config_option` | ✅ Supported | |
 
 ::: tip
 Methods marked "Unstable API" may change in future ACP versions. They are prefixed with `unstable_` in the SDK.
@@ -46,6 +47,9 @@ Session updates the plugin can receive from agents via `session/update`.
 | `plan` | ✅ Supported | |
 | `available_commands_update` | ✅ Supported | |
 | `current_mode_update` | ✅ Supported | |
+| `session_info_update` | ✅ Supported | |
+| `usage_update` | ✅ Supported | Context window usage |
+| `config_option_update` | ✅ Supported | |
 
 ### Agent → Client (Requests)
 
@@ -73,7 +77,7 @@ Content types the plugin can send in `session/prompt`.
 | `text` | ✅ Supported | |
 | `image` | ✅ Supported | Requires agent support |
 | `audio` | ❌ Not supported | |
-| `resource_link` | ❌ Not supported | |
+| `resource_link` | ✅ Supported | File attachments |
 | `resource` | ✅ Supported | Embedded context; requires agent support |
 
 ### Tool Call Content (Agent → Client)
