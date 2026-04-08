@@ -1,22 +1,44 @@
 import { useState, useCallback, useRef, useMemo } from "react";
-import type { IAgentClient } from "../domain/ports/agent-client.port";
-import type { ISettingsAccess } from "../domain/ports/settings-access.port";
+import type { AcpClient } from "../acp/acp-client";
+import type { ISettingsAccess } from "../services/settings-service";
 import type {
 	SessionInfo,
 	ListSessionsResult,
 	SavedSessionInfo,
-} from "../domain/models/session-info";
-import type {
 	ChatSession,
 	SessionModeState,
 	SessionModelState,
-} from "../domain/models/chat-session";
-import type { SessionConfigOption } from "../domain/models/session-update";
-import type { ChatMessage } from "../domain/models/chat-message";
-import {
-	getSessionCapabilityFlags,
-	type SessionCapabilityFlags,
-} from "../shared/session-capability-utils";
+	SessionConfigOption,
+	AgentCapabilities,
+} from "../types/session";
+import type { ChatMessage } from "../types/chat";
+
+// ============================================================================
+// Session Capability Helpers (from session-capability-utils.ts)
+// ============================================================================
+
+interface SessionCapabilityFlags {
+	/** Whether session/load is supported (stable) */
+	canLoad: boolean;
+	/** Whether session/resume is supported (unstable) */
+	canResume: boolean;
+	/** Whether session/fork is supported (unstable) */
+	canFork: boolean;
+	/** Whether session/list is supported (unstable) */
+	canList: boolean;
+}
+
+function getSessionCapabilityFlags(
+	agentCapabilities?: AgentCapabilities,
+): SessionCapabilityFlags {
+	const sessionCaps = agentCapabilities?.sessionCapabilities;
+	return {
+		canLoad: agentCapabilities?.loadSession === true,
+		canResume: sessionCaps?.resume !== undefined,
+		canFork: sessionCaps?.fork !== undefined,
+		canList: sessionCaps?.list !== undefined,
+	};
+}
 
 // ============================================================================
 // Types
@@ -60,21 +82,23 @@ export interface MessagesRestoreCallback {
  */
 export interface UseSessionHistoryOptions {
 	/** Agent client for session operations */
-	agentClient: IAgentClient;
+	agentClient: AcpClient;
 	/** Current session (used to access agentCapabilities and agentId) */
 	session: ChatSession;
 	/** Settings access for local session storage */
 	settingsAccess: ISettingsAccess;
-	/** Working directory (vault path) for session operations */
+	/** Vault root path — used for session list filtering */
 	cwd: string;
+	/** Agent working directory — used for saving new session metadata */
+	agentCwd: string;
 	/** Callback invoked when a session is loaded/resumed/forked */
 	onSessionLoad: SessionLoadCallback;
 	/** Callback invoked when messages should be restored from local storage */
 	onMessagesRestore?: MessagesRestoreCallback;
-	/** Callback invoked when session/load starts (to start ignoring history replay) */
-	onLoadStart?: () => void;
-	/** Callback invoked when session/load ends (to stop ignoring history replay) */
-	onLoadEnd?: () => void;
+	/** Control whether useMessages ignores incoming updates (for history replay suppression) */
+	onIgnoreUpdates?: (ignore: boolean) => void;
+	/** Clear messages before restoring from local storage */
+	onClearMessages?: () => void;
 }
 
 /**
@@ -142,6 +166,18 @@ export interface UseSessionHistoryReturn {
 	deleteSession: (sessionId: string) => Promise<void>;
 
 	/**
+	 * Update the title of a saved session.
+	 * @param sessionId - Session to update
+	 * @param newTitle - New title string
+	 * @param sessionCwd - Original cwd of the session (used when creating a new local entry)
+	 */
+	updateSessionTitle: (
+		sessionId: string,
+		newTitle: string,
+		sessionCwd: string,
+	) => Promise<void>;
+
+	/**
 	 * Save session metadata locally.
 	 * Called when the first message is sent in a new session.
 	 * @param sessionId - Session ID to save
@@ -160,7 +196,7 @@ export interface UseSessionHistoryReturn {
 	 */
 	saveSessionMessages: (
 		sessionId: string,
-		messages: import("../domain/models/chat-message").ChatMessage[],
+		messages: import("../types/chat").ChatMessage[],
 	) => void;
 
 	/**
@@ -237,11 +273,11 @@ export function useSessionHistory(
 		agentClient,
 		session,
 		settingsAccess,
-		cwd,
+		agentCwd,
 		onSessionLoad,
 		onMessagesRestore,
-		onLoadStart,
-		onLoadEnd,
+		onIgnoreUpdates,
+		onClearMessages,
 	} = options;
 
 	// Derive capability flags from session.agentCapabilities
@@ -483,7 +519,8 @@ export function useSessionHistory(
 
 					if (localMessages && onMessagesRestore) {
 						// Local messages available: ignore agent replay, restore from local
-						onLoadStart?.();
+						onIgnoreUpdates?.(true);
+						onClearMessages?.();
 						try {
 							const result = await agentClient.loadSession(
 								sessionId,
@@ -497,7 +534,7 @@ export function useSessionHistory(
 							);
 							onMessagesRestore(localMessages);
 						} finally {
-							onLoadEnd?.();
+							onIgnoreUpdates?.(false);
 						}
 					} else {
 						// No local messages: let agent replay flow through to UI
@@ -550,8 +587,8 @@ export function useSessionHistory(
 			onSessionLoad,
 			settingsAccess,
 			onMessagesRestore,
-			onLoadStart,
-			onLoadEnd,
+			onIgnoreUpdates,
+			onClearMessages,
 		],
 	);
 
@@ -672,6 +709,65 @@ export function useSessionHistory(
 	);
 
 	/**
+	 * Update the title of a saved session.
+	 * Updates both local state and persistent storage.
+	 */
+	const updateSessionTitle = useCallback(
+		async (sessionId: string, newTitle: string, sessionCwd: string) => {
+			// Read current title for potential rollback
+			const savedSessions = settingsAccess.getSavedSessions();
+			const existing = savedSessions.find(
+				(s) => s.sessionId === sessionId,
+			);
+			const previousTitle = existing?.title;
+
+			// Optimistic update
+			setSessions((prev) =>
+				prev.map((s) =>
+					s.sessionId === sessionId ? { ...s, title: newTitle } : s,
+				),
+			);
+
+			try {
+				if (existing) {
+					await settingsAccess.saveSession({
+						...existing,
+						title: newTitle,
+						updatedAt: new Date().toISOString(),
+					});
+				} else {
+					// Session exists only on agent side — create local entry
+					// Use sessionCwd (from SessionInfo) instead of hook's cwd
+					await settingsAccess.saveSession({
+						sessionId,
+						agentId: session.agentId,
+						cwd: sessionCwd,
+						title: newTitle,
+						createdAt: new Date().toISOString(),
+						updatedAt: new Date().toISOString(),
+					});
+				}
+
+				invalidateCache();
+			} catch (err) {
+				// Rollback optimistic update
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.sessionId === sessionId
+							? { ...s, title: previousTitle }
+							: s,
+					),
+				);
+				const errorMessage =
+					err instanceof Error ? err.message : String(err);
+				setError(`Failed to update title: ${errorMessage}`);
+				throw err;
+			}
+		},
+		[settingsAccess, session.agentId, invalidateCache],
+	);
+
+	/**
 	 * Save session metadata locally.
 	 * Called when the first message is sent in a new session.
 	 */
@@ -687,13 +783,13 @@ export function useSessionHistory(
 			await settingsAccess.saveSession({
 				sessionId,
 				agentId: session.agentId,
-				cwd,
+				cwd: agentCwd,
 				title,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			});
 		},
-		[session.agentId, cwd, settingsAccess],
+		[session.agentId, agentCwd, settingsAccess],
 	);
 
 	/**
@@ -704,7 +800,7 @@ export function useSessionHistory(
 	const saveSessionMessages = useCallback(
 		(
 			sessionId: string,
-			messages: import("../domain/models/chat-message").ChatMessage[],
+			messages: import("../types/chat").ChatMessage[],
 		) => {
 			if (!session.agentId || messages.length === 0) return;
 
@@ -718,33 +814,55 @@ export function useSessionHistory(
 		[session.agentId, settingsAccess],
 	);
 
-	return {
-		sessions,
-		loading,
-		error,
-		hasMore: nextCursor !== undefined,
+	return useMemo(
+		() => ({
+			sessions,
+			loading,
+			error,
+			hasMore: nextCursor !== undefined,
 
-		// Capability flags
-		// Show session history UI if any session capability is available
-		canShowSessionHistory:
-			capabilities.canList ||
-			capabilities.canLoad ||
-			capabilities.canResume ||
+			// Capability flags
+			canShowSessionHistory:
+				capabilities.canList ||
+				capabilities.canLoad ||
+				capabilities.canResume ||
+				capabilities.canFork,
+			canRestore: capabilities.canLoad || capabilities.canResume,
+			canFork: capabilities.canFork,
+			canList: capabilities.canList,
+			isUsingLocalSessions: !capabilities.canList,
+			localSessionIds,
+
+			// Methods
+			fetchSessions,
+			loadMoreSessions,
+			restoreSession,
+			forkSession,
+			deleteSession,
+			updateSessionTitle,
+			saveSessionLocally,
+			saveSessionMessages,
+			invalidateCache,
+		}),
+		[
+			sessions,
+			loading,
+			error,
+			nextCursor,
+			capabilities.canList,
+			capabilities.canLoad,
+			capabilities.canResume,
 			capabilities.canFork,
-		canRestore: capabilities.canLoad || capabilities.canResume,
-		canFork: capabilities.canFork,
-		canList: capabilities.canList,
-		isUsingLocalSessions: !capabilities.canList,
-		localSessionIds,
-
-		// Methods
-		fetchSessions,
-		loadMoreSessions,
-		restoreSession,
-		forkSession,
-		deleteSession,
-		saveSessionLocally,
-		saveSessionMessages,
-		invalidateCache,
-	};
+			localSessionIds,
+			fetchSessions,
+			loadMoreSessions,
+			restoreSession,
+			forkSession,
+			deleteSession,
+			updateSessionTitle,
+			saveSessionLocally,
+			saveSessionMessages,
+			invalidateCache,
+		],
+	);
 }

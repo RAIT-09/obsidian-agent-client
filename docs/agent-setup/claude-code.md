@@ -28,7 +28,7 @@ where.exe claude-agent-acp
 
 :::
 
-3. Open **Settings → Agent Client** and set the **Claude Code path** to the path found above.
+3. Open **Settings → Agent Client**. The default command (`claude-agent-acp`) works in many cases. If the agent is not found automatically, set the **Claude Code path** to the path found above, or click **Auto-detect**.
 
 ## Authentication
 
@@ -77,7 +77,7 @@ The Claude Desktop app uses a different authentication system. Having Claude Des
 
 ## Verify Setup
 
-1. Click the robot icon in the ribbon or use the command palette: **"Open agent chat"**
+1. Click the robot icon in the ribbon or use the command palette: **"Open chat view"**
 2. You should see the chat panel open and connect to Claude Code
 3. Try sending a message to verify the connection
 

@@ -10,10 +10,14 @@ Commands operate on the **last focused chat view**. Click on a chat view to focu
 
 | Command | Description |
 |---------|-------------|
-| **Open agent chat** | Open the chat panel |
+| **Open chat view** | Open the chat panel |
 | **Open new chat view** | Open an additional chat view |
 | **New chat** | Start a fresh conversation |
+| **Cancel current message** | Stop the agent's current response |
 | **Export chat** | Export the current conversation to a note |
+| **Toggle auto-mention** | Toggle auto-mention of the active note |
+| **Approve active permission** | Approve the current permission request |
+| **Reject active permission** | Reject the current permission request |
 | **Focus next chat view** | Move focus to the next chat view |
 | **Focus previous chat view** | Move focus to the previous chat view |
 
@@ -31,16 +35,16 @@ Control multiple chat views at once. See [Multi-Session Chat](/usage/multi-sessi
 
 | Command | Description |
 |---------|-------------|
-| **Open floating chat window** | Open an existing floating window, or create one if none exist |
-| **Open new floating chat window** | Always create a new floating window |
-| **Minimize floating chat window** | Hide the focused floating window (session is preserved) |
-| **Close floating chat window** | Close the focused floating window and end the session |
+| **Open floating chat view** | Open an existing floating window, or create one if none exist |
+| **Open new floating chat view** | Always create a new floating window |
+| **Minimize floating chat view** | Hide the focused floating window (session is preserved) |
+| **Close floating chat view** | Close the focused floating window and end the session |
 
 ## Agent Commands
 
 | Command | Description |
 |---------|-------------|
-| **New chat with [Agent Name]** | Start a new chat with a specific agent |
+| **Switch agent to [Agent Name]** | Switch to a specific agent in the last active view |
 
 ::: tip
 Agent-specific commands are generated automatically based on your configured agents.

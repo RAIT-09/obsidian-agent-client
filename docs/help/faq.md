@@ -48,7 +48,7 @@ Click the **×** button next to the auto-mention badge above the input field. Cl
 
 ### How do I switch between agents?
 
-Click the **⋮** (ellipsis) menu in the chat header and select **"Switch agent"**. The agent switches immediately. This is a one-time change for that view only.
+Click the **⋮** (ellipsis) menu in the chat header. Under **"Switch agent"**, select the agent you want to use. This is a one-time change for that view only.
 
 To change the default agent for new chat views, go to **Settings → Agent Client → Default agent**.
 

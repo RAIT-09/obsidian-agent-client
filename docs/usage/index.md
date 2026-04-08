@@ -10,7 +10,7 @@ You can open the Agent Client chat panel in two ways:
   <img src="/images/ribbon-icon.webp" alt="Ribbon Icon" />
 </p>
 
-- **Command Palette**: Open the command palette (`Cmd/Ctrl + P`) and search for **"Open agent chat"**
+- **Command Palette**: Open the command palette (`Cmd/Ctrl + P`) and search for **"Open chat view"**
 
 The chat panel opens in the right sidebar.
 
@@ -21,7 +21,7 @@ The chat panel opens in the right sidebar.
 3. Wait for the agent's response
 
 <p align="center">
-  <img src="/images/sending-messages.webp" alt="Sending Messages" />
+  <img src="/images/sending-messages.webp" alt="Sending Messages"  width="400" />
 </p>
 
 ## Sending Images and Files
@@ -48,8 +48,7 @@ See [Sending Images and Files](/usage/sending-images) for more details.
 To switch agents for the current view:
 
 1. Click the **⋮** (ellipsis) menu in the chat header
-2. Select **"Switch agent"**
-3. The agent switches immediately
+2. Under **"Switch agent"**, select the agent you want to use
 
 This is a one-time change for that view only.
 

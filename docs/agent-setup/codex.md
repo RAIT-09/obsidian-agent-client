@@ -28,7 +28,7 @@ where.exe codex-acp
 
 :::
 
-3. Open **Settings → Agent Client** and set the **Codex path** to the path found above.
+3. Open **Settings → Agent Client**. The default command (`codex-acp`) works in many cases. If the agent is not found automatically, set the **Codex path** to the path found above, or click **Auto-detect**.
 
 ## Authentication
 
@@ -64,12 +64,12 @@ Follow the prompts to authenticate with your OpenAI account.
 3. In **Settings → Agent Client**, leave the **API key field empty**.
 
 ::: tip
-The ChatGPT app uses a different authentication system. Having ChatGPT running does **not** authenticate the plugin — you must log in via the CLI.
+The ChatGPT app and Codex app use a different authentication system. Having ChatGPT running does **not** authenticate the plugin — you must log in via the CLI.
 :::
 
 ## Verify Setup
 
-1. Click the robot icon in the ribbon or use the command palette: **"Open agent chat"**
+1. Click the robot icon in the ribbon or use the command palette: **"Open chat view"**
 2. Switch to Codex from the agent dropdown in the chat header
 3. Try sending a message to verify the connection
 

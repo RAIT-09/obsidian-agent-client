@@ -1,0 +1,188 @@
+import { execFile } from "child_process";
+import { Platform } from "obsidian";
+import { buildWslShellWrapper, getLoginShell } from "./platform";
+
+/**
+ * Check whether a path string is an absolute path (Unix or Windows).
+ */
+export function isAbsolutePath(path: string): boolean {
+	return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
+}
+
+/**
+ * Resolve the absolute path of a command using `which` (macOS/Linux) or `where` (Windows).
+ * If the command is already an absolute path, returns it as-is.
+ * Runs asynchronously to avoid blocking the Electron main thread.
+ *
+ * @param command - Command name (e.g. "node", "claude") or absolute path
+ * @returns Absolute path string, or null if not found
+ */
+export function resolveCommandPath(command: string): Promise<string | null> {
+	if (!command || command.trim().length === 0) return Promise.resolve(null);
+
+	const trimmed = command.trim();
+
+	if (isAbsolutePath(trimmed)) {
+		return Promise.resolve(trimmed);
+	}
+
+	return new Promise((resolve) => {
+		if (Platform.isWin) {
+			execFile(
+				"where",
+				[trimmed],
+				{ timeout: 5000, windowsHide: true },
+				(err, stdout) => {
+					if (err) {
+						resolve(null);
+						return;
+					}
+					const resolved = stdout.split("\n")[0].trim();
+					resolve(resolved.length > 0 ? resolved : null);
+				},
+			);
+		} else {
+			const shell = getLoginShell();
+			const escaped = trimmed.replace(/'/g, "'\\''");
+			execFile(
+				shell,
+				["-l", "-c", `which '${escaped}'`],
+				{ timeout: 5000 },
+				(err, stdout) => {
+					if (err) {
+						resolve(null);
+						return;
+					}
+					const resolved = stdout.split("\n")[0].trim();
+					resolve(resolved.length > 0 ? resolved : null);
+				},
+			);
+		}
+	});
+}
+
+/**
+ * Resolve the absolute path of a command inside WSL.
+ * Uses the WSL shell wrapper (buildWslShellWrapper) to resolve within the Linux environment.
+ *
+ * @param command - Command name (e.g. "node", "claude")
+ * @param distribution - Optional WSL distribution name
+ * @returns Linux absolute path string, or null if not found
+ */
+export function resolveCommandPathInWsl(
+	command: string,
+	distribution?: string,
+): Promise<string | null> {
+	if (!command || command.trim().length === 0) return Promise.resolve(null);
+
+	const trimmed = command.trim();
+
+	if (isAbsolutePath(trimmed)) {
+		return Promise.resolve(trimmed);
+	}
+
+	return new Promise((resolve) => {
+		const escaped = trimmed.replace(/'/g, "'\\''");
+		const args: string[] = [];
+		if (distribution) {
+			args.push("-d", distribution);
+		}
+		const innerCommand = `which '${escaped}'`;
+		args.push("sh", "-c", buildWslShellWrapper(innerCommand));
+		execFile(
+			"C:\\Windows\\System32\\wsl.exe",
+			args,
+			{ timeout: 5000 },
+			(err, stdout) => {
+				if (err) {
+					resolve(null);
+					return;
+				}
+				const resolved = stdout.split("\n")[0].trim();
+				resolve(resolved.length > 0 ? resolved : null);
+			},
+		);
+	});
+}
+
+/**
+ * Extract the directory containing a command (for PATH adjustments).
+ * Example: /usr/local/bin/node → /usr/local/bin
+ *
+ * @param command - Full path to a command
+ * @returns Directory path, or null if cannot be determined
+ */
+export function resolveCommandDirectory(command: string): string | null {
+	if (!command) {
+		return null;
+	}
+	const lastSlash = Math.max(
+		command.lastIndexOf("/"),
+		command.lastIndexOf("\\"),
+	);
+	if (lastSlash <= 0) {
+		return null;
+	}
+	return command.slice(0, lastSlash);
+}
+
+/**
+ * Resolve the Node.js directory from the plugin's nodePath setting.
+ * Returns the directory only when nodePath is an absolute path.
+ * When nodePath is empty or a bare command name, returns undefined
+ * (the login shell handles PATH resolution).
+ *
+ * @param nodePathSetting - The raw nodePath setting value
+ * @returns Directory path, or undefined
+ */
+export function resolveNodeDirectory(
+	nodePathSetting: string | undefined,
+): string | undefined {
+	if (!nodePathSetting) return undefined;
+	const trimmed = nodePathSetting.trim();
+	if (!isAbsolutePath(trimmed)) return undefined;
+	return resolveCommandDirectory(trimmed) || undefined;
+}
+
+/**
+ * Convert absolute path to relative path if it's under basePath.
+ * Otherwise return the absolute path as-is.
+ *
+ * @param absolutePath - The absolute path to convert
+ * @param basePath - The base path (e.g., vault path)
+ * @returns Relative path if under basePath, otherwise absolute path
+ */
+export function toRelativePath(absolutePath: string, basePath: string): string {
+	// Normalize paths (remove trailing slashes)
+	const normalizedBase = basePath.replace(/\/+$/, "");
+	const normalizedPath = absolutePath.replace(/\/+$/, "");
+
+	if (normalizedPath.startsWith(normalizedBase + "/")) {
+		return normalizedPath.slice(normalizedBase.length + 1);
+	}
+	return absolutePath;
+}
+
+/**
+ * Build a file URI from an absolute path.
+ * Handles both Windows and Unix paths.
+ *
+ * @param absolutePath - Absolute file path
+ * @returns file:// URI
+ *
+ * @example
+ * buildFileUri("/Users/user/note.md") // "file:///Users/user/note.md"
+ * buildFileUri("C:\\Users\\user\\note.md") // "file:///C:/Users/user/note.md"
+ */
+export function buildFileUri(absolutePath: string): string {
+	// Normalize backslashes to forward slashes
+	const normalizedPath = absolutePath.replace(/\\/g, "/");
+
+	// Windows path (e.g., C:/Users/...)
+	if (/^[A-Za-z]:/.test(normalizedPath)) {
+		return `file:///${normalizedPath}`;
+	}
+
+	// Unix path (e.g., /Users/...)
+	return `file://${normalizedPath}`;
+}

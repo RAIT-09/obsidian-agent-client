@@ -31,8 +31,8 @@ The agent executable cannot be found at the specified path.
 
 **Solutions:**
 
-1. Use the full absolute path (e.g., `/usr/local/bin/claude-agent-acp` instead of just `claude-agent-acp`)
-2. Verify the agent is installed by running it directly in Terminal
+1. Verify the agent is installed by running it directly in Terminal
+2. Try the **Auto-detect** button in the agent's path setting, or use the full absolute path
 3. On Windows, include the `.cmd` extension if needed
 
 ## Authentication Issues
@@ -123,6 +123,14 @@ The conversation couldn't be saved.
 2. Verify the folder name is valid (no special characters that aren't allowed in folder names)
 3. Check the filename template for invalid characters (**Settings → Agent Client → Export → Filename**)
 
+## Multi-Device Vault Sync
+
+### Agent paths break when syncing across machines
+
+If you sync your vault (e.g., via Nextcloud, Syncthing, or iCloud) across machines with different environments (macOS, Linux, WSL2), absolute paths stored in `data.json` will not work on every machine.
+
+**Solution:** Leave the agent path and Node.js path fields **empty**. The plugin uses bare command names by default (e.g., `claude-agent-acp`) and resolves them through each machine's login shell PATH.
+
 ## Windows-Specific Issues
 
 ### WSL mode not working
@@ -141,7 +149,7 @@ The PATH environment may differ between Terminal and Obsidian.
 
 **Solutions:**
 
-1. Use full absolute paths for both agent and Node.js
+1. Try the **Auto-detect** button, or use full absolute paths for both agent and Node.js
 2. Enable WSL mode for better compatibility
 3. Add the agent's directory to your system PATH (not just user PATH)
 
@@ -151,7 +159,7 @@ The PATH environment may differ between Terminal and Obsidian.
 
 Homebrew binaries may not be in Obsidian's PATH.
 
-**Solution:** Use the full path. Find it with `which <agent-name>` in Terminal.
+**Solution:** Try the **Auto-detect** button, or use the full path (find it with `which <agent-name>` in Terminal).
 
 ## Linux-Specific Issues
 
@@ -167,7 +175,7 @@ Desktop applications on Linux may not inherit PATH settings from `.bashrc`.
 
 **Solutions:**
 
-1. Use the full absolute path (e.g., `/usr/local/bin/gemini` instead of `gemini`)
+1. Try the **Auto-detect** button, or use the full absolute path (e.g., `/usr/local/bin/gemini`)
 2. Ensure the agent is installed in a standard location (`/usr/bin` or `/usr/local/bin`)
 
 ## Debug Mode
@@ -181,8 +189,10 @@ If you need more detailed information about an issue, enable Debug mode:
    - Windows/Linux: `Ctrl + Shift + I`
 4. Go to the **Console** tab
 5. Filter by these prefixes:
-   - `[AcpAdapter]` - Agent communication
-   - `[useChat]` - Message handling
+   - `[AcpClient]` - Agent process and connection
+   - `[AcpHandler]` - Agent event handling
+   - `[PermissionManager]` - Permission requests
+   - `[VaultService]` - Vault access
    - `[useAgentSession]` - Session management
 
 ## Common Error Messages

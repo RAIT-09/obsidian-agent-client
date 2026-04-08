@@ -42,7 +42,7 @@ If you need Node.js:
 
 ### Find Your Node.js Path
 
-Open a terminal (Terminal on macOS/Linux, PowerShell on Windows) and run:
+If auto-detect doesn't find Node.js, you can locate it manually. Open a terminal (Terminal on macOS/Linux, PowerShell on Windows) and run:
 
 ::: code-group
 
@@ -60,8 +60,10 @@ where.exe node
 
 ### Configure Node.js Path
 
+In most cases, the plugin automatically finds Node.js through your login shell's PATH, so no configuration is needed. If Node.js is not detected automatically:
+
 1. Open **Settings → Agent Client**
-2. Enter the Node.js path in the **Node.js path** field
+2. Click the **Auto-detect** button next to the **Node.js path** field, or enter the path manually
 
 ## Next Steps
 

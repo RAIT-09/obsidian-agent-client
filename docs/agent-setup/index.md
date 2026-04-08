@@ -1,6 +1,6 @@
 # Agent Setup Overview
 
-Agent Client supports multiple AI agents through the [Agent Client Protocol (ACP)](https://github.com/zed-industries/agent-client-protocol). This section covers how to set up each supported agent.
+Agent Client supports multiple AI agents through the [Agent Client Protocol (ACP)](https://github.com/agentclientprotocol/agent-client-protocol). This section covers how to set up each supported agent.
 
 ## Supported Agents
 
@@ -16,9 +16,9 @@ Agent Client supports multiple AI agents through the [Agent Client Protocol (ACP
 All agents follow a similar setup pattern:
 
 1. **Install the agent package** via npm
-2. **Find the installation path** using `which` (macOS/Linux) or `where.exe` (Windows)
-3. **Configure the path** in Settings → Agent Client
-4. **Set up authentication** (API key or account login)
+2. **Set up authentication** (API key or account login)
+
+The plugin resolves bare command names through your login shell's PATH, so path configuration is often not needed. If the agent is not found automatically, use `which` (macOS/Linux) or `where.exe` (Windows) to find the path and configure it in Settings → Agent Client.
 
 ## WSL Mode (Windows)
 

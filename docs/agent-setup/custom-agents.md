@@ -1,35 +1,19 @@
 # Custom Agents Setup
 
-You can use any agent that implements the [Agent Client Protocol (ACP)](https://agentclientprotocol.com/overview/agents).
+You can use any agent that implements the [Agent Client Protocol (ACP)](https://agentclientprotocol.com/get-started/agents).
 
 ## Install and Configure
 
-1. Install your ACP-compatible agent (e.g., [OpenCode](https://github.com/sst/opencode), [Qwen Code](https://github.com/QwenLM/qwen-code), [Kiro](https://kiro.dev/)).
+1. Install your ACP-compatible agent (e.g., [OpenCode](https://github.com/anomalyco/opencode), [Qwen Code](https://github.com/QwenLM/qwen-code), [Kiro](https://kiro.dev/)).
 
-2. Find the installation path by running the following command in your terminal (Terminal on macOS/Linux, PowerShell on Windows):
+2. Open **Settings → Agent Client** and scroll to **Custom Agents** section.
 
-::: code-group
+3. Click **Add custom agent**.
 
-```bash [macOS/Linux]
-which your-agent
-# Example output: /usr/local/bin/your-agent
-```
-
-```cmd [Windows]
-where.exe your-agent
-# Example output: C:\Users\Username\AppData\Roaming\npm\your-agent.cmd
-```
-
-:::
-
-3. Open **Settings → Agent Client** and scroll to **Custom Agents** section.
-
-4. Click **Add custom agent**.
-
-5. Configure the agent:
+4. Configure the agent:
    - **Agent ID**: Unique identifier (e.g., `my-agent`)
    - **Display name**: Name shown in menus (e.g., `My Agent`)
-   - **Path**: Absolute path to the agent executable
+   - **Path**: Command name or absolute path to the agent executable. The command name alone (e.g., `opencode`) works in many cases. If the agent is not found automatically, set the full path, or click **Auto-detect**.
    - **Arguments**: Command-line arguments, one per line (if required)
    - **Environment variables**: `KEY=VALUE` pairs, one per line (if required)
 
@@ -41,7 +25,7 @@ where.exe your-agent
 |-------|-------|
 | **Agent ID** | `opencode` |
 | **Display name** | `OpenCode` |
-| **Path** | `/usr/local/bin/opencode` |
+| **Path** | `opencode` |
 | **Arguments** | `acp` |
 | **Environment variables** | (optional) |
 
@@ -51,7 +35,7 @@ where.exe your-agent
 |-------|-------|
 | **Agent ID** | `qwen-code` |
 | **Display name** | `Qwen Code` |
-| **Path** | `/usr/local/bin/qwen` |
+| **Path** | `qwen` |
 | **Arguments** | `--experimental-acp` |
 | **Environment variables** | (optional) |
 
@@ -61,13 +45,9 @@ where.exe your-agent
 |-------|-------|
 | **Agent ID** | `kiro-cli` |
 | **Display name** | `Kiro` |
-| **Path** | `/path/to/home/.local/bin/kiro-cli` |
+| **Path** | `kiro-cli` |
 | **Arguments** | `acp` |
 | **Environment variables** | (optional) |
-
-::: tip
-Replace `/path/to/home` with your home directory (e.g., `/Users/john` on macOS, `/home/john` on Linux). `$HOME` and `~` may not be supported.
-:::
 
 ## Authentication
 
@@ -80,7 +60,7 @@ Refer to your agent's documentation for specific authentication instructions.
 
 ## Verify Setup
 
-1. Click the robot icon in the ribbon or use the command palette: **"Open agent chat"**
+1. Click the robot icon in the ribbon or use the command palette: **"Open chat view"**
 2. Select your custom agent from the agent dropdown in the chat header
 3. Try sending a message to verify the connection
 

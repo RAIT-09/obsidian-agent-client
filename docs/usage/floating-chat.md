@@ -43,8 +43,8 @@ Open more than one floating chat window to run parallel conversations.
 
 ### Opening Additional Windows
 
-- Click the **copy-plus** icon in the floating window header
-- Or use the command **"Open new floating chat window"** from the command palette
+- Click **"Open new view"** from the **⋮** (More) menu in the floating window header
+- Or use the command **"Open new floating chat view"** from the command palette
 
 ### Switching Between Windows
 
@@ -65,10 +65,10 @@ The focused floating window is always displayed in front of other floating windo
 
 | Command | Description |
 |---------|-------------|
-| **Open floating chat window** | Open an existing floating window, or create one if none exist |
-| **Open new floating chat window** | Always create a new floating window |
-| **Minimize floating chat window** | Hide the focused floating window (session is preserved) |
-| **Close floating chat window** | Close the focused floating window and end the session |
+| **Open floating chat view** | Open an existing floating window, or create one if none exist |
+| **Open new floating chat view** | Always create a new floating window |
+| **Minimize floating chat view** | Hide the focused floating window (session is preserved) |
+| **Close floating chat view** | Close the focused floating window and end the session |
 
 ::: tip
 Assign keyboard shortcuts to these commands in **Settings → Hotkeys** for quick access.
