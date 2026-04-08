@@ -189,8 +189,10 @@ If you need more detailed information about an issue, enable Debug mode:
    - Windows/Linux: `Ctrl + Shift + I`
 4. Go to the **Console** tab
 5. Filter by these prefixes:
-   - `[AcpAdapter]` - Agent communication
-   - `[useChat]` - Message handling
+   - `[AcpClient]` - Agent process and connection
+   - `[AcpHandler]` - Agent event handling
+   - `[PermissionManager]` - Permission requests
+   - `[VaultService]` - Vault access
    - `[useAgentSession]` - Session management
 
 ## Common Error Messages
