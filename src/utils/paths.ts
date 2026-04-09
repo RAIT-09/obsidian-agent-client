@@ -46,7 +46,7 @@ export function resolveCommandPath(command: string): Promise<string | null> {
 			const escaped = trimmed.replace(/'/g, "'\\''");
 			execFile(
 				shell,
-				["-l", "-c", `which '${escaped}'`],
+				["-i", "-l", "-c", `which '${escaped}'`],
 				{ timeout: 5000 },
 				(err, stdout) => {
 					if (err) {
