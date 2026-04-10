@@ -842,6 +842,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			this.plugin.settings.gemini.command = path;
 			await this.plugin.saveSettings();
 		});
+		this.addInstallHint(sectionEl, "@google/gemini-cli");
 
 		new Setting(sectionEl)
 			.setName("Arguments")
@@ -917,6 +918,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				this.plugin.settings.claude.command = path;
 				await this.plugin.saveSettings();
 			},
+		);
+		this.addInstallHint(
+			sectionEl,
+			"@agentclientprotocol/claude-agent-acp",
 		);
 
 		new Setting(sectionEl)
@@ -994,6 +999,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings();
 			},
 		);
+		this.addInstallHint(sectionEl, "@zed-industries/codex-acp");
 
 		new Setting(sectionEl)
 			.setName("Arguments")
@@ -1218,6 +1224,32 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			candidate = `${base}-${counter}`;
 		}
 		return candidate;
+	}
+
+	/**
+	 * Renders a copyable npm install command hint below a Path setting.
+	 */
+	private addInstallHint(
+		containerEl: HTMLElement,
+		npmPackage: string,
+	): void {
+		const command = `npm install -g ${npmPackage}@latest`;
+		const frag = document.createDocumentFragment();
+		frag.append("Not installed? Run in terminal: ");
+		frag.appendChild(document.createElement("code")).textContent = command;
+		new Setting(containerEl).setDesc(frag).addButton((btn) => {
+			btn.setButtonText("Copy").onClick(() => {
+				void navigator.clipboard.writeText(command).then(
+					() => {
+						btn.setButtonText("Copied!");
+						setTimeout(() => {
+							btn.setButtonText("Copy");
+						}, 1500);
+					},
+					() => undefined,
+				);
+			});
+		});
 	}
 
 	/**
