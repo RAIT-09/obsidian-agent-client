@@ -1239,10 +1239,15 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		frag.appendChild(document.createElement("code")).textContent = command;
 		new Setting(containerEl).setDesc(frag).addButton((btn) => {
 			btn.setButtonText("Copy").onClick(() => {
-				navigator.clipboard.writeText(command).then(() => {
-					btn.setButtonText("Copied!");
-					setTimeout(() => btn.setButtonText("Copy"), 1500);
-				});
+				void navigator.clipboard.writeText(command).then(
+					() => {
+						btn.setButtonText("Copied!");
+						setTimeout(() => {
+							btn.setButtonText("Copy");
+						}, 1500);
+					},
+					() => undefined,
+				);
 			});
 		});
 	}
