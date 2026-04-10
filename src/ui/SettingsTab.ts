@@ -919,10 +919,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings();
 			},
 		);
-		this.addInstallHint(
-			sectionEl,
-			"@agentclientprotocol/claude-agent-acp",
-		);
+		this.addInstallHint(sectionEl, "@agentclientprotocol/claude-agent-acp");
 
 		new Setting(sectionEl)
 			.setName("Arguments")
@@ -1229,10 +1226,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 	/**
 	 * Renders a copyable npm install command hint below a Path setting.
 	 */
-	private addInstallHint(
-		containerEl: HTMLElement,
-		npmPackage: string,
-	): void {
+	private addInstallHint(containerEl: HTMLElement, npmPackage: string): void {
 		const command = `npm install -g ${npmPackage}@latest`;
 		const frag = document.createDocumentFragment();
 		frag.append("Not installed? Run in terminal: ");
