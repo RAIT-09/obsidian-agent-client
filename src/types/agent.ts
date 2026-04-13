@@ -61,6 +61,8 @@ export interface BaseAgentSettings {
 export interface GeminiAgentSettings extends BaseAgentSettings {
 	/** Gemini API key (GEMINI_API_KEY) */
 	apiKey: string;
+	/** Secret storage ID containing the Gemini API key */
+	apiKeySecretId?: string;
 }
 
 /**
@@ -71,6 +73,8 @@ export interface GeminiAgentSettings extends BaseAgentSettings {
 export interface ClaudeAgentSettings extends BaseAgentSettings {
 	/** Anthropic API key for Claude (ANTHROPIC_API_KEY) */
 	apiKey: string;
+	/** Secret storage ID containing the Anthropic API key */
+	apiKeySecretId?: string;
 }
 
 /**
@@ -81,6 +85,8 @@ export interface ClaudeAgentSettings extends BaseAgentSettings {
 export interface CodexAgentSettings extends BaseAgentSettings {
 	/** OpenAI API key for Codex (OPENAI_API_KEY) */
 	apiKey: string;
+	/** Secret storage ID containing the OpenAI API key */
+	apiKeySecretId?: string;
 }
 
 /**

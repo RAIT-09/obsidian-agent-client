@@ -813,14 +813,16 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("API key")
 			.setDesc(
-				"Gemini API key. Required if not logging in with a Google account. (Stored as plain text)",
+				"Gemini API key. Required if not logging in with a Google account. Stored in Obsidian secret storage.",
 			)
 			.addText((text) => {
 				text.setPlaceholder("Enter your Gemini API key")
 					.setValue(gemini.apiKey)
 					.onChange(async (value) => {
-						this.plugin.settings.gemini.apiKey = value.trim();
-						await this.plugin.saveSettings();
+						await this.plugin.updateAgentApiKey(
+							"gemini",
+							value.trim(),
+						);
 					});
 				text.inputEl.type = "password";
 			});
@@ -863,7 +865,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("Environment variables")
 			.setDesc(
-				"Enter KEY=VALUE pairs, one per line. Required to authenticate with Vertex AI. GEMINI_API_KEY is derived from the field above.(Stored as plain text)",
+				"Enter KEY=VALUE pairs, one per line. Required to authenticate with Vertex AI. GEMINI_API_KEY is derived from the field above.",
 			)
 			.addTextArea((text) => {
 				text.setPlaceholder("GOOGLE_CLOUD_PROJECT=...")
@@ -886,14 +888,16 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("API key")
 			.setDesc(
-				"Anthropic API key. Required if not logging in with an Anthropic account. (Stored as plain text)",
+				"Anthropic API key. Required if not logging in with an Anthropic account. Stored in Obsidian secret storage.",
 			)
 			.addText((text) => {
 				text.setPlaceholder("Enter your Anthropic API key")
 					.setValue(claude.apiKey)
 					.onChange(async (value) => {
-						this.plugin.settings.claude.apiKey = value.trim();
-						await this.plugin.saveSettings();
+						await this.plugin.updateAgentApiKey(
+							"claude",
+							value.trim(),
+						);
 					});
 				text.inputEl.type = "password";
 			});
@@ -963,14 +967,16 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("API key")
 			.setDesc(
-				"OpenAI API key. Required if not logging in with an OpenAI account. (Stored as plain text)",
+				"OpenAI API key. Required if not logging in with an OpenAI account. Stored in Obsidian secret storage.",
 			)
 			.addText((text) => {
 				text.setPlaceholder("Enter your OpenAI API key")
 					.setValue(codex.apiKey)
 					.onChange(async (value) => {
-						this.plugin.settings.codex.apiKey = value.trim();
-						await this.plugin.saveSettings();
+						await this.plugin.updateAgentApiKey(
+							"codex",
+							value.trim(),
+						);
 					});
 				text.inputEl.type = "password";
 			});
