@@ -14,7 +14,7 @@
 
 AIエージェント（Claude Code、Codex、Gemini CLI）をObsidianに直接統合。Vault内からAIアシスタントとチャットできます。
 
-このプラグインは、Zed の [Agent Client Protocol (ACP)](https://github.com/zed-industries/agent-client-protocol) で構築されています。
+このプラグインは、Zed の [Agent Client Protocol (ACP)](https://github.com/agentclientprotocol/agent-client-protocol) で構築されています。
 
 https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 
