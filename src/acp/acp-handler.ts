@@ -68,7 +68,10 @@ export class AcpHandler {
 		const update = params.update;
 		const sessionId = params.sessionId;
 		this.promptSessionUpdateCount++;
-		this.logger.log("[AcpHandler] sessionUpdate:", { sessionId, update });
+		this.logger.log("[AcpHandler] sessionUpdate:", {
+			sessionId,
+			type: update.sessionUpdate,
+		});
 
 		switch (update.sessionUpdate) {
 			case "agent_message_chunk":
@@ -174,7 +177,7 @@ export class AcpHandler {
 	): Promise<void> {
 		this.logger.log(
 			`[AcpHandler] Extension notification received: ${method}`,
-			params,
+			Object.keys(params),
 		);
 	}
 
@@ -199,7 +202,12 @@ export class AcpHandler {
 	): Promise<acp.CreateTerminalResponse> {
 		this.logger.log(
 			"[AcpHandler] createTerminal called with params:",
-			params,
+			{
+				command: params.command,
+				argCount: params.args?.length ?? 0,
+				hasEnv: (params.env?.length ?? 0) > 0,
+				cwd: params.cwd || this.getWorkingDirectory(),
+			},
 		);
 
 		const terminalId = this.terminalManager.createTerminal({

@@ -110,7 +110,7 @@ export class AcpClient {
 	async initialize(config: AgentConfig): Promise<InitializeResult> {
 		this.logger.log(
 			"[AcpClient] Starting initialization with config:",
-			config,
+			this.getSafeConfigForLog(config),
 		);
 		this.logger.log(
 			`[AcpClient] Current state - process: ${!!this.agentProcess}, PID: ${this.agentProcess?.pid}`,
@@ -204,7 +204,7 @@ export class AcpClient {
 		this.logger.log(
 			"[AcpClient] Prepared spawn command:",
 			spawnCommand,
-			spawnArgs,
+			`(${spawnArgs.length} args)`,
 		);
 
 		// Spawn the agent process
@@ -299,9 +299,12 @@ export class AcpClient {
 
 		agentProcess.stderr?.setEncoding("utf8");
 		agentProcess.stderr?.on("data", (data) => {
-			this.logger.log(`[AcpClient] ${agentLabel} stderr:`, data);
+			const stderrChunk = String(data);
+			this.logger.log(
+				`[AcpClient] ${agentLabel} stderr chunk (${stderrChunk.length} chars)`,
+			);
 			// Keep a rolling window of recent stderr for error diagnostics
-			this.recentStderr += data;
+			this.recentStderr += stderrChunk;
 			if (this.recentStderr.length > 8192) {
 				this.recentStderr = this.recentStderr.slice(-4096);
 			}
@@ -382,6 +385,24 @@ export class AcpClient {
 
 			throw error;
 		}
+	}
+
+	private getSafeConfigForLog(config: AgentConfig): {
+		id: string;
+		displayName: string;
+		command: string;
+		args: string[];
+		envKeys: string[];
+		workingDirectory: string;
+	} {
+		return {
+			id: config.id,
+			displayName: config.displayName,
+			command: config.command,
+			args: [...config.args],
+			envKeys: Object.keys(config.env || {}),
+			workingDirectory: config.workingDirectory,
+		};
 	}
 
 	/**

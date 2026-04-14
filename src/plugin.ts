@@ -185,6 +185,14 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	floatingButtonPosition: null,
 };
 
+const AGENT_API_KEY_SECRET_IDS = {
+	claude: "agent-client-claude-api-key",
+	codex: "agent-client-codex-api-key",
+	gemini: "agent-client-gemini-api-key",
+} as const;
+
+type BuiltInAgentKey = keyof typeof AGENT_API_KEY_SECRET_IDS;
+
 export default class AgentClientPlugin extends Plugin {
 	settings: AgentClientPluginSettings;
 	settingsService!: SettingsService;
@@ -830,6 +838,7 @@ export default class AgentClientPlugin extends Plugin {
 	async loadSettings() {
 		const raw = ((await this.loadData()) ?? {}) as Record<string, unknown>;
 		const D = DEFAULT_SETTINGS;
+		let migratedSecrets = false;
 
 		// Extract agent sub-objects
 		const rc = obj(raw.claude) ?? {};
@@ -865,7 +874,17 @@ export default class AgentClientPlugin extends Plugin {
 			claude: {
 				id: D.claude.id, // Fixed — never from raw
 				displayName: str(rc.displayName, D.claude.displayName),
-				apiKey: str(rc.apiKey, D.claude.apiKey),
+				apiKeySecretId: str(
+					rc.apiKeySecretId,
+					AGENT_API_KEY_SECRET_IDS.claude,
+				),
+				apiKey: this.loadAgentApiKey(
+					str(rc.apiKeySecretId, AGENT_API_KEY_SECRET_IDS.claude),
+					str(rc.apiKey, D.claude.apiKey),
+					() => {
+						migratedSecrets = true;
+					},
+				),
 				// Migration: claude.command ← claudeCodeAcpCommandPath (old name)
 				command:
 					str(rc.command, "") ||
@@ -877,7 +896,17 @@ export default class AgentClientPlugin extends Plugin {
 			codex: {
 				id: D.codex.id,
 				displayName: str(rk.displayName, D.codex.displayName),
-				apiKey: str(rk.apiKey, D.codex.apiKey),
+				apiKeySecretId: str(
+					rk.apiKeySecretId,
+					AGENT_API_KEY_SECRET_IDS.codex,
+				),
+				apiKey: this.loadAgentApiKey(
+					str(rk.apiKeySecretId, AGENT_API_KEY_SECRET_IDS.codex),
+					str(rk.apiKey, D.codex.apiKey),
+					() => {
+						migratedSecrets = true;
+					},
+				),
 				command: str(rk.command, "") || D.codex.command,
 				args: sanitizeArgs(rk.args),
 				env: normalizeEnvVars(rk.env),
@@ -885,7 +914,17 @@ export default class AgentClientPlugin extends Plugin {
 			gemini: {
 				id: D.gemini.id,
 				displayName: str(rg.displayName, D.gemini.displayName),
-				apiKey: str(rg.apiKey, D.gemini.apiKey),
+				apiKeySecretId: str(
+					rg.apiKeySecretId,
+					AGENT_API_KEY_SECRET_IDS.gemini,
+				),
+				apiKey: this.loadAgentApiKey(
+					str(rg.apiKeySecretId, AGENT_API_KEY_SECRET_IDS.gemini),
+					str(rg.apiKey, D.gemini.apiKey),
+					() => {
+						migratedSecrets = true;
+					},
+				),
 				// Migration: gemini.command ← geminiCommandPath (old name)
 				command:
 					str(rg.command, "") ||
@@ -1017,14 +1056,85 @@ export default class AgentClientPlugin extends Plugin {
 		};
 
 		this.ensureDefaultAgentId();
+
+		if (migratedSecrets) {
+			await this.saveSettings();
+		}
 	}
 
 	async saveSettings() {
-		await this.saveData(this.settings);
+		await this.saveData(this.getPersistedSettings());
 	}
 
 	async saveSettingsAndNotify(nextSettings: AgentClientPluginSettings) {
 		await this.settingsService.updateSettings(nextSettings);
+	}
+
+	private loadAgentApiKey(
+		secretId: string,
+		legacyApiKey: string,
+		onMigrate: () => void,
+	): string {
+		const storedSecret = this.app.secretStorage.getSecret(secretId);
+		if (storedSecret !== null) {
+			return storedSecret;
+		}
+
+		if (legacyApiKey.trim().length > 0) {
+			this.app.secretStorage.setSecret(secretId, legacyApiKey);
+			onMigrate();
+			return legacyApiKey;
+		}
+
+		return "";
+	}
+
+	private getPersistedSettings(): AgentClientPluginSettings {
+		return {
+			...this.settings,
+			claude: {
+				...this.settings.claude,
+				apiKey: "",
+				apiKeySecretId:
+					this.settings.claude.apiKeySecretId ??
+					AGENT_API_KEY_SECRET_IDS.claude,
+			},
+			codex: {
+				...this.settings.codex,
+				apiKey: "",
+				apiKeySecretId:
+					this.settings.codex.apiKeySecretId ??
+					AGENT_API_KEY_SECRET_IDS.codex,
+			},
+			gemini: {
+				...this.settings.gemini,
+				apiKey: "",
+				apiKeySecretId:
+					this.settings.gemini.apiKeySecretId ??
+					AGENT_API_KEY_SECRET_IDS.gemini,
+			},
+		};
+	}
+
+	async updateAgentApiKey(
+		agent: BuiltInAgentKey,
+		apiKey: string,
+	): Promise<void> {
+		const secretId = AGENT_API_KEY_SECRET_IDS[agent];
+		this.app.secretStorage.setSecret(secretId, apiKey);
+
+		if (agent === "claude") {
+			this.settings.claude.apiKey = apiKey;
+			this.settings.claude.apiKeySecretId = secretId;
+		} else if (agent === "codex") {
+			this.settings.codex.apiKey = apiKey;
+			this.settings.codex.apiKeySecretId = secretId;
+		} else {
+			this.settings.gemini.apiKey = apiKey;
+			this.settings.gemini.apiKeySecretId = secretId;
+		}
+
+		await this.saveSettings();
 	}
 
 	/**
