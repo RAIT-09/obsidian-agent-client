@@ -34,6 +34,7 @@ https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 - **Session History**: Resume or fork previous conversations
 - **Chat Export**: Save conversations as Markdown notes
 - **Terminal Integration**: Let agents execute commands and return results
+- **MCP Support**: Agents use their configured MCP servers — no extra setup needed in the plugin
 
 ## Installation
 
