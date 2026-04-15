@@ -82,6 +82,7 @@ export interface PreparePromptInput {
 	/** Prompt injection settings (undefined = disabled) */
 	promptInjection?: {
 		latex?: boolean;
+		wikiLinks?: boolean;
 	};
 }
 
@@ -154,6 +155,8 @@ const DEFAULT_MAX_NOTE_LENGTH = 10000; // Default maximum characters per note
 const DEFAULT_MAX_SELECTION_LENGTH = 10000; // Default maximum characters for selection
 const LATEX_MATH_INSTRUCTION =
 	"This client uses Obsidian Flavored Markdown. For math, use $...$ for inline and $$...$$ for display (not \\(...\\) or \\[...\\]).";
+const WIKI_LINK_INSTRUCTION =
+	"When referencing notes in this vault, use [[Note Name]] wikilink syntax so they become clickable links.";
 
 // ============================================================================
 // Shared Helper Functions
@@ -272,6 +275,10 @@ function buildSystemInstructions(input: PreparePromptInput): string[] {
 	if (!input.promptInjection) return [];
 
 	const instructions: string[] = [];
+
+	if (input.promptInjection.wikiLinks) {
+		instructions.push(WIKI_LINK_INSTRUCTION);
+	}
 
 	if (input.promptInjection.latex) {
 		instructions.push(LATEX_MATH_INSTRUCTION);

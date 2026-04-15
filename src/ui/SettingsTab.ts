@@ -468,6 +468,23 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		if (this.plugin.settings.promptInjection.enabled) {
 			new Setting(containerEl)
+				.setName("Wikilink formatting")
+				.setDesc(
+					"Instruct agents to use [[Note Name]] wikilink syntax when referencing notes.",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(
+							this.plugin.settings.promptInjection.wikiLinks,
+						)
+						.onChange(async (value) => {
+							this.plugin.settings.promptInjection.wikiLinks =
+								value;
+							await this.plugin.saveSettings();
+						}),
+				);
+
+			new Setting(containerEl)
 				.setName("LaTeX math formatting")
 				.setDesc(
 					"Instruct agents to use $...$ and $$...$$ delimiters for math expressions.",

@@ -83,6 +83,8 @@ export interface AgentClientPluginSettings {
 		enabled: boolean;
 		/** Inject LaTeX math formatting instructions ($...$ and $$...$$) */
 		latex: boolean;
+		/** Instruct agents to use [[Note Name]] wikilink syntax */
+		wikiLinks: boolean;
 	};
 	debugMode: boolean;
 	nodePath: string;
@@ -160,6 +162,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	promptInjection: {
 		enabled: true,
 		latex: true,
+		wikiLinks: true,
 	},
 	debugMode: false,
 	nodePath: "",
@@ -927,6 +930,7 @@ export default class AgentClientPlugin extends Plugin {
 				return {
 					enabled: bool(rp.enabled, D.promptInjection.enabled),
 					latex: bool(rp.latex, D.promptInjection.latex),
+				wikiLinks: bool(rp.wikiLinks, D.promptInjection.wikiLinks),
 				};
 			})(),
 			debugMode: bool(raw.debugMode, D.debugMode),
