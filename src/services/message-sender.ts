@@ -75,6 +75,15 @@ export interface PreparePromptInput {
 
 	/** Maximum characters for selection (default: 10000) */
 	maxSelectionLength?: number;
+
+	/** Whether this is the first message in the session */
+	isFirstMessage?: boolean;
+
+	/** Prompt injection settings (undefined = disabled) */
+	promptInjection?: {
+		latex?: boolean;
+		wikiLinks?: boolean;
+	};
 }
 
 /**
@@ -144,6 +153,10 @@ export interface SendPromptResult {
 
 const DEFAULT_MAX_NOTE_LENGTH = 10000; // Default maximum characters per note
 const DEFAULT_MAX_SELECTION_LENGTH = 10000; // Default maximum characters for selection
+const LATEX_MATH_INSTRUCTION =
+	"This client uses Obsidian Flavored Markdown. For math, use $...$ for inline and $$...$$ for display (not \\(...\\) or \\[...\\]).";
+const WIKI_LINK_INSTRUCTION =
+	"When referencing notes in this vault, use [[Note Name]] wikilink syntax so they become clickable links.";
 
 // ============================================================================
 // Shared Helper Functions
@@ -250,6 +263,43 @@ function buildAutoMentionPrefix(
 		return `@[[${activeNote.name}]]:${activeNote.selection.from.line + 1}-${activeNote.selection.to.line + 1}\n`;
 	}
 	return `@[[${activeNote.name}]]\n`;
+}
+
+/**
+ * Build system prompt instruction strings for Obsidian-flavored Markdown.
+ * Returns an array of instruction strings to inject.
+ * Empty array if not first message or no instructions enabled.
+ */
+function buildSystemInstructions(input: PreparePromptInput): string[] {
+	if (!input.isFirstMessage) return [];
+	if (!input.promptInjection) return [];
+
+	const instructions: string[] = [];
+
+	if (input.promptInjection.wikiLinks) {
+		instructions.push(WIKI_LINK_INSTRUCTION);
+	}
+
+	if (input.promptInjection.latex) {
+		instructions.push(LATEX_MATH_INSTRUCTION);
+	}
+
+	return instructions;
+}
+
+function buildAgentMessageText(
+	message: string,
+	autoMentionPrefix: string,
+	contextBlocks?: string[],
+): string {
+	const userMessage = autoMentionPrefix + message;
+
+	return [
+		...(contextBlocks && contextBlocks.length > 0
+			? [contextBlocks.join("\n")]
+			: []),
+		...(userMessage ? [userMessage] : []),
+	].join("\n\n");
 }
 
 /**
@@ -398,7 +448,15 @@ async function preparePromptWithEmbeddedContext(
 		input.isAutoMentionDisabled,
 	);
 
+	// Build system prompt instructions (first message only)
+	const systemInstructions = buildSystemInstructions(input);
+	const systemBlocks: PromptContent[] = systemInstructions.map((text) => ({
+		type: "text" as const,
+		text,
+	}));
+
 	const agentContent: PromptContent[] = [
+		...systemBlocks,
 		...resourceBlocks,
 		...autoMentionBlocks,
 		...(input.message || autoMentionPrefix
@@ -472,19 +530,24 @@ async function preparePromptWithTextContext(
 		contextBlocks.push(autoMentionContextBlock);
 	}
 
+	// Build system prompt instructions (first message only)
+	const systemInstructions = buildSystemInstructions(input);
+	for (const instruction of systemInstructions) {
+		contextBlocks.push(
+			`<obsidian_system_instruction>\n${instruction}\n</obsidian_system_instruction>`,
+		);
+	}
+
 	const autoMentionPrefix = buildAutoMentionPrefix(
 		input.activeNote,
 		input.isAutoMentionDisabled,
 	);
 
-	// Build agent message text (context blocks + auto-mention prefix + original message)
-	const agentMessageText =
-		contextBlocks.length > 0
-			? contextBlocks.join("\n") +
-				"\n\n" +
-				autoMentionPrefix +
-				input.message
-			: autoMentionPrefix + input.message;
+	const agentMessageText = buildAgentMessageText(
+		input.message,
+		autoMentionPrefix,
+		contextBlocks,
+	);
 
 	const agentContent: PromptContent[] = [
 		...(agentMessageText
