@@ -144,6 +144,12 @@ export interface SendPromptResult {
 
 const DEFAULT_MAX_NOTE_LENGTH = 10000; // Default maximum characters per note
 const DEFAULT_MAX_SELECTION_LENGTH = 10000; // Default maximum characters for selection
+const MATH_FORMATTING_INSTRUCTION = [
+	"When your response includes mathematical expressions, always format them using standard LaTeX math delimiters that render correctly in Obsidian Markdown.",
+	"Use $...$ for inline math and $$...$$ for display math.",
+	"Do not output bare LaTeX such as A^{-1}, \\begin{pmatrix}...\\end{pmatrix}, or standalone [ ... ] without math delimiters.",
+	"Do not wrap mathematical expressions in code fences or inline backticks unless the user explicitly asks for source code.",
+].join(" ");
 
 // ============================================================================
 // Shared Helper Functions
@@ -250,6 +256,22 @@ function buildAutoMentionPrefix(
 		return `@[[${activeNote.name}]]:${activeNote.selection.from.line + 1}-${activeNote.selection.to.line + 1}\n`;
 	}
 	return `@[[${activeNote.name}]]\n`;
+}
+
+function buildAgentMessageText(
+	message: string,
+	autoMentionPrefix: string,
+	contextBlocks?: string[],
+): string {
+	const userMessage = autoMentionPrefix + message;
+
+	return [
+		...(contextBlocks && contextBlocks.length > 0
+			? [contextBlocks.join("\n")]
+			: []),
+		MATH_FORMATTING_INSTRUCTION,
+		...(userMessage ? [userMessage] : []),
+	].join("\n\n");
 }
 
 /**
@@ -397,15 +419,19 @@ async function preparePromptWithEmbeddedContext(
 		input.activeNote,
 		input.isAutoMentionDisabled,
 	);
+	const agentMessageText = buildAgentMessageText(
+		input.message,
+		autoMentionPrefix,
+	);
 
 	const agentContent: PromptContent[] = [
 		...resourceBlocks,
 		...autoMentionBlocks,
-		...(input.message || autoMentionPrefix
+		...(agentMessageText
 			? [
 					{
 						type: "text" as const,
-						text: autoMentionPrefix + input.message,
+						text: agentMessageText,
 					},
 				]
 			: []),
@@ -477,14 +503,11 @@ async function preparePromptWithTextContext(
 		input.isAutoMentionDisabled,
 	);
 
-	// Build agent message text (context blocks + auto-mention prefix + original message)
-	const agentMessageText =
-		contextBlocks.length > 0
-			? contextBlocks.join("\n") +
-				"\n\n" +
-				autoMentionPrefix +
-				input.message
-			: autoMentionPrefix + input.message;
+	const agentMessageText = buildAgentMessageText(
+		input.message,
+		autoMentionPrefix,
+		contextBlocks,
+	);
 
 	const agentContent: PromptContent[] = [
 		...(agentMessageText
