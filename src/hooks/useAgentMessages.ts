@@ -48,6 +48,8 @@ export interface SendMessageOptions {
 	images?: ImagePromptContent[];
 	/** Attached file references (resource links) */
 	resourceLinks?: ResourceLinkPromptContent[];
+	/** Whether this is the first message in the session */
+	isFirstMessage?: boolean;
 }
 
 export interface UseAgentMessagesReturn {
@@ -247,6 +249,10 @@ export function useAgentMessages(
 					maxNoteLength: settings.displaySettings.maxNoteLength,
 					maxSelectionLength:
 						settings.displaySettings.maxSelectionLength,
+					isFirstMessage: options.isFirstMessage,
+					promptInjection: settings.promptInjection.enabled
+						? { latex: settings.promptInjection.latex }
+						: undefined,
 				},
 				vaultAccess,
 				vaultAccess, // IMentionService (same object)

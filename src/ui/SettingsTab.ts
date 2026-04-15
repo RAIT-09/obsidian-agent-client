@@ -446,6 +446,43 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		// ─────────────────────────────────────────────────────────────────────
+		// Prompt injection
+		// ───────────��─────────────────────────────────────────────────────────
+
+		new Setting(containerEl).setName("Prompt injection").setHeading();
+
+		new Setting(containerEl)
+			.setName("Inject Obsidian Markdown instructions")
+			.setDesc(
+				"Include formatting guidance in the first message of each session so agents produce Obsidian-compatible Markdown.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.promptInjection.enabled)
+					.onChange(async (value) => {
+						this.plugin.settings.promptInjection.enabled = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (this.plugin.settings.promptInjection.enabled) {
+			new Setting(containerEl)
+				.setName("LaTeX math formatting")
+				.setDesc(
+					"Instruct agents to use $...$ and $$...$$ delimiters for math expressions.",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.promptInjection.latex)
+						.onChange(async (value) => {
+							this.plugin.settings.promptInjection.latex = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
+
+		// ─────────────────────────────────────────────────────────────────────
 		// Windows WSL Settings (Windows only)
 		// ─────────────────────────────────────────────────────────────────────
 
