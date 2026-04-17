@@ -270,8 +270,8 @@ export function wrapCommandForWsl(
 
 	// Specify WSL distribution if provided
 	if (distribution) {
-		// Validate distribution name (alphanumeric, dash, underscore only)
-		if (!/^[a-zA-Z0-9_-]+$/.test(distribution)) {
+		// Validate distribution name (alphanumeric, dot, dash, underscore only)
+		if (!/^[a-zA-Z0-9._-]+$/.test(distribution)) {
 			throw new Error(`Invalid WSL distribution name: ${distribution}`);
 		}
 		wslArgs.push("-d", distribution);
