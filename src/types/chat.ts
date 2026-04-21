@@ -46,7 +46,7 @@ export type ToolKind =
  * Content that can be included in a tool call result.
  * Currently supports diffs and terminal output.
  */
-export type ToolCallContent = DiffContent | TerminalContent;
+export type ToolCallContent = DiffContent | TerminalContent | TextToolContent;
 
 /**
  * Represents a file modification with before/after content.
@@ -64,6 +64,15 @@ export interface DiffContent {
 export interface TerminalContent {
 	type: "terminal";
 	terminalId: string;
+}
+
+/**
+ * Plain text tool output content.
+ * Used by ACP tool_call/tool_call_update payloads with content.type === "content".
+ */
+export interface TextToolContent {
+	type: "content";
+	text: string;
 }
 
 // ============================================================================

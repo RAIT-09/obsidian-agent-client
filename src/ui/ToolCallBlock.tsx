@@ -9,7 +9,7 @@ import { PermissionBanner } from "./PermissionBanner";
 import { LucideIcon } from "./shared/IconButton";
 import { toRelativePath } from "../utils/paths";
 import * as Diff from "diff";
-// import { MarkdownRenderer } from "./shared/MarkdownRenderer";
+import { MarkdownRenderer } from "./shared/MarkdownRenderer";
 
 interface ToolCallBlockProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
@@ -43,6 +43,9 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 	const [selectedOptionId, setSelectedOptionId] = useState<
 		string | undefined
 	>(permissionRequest?.selectedOptionId);
+	const hasToolOutput = Boolean(toolContent && toolContent.length > 0);
+	const [isOutputExpanded, setIsOutputExpanded] = useState(false);
+	const hadToolOutputRef = React.useRef(hasToolOutput);
 
 	// Update selectedOptionId when permissionRequest changes
 	React.useEffect(() => {
@@ -50,6 +53,18 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 			setSelectedOptionId(permissionRequest?.selectedOptionId);
 		}
 	}, [permissionRequest?.selectedOptionId]);
+
+	React.useEffect(() => {
+		if (!hadToolOutputRef.current && hasToolOutput) {
+			setIsOutputExpanded(status === "failed");
+		}
+
+		if (status === "failed") {
+			setIsOutputExpanded(true);
+		}
+
+		hadToolOutputRef.current = hasToolOutput;
+	}, [hasToolOutput, status]);
 
 	// Get vault path for relative path display
 	const vaultPath = useMemo(() => {
@@ -110,6 +125,27 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 						/>
 					)}
 				</div>
+				{hasToolOutput && (
+					<button
+						type="button"
+						className="agent-client-tool-call-output-toggle"
+						onClick={() => setIsOutputExpanded(!isOutputExpanded)}
+					>
+						<span className="agent-client-tool-call-output-toggle-text">
+							{isOutputExpanded
+								? "Hide tool output"
+								: "Show tool output"}
+						</span>
+						<LucideIcon
+							name={
+								isOutputExpanded
+									? "chevron-up"
+									: "chevron-right"
+							}
+							className="agent-client-tool-call-output-toggle-icon"
+						/>
+					</button>
+				)}
 				{kind === "execute" &&
 					rawInput &&
 					typeof rawInput.command === "string" && (
@@ -138,7 +174,8 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 			</div>
 
 			{/* Tool call content (diffs, terminal output, etc.) */}
-			{toolContent &&
+			{isOutputExpanded &&
+				toolContent &&
 				toolContent.map((item, index) => {
 					if (item.type === "terminal") {
 						return (
@@ -165,6 +202,19 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 										.diffCollapseThreshold
 								}
 							/>
+						);
+					}
+					if (item.type === "content") {
+						return (
+							<div
+								key={index}
+								className="agent-client-message-tool-call-content"
+							>
+								<MarkdownRenderer
+									text={item.text}
+									plugin={plugin}
+								/>
+							</div>
 						);
 					}
 					return null;
