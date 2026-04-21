@@ -36,8 +36,7 @@ export class AcpTypeConverter {
 	 * Convert ACP ToolCallContent to domain ToolCallContent.
 	 *
 	 * Filters out content types that are not supported by the domain model:
-	 * - Supports: "diff", "terminal"
-	 * - Ignores: "content" (not implemented in UI)
+	 * - Supports: "diff", "terminal", "content" (text)
 	 *
 	 * @param acpContent - Tool call content from ACP protocol
 	 * @returns Domain model tool call content, or undefined if input is null/empty
@@ -75,8 +74,14 @@ export class AcpTypeConverter {
 					type: "terminal",
 					terminalId: item.terminalId,
 				});
+			} else if (item.type === "content") {
+				if (item.content?.type === "text") {
+					converted.push({
+						type: "content",
+						text: item.content.text,
+					});
+				}
 			}
-			// "content" type is intentionally ignored (not implemented in UI)
 		}
 
 		return converted.length > 0 ? converted : undefined;
