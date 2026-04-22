@@ -254,6 +254,7 @@ export function useAgentMessages(
 						? {
 								latex: settings.promptInjection.latex,
 								wikiLinks: settings.promptInjection.wikiLinks,
+								tables: settings.promptInjection.tables,
 							}
 						: undefined,
 				},

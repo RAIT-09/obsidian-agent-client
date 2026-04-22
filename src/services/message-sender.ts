@@ -83,6 +83,7 @@ export interface PreparePromptInput {
 	promptInjection?: {
 		latex?: boolean;
 		wikiLinks?: boolean;
+		tables?: boolean;
 	};
 }
 
@@ -157,6 +158,8 @@ const LATEX_MATH_INSTRUCTION =
 	"This client uses Obsidian Flavored Markdown. For math, use $...$ for inline and $$...$$ for display (not \\(...\\) or \\[...\\]).";
 const WIKI_LINK_INSTRUCTION =
 	"When referencing notes in this vault, use [[Note Name]] wikilink syntax so they become clickable links.";
+const TABLE_INSTRUCTION =
+	"Always leave a blank line before Markdown tables; without it Obsidian renders them as plain text.";
 
 // ============================================================================
 // Shared Helper Functions
@@ -278,6 +281,10 @@ function buildSystemInstructions(input: PreparePromptInput): string[] {
 
 	if (input.promptInjection.wikiLinks) {
 		instructions.push(WIKI_LINK_INSTRUCTION);
+	}
+
+	if (input.promptInjection.tables) {
+		instructions.push(TABLE_INSTRUCTION);
 	}
 
 	if (input.promptInjection.latex) {

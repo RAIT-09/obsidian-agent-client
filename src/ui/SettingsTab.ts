@@ -485,6 +485,20 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				);
 
 			new Setting(containerEl)
+				.setName("Markdown table spacing")
+				.setDesc(
+					"Instruct agents to leave a blank line before Markdown tables so Obsidian renders them correctly.",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.promptInjection.tables)
+						.onChange(async (value) => {
+							this.plugin.settings.promptInjection.tables = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+
+			new Setting(containerEl)
 				.setName("LaTeX math formatting")
 				.setDesc(
 					"Instruct agents to use $...$ and $$...$$ delimiters for math expressions.",
