@@ -85,6 +85,8 @@ export interface AgentClientPluginSettings {
 		latex: boolean;
 		/** Instruct agents to use [[Note Name]] wikilink syntax */
 		wikiLinks: boolean;
+		/** Instruct agents to leave a blank line before Markdown tables */
+		tables: boolean;
 	};
 	debugMode: boolean;
 	nodePath: string;
@@ -163,6 +165,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		enabled: true,
 		latex: true,
 		wikiLinks: true,
+		tables: true,
 	},
 	debugMode: false,
 	nodePath: "",
@@ -970,6 +973,7 @@ export default class AgentClientPlugin extends Plugin {
 					enabled: bool(rp.enabled, D.promptInjection.enabled),
 					latex: bool(rp.latex, D.promptInjection.latex),
 				wikiLinks: bool(rp.wikiLinks, D.promptInjection.wikiLinks),
+					tables: bool(rp.tables, D.promptInjection.tables),
 				};
 			})(),
 			debugMode: bool(raw.debugMode, D.debugMode),
