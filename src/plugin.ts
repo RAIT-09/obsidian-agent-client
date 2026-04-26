@@ -129,6 +129,10 @@ export interface AgentClientPluginSettings {
 	floatingWindowSize: { width: number; height: number };
 	floatingWindowPosition: { x: number; y: number } | null;
 	floatingButtonPosition: { x: number; y: number } | null;
+
+	// Tab settings
+	/** Maximum number of session tabs per view (default: 10) */
+	maxSessionTabs: number;
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -200,6 +204,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	floatingWindowSize: { width: 400, height: 500 },
 	floatingWindowPosition: null,
 	floatingButtonPosition: null,
+	maxSessionTabs: 10,
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -270,6 +275,39 @@ export default class AgentClientPlugin extends Plugin {
 				void this.openNewChatViewWithAgent(
 					this.settings.defaultAgentId,
 				);
+			},
+		});
+
+		// Tab commands
+		this.addCommand({
+			id: "new-session-tab",
+			name: "New session tab",
+			callback: () => {
+				this.getActiveChatView()?.addTab();
+			},
+		});
+
+		this.addCommand({
+			id: "close-session-tab",
+			name: "Close session tab",
+			callback: () => {
+				this.getActiveChatView()?.closeActiveTab();
+			},
+		});
+
+		this.addCommand({
+			id: "next-session-tab",
+			name: "Next session tab",
+			callback: () => {
+				this.getActiveChatView()?.nextTab();
+			},
+		});
+
+		this.addCommand({
+			id: "previous-session-tab",
+			name: "Previous session tab",
+			callback: () => {
+				this.getActiveChatView()?.prevTab();
 			},
 		});
 
@@ -642,6 +680,22 @@ export default class AgentClientPlugin extends Plugin {
 		if (view) {
 			view.expand();
 		}
+	}
+
+	/**
+	 * Get the active sidebar ChatView (for tab commands).
+	 */
+	getActiveChatView(): ChatView | null {
+		const focusedId = this.lastActiveChatViewId;
+		if (!focusedId) return null;
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
+		for (const leaf of leaves) {
+			const view = leaf.view;
+			if (view instanceof ChatView && view.viewId === focusedId) {
+				return view;
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -1082,6 +1136,11 @@ export default class AgentClientPlugin extends Plugin {
 			})(),
 			floatingWindowPosition: xyPoint(raw.floatingWindowPosition),
 			floatingButtonPosition: xyPoint(raw.floatingButtonPosition),
+			maxSessionTabs: num(
+				raw.maxSessionTabs,
+				D.maxSessionTabs,
+				1,
+			),
 		};
 
 		this.ensureDefaultAgentId();

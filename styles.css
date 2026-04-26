@@ -398,6 +398,8 @@ If your plugin does not need CSS, delete this file.
 .agent-client-chat-view-container {
 	--ac-chat-font-size: var(--font-text-size);
 	height: 100%;
+	flex: 1;
+	min-height: 0;
 	display: flex;
 	flex-direction: column;
 	padding: 0;
@@ -2187,4 +2189,189 @@ If your plugin does not need CSS, delete this file.
 .agent-client-agent-label {
 	color: var(--text-normal);
 	font-size: 12px;
+}
+
+/* ===== Tab Bar (Multi-Session) ===== */
+
+.agent-client-tab-bar {
+	display: flex;
+	align-items: center;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background-color: var(--background-secondary);
+	min-height: 32px;
+	flex-shrink: 0;
+}
+
+.agent-client-tab-bar-scroll {
+	display: flex;
+	flex: 1;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none; /* Firefox */
+	min-width: 0;
+}
+
+.agent-client-tab-bar-scroll::-webkit-scrollbar {
+	display: none;
+}
+
+/* Single tab */
+.agent-client-tab {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 8px;
+	cursor: pointer;
+	white-space: nowrap;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	border-right: 1px solid var(--background-modifier-border);
+	flex-shrink: 0;
+	user-select: none;
+	transition: background-color 0.1s ease;
+}
+
+.agent-client-tab:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+/* Active tab — blends with content area (Obsidian convention) */
+.agent-client-tab-active {
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+}
+
+/* Tab label */
+.agent-client-tab-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 160px;
+}
+
+/* Tab close button — Obsidian convention: visible on active, hover on others */
+.agent-client-tab-close {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	flex-shrink: 0;
+	border-radius: var(--radius-s);
+}
+
+.agent-client-tab-close:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.agent-client-tab-close svg {
+	width: 16px;
+	height: 16px;
+}
+
+.agent-client-tab-active .agent-client-tab-close {
+	display: flex;
+}
+
+.agent-client-tab:hover .agent-client-tab-close {
+	display: flex;
+}
+
+/* + button and chevron */
+.agent-client-tab-bar-add,
+.agent-client-tab-bar-chevron {
+	flex-shrink: 0;
+	width: 28px;
+	height: 28px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.agent-client-tab-bar-add svg,
+.agent-client-tab-bar-chevron svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* ===== Tab State Icons (Colorblind-Safe) ===== */
+
+.agent-client-tab-state-icon {
+	flex-shrink: 0;
+	font-size: 10px;
+	line-height: 1;
+	width: 14px;
+	text-align: center;
+}
+
+.agent-client-tab-state-ready {
+	color: var(--interactive-accent);
+}
+
+.agent-client-tab-state-busy {
+	color: var(--interactive-accent);
+	animation: agent-client-spin 1s linear infinite;
+}
+
+.agent-client-tab-state-permission {
+	color: var(--color-orange);
+	animation: agent-client-pulse 1.5s ease-in-out infinite;
+}
+
+.agent-client-tab-state-error {
+	color: var(--color-red);
+}
+
+.agent-client-tab-state-disconnected {
+	color: var(--text-faint);
+}
+
+@keyframes agent-client-spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+@keyframes agent-client-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.4; }
+}
+
+/* Drag feedback */
+.agent-client-tab[draggable="true"]:active {
+	opacity: 0.6;
+}
+
+/* ===== Tab Error Boundary ===== */
+
+.agent-client-tab-error {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	flex: 1;
+	gap: 8px;
+	padding: 24px;
+	color: var(--text-muted);
+}
+
+.agent-client-tab-error-icon {
+	font-size: 32px;
+	opacity: 0.6;
+}
+
+.agent-client-tab-error-title {
+	font-size: var(--font-ui-medium);
+	font-weight: var(--font-semibold);
+	color: var(--text-normal);
+}
+
+.agent-client-tab-error-message {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	max-width: 300px;
+	text-align: center;
+	word-break: break-word;
+}
+
+.agent-client-tab-error-retry {
+	margin-top: 8px;
 }
