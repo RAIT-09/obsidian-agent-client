@@ -91,6 +91,8 @@ export interface UseAgentReturn {
 	setMessagesFromLocal: (localMessages: ChatMessage[]) => void;
 	clearError: () => void;
 	setIgnoreUpdates: (ignore: boolean) => void;
+	/** Discard any pending RAF updates and reset streaming state (call after stop/cancel). */
+	clearPendingUpdates: () => void;
 
 	// Permission
 	activePermission: ActivePermission | null;
@@ -204,6 +206,7 @@ export function useAgent(
 			setMessagesFromLocal: agentMessages.setMessagesFromLocal,
 			clearError: agentMessages.clearError,
 			setIgnoreUpdates: agentMessages.setIgnoreUpdates,
+			clearPendingUpdates: agentMessages.clearPendingUpdates,
 
 			// Permission
 			activePermission: agentMessages.activePermission,
@@ -234,6 +237,7 @@ export function useAgent(
 			agentMessages.setInitialMessages,
 			agentMessages.setMessagesFromLocal,
 			agentMessages.clearError,
+			agentMessages.clearPendingUpdates,
 			agentMessages.setIgnoreUpdates,
 			agentMessages.activePermission,
 			agentMessages.hasActivePermission,

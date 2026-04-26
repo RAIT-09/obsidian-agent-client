@@ -72,6 +72,8 @@ export interface UseAgentMessagesReturn {
 	setMessagesFromLocal: (localMessages: ChatMessage[]) => void;
 	clearError: () => void;
 	setIgnoreUpdates: (ignore: boolean) => void;
+	/** Discard any pending RAF updates and reset streaming state (call after stop/cancel). */
+	clearPendingUpdates: () => void;
 
 	// Permission
 	activePermission: ActivePermission | null;
@@ -108,6 +110,16 @@ export function useAgentMessages(
 
 	// Ignore updates flag (used during session/load to skip history replay)
 	const ignoreUpdatesRef = useRef(false);
+
+	// Generation counter to prevent stale async callbacks from overwriting
+	// state after cancel/stop followed by a new send. Each sendMessage()
+	// increments this; completion handlers only update state if the
+	// generation hasn't changed (fixes Issue #200).
+	const generationRef = useRef(0);
+
+	// Track the current send promise so a new sendMessage() can wait for
+	// the previous one to settle before starting (avoids interleaved sends).
+	const sendPromiseRef = useRef<Promise<void> | null>(null);
 
 	// ============================================================
 	// Streaming Update Batching
@@ -166,6 +178,13 @@ export function useAgentMessages(
 
 	const setIgnoreUpdates = useCallback((ignore: boolean): void => {
 		ignoreUpdatesRef.current = ignore;
+	}, []);
+
+	/** Discard any pending RAF updates and reset the streaming flag. */
+	const clearPendingUpdates = useCallback((): void => {
+		pendingUpdatesRef.current = [];
+		flushScheduledRef.current = false;
+		setIsSending(false);
 	}, []);
 
 	const clearMessages = useCallback((): void => {
@@ -231,6 +250,14 @@ export function useAgentMessages(
 				return;
 			}
 
+			// Wait for any in-flight send to settle (e.g. after cancel/stop)
+			// before starting a new one to avoid interleaved state updates.
+			if (sendPromiseRef.current) {
+				try { await sendPromiseRef.current; } catch { /* ignore */ }
+			}
+
+			const currentSessionId = session.sessionId as string;
+			const generation = ++generationRef.current;
 			const settings = settingsAccess.getSnapshot();
 
 			const prepared = await preparePrompt(
@@ -300,41 +327,56 @@ export function useAgentMessages(
 			setIsSending(true);
 			setLastUserMessage(content);
 
-			try {
-				const result = await sendPreparedPrompt(
-					{
-						sessionId: session.sessionId,
-						agentContent: prepared.agentContent,
-						displayContent: prepared.displayContent,
-						authMethods: session.authMethods,
-					},
-					agentClient,
-				);
-
-				if (result.success) {
-					setIsSending(false);
-					setLastUserMessage(null);
-				} else {
-					setIsSending(false);
-					setErrorInfo(
-						result.error
-							? {
-									title: result.error.title,
-									message: result.error.message,
-									suggestion: result.error.suggestion,
-								}
-							: {
-									title: "Send Message Failed",
-									message: "Failed to send message",
-								},
+			const sendPromise = (async () => {
+				try {
+					const result = await sendPreparedPrompt(
+						{
+							sessionId: currentSessionId,
+							agentContent: prepared.agentContent,
+							displayContent: prepared.displayContent,
+							authMethods: session.authMethods,
+						},
+						agentClient,
 					);
+
+					// Discard results if a newer send has started
+					if (generationRef.current !== generation) return;
+
+					if (result.success) {
+						setIsSending(false);
+						setLastUserMessage(null);
+					} else {
+						setIsSending(false);
+						setErrorInfo(
+							result.error
+								? {
+										title: result.error.title,
+										message: result.error.message,
+										suggestion: result.error.suggestion,
+									}
+								: {
+										title: "Send Message Failed",
+										message: "Failed to send message",
+									},
+						);
+					}
+				} catch (error) {
+					if (generationRef.current !== generation) return;
+					setIsSending(false);
+					setErrorInfo({
+						title: "Send Message Failed",
+						message: `Failed to send message: ${error instanceof Error ? error.message : String(error)}`,
+					});
 				}
-			} catch (error) {
-				setIsSending(false);
-				setErrorInfo({
-					title: "Send Message Failed",
-					message: `Failed to send message: ${error instanceof Error ? error.message : String(error)}`,
-				});
+			})();
+
+			sendPromiseRef.current = sendPromise;
+			try {
+				await sendPromise;
+			} catch {
+				// Error already handled inside sendPromise
+			} finally {
+				sendPromiseRef.current = null;
 			}
 		},
 		[
@@ -416,6 +458,7 @@ export function useAgentMessages(
 		setMessagesFromLocal,
 		clearError,
 		setIgnoreUpdates,
+		clearPendingUpdates,
 		activePermission,
 		hasActivePermission,
 		approvePermission,
