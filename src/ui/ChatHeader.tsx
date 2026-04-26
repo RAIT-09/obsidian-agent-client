@@ -120,7 +120,7 @@ function SidebarHeader({
 					</span>
 				)}
 				<NavActionButton
-					icon="plus"
+					icon="refresh-cw"
 					label="New chat"
 					onClick={onNewChat}
 				/>

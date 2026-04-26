@@ -89,6 +89,10 @@ export interface ChatPanelProps {
 	viewHost?: IChatViewHost;
 	/** External container element for focus tracking (floating uses parent's container) */
 	containerEl?: HTMLElement | null;
+	/** Called when session state changes (for tab icon updates) */
+	onStateChange?: (state: import("../types/tab").TabState) => void;
+	/** Called when a suitable tab label is available (session title or first message) */
+	onLabelChange?: (label: string) => void;
 }
 
 // ============================================================================
@@ -129,6 +133,8 @@ export function ChatPanel({
 	onFloatingHeaderMouseDown,
 	viewHost: viewHostProp,
 	containerEl: containerElProp,
+	onStateChange,
+	onLabelChange,
 }: ChatPanelProps) {
 	// ============================================================
 	// Platform Check
@@ -320,10 +326,14 @@ export function ChatPanel({
 	// ============================================================
 	const handleNewChatWithPersist = useCallback(
 		async (requestedAgentId?: string) => {
-			await handleNewChat(requestedAgentId);
-			// Persist agent ID for this view (survives Obsidian restart)
-			if (requestedAgentId) {
-				onAgentIdChanged?.(requestedAgentId);
+			try {
+				await handleNewChat(requestedAgentId);
+				// Persist agent ID for this view (survives Obsidian restart)
+				if (requestedAgentId) {
+					onAgentIdChanged?.(requestedAgentId);
+				}
+			} catch (error) {
+				console.error("[Agent Client] New chat error:", error);
 			}
 		},
 		[handleNewChat, onAgentIdChanged],
@@ -340,14 +350,18 @@ export function ChatPanel({
 
 	const handleNewChatInDirectory = useCallback(
 		async (directory: string) => {
-			// Auto-export current chat before switching
-			if (messages.length > 0) {
-				await autoExportIfEnabled("newChat", messages, session);
+			try {
+				// Auto-export current chat before switching
+				if (messages.length > 0) {
+					await autoExportIfEnabled("newChat", messages, session);
+				}
+				agent.clearMessages();
+				setAgentCwd(directory);
+				await agent.restartSession(undefined, directory);
+				sessionHistory.invalidateCache();
+			} catch (error) {
+				console.error("[Agent Client] New chat in directory error:", error);
 			}
-			agent.clearMessages();
-			setAgentCwd(directory);
-			await agent.restartSession(undefined, directory);
-			sessionHistory.invalidateCache();
 		},
 		[
 			messages,
@@ -641,12 +655,16 @@ export function ChatPanel({
 		return () => {
 			logger.log("[ChatPanel] Cleanup: auto-export and close session");
 			void (async () => {
-				await autoExportRef.current(
-					"closeChat",
-					messagesRef.current,
-					sessionRef.current,
-				);
-				await closeSessionRef.current();
+				try {
+					await autoExportRef.current(
+						"closeChat",
+						messagesRef.current,
+						sessionRef.current,
+					);
+					await closeSessionRef.current();
+				} catch (error) {
+					logger.error("[ChatPanel] Cleanup error:", error);
+				}
 			})();
 		};
 	}, [logger]);
@@ -745,6 +763,53 @@ export function ChatPanel({
 	]);
 
 	// ============================================================
+	// Effects - Tab State & Label Reporting
+	// ============================================================
+	useEffect(() => {
+		if (!onStateChange) return;
+		if (errorInfo) {
+			onStateChange("error");
+		} else if (agent.hasActivePermission) {
+			onStateChange("permission");
+		} else if (isSending) {
+			onStateChange("busy");
+		} else if (isSessionReady) {
+			onStateChange("ready");
+		} else {
+			onStateChange("disconnected");
+		}
+	}, [
+		onStateChange,
+		errorInfo,
+		agent.hasActivePermission,
+		isSending,
+		isSessionReady,
+	]);
+
+	// Report label from first user message
+	const labelReportedRef = useRef(false);
+	useEffect(() => {
+		if (!onLabelChange || labelReportedRef.current) return;
+		if (messages.length > 0) {
+			const firstUserMsg = messages.find((m) => m.role === "user");
+			if (firstUserMsg) {
+				// content is MessageContent[] — extract text from the first text/text_with_context block
+				const textBlock = firstUserMsg.content.find(
+					(block) =>
+						block.type === "text" ||
+						block.type === "text_with_context",
+				);
+				const text =
+					textBlock && "text" in textBlock ? textBlock.text : "";
+				if (text.trim()) {
+					onLabelChange(text.trim());
+					labelReportedRef.current = true;
+				}
+			}
+		}
+	}, [onLabelChange, messages]);
+
+	// ============================================================
 	// Effects - Auto-mention Active Note Tracking
 	// ============================================================
 	useEffect(() => {
@@ -823,12 +888,16 @@ export function ChatPanel({
 				(targetViewId?: string) => {
 					if (targetViewId && targetViewId !== viewId) return;
 					void (async () => {
-						const success =
-							await approveActivePermissionRef.current();
-						if (!success) {
-							new Notice(
-								"[Agent Client] No active permission request",
-							);
+						try {
+							const success =
+								await approveActivePermissionRef.current();
+							if (!success) {
+								new Notice(
+									"[Agent Client] No active permission request",
+								);
+							}
+						} catch (error) {
+							console.error("[Agent Client] Approve permission error:", error);
 						}
 					})();
 				},
@@ -840,12 +909,16 @@ export function ChatPanel({
 				(targetViewId?: string) => {
 					if (targetViewId && targetViewId !== viewId) return;
 					void (async () => {
-						const success =
-							await rejectActivePermissionRef.current();
-						if (!success) {
-							new Notice(
-								"[Agent Client] No active permission request",
-							);
+						try {
+							const success =
+								await rejectActivePermissionRef.current();
+							if (!success) {
+								new Notice(
+									"[Agent Client] No active permission request",
+								);
+							}
+						} catch (error) {
+							console.error("[Agent Client] Reject permission error:", error);
 						}
 					})();
 				},
@@ -964,12 +1037,20 @@ export function ChatPanel({
 				setInputValue("");
 				setAttachedFiles([]);
 
-				await handleSendMessageRef.current(messageToSend, filesToSend);
+				try {
+					await handleSendMessageRef.current(messageToSend, filesToSend);
+				} catch (error) {
+					console.error("[Agent Client] Send message error:", error);
+				}
 				return true;
 			},
 			cancelOperation: async () => {
 				if (isSendingRef.current) {
-					await handleStopGenerationRef.current();
+					try {
+						await handleStopGenerationRef.current();
+					} catch (error) {
+						console.error("[Agent Client] Cancel operation error:", error);
+					}
 				}
 			},
 		});

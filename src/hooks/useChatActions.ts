@@ -177,28 +177,32 @@ export function useChatActions(
 				}
 			}
 
-			await agent.sendMessage(content, {
-				activeNote: settings.autoMentionActiveNote
-					? suggestions.mentions.activeNote
-					: null,
-				vaultBasePath: vaultPath,
-				isAutoMentionDisabled:
-					suggestions.mentions.isAutoMentionDisabled,
-				images: images.length > 0 ? images : undefined,
-				resourceLinks:
-					resourceLinks.length > 0 ? resourceLinks : undefined,
-				isFirstMessage,
-			});
+			try {
+				await agent.sendMessage(content, {
+					activeNote: settings.autoMentionActiveNote
+						? suggestions.mentions.activeNote
+						: null,
+					vaultBasePath: vaultPath,
+					isAutoMentionDisabled:
+						suggestions.mentions.isAutoMentionDisabled,
+					images: images.length > 0 ? images : undefined,
+					resourceLinks:
+						resourceLinks.length > 0 ? resourceLinks : undefined,
+					isFirstMessage,
+				});
 
-			// Save session metadata locally on first message
-			if (isFirstMessage && session.sessionId) {
-				await sessionHistory.saveSessionLocally(
-					session.sessionId,
-					content,
-				);
-				logger.log(
-					`[ChatPanel] Session saved locally: ${session.sessionId}`,
-				);
+				// Save session metadata locally on first message
+				if (isFirstMessage && session.sessionId) {
+					await sessionHistory.saveSessionLocally(
+						session.sessionId,
+						content,
+					);
+					logger.log(
+						`[ChatPanel] Session saved locally: ${session.sessionId}`,
+					);
+				}
+			} catch (error) {
+				logger.error("[ChatPanel] Send message error:", error);
 			}
 		},
 		[
@@ -219,7 +223,11 @@ export function useChatActions(
 	const handleStopGeneration = useCallback(async () => {
 		logger.log("Cancelling current operation...");
 		const lastMessage = agent.lastUserMessage;
-		await agent.cancelOperation();
+		try {
+			await agent.cancelOperation();
+		} catch (error) {
+			logger.error("[ChatPanel] Cancel operation error:", error);
+		}
 		if (lastMessage) {
 			setRestoredMessage(lastMessage);
 		}
@@ -236,30 +244,35 @@ export function useChatActions(
 				return;
 			}
 
-			// Cancel ongoing generation before starting new chat
-			if (agent.isSending) {
-				await agent.cancelOperation();
+			try {
+				// Cancel ongoing generation before starting new chat
+				if (agent.isSending) {
+					await agent.cancelOperation();
+				}
+
+				logger.log(
+					`[Debug] Creating new session${isAgentSwitch ? ` with agent: ${requestedAgentId}` : ""}...`,
+				);
+
+				// Auto-export current chat before starting new one (if has messages)
+				if (messages.length > 0) {
+					await autoExportIfEnabled("newChat", messages, session);
+				}
+
+				suggestions.mentions.toggleAutoMention(false);
+				agent.clearMessages();
+
+				const newAgentId = isAgentSwitch
+					? requestedAgentId
+					: session.agentId;
+				await agent.restartSession(newAgentId);
+
+				// Invalidate session history cache when creating new session
+				sessionHistory.invalidateCache();
+			} catch (error) {
+				logger.error("[ChatPanel] New chat error:", error);
+				new Notice("[Agent Client] Failed to create new session");
 			}
-
-			logger.log(
-				`[Debug] Creating new session${isAgentSwitch ? ` with agent: ${requestedAgentId}` : ""}...`,
-			);
-
-			// Auto-export current chat before starting new one (if has messages)
-			if (messages.length > 0) {
-				await autoExportIfEnabled("newChat", messages, session);
-			}
-
-			suggestions.mentions.toggleAutoMention(false);
-			agent.clearMessages();
-
-			const newAgentId = isAgentSwitch
-				? requestedAgentId
-				: session.agentId;
-			await agent.restartSession(newAgentId);
-
-			// Invalidate session history cache when creating new session
-			sessionHistory.invalidateCache();
 		},
 		[
 			messages,
