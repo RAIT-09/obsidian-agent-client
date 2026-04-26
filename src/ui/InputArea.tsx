@@ -320,12 +320,28 @@ export function InputArea({
 
 	// Refs
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const autoMentionToggleRef = useRef<HTMLButtonElement | null>(null);
 	const dragCounterRef = useRef(0);
+
+	// Stable callback ref for auto-mention toggle button — sets icon on mount
+	const autoMentionToggleCallbackRef = useCallback((el: HTMLButtonElement | null) => {
+		autoMentionToggleRef.current = el;
+		if (el) {
+			setIcon(el, "x"); // default: auto-mention enabled → show × to disable
+		}
+	}, []);
 
 	// Clear attached files when agent changes
 	useEffect(() => {
 		onAttachedFilesChange([]);
 	}, [agentId, onAttachedFilesChange]);
+
+	// Sync auto-mention toggle icon when disabled state changes
+	useEffect(() => {
+		if (autoMentionToggleRef.current) {
+			setIcon(autoMentionToggleRef.current, mentions.isAutoMentionDisabled ? "plus" : "x");
+		}
+	}, [mentions.isAutoMentionDisabled]);
 
 	/**
 	 * Add multiple attachments at once with limit enforcement.
@@ -1018,29 +1034,17 @@ export function InputArea({
 						</span>
 						<button
 							className="agent-client-auto-mention-toggle-btn"
-							onClick={(e) => {
-								const newDisabledState =
-									!mentions.isAutoMentionDisabled;
-								mentions.toggleAutoMention(newDisabledState);
-								const iconName = newDisabledState
-									? "x"
-									: "plus";
-								setIcon(e.currentTarget, iconName);
+							onClick={() => {
+								mentions.toggleAutoMention(
+									!mentions.isAutoMentionDisabled,
+								);
 							}}
 							title={
 								mentions.isAutoMentionDisabled
 									? "Enable auto-mention"
 									: "Temporarily disable auto-mention"
 							}
-							ref={(el) => {
-								if (el) {
-									const iconName =
-										mentions.isAutoMentionDisabled
-											? "plus"
-											: "x";
-									setIcon(el, iconName);
-								}
-							}}
+							ref={autoMentionToggleCallbackRef}
 						/>
 					</div>
 				)}
