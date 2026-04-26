@@ -165,6 +165,36 @@ export function MessageList({
 		checkIfAtBottom();
 	}, [view, checkIfAtBottom]);
 
+	// Scroll to bottom when tab becomes visible (display:none → display:flex).
+	// The tab panel sets display:none on inactive tabs, which collapses the
+	// container to zero height. When the tab becomes active again, the
+	// ResizeObserver fires and we scroll to the latest content.
+	const wasHiddenRef = useRef(false);
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+
+		const observer = new ResizeObserver((entries) => {
+			const entry = entries[0];
+			if (!entry) return;
+			const height = entry.contentRect.height;
+			if (height === 0) {
+				wasHiddenRef.current = true;
+			} else if (wasHiddenRef.current) {
+				wasHiddenRef.current = false;
+				// Tab just became visible — scroll to bottom
+				if (messages.length > 0) {
+					virtualizer.scrollToIndex(messages.length - 1, {
+						align: "end",
+					});
+				}
+			}
+		});
+
+		observer.observe(container);
+		return () => observer.disconnect();
+	}, [messages.length, virtualizer]);
+
 	// ============================================================
 	// Render
 	// ============================================================
@@ -246,20 +276,40 @@ export function MessageList({
 			</div>
 
 			{/* Scroll to bottom button */}
-			{!isAtBottom && (
-				<button
-					className="agent-client-scroll-to-bottom"
-					onClick={() => {
-						virtualizer.scrollToIndex(messages.length - 1, {
-							align: "end",
-							behavior: "smooth",
-						});
-					}}
-					ref={(el) => {
-						if (el) setIcon(el, "chevron-down");
-					}}
-				/>
-			)}
+			{!isAtBottom && <ScrollToBottomButton virtualizer={virtualizer} messageCount={messages.length} />}
 		</div>
+	);
+}
+
+/**
+ * Extracted scroll-to-bottom button with a stable ref for setIcon.
+ * Avoids the inline callback ref cycling that swallows click events (same fix as I7).
+ */
+function ScrollToBottomButton({
+	virtualizer,
+	messageCount,
+}: {
+	virtualizer: ReturnType<typeof useVirtualizer>;
+	messageCount: number;
+}) {
+	const btnRef = useRef<HTMLButtonElement>(null);
+
+	useEffect(() => {
+		if (btnRef.current) {
+			setIcon(btnRef.current, "chevron-down");
+		}
+	}, []);
+
+	return (
+		<button
+			ref={btnRef}
+			className="agent-client-scroll-to-bottom"
+			onClick={() => {
+				virtualizer.scrollToIndex(messageCount - 1, {
+					align: "end",
+					behavior: "smooth",
+				});
+			}}
+		/>
 	);
 }
