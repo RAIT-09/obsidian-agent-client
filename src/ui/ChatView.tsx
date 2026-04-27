@@ -283,6 +283,20 @@ function ChatComponent({
 		[],
 	);
 
+	/** Find a tab that owns the given session ID (for I20: avoid restoring an already-open session) */
+	const findTabBySessionId = useCallback(
+		(sessionId: string): { tabId: string; label: string } | null => {
+			for (const [tabId, sid] of tabSessionIdsRef.current) {
+				if (sid === sessionId) {
+					const tab = tabs.find((t) => t.tabId === tabId);
+					if (tab) return { tabId: tab.tabId, label: tab.label };
+				}
+			}
+			return null;
+		},
+		[tabs],
+	);
+
 	// ============================================================
 	// Register callbacks for IChatViewContainer (active tab only)
 	// ============================================================
@@ -394,6 +408,8 @@ function ChatComponent({
 										sessionId,
 									)
 								}
+								findTabBySessionId={findTabBySessionId}
+								onSwitchToTab={tabManager.setActiveTab}
 							/>
 						</TabPanel>
 					</TabErrorBoundary>

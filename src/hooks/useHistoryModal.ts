@@ -29,6 +29,8 @@ export function useHistoryModal(
 	onAgentCwdChange?: (cwd: string) => void,
 	onLabelChange?: (label: string) => void,
 	currentSessionId?: string,
+	findTabBySessionId?: (sessionId: string) => { tabId: string; label: string } | null,
+	onSwitchToTab?: (tabId: string) => void,
 ): {
 	handleOpenHistory: () => void;
 } {
@@ -49,10 +51,24 @@ export function useHistoryModal(
 	onAgentCwdChangeRef.current = onAgentCwdChange;
 	const currentSessionIdRef = useRef(currentSessionId);
 	currentSessionIdRef.current = currentSessionId;
+	const findTabBySessionIdRef = useRef(findTabBySessionId);
+	findTabBySessionIdRef.current = findTabBySessionId;
+	const onSwitchToTabRef = useRef(onSwitchToTab);
+	onSwitchToTabRef.current = onSwitchToTab;
 
 	const handleRestoreSession = useCallback(
 		async (sessionId: string, cwd: string) => {
 			try {
+				// I20: If session is already open in another tab, switch to it
+				const existingTab = findTabBySessionIdRef.current?.(sessionId);
+				if (existingTab) {
+					onSwitchToTabRef.current?.(existingTab.tabId);
+					historyModalRef.current?.close();
+					new Notice(
+						`[Agent Client] Session already open in tab "${existingTab.label}"`,
+					);
+					return;
+				}
 				logger.log(`[ChatPanel] Restoring session: ${sessionId}`);
 				agent.clearMessages();
 				await sessionHistory.restoreSession(sessionId, cwd);
