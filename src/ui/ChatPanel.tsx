@@ -93,6 +93,8 @@ export interface ChatPanelProps {
 	onStateChange?: (state: import("../types/tab").TabState) => void;
 	/** Called when a suitable tab label is available (session title or first message) */
 	onLabelChange?: (label: string) => void;
+	/** Called when the session ID changes (for tab rename persistence) */
+	onSessionIdChange?: (sessionId: string | null) => void;
 	/** Whether this tab is the currently active tab (controls focus on activation) */
 	isActive?: boolean;
 }
@@ -137,6 +139,7 @@ export function ChatPanel({
 	containerEl: containerElProp,
 	onStateChange,
 	onLabelChange,
+	onSessionIdChange,
 	isActive,
 }: ChatPanelProps) {
 	// ============================================================
@@ -824,6 +827,11 @@ export function ChatPanel({
 			}
 		}
 	}, [onLabelChange, messages]);
+
+	// Report session ID changes to parent (for tab rename persistence)
+	useEffect(() => {
+		onSessionIdChange?.(session.sessionId);
+	}, [onSessionIdChange, session.sessionId]);
 
 	// ============================================================
 	// Effects - Auto-mention Active Note Tracking
