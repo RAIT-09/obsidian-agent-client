@@ -94,7 +94,7 @@ class ConfirmDeleteModal extends Modal {
  * Displays a text input pre-filled with the current title.
  * Calls onSave callback with the new title when user clicks Save.
  */
-class EditTitleModal extends Modal {
+export class EditTitleModal extends Modal {
 	private currentTitle: string;
 	private onSave: (newTitle: string) => void | Promise<void>;
 

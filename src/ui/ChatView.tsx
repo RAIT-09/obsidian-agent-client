@@ -21,6 +21,7 @@ import { ChatContextProvider } from "./ChatContext";
 import { ChatPanel, type ChatPanelCallbacks } from "./ChatPanel";
 import { TabBar } from "./TabBar";
 import { TabErrorBoundary } from "./TabErrorBoundary";
+import { EditTitleModal } from "./SessionHistoryModal";
 
 // Hook imports
 import { useTabManager } from "../hooks/useTabManager";
@@ -94,6 +95,9 @@ function ChatComponent({
 	// ============================================================
 	const acpClientsRef = useRef<Map<string, AcpClient>>(new Map());
 
+	// Per-tab session ID tracking (for rename persistence to session history)
+	const tabSessionIdsRef = useRef<Map<string, string | null>>(new Map());
+
 	const getOrCreateClient = useCallback(
 		(tabId: string): AcpClient => {
 			let client = acpClientsRef.current.get(tabId);
@@ -110,6 +114,7 @@ function ChatComponent({
 		async (tabId: string) => {
 			await plugin.removeAcpClient(tabId);
 			acpClientsRef.current.delete(tabId);
+			tabSessionIdsRef.current.delete(tabId);
 		},
 		[plugin],
 	);
@@ -189,10 +194,34 @@ function ChatComponent({
 
 	const handleRenameTab = useCallback(
 		(tabId: string) => {
-			// TODO: Replace with Obsidian Modal for rename
-			new Notice("[Agent Client] Tab rename coming soon");
+			const tab = tabs.find((t) => t.tabId === tabId);
+			if (!tab) return;
+
+			const modal = new EditTitleModal(
+				plugin.app,
+				tab.label,
+				async (newTitle) => {
+					tabManager.setTabLabel(tabId, newTitle);
+
+					// Persist to session history if this tab has a session
+					const sessionId = tabSessionIdsRef.current.get(tabId);
+					if (sessionId) {
+						const saved = plugin.settingsService
+							.getSavedSessions()
+							.find((s) => s.sessionId === sessionId);
+						if (saved) {
+							await plugin.settingsService.saveSession({
+								...saved,
+								title: newTitle,
+								updatedAt: new Date().toISOString(),
+							});
+						}
+					}
+				},
+			);
+			modal.open();
 		},
-		[],
+		[tabs, plugin, tabManager],
 	);
 
 	const handleAddTabWithAgent = useCallback(
@@ -234,6 +263,13 @@ function ChatComponent({
 			tabManager.setTabLabel(tabId, label);
 		},
 		[tabManager],
+	);
+
+	const handleSessionIdChange = useCallback(
+		(tabId: string, sessionId: string | null) => {
+			tabSessionIdsRef.current.set(tabId, sessionId);
+		},
+		[],
 	);
 
 	// ============================================================
@@ -338,6 +374,12 @@ function ChatComponent({
 									handleTabLabelChange(
 										tab.tabId,
 										label,
+									)
+								}
+								onSessionIdChange={(sessionId) =>
+									handleSessionIdChange(
+										tab.tabId,
+										sessionId,
 									)
 								}
 							/>
