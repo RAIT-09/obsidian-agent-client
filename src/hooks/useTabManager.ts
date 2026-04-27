@@ -67,7 +67,7 @@ function createTab(agentId: string, label?: string): TabInfo {
 	};
 }
 
-function truncateLabel(text: string, max = 25): string {
+export function truncateLabel(text: string, max = 100): string {
 	return text.length > max ? text.slice(0, max - 1) + "…" : text;
 }
 
