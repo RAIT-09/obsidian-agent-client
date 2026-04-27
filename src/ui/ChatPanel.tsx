@@ -97,6 +97,10 @@ export interface ChatPanelProps {
 	onSessionIdChange?: (sessionId: string | null) => void;
 	/** Whether this tab is the currently active tab (controls focus on activation) */
 	isActive?: boolean;
+	/** Look up whether a session is already open in another tab (I20) */
+	findTabBySessionId?: (sessionId: string) => { tabId: string; label: string } | null;
+	/** Switch to a specific tab by ID (I20) */
+	onSwitchToTab?: (tabId: string) => void;
 }
 
 // ============================================================================
@@ -141,6 +145,8 @@ export function ChatPanel({
 	onLabelChange,
 	onSessionIdChange,
 	isActive,
+	findTabBySessionId,
+	onSwitchToTab,
 }: ChatPanelProps) {
 	// ============================================================
 	// Platform Check
@@ -338,6 +344,8 @@ export function ChatPanel({
 		setAgentCwd,
 		handleLabelChangeFromRestore,
 		session.sessionId ?? undefined,
+		findTabBySessionId,
+		onSwitchToTab,
 	);
 
 	// ============================================================
