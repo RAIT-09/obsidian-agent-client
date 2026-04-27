@@ -311,6 +311,17 @@ export function ChatPanel({
 		autoExportIfEnabled,
 	} = actions;
 
+	// Track whether tab label has been reported (reset on new chat / restore)
+	const labelReportedRef = useRef(false);
+
+	const handleLabelChangeFromRestore = useCallback(
+		(label: string) => {
+			onLabelChange?.(label);
+			labelReportedRef.current = true;
+		},
+		[onLabelChange],
+	);
+
 	const { handleOpenHistory } = useHistoryModal(
 		plugin,
 		agent,
@@ -319,6 +330,7 @@ export function ChatPanel({
 		isSessionReady,
 		settings.debugMode,
 		setAgentCwd,
+		handleLabelChangeFromRestore,
 	);
 
 	// ============================================================
@@ -328,6 +340,7 @@ export function ChatPanel({
 		async (requestedAgentId?: string) => {
 			try {
 				await handleNewChat(requestedAgentId);
+				labelReportedRef.current = false;
 				// Persist agent ID for this view (survives Obsidian restart)
 				if (requestedAgentId) {
 					onAgentIdChanged?.(requestedAgentId);
@@ -787,7 +800,6 @@ export function ChatPanel({
 	]);
 
 	// Report label from first user message
-	const labelReportedRef = useRef(false);
 	useEffect(() => {
 		if (!onLabelChange || labelReportedRef.current) return;
 		if (messages.length > 0) {

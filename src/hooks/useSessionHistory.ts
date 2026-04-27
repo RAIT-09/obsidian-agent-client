@@ -822,11 +822,7 @@ export function useSessionHistory(
 			hasMore: nextCursor !== undefined,
 
 			// Capability flags
-			canShowSessionHistory:
-				capabilities.canList ||
-				capabilities.canLoad ||
-				capabilities.canResume ||
-				capabilities.canFork,
+			canShowSessionHistory: true,
 			canRestore: capabilities.canLoad || capabilities.canResume,
 			canFork: capabilities.canFork,
 			canList: capabilities.canList,
