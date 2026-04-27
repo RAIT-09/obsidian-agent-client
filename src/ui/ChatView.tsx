@@ -318,6 +318,7 @@ function ChatComponent({
 								viewId={tab.tabId}
 								initialAgentId={tab.agentId}
 								viewHost={view}
+								isActive={tab.tabId === activeTabId}
 								onRegisterCallbacks={(callbacks) => {
 									if (tab.tabId === activeTabId) {
 										activeCallbacksRef.current =

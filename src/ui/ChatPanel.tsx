@@ -93,6 +93,8 @@ export interface ChatPanelProps {
 	onStateChange?: (state: import("../types/tab").TabState) => void;
 	/** Called when a suitable tab label is available (session title or first message) */
 	onLabelChange?: (label: string) => void;
+	/** Whether this tab is the currently active tab (controls focus on activation) */
+	isActive?: boolean;
 }
 
 // ============================================================================
@@ -135,6 +137,7 @@ export function ChatPanel({
 	containerEl: containerElProp,
 	onStateChange,
 	onLabelChange,
+	isActive,
 }: ChatPanelProps) {
 	// ============================================================
 	// Platform Check
@@ -1171,6 +1174,7 @@ export function ChatPanel({
 			agentUpdateNotification={agentUpdateNotification}
 			onClearAgentUpdate={handleClearAgentUpdate}
 			messages={messages}
+			isActive={isActive}
 		/>
 	);
 

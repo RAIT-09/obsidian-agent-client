@@ -245,6 +245,8 @@ export interface InputAreaProps {
 	onClearAgentUpdate: () => void;
 	/** Messages array for input history navigation */
 	messages: ChatMessage[];
+	/** Whether this tab is the currently active tab (focuses textarea on activation) */
+	isActive?: boolean;
 }
 
 /**
@@ -295,6 +297,7 @@ export function InputArea({
 	onClearAgentUpdate,
 	// Input history
 	messages,
+	isActive,
 }: InputAreaProps) {
 	const { mentions, commands: slashCommands } = suggestions;
 	const logger = getLogger();
@@ -934,6 +937,19 @@ export function InputArea({
 			}
 		}, 0);
 	}, []);
+
+	// Focus textarea when this tab becomes active (I19)
+	// Tabs are kept mounted and hidden via display:none; without this, hotkey-
+	// driven tab switches leave focus on the previously active tab's textarea.
+	useEffect(() => {
+		if (isActive) {
+			window.setTimeout(() => {
+				if (textareaRef.current) {
+					textareaRef.current.focus();
+				}
+			}, 0);
+		}
+	}, [isActive]);
 
 	// Restore message when provided (e.g., after cancellation)
 	// Only restore if input is empty to avoid overwriting user's new input
