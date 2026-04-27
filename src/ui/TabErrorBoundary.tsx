@@ -3,6 +3,7 @@ import * as React from "react";
 interface Props {
 	tabId: string;
 	onError?: (tabId: string) => void;
+	onRetry?: (tabId: string) => void;
 	children: React.ReactNode;
 }
 
@@ -32,6 +33,7 @@ export class TabErrorBoundary extends React.Component<Props, State> {
 	}
 
 	private handleRetry = () => {
+		this.props.onRetry?.(this.props.tabId);
 		this.setState({ hasError: false, error: null });
 	};
 
