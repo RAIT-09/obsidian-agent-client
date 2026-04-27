@@ -170,6 +170,7 @@ export function MessageList({
 	// container to zero height. When the tab becomes active again, the
 	// ResizeObserver fires and we scroll to the latest content.
 	const wasHiddenRef = useRef(false);
+	const savedScrollTopRef = useRef<number | null>(null);
 	useEffect(() => {
 		const container = containerRef.current;
 		if (!container) return;
@@ -179,15 +180,25 @@ export function MessageList({
 			if (!entry) return;
 			const height = entry.contentRect.height;
 			if (height === 0) {
+				// Tab becoming hidden — save scroll position
+				savedScrollTopRef.current = container.scrollTop;
 				wasHiddenRef.current = true;
 			} else if (wasHiddenRef.current) {
 				wasHiddenRef.current = false;
-				// Tab just became visible — scroll to bottom
 				if (messages.length > 0) {
-					virtualizer.scrollToIndex(messages.length - 1, {
-						align: "end",
-					});
+					if (isAtBottomRef.current) {
+						// Was at bottom — scroll to latest content
+						virtualizer.scrollToIndex(messages.length - 1, {
+							align: "end",
+						});
+					} else if (savedScrollTopRef.current !== null) {
+						// Was manually scrolled up — restore position
+						requestAnimationFrame(() => {
+							container.scrollTop = savedScrollTopRef.current!;
+						});
+					}
 				}
+				savedScrollTopRef.current = null;
 			}
 		});
 
