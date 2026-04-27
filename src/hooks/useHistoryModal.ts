@@ -27,11 +27,25 @@ export function useHistoryModal(
 	isSessionReady: boolean,
 	debugMode: boolean,
 	onAgentCwdChange?: (cwd: string) => void,
+	onLabelChange?: (label: string) => void,
 ): {
 	handleOpenHistory: () => void;
 } {
 	const logger = getLogger();
 	const historyModalRef = useRef<SessionHistoryModal | null>(null);
+
+	// ── Stable refs for values read at call time ──
+	// These prevent callbacks from depending on frequently-changing references
+	// (like sessionHistory.sessions which is a new array every render),
+	// which would cause the callbacks to be recreated every render,
+	// which would cause the useEffect syncing modal props to fire every render,
+	// which would call updateProps → root.render() → infinite re-render loop (I11/I12).
+	const sessionsRef = useRef(sessionHistory.sessions);
+	sessionsRef.current = sessionHistory.sessions;
+	const onLabelChangeRef = useRef(onLabelChange);
+	onLabelChangeRef.current = onLabelChange;
+	const onAgentCwdChangeRef = useRef(onAgentCwdChange);
+	onAgentCwdChangeRef.current = onAgentCwdChange;
 
 	const handleRestoreSession = useCallback(
 		async (sessionId: string, cwd: string) => {
@@ -39,19 +53,21 @@ export function useHistoryModal(
 				logger.log(`[ChatPanel] Restoring session: ${sessionId}`);
 				agent.clearMessages();
 				await sessionHistory.restoreSession(sessionId, cwd);
-				onAgentCwdChange?.(cwd);
+				onAgentCwdChangeRef.current?.(cwd);
+				// Update tab label from saved session title
+				const saved = sessionsRef.current.find(
+					(s) => s.sessionId === sessionId,
+				);
+				if (saved?.title && onLabelChangeRef.current) {
+					onLabelChangeRef.current(saved.title);
+				}
 				new Notice("[Agent Client] Session restored");
 			} catch (error) {
 				new Notice("[Agent Client] Failed to restore session");
 				logger.error("Session restore error:", error);
 			}
 		},
-		[
-			logger,
-			agent.clearMessages,
-			sessionHistory.restoreSession,
-			onAgentCwdChange,
-		],
+		[logger, agent.clearMessages, sessionHistory.restoreSession],
 	);
 
 	const handleForkSession = useCallback(
@@ -60,19 +76,21 @@ export function useHistoryModal(
 				logger.log(`[ChatPanel] Forking session: ${sessionId}`);
 				agent.clearMessages();
 				await sessionHistory.forkSession(sessionId, cwd);
-				onAgentCwdChange?.(cwd);
+				onAgentCwdChangeRef.current?.(cwd);
+				// Update tab label from the original session's title
+				const saved = sessionsRef.current.find(
+					(s) => s.sessionId === sessionId,
+				);
+				if (saved?.title && onLabelChangeRef.current) {
+					onLabelChangeRef.current(saved.title);
+				}
 				new Notice("[Agent Client] Session forked");
 			} catch (error) {
 				new Notice("[Agent Client] Failed to fork session");
 				logger.error("Session fork error:", error);
 			}
 		},
-		[
-			logger,
-			agent.clearMessages,
-			sessionHistory.forkSession,
-			onAgentCwdChange,
-		],
+		[logger, agent.clearMessages, sessionHistory.forkSession],
 	);
 
 	const handleDeleteSession = useCallback(
@@ -139,7 +157,7 @@ export function useHistoryModal(
 				onEditTitle: handleEditTitle,
 				onLoadMore: handleLoadMore,
 				onFetchSessions: handleFetchSessions,
-			});
+			}, () => { historyModalRef.current = null; });
 		}
 		historyModalRef.current.open();
 		void sessionHistory.fetchSessions(vaultPath);
