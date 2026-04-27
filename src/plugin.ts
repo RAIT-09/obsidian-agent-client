@@ -398,6 +398,16 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	/**
+	 * Update auto-allow permission setting on all live AcpClient instances.
+	 * Called when the setting changes at runtime.
+	 */
+	updateAllAutoAllow(autoAllow: boolean): void {
+		for (const client of this._acpClients.values()) {
+			client.updateAutoAllow(autoAllow);
+		}
+	}
+
+	/**
 	 * Remove and disconnect the AcpClient for a specific view.
 	 * Called when a ChatView is closed.
 	 */

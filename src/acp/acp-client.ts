@@ -385,6 +385,14 @@ export class AcpClient {
 	}
 
 	/**
+	 * Update the auto-allow permission setting on a live client.
+	 * Called by the plugin when the setting changes at runtime.
+	 */
+	updateAutoAllow(autoAllow: boolean): void {
+		this.permissionManager.setAutoAllow(autoAllow);
+	}
+
+	/**
 	 * Create a new chat session with the agent.
 	 */
 	async newSession(workingDirectory: string): Promise<SessionResult> {
