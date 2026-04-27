@@ -343,6 +343,7 @@ function ChatComponent({
 						onError={(tabId) =>
 							handleTabStateChange(tabId, "error")
 						}
+						onRetry={(tabId) => tabManager.resetTab(tabId)}
 					>
 						<TabPanel
 							plugin={plugin}

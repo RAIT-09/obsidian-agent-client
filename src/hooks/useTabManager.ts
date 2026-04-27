@@ -35,6 +35,8 @@ export interface UseTabManagerReturn {
 	setTabLabel: (tabId: string, label: string) => void;
 	/** Update a tab's visual state */
 	setTabState: (tabId: string, state: TabState) => void;
+	/** Reset a tab's label and state to defaults (used after error boundary retry) */
+	resetTab: (tabId: string) => void;
 	/** Reorder: move tab from one index to another */
 	moveTab: (fromIndex: number, toIndex: number) => void;
 	/** Switch to next tab (cyclic) */
@@ -51,13 +53,15 @@ function generateTabId(): string {
 	return `tab-${crypto.randomUUID().slice(0, 8)}`;
 }
 
+function defaultLabel(agentId: string): string {
+	return `${agentId} ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+}
+
 function createTab(agentId: string, label?: string): TabInfo {
 	return {
 		tabId: generateTabId(),
 		agentId,
-		label:
-			label ||
-			`${agentId} ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+		label: label || defaultLabel(agentId),
 		state: "disconnected",
 		createdAt: new Date(),
 	};
@@ -168,6 +172,16 @@ export function useTabManager(initialAgentId: string): UseTabManagerReturn {
 		[],
 	);
 
+	const resetTab = useCallback((tabId: string) => {
+		setTabs((prev) =>
+			prev.map((t) =>
+				t.tabId === tabId
+					? { ...t, label: defaultLabel(t.agentId), state: "disconnected" }
+					: t,
+			),
+		);
+	}, []);
+
 	const moveTab = useCallback(
 		(fromIndex: number, toIndex: number) => {
 			setTabs((prev) => {
@@ -223,6 +237,7 @@ export function useTabManager(initialAgentId: string): UseTabManagerReturn {
 			setActiveTab: setActiveTabId,
 			setTabLabel,
 			setTabState,
+			resetTab,
 			moveTab,
 			nextTab,
 			prevTab,
@@ -237,6 +252,7 @@ export function useTabManager(initialAgentId: string): UseTabManagerReturn {
 			removeTabsToRight,
 			setTabLabel,
 			setTabState,
+			resetTab,
 			moveTab,
 			nextTab,
 			prevTab,
