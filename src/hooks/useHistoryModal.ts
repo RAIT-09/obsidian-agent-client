@@ -28,6 +28,7 @@ export function useHistoryModal(
 	debugMode: boolean,
 	onAgentCwdChange?: (cwd: string) => void,
 	onLabelChange?: (label: string) => void,
+	currentSessionId?: string,
 ): {
 	handleOpenHistory: () => void;
 } {
@@ -46,6 +47,8 @@ export function useHistoryModal(
 	onLabelChangeRef.current = onLabelChange;
 	const onAgentCwdChangeRef = useRef(onAgentCwdChange);
 	onAgentCwdChangeRef.current = onAgentCwdChange;
+	const currentSessionIdRef = useRef(currentSessionId);
+	currentSessionIdRef.current = currentSessionId;
 
 	const handleRestoreSession = useCallback(
 		async (sessionId: string, cwd: string) => {
@@ -115,6 +118,13 @@ export function useHistoryModal(
 					newTitle,
 					sessionCwd,
 				);
+				// If the renamed session is open in this tab, update the tab label
+				if (
+					sessionId === currentSessionIdRef.current &&
+					onLabelChangeRef.current
+				) {
+					onLabelChangeRef.current(newTitle);
+				}
 				new Notice("[Agent Client] Title updated");
 			} catch (error) {
 				new Notice("[Agent Client] Failed to update title");

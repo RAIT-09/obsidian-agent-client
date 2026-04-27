@@ -331,6 +331,7 @@ export function ChatPanel({
 		settings.debugMode,
 		setAgentCwd,
 		handleLabelChangeFromRestore,
+		session.sessionId ?? undefined,
 	);
 
 	// ============================================================
