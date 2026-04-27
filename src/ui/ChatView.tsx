@@ -24,7 +24,7 @@ import { TabErrorBoundary } from "./TabErrorBoundary";
 import { EditTitleModal } from "./SessionHistoryModal";
 
 // Hook imports
-import { useTabManager } from "../hooks/useTabManager";
+import { useTabManager, truncateLabel } from "../hooks/useTabManager";
 
 // Service imports
 import { VaultService } from "../services/vault-service";
@@ -201,6 +201,17 @@ function ChatComponent({
 				plugin.app,
 				tab.label,
 				async (newTitle) => {
+					const duplicate = tabs.find(
+						(t) =>
+							t.tabId !== tabId &&
+							t.label === truncateLabel(newTitle),
+					);
+					if (duplicate) {
+						new Notice(
+							"[Agent Client] A tab with that name already exists",
+						);
+						return;
+					}
 					tabManager.setTabLabel(tabId, newTitle);
 
 					// Persist to session history if this tab has a session
