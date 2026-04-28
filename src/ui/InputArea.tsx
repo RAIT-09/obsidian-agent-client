@@ -358,6 +358,7 @@ export function InputArea({
 	const removeFile = useCallback(
 		(id: string) => {
 			onAttachedFilesChange(attachedFiles.filter((f) => f.id !== id));
+			textareaRef.current?.focus();
 		},
 		[attachedFiles, onAttachedFilesChange],
 	);
