@@ -271,7 +271,11 @@ function ChatComponent({
 
 	const handleTabLabelChange = useCallback(
 		(tabId: string, label: string) => {
-			tabManager.setTabLabel(tabId, label);
+			if (label === "") {
+				tabManager.resetTab(tabId);
+			} else {
+				tabManager.setTabLabel(tabId, label);
+			}
 		},
 		[tabManager],
 	);

@@ -356,6 +356,7 @@ export function ChatPanel({
 			try {
 				await handleNewChat(requestedAgentId);
 				labelReportedRef.current = false;
+				onLabelChange?.("");
 				// Persist agent ID for this view (survives Obsidian restart)
 				if (requestedAgentId) {
 					onAgentIdChanged?.(requestedAgentId);
