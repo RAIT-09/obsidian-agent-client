@@ -758,7 +758,7 @@ export default class AgentClientPlugin extends Plugin {
 					if (checking) return true;
 					this.app.workspace.trigger(
 						"agent-client:new-chat-requested" as "quit",
-						view.viewId,
+						view.getActiveTabId(),
 						agent.id,
 					);
 				},
@@ -777,7 +777,7 @@ export default class AgentClientPlugin extends Plugin {
 				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:approve-active-permission" as "quit",
-					view.viewId,
+					view.getActiveTabId(),
 				);
 			},
 		});
@@ -792,7 +792,7 @@ export default class AgentClientPlugin extends Plugin {
 				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:reject-active-permission" as "quit",
-					view.viewId,
+					view.getActiveTabId(),
 				);
 			},
 		});
@@ -807,7 +807,7 @@ export default class AgentClientPlugin extends Plugin {
 				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:toggle-auto-mention" as "quit",
-					view.viewId,
+					view.getActiveTabId(),
 				);
 			},
 		});
@@ -822,7 +822,7 @@ export default class AgentClientPlugin extends Plugin {
 				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:new-chat-requested" as "quit",
-					view.viewId,
+					view.getActiveTabId(),
 				);
 			},
 		});
@@ -837,7 +837,7 @@ export default class AgentClientPlugin extends Plugin {
 				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:cancel-message" as "quit",
-					view.viewId,
+					view.getActiveTabId(),
 				);
 			},
 		});
@@ -852,7 +852,7 @@ export default class AgentClientPlugin extends Plugin {
 				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:export-chat" as "quit",
-					view.viewId,
+					view.getActiveTabId(),
 				);
 			},
 		});
