@@ -1149,6 +1149,7 @@ export function ChatPanel({
 			terminalClient={terminalClientRef.current}
 			onApprovePermission={agent.approvePermission}
 			hasActivePermission={agent.hasActivePermission}
+			isActive={isActive}
 		/>
 	);
 

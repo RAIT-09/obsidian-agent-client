@@ -36,6 +36,8 @@ export interface MessageListProps {
 	) => Promise<void>;
 	/** Whether a permission request is currently pending */
 	hasActivePermission: boolean;
+	/** Whether this tab is currently active (visible) */
+	isActive?: boolean;
 }
 
 /**
@@ -61,6 +63,7 @@ export function MessageList({
 	terminalClient,
 	onApprovePermission,
 	hasActivePermission,
+	isActive = true,
 }: MessageListProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
@@ -77,14 +80,12 @@ export function MessageList({
 		overscan: 5,
 	});
 
-	// Suppress scroll position correction when user has scrolled up.
-	// By default, the virtualizer adjusts scrollTop when an item before
-	// the scroll offset changes size (to keep visible content stable).
-	// During streaming, this causes the viewport to creep down as the
-	// last message grows. Our auto-scroll effect handles following new
-	// content when isAtBottom, so corrections are only needed there.
+	// Suppress scroll position correction on hidden tabs and when user
+	// has scrolled up. Without the isActive check, the virtualizer
+	// adjusts its internal offset during measurement of collapsed
+	// containers, corrupting the saved position.
 	virtualizer.shouldAdjustScrollPositionOnItemSizeChange = () =>
-		isAtBottomRef.current;
+		isActive && isAtBottomRef.current;
 
 	// ============================================================
 	// Scroll management
@@ -92,6 +93,9 @@ export function MessageList({
 
 	/**
 	 * Check if the scroll position is near the bottom.
+	 * Skips when the container is collapsed (display:none) to avoid
+	 * corrupting isAtBottomRef — a zero-height container always
+	 * satisfies the "near bottom" check (0 + 0 >= 0 - threshold).
 	 */
 	const checkIfAtBottom = useCallback(() => {
 		const container = containerRef.current;
@@ -124,87 +128,59 @@ export function MessageList({
 		prevIsSendingRef.current = isSending;
 	}, [isSending]);
 
-	// Auto-scroll to bottom when new messages arrive or content changes
-	useEffect(() => {
-		if (messages.length === 0) return;
+	// Ref for virtualizer — avoids putting the virtualizer object
+	// (new every render) in effect dependency arrays.
+	const virtualizerRef = useRef(virtualizer);
+	virtualizerRef.current = virtualizer;
 
+	const prevIsActiveRef = useRef(isActive);
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+		view.registerDomEvent(container, "scroll", checkIfAtBottom);
+		checkIfAtBottom();
+	}, [view, checkIfAtBottom]);
+
+	// Scroll to bottom on new messages and on tab switch.
+	// Streaming scroll is handled by shouldAdjustScrollPositionOnItemSizeChange.
+	useEffect(() => {
+		const wasInactive = !prevIsActiveRef.current;
+		prevIsActiveRef.current = isActive;
+
+		if (!isActive || messages.length === 0) return;
+
+		if (wasInactive) {
+			// Tab became active — always go to bottom
+			requestAnimationFrame(() => {
+				virtualizerRef.current.scrollToIndex(
+					messages.length - 1,
+					{ align: "end" },
+				);
+			});
+			return;
+		}
+
+		// New message: auto-scroll if pinned to bottom
 		if (scrollSmoothRef.current) {
-			// User sent a message — smooth scroll regardless of isAtBottom
 			scrollSmoothRef.current = false;
 			requestAnimationFrame(() => {
-				virtualizer.scrollToIndex(messages.length - 1, {
-					align: "end",
-					behavior: "smooth",
-				});
+				virtualizerRef.current.scrollToIndex(
+					messages.length - 1,
+					{ align: "end", behavior: "smooth" },
+				);
 			});
 			return;
 		}
 
 		if (isAtBottomRef.current) {
-			// Use requestAnimationFrame to ensure virtualizer has measured
 			requestAnimationFrame(() => {
-				virtualizer.scrollToIndex(messages.length - 1, {
-					align: "end",
-				});
+				virtualizerRef.current.scrollToIndex(
+					messages.length - 1,
+					{ align: "end" },
+				);
 			});
 		}
-	}, [messages, virtualizer]);
-
-	// Set up scroll event listener for isAtBottom detection
-	useEffect(() => {
-		const container = containerRef.current;
-		if (!container) return;
-
-		const handleScroll = () => {
-			checkIfAtBottom();
-		};
-
-		view.registerDomEvent(container, "scroll", handleScroll);
-
-		// Initial check
-		checkIfAtBottom();
-	}, [view, checkIfAtBottom]);
-
-	// Scroll to bottom when tab becomes visible (display:none → display:flex).
-	// The tab panel sets display:none on inactive tabs, which collapses the
-	// container to zero height. When the tab becomes active again, the
-	// ResizeObserver fires and we scroll to the latest content.
-	const wasHiddenRef = useRef(false);
-	const savedScrollTopRef = useRef<number | null>(null);
-	useEffect(() => {
-		const container = containerRef.current;
-		if (!container) return;
-
-		const observer = new ResizeObserver((entries) => {
-			const entry = entries[0];
-			if (!entry) return;
-			const height = entry.contentRect.height;
-			if (height === 0) {
-				// Tab becoming hidden — save scroll position
-				savedScrollTopRef.current = container.scrollTop;
-				wasHiddenRef.current = true;
-			} else if (wasHiddenRef.current) {
-				wasHiddenRef.current = false;
-				if (messages.length > 0) {
-					if (isAtBottomRef.current) {
-						// Was at bottom — scroll to latest content
-						virtualizer.scrollToIndex(messages.length - 1, {
-							align: "end",
-						});
-					} else if (savedScrollTopRef.current !== null) {
-						// Was manually scrolled up — restore position
-						requestAnimationFrame(() => {
-							container.scrollTop = savedScrollTopRef.current!;
-						});
-					}
-				}
-				savedScrollTopRef.current = null;
-			}
-		});
-
-		observer.observe(container);
-		return () => observer.disconnect();
-	}, [messages.length, virtualizer]);
+	}, [messages, messages.length, isActive]);
 
 	// ============================================================
 	// Render
