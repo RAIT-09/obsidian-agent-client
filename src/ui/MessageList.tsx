@@ -141,6 +141,34 @@ export function MessageList({
 		checkIfAtBottom();
 	}, [view, checkIfAtBottom]);
 
+	// Scroll to bottom when the panel becomes visible again (e.g. user
+	// clicked away to another Obsidian pane and came back). The tab-switch
+	// logic (wasInactive) doesn't cover this because isActive tracks which
+	// tab is selected, not whether the leaf is on-screen. (I25)
+	const wasVisibleRef = useRef(true);
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				const visible = entry.isIntersecting;
+				if (visible && !wasVisibleRef.current && isActive && messages.length > 0) {
+					requestAnimationFrame(() => {
+						virtualizerRef.current.scrollToIndex(
+							messages.length - 1,
+							{ align: "end" },
+						);
+					});
+				}
+				wasVisibleRef.current = visible;
+			},
+			{ threshold: 0.1 },
+		);
+		observer.observe(container);
+		return () => observer.disconnect();
+	}, [isActive, messages.length]);
+
 	// Scroll to bottom on new messages and on tab switch.
 	// Streaming scroll is handled by shouldAdjustScrollPositionOnItemSizeChange.
 	useEffect(() => {
