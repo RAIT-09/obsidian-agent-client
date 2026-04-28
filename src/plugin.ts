@@ -282,32 +282,48 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "new-session-tab",
 			name: "New session tab",
-			callback: () => {
-				this.getActiveChatView()?.addTab();
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
+				view.addTab();
 			},
 		});
 
 		this.addCommand({
 			id: "close-session-tab",
 			name: "Close session tab",
-			callback: () => {
-				this.getActiveChatView()?.closeActiveTab();
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
+				view.closeActiveTab();
 			},
 		});
 
 		this.addCommand({
 			id: "next-session-tab",
 			name: "Next session tab",
-			callback: () => {
-				this.getActiveChatView()?.nextTab();
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
+				view.nextTab();
 			},
 		});
 
 		this.addCommand({
 			id: "previous-session-tab",
 			name: "Previous session tab",
-			callback: () => {
-				this.getActiveChatView()?.prevTab();
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
+				view.prevTab();
 			},
 		});
 
