@@ -185,15 +185,15 @@ export function TabBar({
 				});
 			});
 
-			menu.addSeparator();
-
-			menu.addItem((item: MenuItem) => {
-				item.setTitle("Close").setIcon("x").onClick(() => {
-					onCloseTab(tab.tabId);
-				});
-			});
-
 			if (tabs.length > 1) {
+				menu.addSeparator();
+
+				menu.addItem((item: MenuItem) => {
+					item.setTitle("Close").setIcon("x").onClick(() => {
+						onCloseTab(tab.tabId);
+					});
+				});
+
 				menu.addItem((item: MenuItem) => {
 					item.setTitle("Close others").onClick(() => {
 						onCloseOtherTabs(tab.tabId);
