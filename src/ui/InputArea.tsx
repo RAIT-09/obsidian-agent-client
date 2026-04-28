@@ -951,6 +951,30 @@ export function InputArea({
 		}
 	}, [isActive]);
 
+	// Focus textarea when the ACP panel regains visibility from another
+	// Obsidian pane. The isActive effect above only fires on tab switches
+	// within ACP, not on leaf-level focus changes. (I26)
+	const panelWasVisibleRef = useRef(true);
+	useEffect(() => {
+		const textarea = textareaRef.current;
+		if (!textarea) return;
+
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				const visible = entry.isIntersecting;
+				if (visible && !panelWasVisibleRef.current && isActive) {
+					window.setTimeout(() => {
+						textareaRef.current?.focus();
+					}, 0);
+				}
+				panelWasVisibleRef.current = visible;
+			},
+			{ threshold: 0.1 },
+		);
+		observer.observe(textarea);
+		return () => observer.disconnect();
+	}, [isActive]);
+
 	// Restore message when provided (e.g., after cancellation)
 	// Only restore if input is empty to avoid overwriting user's new input
 	useEffect(() => {
