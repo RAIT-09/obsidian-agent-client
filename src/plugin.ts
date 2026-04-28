@@ -667,10 +667,14 @@ export default class AgentClientPlugin extends Plugin {
 			this.addCommand({
 				id: `switch-agent-to-${agent.id}`,
 				name: `Switch agent to ${agent.displayName}`,
-				callback: () => {
+				checkCallback: (checking) => {
+					const view =
+						this.app.workspace.getActiveViewOfType(ChatView);
+					if (!view) return false;
+					if (checking) return true;
 					this.app.workspace.trigger(
 						"agent-client:new-chat-requested" as "quit",
-						this.lastActiveChatViewId,
+						view.viewId,
 						agent.id,
 					);
 				},
@@ -682,10 +686,14 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "approve-active-permission",
 			name: "Approve active permission",
-			callback: () => {
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:approve-active-permission" as "quit",
-					this.lastActiveChatViewId,
+					view.viewId,
 				);
 			},
 		});
@@ -693,10 +701,14 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "reject-active-permission",
 			name: "Reject active permission",
-			callback: () => {
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:reject-active-permission" as "quit",
-					this.lastActiveChatViewId,
+					view.viewId,
 				);
 			},
 		});
@@ -704,10 +716,14 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "toggle-auto-mention",
 			name: "Toggle auto-mention",
-			callback: () => {
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:toggle-auto-mention" as "quit",
-					this.lastActiveChatViewId,
+					view.viewId,
 				);
 			},
 		});
@@ -715,10 +731,14 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "new-chat",
 			name: "New chat",
-			callback: () => {
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:new-chat-requested" as "quit",
-					this.lastActiveChatViewId,
+					view.viewId,
 				);
 			},
 		});
@@ -726,10 +746,14 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "cancel-current-message",
 			name: "Cancel current message",
-			callback: () => {
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:cancel-message" as "quit",
-					this.lastActiveChatViewId,
+					view.viewId,
 				);
 			},
 		});
@@ -737,10 +761,14 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "export-chat",
 			name: "Export chat",
-			callback: () => {
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:export-chat" as "quit",
-					this.lastActiveChatViewId,
+					view.viewId,
 				);
 			},
 		});
