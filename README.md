@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/rait-09-obsidian-agent-client-badge.png)](https://mseep.ai/app/rait-09-obsidian-agent-client)
+
 <h1 align="center">Agent Client Plugin for Obsidian</h1>
 
 <p align="center">
