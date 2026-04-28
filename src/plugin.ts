@@ -41,7 +41,7 @@ import {
 	CustomAgentSettings,
 } from "./types/agent";
 import type { SavedSessionInfo } from "./types/session";
-import { initializeLogger } from "./utils/logger";
+import { initializeLogger, getLogger } from "./utils/logger";
 
 // Re-export for backward compatibility
 export type { AgentEnvVar, CustomAgentSettings };
@@ -351,7 +351,7 @@ export default class AgentClientPlugin extends Plugin {
 				// Fire and forget - don't block Obsidian from quitting
 				for (const [viewId, client] of this._acpClients) {
 					client.disconnect().catch((error) => {
-						console.warn(
+						getLogger().warn(
 							`[AgentClient] Quit cleanup error for view ${viewId}:`,
 							error,
 						);
@@ -407,7 +407,7 @@ export default class AgentClientPlugin extends Plugin {
 			try {
 				await client.disconnect();
 			} catch (error) {
-				console.warn(
+				getLogger().warn(
 					`[AgentClient] Failed to disconnect client for view ${viewId}:`,
 					error,
 				);
@@ -560,7 +560,7 @@ export default class AgentClientPlugin extends Plugin {
 	async openNewChatViewWithAgent(agentId: string): Promise<void> {
 		const leaf = this.createNewChatLeaf(true);
 		if (!leaf) {
-			console.warn("[AgentClient] Failed to create new leaf");
+			getLogger().warn("[AgentClient] Failed to create new leaf");
 			return;
 		}
 

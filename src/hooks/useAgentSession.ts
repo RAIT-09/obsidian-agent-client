@@ -18,6 +18,7 @@ import type {
 import type { AcpClient } from "../acp/acp-client";
 import type { ISettingsAccess } from "../services/settings-service";
 import type { ErrorInfo } from "../types/errors";
+import { getLogger } from "../utils/logger";
 import {
 	type AgentDisplayInfo,
 	getDefaultAgentId,
@@ -300,13 +301,13 @@ export function useAgentSession(
 			try {
 				await agentClient.cancel(s.sessionId);
 			} catch (error) {
-				console.warn("Failed to cancel session:", error);
+				getLogger().warn("Failed to cancel session:", error);
 			}
 		}
 		try {
 			await agentClient.disconnect();
 		} catch (error) {
-			console.warn("Failed to disconnect:", error);
+			getLogger().warn("Failed to disconnect:", error);
 		}
 		setSession((prev) => ({
 			...prev,
@@ -328,7 +329,7 @@ export function useAgentSession(
 			await agentClient.cancel(s.sessionId);
 			setSession((prev) => ({ ...prev, state: "ready" }));
 		} catch (error) {
-			console.warn("Failed to cancel operation:", error);
+			getLogger().warn("Failed to cancel operation:", error);
 			setSession((prev) => ({ ...prev, state: "ready" }));
 		}
 	}, [agentClient]);
@@ -403,7 +404,7 @@ export function useAgentSession(
 		async (kind: "mode" | "model", value: string) => {
 			const s = sessionRef.current;
 			if (!s.sessionId) {
-				console.warn(`Cannot set ${kind}: no active session`);
+				getLogger().debug(`Cannot set ${kind}: no active session`);
 				return;
 			}
 
@@ -433,7 +434,7 @@ export function useAgentSession(
 					});
 				}
 			} catch (error) {
-				console.error(`Failed to set ${kind}:`, error);
+				getLogger().error(`Failed to set ${kind}:`, error);
 				if (previousValue) {
 					setSession((prev) =>
 						applyLegacyValue(prev, kind, previousValue),
@@ -458,7 +459,7 @@ export function useAgentSession(
 		async (configId: string, value: string) => {
 			const s = sessionRef.current;
 			if (!s.sessionId) {
-				console.warn("Cannot set config option: no active session");
+				getLogger().debug("Cannot set config option: no active session");
 				return;
 			}
 
@@ -509,7 +510,7 @@ export function useAgentSession(
 					});
 				}
 			} catch (error) {
-				console.error("Failed to set config option:", error);
+				getLogger().error("Failed to set config option:", error);
 				if (previousConfigOptions) {
 					setSession((prev) => ({
 						...prev,

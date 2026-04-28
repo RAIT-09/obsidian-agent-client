@@ -13,6 +13,7 @@ import type AgentClientPlugin from "../plugin";
 import type { ChatMessage, MessageContent } from "../types/chat";
 import type { SavedSessionInfo } from "../types/session";
 import { convertWindowsPathToWsl } from "../utils/platform";
+import { getLogger } from "../utils/logger";
 
 // ============================================================================
 // Types
@@ -227,14 +228,14 @@ export class SessionStorage {
 				typeof data.version !== "number" ||
 				!Array.isArray(data.messages)
 			) {
-				console.warn(
+				getLogger().debug(
 					`[SessionStorage] Invalid session file structure: ${filePath}`,
 				);
 				return null;
 			}
 
 			if (data.version !== 1) {
-				console.warn(
+				getLogger().debug(
 					`[SessionStorage] Unknown session file version: ${data.version}`,
 				);
 				return null;
@@ -245,7 +246,7 @@ export class SessionStorage {
 				timestamp: new Date(msg.timestamp),
 			}));
 		} catch (error) {
-			console.error(
+			getLogger().error(
 				`[SessionStorage] Failed to load session messages: ${error}`,
 			);
 			return null;

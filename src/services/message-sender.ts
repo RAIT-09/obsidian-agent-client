@@ -13,6 +13,7 @@
  */
 
 import type { AcpClient } from "../acp/acp-client";
+import { getLogger } from "../utils/logger";
 import type {
 	IVaultAccess,
 	NoteMetadata,
@@ -212,7 +213,7 @@ async function processNote(
 			originalLength: content.length,
 		};
 	} catch (error) {
-		console.error(`Failed to read note ${file.path}:`, error);
+		getLogger().error(`Failed to read note ${file.path}:`, error);
 		return null;
 	}
 }
@@ -248,7 +249,7 @@ async function readSelection(
 			originalLength: fullText.length,
 		};
 	} catch (error) {
-		console.error(`Failed to read selection from ${notePath}:`, error);
+		getLogger().error(`Failed to read selection from ${notePath}:`, error);
 		return null;
 	}
 }

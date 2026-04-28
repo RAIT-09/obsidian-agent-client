@@ -758,8 +758,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.debugMode)
 					.onChange(async (value) => {
-						this.plugin.settings.debugMode = value;
-						await this.plugin.saveSettings();
+						await this.plugin.saveSettingsAndNotify({
+							...this.plugin.settings,
+							debugMode: value,
+						});
 					}),
 			);
 	}
