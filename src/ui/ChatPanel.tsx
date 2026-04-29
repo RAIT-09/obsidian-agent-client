@@ -326,12 +326,18 @@ export function ChatPanel({
 	// Track whether tab label has been reported (reset on new chat / restore)
 	const labelReportedRef = useRef(false);
 
+	// Stable refs for tab callbacks (avoid re-render loops from inline arrow props)
+	const onStateChangeRef = useRef(onStateChange);
+	onStateChangeRef.current = onStateChange;
+	const onLabelChangeRef = useRef(onLabelChange);
+	onLabelChangeRef.current = onLabelChange;
+
 	const handleLabelChangeFromRestore = useCallback(
 		(label: string) => {
-			onLabelChange?.(label);
+			onLabelChangeRef.current?.(label);
 			labelReportedRef.current = true;
 		},
-		[onLabelChange],
+		[],
 	);
 
 	const { handleOpenHistory } = useHistoryModal(
@@ -356,7 +362,7 @@ export function ChatPanel({
 			try {
 				await handleNewChat(requestedAgentId);
 				labelReportedRef.current = false;
-				onLabelChange?.("");
+				onLabelChangeRef.current?.("");
 				// Persist agent ID for this view (survives Obsidian restart)
 				if (requestedAgentId) {
 					onAgentIdChanged?.(requestedAgentId);
@@ -795,20 +801,19 @@ export function ChatPanel({
 	// Effects - Tab State & Label Reporting
 	// ============================================================
 	useEffect(() => {
-		if (!onStateChange) return;
+		if (!onStateChangeRef.current) return;
 		if (errorInfo) {
-			onStateChange("error");
+			onStateChangeRef.current("error");
 		} else if (agent.hasActivePermission) {
-			onStateChange("permission");
+			onStateChangeRef.current("permission");
 		} else if (isSending) {
-			onStateChange("busy");
+			onStateChangeRef.current("busy");
 		} else if (isSessionReady) {
-			onStateChange("ready");
+			onStateChangeRef.current("ready");
 		} else {
-			onStateChange("disconnected");
+			onStateChangeRef.current("disconnected");
 		}
 	}, [
-		onStateChange,
 		errorInfo,
 		agent.hasActivePermission,
 		isSending,
@@ -817,7 +822,7 @@ export function ChatPanel({
 
 	// Report label from first user message
 	useEffect(() => {
-		if (!onLabelChange || labelReportedRef.current) return;
+		if (!onLabelChangeRef.current || labelReportedRef.current) return;
 		if (messages.length > 0) {
 			const firstUserMsg = messages.find((m) => m.role === "user");
 			if (firstUserMsg) {
@@ -830,12 +835,12 @@ export function ChatPanel({
 				const text =
 					textBlock && "text" in textBlock ? textBlock.text : "";
 				if (text.trim()) {
-					onLabelChange(text.trim());
+					onLabelChangeRef.current(text.trim());
 					labelReportedRef.current = true;
 				}
 			}
 		}
-	}, [onLabelChange, messages]);
+	}, [messages]);
 
 	// Report session ID changes to parent (for tab rename persistence)
 	useEffect(() => {

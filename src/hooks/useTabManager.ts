@@ -150,24 +150,29 @@ export function useTabManager(initialAgentId: string): UseTabManagerReturn {
 
 	const setTabLabel = useCallback(
 		(tabId: string, label: string) => {
-			setTabs((prev) =>
-				prev.map((t) =>
+			const truncated = truncateLabel(label);
+			setTabs((prev) => {
+				const tab = prev.find((t) => t.tabId === tabId);
+				if (!tab || tab.label === truncated) return prev;
+				return prev.map((t) =>
 					t.tabId === tabId
-						? { ...t, label: truncateLabel(label) }
+						? { ...t, label: truncated }
 						: t,
-				),
-			);
+				);
+			});
 		},
 		[],
 	);
 
 	const setTabState = useCallback(
 		(tabId: string, state: TabState) => {
-			setTabs((prev) =>
-				prev.map((t) =>
+			setTabs((prev) => {
+				const tab = prev.find((t) => t.tabId === tabId);
+				if (!tab || tab.state === state) return prev;
+				return prev.map((t) =>
 					t.tabId === tabId ? { ...t, state } : t,
-				),
-			);
+				);
+			});
 		},
 		[],
 	);
