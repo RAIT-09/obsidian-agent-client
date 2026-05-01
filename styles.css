@@ -840,211 +840,121 @@ If your plugin does not need CSS, delete this file.
 .agent-client-chat-input-actions {
 	display: flex;
 	align-items: center;
-	justify-content: flex-end;
+	justify-content: flex-start;
 	flex-wrap: nowrap;
-	gap: 8px;
+	gap: 12px;
 	padding: 4px 12px 8px 12px;
 	min-width: 0;
 }
 
-/* Mode Selector */
-.agent-client-mode-selector {
+/* Push the send button to the far right, keeping dropdowns left-aligned.
+   !important needed to defeat the `margin: 0 !important` on .agent-client-chat-send-button below. */
+.agent-client-chat-input-actions > .agent-client-chat-send-button {
+	margin-left: auto !important;
+}
+
+/* Toolbar dropdown — inline-typographic trigger that opens an Obsidian Menu.
+   Style goal: no button chrome at all in idle state. Reads as part of the
+   text below the input, not as a control. Hover only shifts text color.
+   Uses !important against Obsidian's default global `button` styles. */
+
+.agent-client-toolbar-dropdown {
 	display: inline-flex;
 	align-items: center;
-	padding: 0 4px;
-	border-radius: 4px;
+	gap: 4px;
+	height: auto !important;
+	padding: 0 !important;
+	margin: 0 !important;
+	background: transparent !important;
+	background-color: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+	color: var(--text-muted);
+	font-size: var(--font-smallest);
+	line-height: 1;
 	cursor: pointer;
-	transition: background-color 0.1s ease;
-	height: 20px;
-	max-width: 120px;
+	transition: color 0.1s ease;
+	max-width: 200px;
 	min-width: 0;
 	flex-shrink: 1;
 	overflow: hidden;
-}
-
-.agent-client-mode-selector:hover {
-	background-color: var(--background-modifier-hover);
-}
-
-.agent-client-mode-selector-icon {
-	display: flex;
-	align-items: center;
-	pointer-events: none;
-	color: var(--text-faint);
-	margin-left: 2px;
-	order: 2;
-}
-
-.agent-client-mode-selector-icon svg {
-	width: 12px;
-	height: 12px;
-}
-
-.agent-client-mode-selector select.dropdown {
-	padding: 0 !important;
-	margin: 0 !important;
-	border: none !important;
-	border-radius: 0 !important;
-	background: none !important;
-	background-color: transparent !important;
-	background-image: none !important;
-	box-shadow: none !important;
-	color: var(--text-faint) !important;
-	font-size: 11px !important;
-	cursor: pointer !important;
-	outline: none !important;
-	appearance: none !important;
-	-webkit-appearance: none !important;
-	-moz-appearance: none !important;
-	order: 1;
-	max-width: 100px;
-	overflow: hidden;
-	text-overflow: ellipsis;
 	white-space: nowrap;
+	box-shadow: none !important;
 }
 
-.agent-client-mode-selector select.dropdown:hover,
-.agent-client-mode-selector select.dropdown:focus {
-	color: var(--text-faint) !important;
+.agent-client-toolbar-dropdown:hover {
+	color: var(--text-normal);
+	background: transparent !important;
 	background-color: transparent !important;
 	box-shadow: none !important;
 }
 
-/* Model Selector (experimental) */
-.agent-client-model-selector {
+.agent-client-toolbar-dropdown:focus {
+	background: transparent !important;
+	background-color: transparent !important;
+	box-shadow: none !important;
+	outline: none;
+}
+
+.agent-client-toolbar-dropdown:focus-visible {
+	outline: 1px dotted var(--text-faint);
+	outline-offset: 2px;
+}
+
+.agent-client-toolbar-dropdown-icon {
 	display: inline-flex;
 	align-items: center;
-	padding: 0 4px;
-	border-radius: 4px;
-	cursor: pointer;
-	transition: background-color 0.1s ease;
-	height: 20px;
-	max-width: 120px;
-	min-width: 0;
-	flex-shrink: 1;
-	overflow: hidden;
-}
-
-.agent-client-model-selector:hover {
-	background-color: var(--background-modifier-hover);
-}
-
-.agent-client-model-selector-icon {
-	display: flex;
-	align-items: center;
-	pointer-events: none;
+	flex-shrink: 0;
 	color: var(--text-faint);
-	margin-left: 2px;
-	order: 2;
 }
 
-.agent-client-model-selector-icon svg {
-	width: 12px;
-	height: 12px;
+.agent-client-toolbar-dropdown:hover .agent-client-toolbar-dropdown-icon {
+	color: var(--text-muted);
 }
 
-.agent-client-model-selector select.dropdown {
-	padding: 0 !important;
-	margin: 0 !important;
-	border: none !important;
-	border-radius: 0 !important;
-	background: none !important;
-	background-color: transparent !important;
-	background-image: none !important;
-	box-shadow: none !important;
-	color: var(--text-faint) !important;
-	font-size: 11px !important;
-	cursor: pointer !important;
-	outline: none !important;
-	appearance: none !important;
-	-webkit-appearance: none !important;
-	-moz-appearance: none !important;
-	order: 1;
-	max-width: 100px;
+.agent-client-toolbar-dropdown-icon svg {
+	width: 13px;
+	height: 13px;
+}
+
+.agent-client-toolbar-dropdown-label {
+	flex: 1 1 auto;
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	color: var(--text-accent);
+	font-weight: var(--font-medium);
 }
 
-.agent-client-model-selector select.dropdown:hover,
-.agent-client-model-selector select.dropdown:focus {
-	color: var(--text-faint) !important;
-	background-color: transparent !important;
-	box-shadow: none !important;
-}
-
-/* Config option selector (configOptions API - supersedes mode/model selectors) */
-
-.agent-client-config-options-container {
-	display: contents;
-}
-
-.agent-client-config-selector {
+.agent-client-toolbar-dropdown-chevron {
 	display: inline-flex;
 	align-items: center;
-	padding: 0 4px;
-	border-radius: 4px;
-	cursor: pointer;
-	transition: background-color 0.1s ease;
-	height: 20px;
-	max-width: 120px;
-	min-width: 0;
-	flex-shrink: 1;
-	overflow: hidden;
-}
-
-.agent-client-config-selector:hover {
-	background-color: var(--background-modifier-hover);
-}
-
-.agent-client-config-selector-icon {
-	display: flex;
-	align-items: center;
-	pointer-events: none;
+	flex-shrink: 0;
 	color: var(--text-faint);
-	margin-left: 2px;
-	order: 2;
+	margin-left: 1px;
+	opacity: 0.7;
+	transition: opacity 0.1s ease;
 }
 
-.agent-client-config-selector-icon svg {
-	width: 12px;
-	height: 12px;
+.agent-client-toolbar-dropdown:hover .agent-client-toolbar-dropdown-chevron {
+	opacity: 1;
 }
 
-.agent-client-config-selector select.dropdown {
-	padding: 0 !important;
-	margin: 0 !important;
-	border: none !important;
-	border-radius: 0 !important;
-	background: none !important;
-	background-color: transparent !important;
-	background-image: none !important;
-	box-shadow: none !important;
-	color: var(--text-faint) !important;
-	font-size: 11px !important;
-	cursor: pointer !important;
-	outline: none !important;
-	appearance: none !important;
-	-webkit-appearance: none !important;
-	-moz-appearance: none !important;
-	order: 1;
-	max-width: 100px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+.agent-client-toolbar-dropdown-chevron svg {
+	width: 11px;
+	height: 11px;
 }
 
-.agent-client-config-selector select.dropdown:hover,
-.agent-client-config-selector select.dropdown:focus {
-	color: var(--text-faint) !important;
-	background-color: transparent !important;
-	box-shadow: none !important;
+/* Permission-mode is the safety-critical selector — make its icon match
+   the accent so it reads as the most prominent control */
+.agent-client-toolbar-dropdown.agent-client-config-selector-permission .agent-client-toolbar-dropdown-icon {
+	color: var(--text-accent);
 }
 
 /* Context Usage Indicator */
 .agent-client-usage-indicator {
 	font-size: var(--font-smallest);
-	margin-right: auto;
 	flex-shrink: 0;
 	cursor: default;
 	user-select: none;
