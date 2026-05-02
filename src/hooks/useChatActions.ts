@@ -109,15 +109,13 @@ export function useChatActions(
 
 			try {
 				const exporter = new ChatExporter(plugin);
-				const openFile =
-					plugin.settings.exportSettings.openFileAfterExport;
 				const filePath = await exporter.exportToMarkdown(
 					triggerMessages,
 					triggerSession.agentDisplayName,
 					triggerSession.agentId,
 					triggerSession.sessionId,
 					triggerSession.createdAt,
-					openFile,
+					false,
 				);
 				if (filePath) {
 					const context =
@@ -220,10 +218,12 @@ export function useChatActions(
 		logger.log("Cancelling current operation...");
 		const lastMessage = agent.lastUserMessage;
 		await agent.cancelOperation();
+		// Discard stale streaming state so the next send starts clean (Issue #200)
+		agent.clearPendingUpdates();
 		if (lastMessage) {
 			setRestoredMessage(lastMessage);
 		}
-	}, [logger, agent.cancelOperation, agent.lastUserMessage]);
+	}, [logger, agent.cancelOperation, agent.clearPendingUpdates, agent.lastUserMessage]);
 
 	const handleNewChat = useCallback(
 		async (requestedAgentId?: string) => {
