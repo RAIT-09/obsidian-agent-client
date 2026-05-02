@@ -994,7 +994,7 @@ export function InputArea({
 				onDrop={(e) => void handleDrop(e)}
 			>
 				{/* Auto-mention Badge */}
-				{autoMentionEnabled && mentions.activeNote && (
+				{mentions.activeNote && (
 					<button
 						className="agent-client-auto-mention-inline"
 						onClick={() =>
@@ -1045,7 +1045,7 @@ export function InputArea({
 						onKeyDown={handleKeyDown}
 						onPaste={(e) => void handlePaste(e)}
 						placeholder={placeholder}
-						className={`agent-client-chat-input-textarea ${autoMentionEnabled && mentions.activeNote ? "has-auto-mention" : ""}`}
+						className={`agent-client-chat-input-textarea ${mentions.activeNote ? "has-auto-mention" : ""}`}
 						rows={1}
 						spellCheck={obsidianSpellcheck}
 					/>
