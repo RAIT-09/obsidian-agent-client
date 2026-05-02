@@ -62,6 +62,10 @@ function ToolbarDropdown({
 
 			const menu = new Menu();
 
+			menu.addItem((menuItem) => {
+				menuItem.setTitle(title).setIsLabel(true);
+			});
+
 			let lastGroupName: string | undefined;
 			for (const item of items) {
 				if (
