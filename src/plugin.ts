@@ -135,7 +135,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	claude: {
 		id: "claude-code-acp",
 		displayName: "Claude Code",
-		apiKey: "",
+		apiKeySecretId: "",
 		command: "claude-agent-acp",
 		args: [],
 		env: [],
@@ -143,7 +143,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	codex: {
 		id: "codex-acp",
 		displayName: "Codex",
-		apiKey: "",
+		apiKeySecretId: "",
 		command: "codex-acp",
 		args: [],
 		env: [],
@@ -151,7 +151,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	gemini: {
 		id: "gemini-cli",
 		displayName: "Gemini CLI",
-		apiKey: "",
+		apiKeySecretId: "",
 		command: "gemini",
 		args: ["--experimental-acp"],
 		env: [],
@@ -847,6 +847,7 @@ export default class AgentClientPlugin extends Plugin {
 	async loadSettings() {
 		const raw = ((await this.loadData()) ?? {}) as Record<string, unknown>;
 		const D = DEFAULT_SETTINGS;
+		let migratedSecrets = false;
 
 		// Extract agent sub-objects
 		const rc = obj(raw.claude) ?? {};
@@ -882,7 +883,16 @@ export default class AgentClientPlugin extends Plugin {
 			claude: {
 				id: D.claude.id, // Fixed — never from raw
 				displayName: str(rc.displayName, D.claude.displayName),
-				apiKey: str(rc.apiKey, D.claude.apiKey),
+				apiKeySecretId: this.migrateLegacyApiKey(
+					"claude-api-key",
+					"agent-client-claude-api-key",
+					str(rc.apiKeySecretId, D.claude.apiKeySecretId),
+					str(rc.apiKey, ""),
+					"Claude",
+					() => {
+						migratedSecrets = true;
+					},
+				),
 				// Migration: claude.command ← claudeCodeAcpCommandPath (old name)
 				command:
 					str(rc.command, "") ||
@@ -894,7 +904,16 @@ export default class AgentClientPlugin extends Plugin {
 			codex: {
 				id: D.codex.id,
 				displayName: str(rk.displayName, D.codex.displayName),
-				apiKey: str(rk.apiKey, D.codex.apiKey),
+				apiKeySecretId: this.migrateLegacyApiKey(
+					"openai-api-key",
+					"agent-client-openai-api-key",
+					str(rk.apiKeySecretId, D.codex.apiKeySecretId),
+					str(rk.apiKey, ""),
+					"Codex",
+					() => {
+						migratedSecrets = true;
+					},
+				),
 				command: str(rk.command, "") || D.codex.command,
 				args: sanitizeArgs(rk.args),
 				env: normalizeEnvVars(rk.env),
@@ -902,7 +921,16 @@ export default class AgentClientPlugin extends Plugin {
 			gemini: {
 				id: D.gemini.id,
 				displayName: str(rg.displayName, D.gemini.displayName),
-				apiKey: str(rg.apiKey, D.gemini.apiKey),
+				apiKeySecretId: this.migrateLegacyApiKey(
+					"gemini-api-key",
+					"agent-client-gemini-api-key",
+					str(rg.apiKeySecretId, D.gemini.apiKeySecretId),
+					str(rg.apiKey, ""),
+					"Gemini",
+					() => {
+						migratedSecrets = true;
+					},
+				),
 				// Migration: gemini.command ← geminiCommandPath (old name)
 				command:
 					str(rg.command, "") ||
@@ -1043,6 +1071,10 @@ export default class AgentClientPlugin extends Plugin {
 		};
 
 		this.ensureDefaultAgentId();
+
+		if (migratedSecrets) {
+			await this.saveSettings();
+		}
 	}
 
 	async saveSettings() {
@@ -1051,6 +1083,80 @@ export default class AgentClientPlugin extends Plugin {
 
 	async saveSettingsAndNotify(nextSettings: AgentClientPluginSettings) {
 		await this.settingsService.updateSettings(nextSettings);
+	}
+
+	/**
+	 * Migrate legacy plaintext apiKey (v0.10.x) to secretStorage.
+	 *
+	 * Returns the secretId to use for this agent.
+	 *
+	 * Behavior:
+	 * - If apiKeySecretId is already set, return it as-is. If a legacy
+	 *   plaintext apiKey still lingers in data.json (orphaned from prior
+	 *   experimental state), trigger onMigrate to schedule a save that
+	 *   cleans it up.
+	 * - If legacy apiKey is empty, return empty string (no migration needed).
+	 * - Otherwise, migrate to secretStorage:
+	 *   - Use defaultSecretId (e.g. "claude-api-key") for cross-plugin sharing.
+	 *   - On collision (defaultSecretId exists with a different value, e.g.
+	 *     from another plugin), fall back to fallbackSecretId
+	 *     (e.g. "agent-client-claude-api-key") to preserve the user's key
+	 *     and notify them.
+	 *
+	 * This method is for upgrading from v0.10.x or experimental builds and
+	 * can be removed in a future major version once we're confident no
+	 * users have legacy plaintext apiKey fields in data.json.
+	 */
+	private migrateLegacyApiKey(
+		defaultSecretId: string,
+		fallbackSecretId: string,
+		currentSecretId: string,
+		legacyApiKey: string,
+		agentLabel: string,
+		onMigrate: () => void,
+	): string {
+		const trimmed = legacyApiKey.trim();
+
+		// Already migrated
+		if (currentSecretId.length > 0) {
+			// Clean up orphaned plaintext apiKey if still in data.json
+			if (trimmed.length > 0) {
+				onMigrate();
+			}
+			return currentSecretId;
+		}
+
+		if (trimmed.length === 0) {
+			return "";
+		}
+
+		const existing = this.app.secretStorage.getSecret(defaultSecretId);
+
+		if (existing === null) {
+			// No collision — create the secret with the preferred ID
+			this.app.secretStorage.setSecret(defaultSecretId, trimmed);
+			new Notice(
+				`[Agent Client] Your ${agentLabel} API key has been migrated to Obsidian's secret storage as "${defaultSecretId}".`,
+			);
+			onMigrate();
+			return defaultSecretId;
+		}
+
+		if (existing === trimmed) {
+			// Idempotent re-migration (same value already stored)
+			onMigrate();
+			return defaultSecretId;
+		}
+
+		// Collision: defaultSecretId exists with a different value (likely
+		// another plugin). Fall back to a plugin-prefixed ID to preserve
+		// the user's key without overwriting other plugins' secrets.
+		this.app.secretStorage.setSecret(fallbackSecretId, trimmed);
+		new Notice(
+			`[Agent Client] "${defaultSecretId}" was already in use. Your ${agentLabel} API key was migrated to "${fallbackSecretId}". You can rename it in Obsidian's secret storage settings.`,
+		);
+		onMigrate();
+		return fallbackSecretId;
 	}
 
 	/**

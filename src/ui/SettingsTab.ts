@@ -4,6 +4,7 @@ import {
 	Setting,
 	DropdownComponent,
 	Platform,
+	SecretComponent,
 } from "obsidian";
 import type AgentClientPlugin from "../plugin";
 import type {
@@ -881,17 +882,16 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("API key")
 			.setDesc(
-				"Gemini API key. Required if not logging in with a Google account. (Stored as plain text)",
+				"Gemini API key. Required if not logging in with a Google account. Select from Obsidian's secret storage or create a new secret.",
 			)
-			.addText((text) => {
-				text.setPlaceholder("Enter your Gemini API key")
-					.setValue(gemini.apiKey)
+			.addComponent((el) =>
+				new SecretComponent(this.app, el)
+					.setValue(gemini.apiKeySecretId)
 					.onChange(async (value) => {
-						this.plugin.settings.gemini.apiKey = value.trim();
+						this.plugin.settings.gemini.apiKeySecretId = value;
 						await this.plugin.saveSettings();
-					});
-				text.inputEl.type = "password";
-			});
+					}),
+			);
 
 		const geminiPathSetting = new Setting(sectionEl)
 			.setName("Path")
@@ -931,7 +931,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("Environment variables")
 			.setDesc(
-				"Enter KEY=VALUE pairs, one per line. Required to authenticate with Vertex AI. GEMINI_API_KEY is derived from the field above.(Stored as plain text)",
+				"Enter KEY=VALUE pairs, one per line. Required to authenticate with Vertex AI. GEMINI_API_KEY is derived from the field above.",
 			)
 			.addTextArea((text) => {
 				text.setPlaceholder("GOOGLE_CLOUD_PROJECT=...")
@@ -954,17 +954,16 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("API key")
 			.setDesc(
-				"Anthropic API key. Required if not logging in with an Anthropic account. (Stored as plain text)",
+				"Anthropic API key. Required if not logging in with an Anthropic account. Select from Obsidian's secret storage or create a new secret.",
 			)
-			.addText((text) => {
-				text.setPlaceholder("Enter your Anthropic API key")
-					.setValue(claude.apiKey)
+			.addComponent((el) =>
+				new SecretComponent(this.app, el)
+					.setValue(claude.apiKeySecretId)
 					.onChange(async (value) => {
-						this.plugin.settings.claude.apiKey = value.trim();
+						this.plugin.settings.claude.apiKeySecretId = value;
 						await this.plugin.saveSettings();
-					});
-				text.inputEl.type = "password";
-			});
+					}),
+			);
 
 		const claudePathSetting = new Setting(sectionEl)
 			.setName("Path")
@@ -1031,17 +1030,16 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("API key")
 			.setDesc(
-				"OpenAI API key. Required if not logging in with an OpenAI account. (Stored as plain text)",
+				"OpenAI API key. Required if not logging in with an OpenAI account. Select from Obsidian's secret storage or create a new secret.",
 			)
-			.addText((text) => {
-				text.setPlaceholder("Enter your OpenAI API key")
-					.setValue(codex.apiKey)
+			.addComponent((el) =>
+				new SecretComponent(this.app, el)
+					.setValue(codex.apiKeySecretId)
 					.onChange(async (value) => {
-						this.plugin.settings.codex.apiKey = value.trim();
+						this.plugin.settings.codex.apiKeySecretId = value;
 						await this.plugin.saveSettings();
-					});
-				text.inputEl.type = "password";
-			});
+					}),
+			);
 
 		const codexPathSetting = new Setting(sectionEl)
 			.setName("Path")

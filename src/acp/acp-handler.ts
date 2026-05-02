@@ -68,7 +68,10 @@ export class AcpHandler {
 		const update = params.update;
 		const sessionId = params.sessionId;
 		this.promptSessionUpdateCount++;
-		this.logger.log("[AcpHandler] sessionUpdate:", { sessionId, update });
+		this.logger.log("[AcpHandler] sessionUpdate:", {
+			sessionId,
+			type: update.sessionUpdate,
+		});
 
 		switch (update.sessionUpdate) {
 			case "agent_message_chunk":
