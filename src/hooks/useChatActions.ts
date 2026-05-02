@@ -220,12 +220,10 @@ export function useChatActions(
 		logger.log("Cancelling current operation...");
 		const lastMessage = agent.lastUserMessage;
 		await agent.cancelOperation();
-		// Discard stale streaming state so the next send starts clean (Issue #200)
-		agent.clearPendingUpdates();
 		if (lastMessage) {
 			setRestoredMessage(lastMessage);
 		}
-	}, [logger, agent.cancelOperation, agent.clearPendingUpdates, agent.lastUserMessage]);
+	}, [logger, agent.cancelOperation, agent.lastUserMessage]);
 
 	const handleNewChat = useCallback(
 		async (requestedAgentId?: string) => {
