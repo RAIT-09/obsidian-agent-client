@@ -227,7 +227,7 @@ export class AcpClient {
 		this.logger.log(
 			"[AcpClient] Prepared spawn command:",
 			spawnCommand,
-			`(${spawnArgs.length} args)`,
+			spawnArgs,
 		);
 
 		// Spawn the agent process
@@ -322,12 +322,9 @@ export class AcpClient {
 
 		agentProcess.stderr?.setEncoding("utf8");
 		agentProcess.stderr?.on("data", (data) => {
-			const stderrChunk = String(data);
-			this.logger.log(
-				`[AcpClient] ${agentLabel} stderr chunk (${stderrChunk.length} chars)`,
-			);
+			this.logger.log(`[AcpClient] ${agentLabel} stderr:`, data);
 			// Keep a rolling window of recent stderr for error diagnostics
-			this.recentStderr += stderrChunk;
+			this.recentStderr += data;
 			if (this.recentStderr.length > 8192) {
 				this.recentStderr = this.recentStderr.slice(-4096);
 			}

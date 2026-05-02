@@ -78,12 +78,7 @@ export class PermissionManager {
 	): Promise<acp.RequestPermissionResponse> {
 		this.logger.log(
 			"[PermissionManager] Permission request received:",
-			{
-				sessionId: params.sessionId,
-				optionCount: params.options.length,
-				toolCallId: params.toolCall?.toolCallId,
-				title: params.toolCall?.title,
-			},
+			params,
 		);
 
 		// If auto-allow is enabled, automatically approve the first allow option
@@ -99,11 +94,7 @@ export class PermissionManager {
 
 			this.logger.log(
 				"[PermissionManager] Auto-allowing permission request:",
-				{
-					optionId: allowOption.optionId,
-					kind: allowOption.kind,
-					name: allowOption.name,
-				},
+				allowOption,
 			);
 
 			return Promise.resolve({

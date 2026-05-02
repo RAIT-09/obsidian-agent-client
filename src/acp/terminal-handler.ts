@@ -93,7 +93,7 @@ export class TerminalManager {
 
 		this.logger.log(`[Terminal ${terminalId}] Creating terminal:`, {
 			command,
-			argCount: args.length,
+			args,
 			cwd: params.cwd,
 		});
 
@@ -135,17 +135,13 @@ export class TerminalManager {
 		// Capture stdout and stderr
 		childProcess.stdout?.on("data", (data: Buffer) => {
 			const output = data.toString();
-			this.logger.log(
-				`[Terminal ${terminalId}] stdout chunk (${Buffer.byteLength(output, "utf8")} bytes)`,
-			);
+			this.logger.log(`[Terminal ${terminalId}] stdout:`, output);
 			this.appendOutput(terminal, output);
 		});
 
 		childProcess.stderr?.on("data", (data: Buffer) => {
 			const output = data.toString();
-			this.logger.log(
-				`[Terminal ${terminalId}] stderr chunk (${Buffer.byteLength(output, "utf8")} bytes)`,
-			);
+			this.logger.log(`[Terminal ${terminalId}] stderr:`, output);
 			this.appendOutput(terminal, output);
 		});
 

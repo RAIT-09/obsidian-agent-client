@@ -177,7 +177,7 @@ export class AcpHandler {
 	): Promise<void> {
 		this.logger.log(
 			`[AcpHandler] Extension notification received: ${method}`,
-			Object.keys(params),
+			params,
 		);
 	}
 
@@ -202,12 +202,7 @@ export class AcpHandler {
 	): Promise<acp.CreateTerminalResponse> {
 		this.logger.log(
 			"[AcpHandler] createTerminal called with params:",
-			{
-				command: params.command,
-				argCount: params.args?.length ?? 0,
-				hasEnv: (params.env?.length ?? 0) > 0,
-				cwd: params.cwd || this.getWorkingDirectory(),
-			},
+			params,
 		);
 
 		const terminalId = this.terminalManager.createTerminal({
