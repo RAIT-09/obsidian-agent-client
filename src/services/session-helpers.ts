@@ -110,7 +110,13 @@ export function findAgentSettings(
 }
 
 /**
- * Build AgentConfig with API key injection for known agents.
+ * Build AgentConfig with API key injection intent for known agents.
+ *
+ * For built-in agents, attaches an `apiKey` intent (secretId + envVarName)
+ * to the config. AcpClient.initialize() resolves the secret value from
+ * Obsidian's secret storage just before spawn.
+ *
+ * Custom agents pass through unchanged (they manage env vars directly).
  */
 export function buildAgentConfigWithApiKey(
 	settings: AgentClientPluginSettings,
@@ -120,14 +126,13 @@ export function buildAgentConfigWithApiKey(
 ) {
 	const baseConfig = toAgentConfig(agentSettings, workingDirectory);
 
-	// Add API keys to environment for Claude, Codex, and Gemini
 	if (agentId === settings.claude.id) {
 		const claudeSettings = agentSettings as ClaudeAgentSettings;
 		return {
 			...baseConfig,
-			env: {
-				...baseConfig.env,
-				ANTHROPIC_API_KEY: claudeSettings.apiKey,
+			apiKey: {
+				secretId: claudeSettings.apiKeySecretId,
+				envVarName: "ANTHROPIC_API_KEY",
 			},
 		};
 	}
@@ -135,9 +140,9 @@ export function buildAgentConfigWithApiKey(
 		const codexSettings = agentSettings as CodexAgentSettings;
 		return {
 			...baseConfig,
-			env: {
-				...baseConfig.env,
-				OPENAI_API_KEY: codexSettings.apiKey,
+			apiKey: {
+				secretId: codexSettings.apiKeySecretId,
+				envVarName: "OPENAI_API_KEY",
 			},
 		};
 	}
@@ -145,14 +150,14 @@ export function buildAgentConfigWithApiKey(
 		const geminiSettings = agentSettings as GeminiAgentSettings;
 		return {
 			...baseConfig,
-			env: {
-				...baseConfig.env,
-				GEMINI_API_KEY: geminiSettings.apiKey,
+			apiKey: {
+				secretId: geminiSettings.apiKeySecretId,
+				envVarName: "GEMINI_API_KEY",
 			},
 		};
 	}
 
-	// Custom agents - no API key injection
+	// Custom agents — no API key injection
 	return baseConfig;
 }
 

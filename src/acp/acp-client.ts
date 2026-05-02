@@ -42,6 +42,19 @@ export interface AgentConfig {
 	args: string[];
 	env?: Record<string, string>;
 	workingDirectory: string;
+	/**
+	 * Optional API key injection intent.
+	 * When present, AcpClient.initialize() resolves the secret value from
+	 * Obsidian's secret storage and injects it into the spawn environment
+	 * as `envVarName`. Custom agents typically don't set this (they use
+	 * env vars directly).
+	 */
+	apiKey?: {
+		/** Secret storage ID to look up at spawn time */
+		secretId: string;
+		/** Environment variable name to inject the resolved value into */
+		envVarName: string;
+	};
 }
 
 /**
@@ -178,6 +191,16 @@ export class AcpClient {
 				"[AcpClient] Node.js directory added to PATH:",
 				nodeDir,
 			);
+		}
+
+		// Resolve API key secret just before spawn so the latest value is used.
+		// Custom agents don't set config.apiKey and inject keys via env directly.
+		if (config.apiKey) {
+			const secretValue =
+				this.plugin.app.secretStorage.getSecret(
+					config.apiKey.secretId,
+				) ?? "";
+			baseEnv[config.apiKey.envVarName] = secretValue;
 		}
 
 		this.logger.log(
@@ -394,6 +417,7 @@ export class AcpClient {
 		args: string[];
 		envKeys: string[];
 		workingDirectory: string;
+		apiKeyEnvVar?: string;
 	} {
 		return {
 			id: config.id,
@@ -402,6 +426,8 @@ export class AcpClient {
 			args: [...config.args],
 			envKeys: Object.keys(config.env || {}),
 			workingDirectory: config.workingDirectory,
+			// Log env var name only — never the secret ID or value
+			apiKeyEnvVar: config.apiKey?.envVarName,
 		};
 	}
 

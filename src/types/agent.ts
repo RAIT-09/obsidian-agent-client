@@ -57,36 +57,36 @@ export interface BaseAgentSettings {
  * Configuration for Gemini CLI agent.
  *
  * Extends base settings with Gemini-specific requirements.
+ * The API key (GEMINI_API_KEY) is stored in Obsidian's secret storage
+ * and referenced by ID. Empty string means no API key is configured.
  */
 export interface GeminiAgentSettings extends BaseAgentSettings {
-	/** Gemini API key (GEMINI_API_KEY) */
-	apiKey: string;
-	/** Secret storage ID containing the Gemini API key */
-	apiKeySecretId?: string;
+	/** Secret storage ID containing the Gemini API key (GEMINI_API_KEY) */
+	apiKeySecretId: string;
 }
 
 /**
  * Configuration for Claude Code agent.
  *
  * Extends base settings with Claude-specific requirements.
+ * The API key (ANTHROPIC_API_KEY) is stored in Obsidian's secret storage
+ * and referenced by ID. Empty string means no API key is configured.
  */
 export interface ClaudeAgentSettings extends BaseAgentSettings {
-	/** Anthropic API key for Claude (ANTHROPIC_API_KEY) */
-	apiKey: string;
-	/** Secret storage ID containing the Anthropic API key */
-	apiKeySecretId?: string;
+	/** Secret storage ID containing the Anthropic API key (ANTHROPIC_API_KEY) */
+	apiKeySecretId: string;
 }
 
 /**
  * Configuration for Codex CLI agent.
  *
  * Extends base settings with Codex-specific requirements.
+ * The API key (OPENAI_API_KEY) is stored in Obsidian's secret storage
+ * and referenced by ID. Empty string means no API key is configured.
  */
 export interface CodexAgentSettings extends BaseAgentSettings {
-	/** OpenAI API key for Codex (OPENAI_API_KEY) */
-	apiKey: string;
-	/** Secret storage ID containing the OpenAI API key */
-	apiKeySecretId?: string;
+	/** Secret storage ID containing the OpenAI API key (OPENAI_API_KEY) */
+	apiKeySecretId: string;
 }
 
 /**
