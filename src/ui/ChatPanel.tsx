@@ -188,6 +188,7 @@ export function ChatPanel({
 		vaultService,
 		plugin,
 		session.availableCommands || EMPTY_COMMANDS,
+		settings.autoMentionActiveNote,
 	);
 
 	// Session history hook with callback for session load

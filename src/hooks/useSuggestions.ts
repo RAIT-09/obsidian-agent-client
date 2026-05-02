@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import type { NoteMetadata, IVaultAccess } from "../services/vault-service";
 import {
 	detectMention,
@@ -90,6 +90,7 @@ export function useSuggestions(
 	vaultAccess: IVaultAccess,
 	plugin: AgentClientPlugin,
 	availableCommands: SlashCommand[],
+	autoMentionDefault: boolean,
 ): UseSuggestionsReturn {
 	// ============================================================
 	// Mention State
@@ -103,7 +104,14 @@ export function useSuggestions(
 		null,
 	);
 	const [activeNote, setActiveNote] = useState<NoteMetadata | null>(null);
-	const [isAutoMentionDisabled, setIsAutoMentionDisabled] = useState(false);
+	const [isAutoMentionDisabled, setIsAutoMentionDisabled] = useState(
+		!autoMentionDefault,
+	);
+
+	// Sync toggle when the setting changes at runtime (e.g. from plugin settings)
+	useEffect(() => {
+		setIsAutoMentionDisabled(!autoMentionDefault);
+	}, [autoMentionDefault]);
 
 	const mentionIsOpen =
 		mentionSuggestions.length > 0 && mentionContext !== null;
