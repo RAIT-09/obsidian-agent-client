@@ -258,7 +258,7 @@ export function useAgentMessages(
 				try { await sendPromiseRef.current; } catch { /* ignore */ }
 			}
 
-			const currentSessionId = session.sessionId as string;
+			const currentSessionId = session.sessionId;
 			const generation = ++generationRef.current;
 			const settings = settingsAccess.getSnapshot();
 
