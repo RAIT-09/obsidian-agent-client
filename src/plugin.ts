@@ -1135,6 +1135,9 @@ export default class AgentClientPlugin extends Plugin {
 		if (existing === null) {
 			// No collision — create the secret with the preferred ID
 			this.app.secretStorage.setSecret(defaultSecretId, trimmed);
+			new Notice(
+				`[Agent Client] Your ${agentLabel} API key has been migrated to Obsidian's secret storage as "${defaultSecretId}".`,
+			);
 			onMigrate();
 			return defaultSecretId;
 		}
