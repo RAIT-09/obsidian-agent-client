@@ -882,7 +882,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("API key")
 			.setDesc(
-				"Gemini API key. Required if not logging in with a Google account. Select from Obsidian's secret storage or create a new secret.",
+				"Gemini API key. Required if not logging in with a Google account. Select from Obsidian's Keychain or create a new secret.",
 			)
 			.addComponent((el) =>
 				new SecretComponent(this.app, el)
@@ -954,7 +954,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("API key")
 			.setDesc(
-				"Anthropic API key. Required if not logging in with an Anthropic account. Select from Obsidian's secret storage or create a new secret.",
+				"Anthropic API key. Required if not logging in with an Anthropic account. Select from Obsidian's Keychain or create a new secret.",
 			)
 			.addComponent((el) =>
 				new SecretComponent(this.app, el)
@@ -1030,7 +1030,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("API key")
 			.setDesc(
-				"OpenAI API key. Required if not logging in with an OpenAI account. Select from Obsidian's secret storage or create a new secret.",
+				"OpenAI API key. Required if not logging in with an OpenAI account. Select from Obsidian's Keychain or create a new secret.",
 			)
 			.addComponent((el) =>
 				new SecretComponent(this.app, el)

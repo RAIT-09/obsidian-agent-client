@@ -1136,7 +1136,7 @@ export default class AgentClientPlugin extends Plugin {
 			// No collision — create the secret with the preferred ID
 			this.app.secretStorage.setSecret(defaultSecretId, trimmed);
 			new Notice(
-				`[Agent Client] Your ${agentLabel} API key has been migrated to Obsidian's secret storage as "${defaultSecretId}".`,
+				`[Agent Client] Your ${agentLabel} API key has been migrated to Obsidian's Keychain as "${defaultSecretId}".`,
 			);
 			onMigrate();
 			return defaultSecretId;
@@ -1153,7 +1153,7 @@ export default class AgentClientPlugin extends Plugin {
 		// the user's key without overwriting other plugins' secrets.
 		this.app.secretStorage.setSecret(fallbackSecretId, trimmed);
 		new Notice(
-			`[Agent Client] "${defaultSecretId}" was already in use. Your ${agentLabel} API key was migrated to "${fallbackSecretId}". You can rename it in Obsidian's secret storage settings.`,
+			`[Agent Client] "${defaultSecretId}" was already in use. Your ${agentLabel} API key was migrated to "${fallbackSecretId}". You can rename it in Obsidian's Keychain settings.`,
 		);
 		onMigrate();
 		return fallbackSecretId;
