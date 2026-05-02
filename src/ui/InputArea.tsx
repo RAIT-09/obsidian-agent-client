@@ -403,7 +403,7 @@ export function InputArea({
 						mimeType: file.type,
 					});
 				} catch (error) {
-					console.error("Failed to convert image:", error);
+					getLogger().error("Failed to convert image:", error);
 					new Notice("[Agent Client] Failed to attach image");
 				}
 			}

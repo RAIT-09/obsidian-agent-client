@@ -8,6 +8,7 @@
 
 import type { AgentClientPluginSettings } from "../plugin";
 import type AgentClientPlugin from "../plugin";
+import { updateDebugMode } from "../utils/logger";
 import type { ChatMessage } from "../types/chat";
 import type { SavedSessionInfo } from "../types/session";
 import { SessionStorage } from "./session-storage";
@@ -199,6 +200,9 @@ export class SettingsService implements ISettingsAccess {
 
 		// Sync with plugin.settings (required for saveSettings to persist correctly)
 		this.plugin.settings = next;
+
+		// Keep logger in sync with debug mode toggle
+		updateDebugMode(next.debugMode);
 
 		// Notify all subscribers
 		for (const listener of this.listeners) {
