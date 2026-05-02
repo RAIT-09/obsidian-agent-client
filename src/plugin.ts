@@ -224,6 +224,10 @@ export default class AgentClientPlugin extends Plugin {
 		// Initialize settings store
 		this.settingsService = createSettingsService(this.settings, this);
 
+		// Detach stale leaves from a previous plugin instance to prevent
+		// "Attempting to register an existing view type" when Obsidian's
+		// hot-reload races onunload/onload (e.g. rapid toggle or npm run dev).
+		this.app.workspace.detachLeavesOfType(VIEW_TYPE_CHAT);
 		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
 
 		const ribbonIconEl = this.addRibbonIcon(
