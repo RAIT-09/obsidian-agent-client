@@ -550,13 +550,15 @@ export class AcpClient {
 	 * Cancel the current operation in a session.
 	 */
 	async cancel(sessionId: string): Promise<void> {
+		if (!this.connection) {
+			this.cancelAllOperations();
+			return;
+		}
 		try {
-			const connection = this.requireConnection();
-
 			this.logger.log(
 				"[AcpClient] Sending session/cancel notification...",
 			);
-			await connection.cancel({ sessionId });
+			await this.connection.cancel({ sessionId });
 			this.logger.log(
 				"[AcpClient] Cancellation request sent successfully",
 			);
