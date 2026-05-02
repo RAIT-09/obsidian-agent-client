@@ -27,7 +27,6 @@ interface ToolbarDropdownProps {
 	items: ToolbarDropdownItem[];
 	currentValue: string | undefined;
 	onChange: (value: string) => void;
-	icon?: string;
 	className?: string;
 }
 
@@ -42,18 +41,10 @@ function ToolbarDropdown({
 	items,
 	currentValue,
 	onChange,
-	icon,
 	className,
 }: ToolbarDropdownProps) {
 	const buttonRef = useRef<HTMLButtonElement>(null);
-	const iconRef = useRef<HTMLSpanElement>(null);
 	const chevronRef = useRef<HTMLSpanElement>(null);
-
-	useEffect(() => {
-		if (icon && iconRef.current) {
-			setIcon(iconRef.current, icon);
-		}
-	}, [icon]);
 
 	useEffect(() => {
 		if (chevronRef.current) {
@@ -105,6 +96,7 @@ function ToolbarDropdown({
 				x: rect.left,
 				y: targetY,
 			});
+			button.blur();
 		},
 		[items, currentValue, onChange],
 	);
@@ -119,14 +111,19 @@ function ToolbarDropdown({
 			title={title}
 			onClick={handleClick}
 		>
-			{icon && (
-				<span
-					ref={iconRef}
-					className="agent-client-toolbar-dropdown-icon"
-					aria-hidden="true"
-				/>
-			)}
-			<span className="agent-client-toolbar-dropdown-label">{label}</span>
+			<span className="agent-client-toolbar-dropdown-label-area">
+				{items.map((item) => (
+					<span
+						key={item.value}
+						className="agent-client-toolbar-dropdown-sizer"
+					>
+						{item.label}
+					</span>
+				))}
+				<span className="agent-client-toolbar-dropdown-label">
+					{label}
+				</span>
+			</span>
 			<span
 				ref={chevronRef}
 				className="agent-client-toolbar-dropdown-chevron"
@@ -153,24 +150,6 @@ function getUsageColorClass(percentage: number): string {
 	if (percentage >= 80) return "agent-client-usage-warning";
 	if (percentage >= 70) return "agent-client-usage-caution";
 	return "agent-client-usage-normal";
-}
-
-/** Pick an icon for a config option based on its category. */
-function iconForCategory(
-	category: string | null | undefined,
-): string | undefined {
-	switch (category) {
-		case "permission":
-			return "shield";
-		case "mode":
-			return "sliders-horizontal";
-		case "model":
-			return "cpu";
-		case "reasoning":
-			return "brain";
-		default:
-			return undefined;
-	}
 }
 
 // ============================================================================
@@ -347,7 +326,6 @@ export function InputToolbar({
 								onChange={(value) => {
 									onConfigOptionChange?.(option.id, value);
 								}}
-								icon={iconForCategory(option.category)}
 								className={
 									option.category
 										? `agent-client-config-selector-${option.category}`
@@ -369,7 +347,6 @@ export function InputToolbar({
 								items={modeItems}
 								currentValue={modes.currentModeId ?? undefined}
 								onChange={onModeChange}
-								icon="sliders-horizontal"
 							/>
 						)}
 
@@ -390,7 +367,6 @@ export function InputToolbar({
 										models.currentModelId ?? undefined
 									}
 									onChange={onModelChange}
-									icon="cpu"
 								/>
 							)}
 					</>

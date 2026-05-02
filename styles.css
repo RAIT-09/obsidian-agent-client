@@ -840,121 +840,84 @@ If your plugin does not need CSS, delete this file.
 .agent-client-chat-input-actions {
 	display: flex;
 	align-items: center;
-	justify-content: flex-start;
+	justify-content: flex-end;
 	flex-wrap: nowrap;
-	gap: 12px;
+	gap: 8px;
 	padding: 4px 12px 8px 12px;
 	min-width: 0;
 }
 
-/* Push the send button to the far right, keeping dropdowns left-aligned.
-   !important needed to defeat the `margin: 0 !important` on .agent-client-chat-send-button below. */
-.agent-client-chat-input-actions > .agent-client-chat-send-button {
-	margin-left: auto !important;
-}
-
-/* Toolbar dropdown — inline-typographic trigger that opens an Obsidian Menu.
-   Style goal: no button chrome at all in idle state. Reads as part of the
-   text below the input, not as a control. Hover only shifts text color.
-   Uses !important against Obsidian's default global `button` styles. */
+/* Toolbar dropdown — opens an Obsidian Menu on click. */
 
 .agent-client-toolbar-dropdown {
 	display: inline-flex;
 	align-items: center;
-	gap: 4px;
-	height: auto !important;
-	padding: 0 !important;
+	padding: 0 4px !important;
 	margin: 0 !important;
+	border: none !important;
+	border-radius: 4px !important;
 	background: transparent !important;
 	background-color: transparent !important;
-	border: none !important;
-	border-radius: 0 !important;
-	color: var(--text-muted);
-	font-size: var(--font-smallest);
-	line-height: 1;
+	box-shadow: none !important;
 	cursor: pointer;
-	transition: color 0.1s ease;
-	max-width: 200px;
+	transition: background-color 0.1s ease;
+	height: 20px;
+	max-width: 120px;
 	min-width: 0;
 	flex-shrink: 1;
 	overflow: hidden;
-	white-space: nowrap;
-	box-shadow: none !important;
 }
 
 .agent-client-toolbar-dropdown:hover {
-	color: var(--text-normal);
-	background: transparent !important;
-	background-color: transparent !important;
-	box-shadow: none !important;
+	background-color: var(--background-modifier-hover) !important;
 }
 
 .agent-client-toolbar-dropdown:focus {
 	background: transparent !important;
-	background-color: transparent !important;
 	box-shadow: none !important;
 	outline: none;
 }
 
-.agent-client-toolbar-dropdown:focus-visible {
-	outline: 1px dotted var(--text-faint);
-	outline-offset: 2px;
+.agent-client-toolbar-dropdown-label-area {
+	display: grid;
+	max-width: 100px;
+	overflow: hidden;
 }
 
-.agent-client-toolbar-dropdown-icon {
-	display: inline-flex;
-	align-items: center;
-	flex-shrink: 0;
-	color: var(--text-faint);
-}
-
-.agent-client-toolbar-dropdown:hover .agent-client-toolbar-dropdown-icon {
-	color: var(--text-muted);
-}
-
-.agent-client-toolbar-dropdown-icon svg {
-	width: 13px;
-	height: 13px;
-}
-
-.agent-client-toolbar-dropdown-label {
-	flex: 1 1 auto;
-	min-width: 0;
+.agent-client-toolbar-dropdown-label-area > * {
+	grid-area: 1 / 1;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	color: var(--text-accent);
-	font-weight: var(--font-medium);
+	text-align: left;
+	font-size: 11px;
+}
+
+.agent-client-toolbar-dropdown-sizer {
+	visibility: hidden;
+}
+
+.agent-client-toolbar-dropdown-label {
+	color: var(--text-faint);
 }
 
 .agent-client-toolbar-dropdown-chevron {
-	display: inline-flex;
+	display: flex;
 	align-items: center;
-	flex-shrink: 0;
+	pointer-events: none;
 	color: var(--text-faint);
-	margin-left: 1px;
-	opacity: 0.7;
-	transition: opacity 0.1s ease;
-}
-
-.agent-client-toolbar-dropdown:hover .agent-client-toolbar-dropdown-chevron {
-	opacity: 1;
+	margin-left: 2px;
 }
 
 .agent-client-toolbar-dropdown-chevron svg {
-	width: 11px;
-	height: 11px;
-}
-
-/* Permission-mode is the safety-critical selector — make its icon match
-   the accent so it reads as the most prominent control */
-.agent-client-toolbar-dropdown.agent-client-config-selector-permission .agent-client-toolbar-dropdown-icon {
-	color: var(--text-accent);
+	width: 12px;
+	height: 12px;
 }
 
 /* Context Usage Indicator */
 .agent-client-usage-indicator {
 	font-size: var(--font-smallest);
+	margin-right: auto;
 	flex-shrink: 0;
 	cursor: default;
 	user-select: none;
