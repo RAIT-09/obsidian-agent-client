@@ -179,9 +179,7 @@ export function useChatActions(
 
 			try {
 				await agent.sendMessage(content, {
-					activeNote: settings.autoMentionActiveNote
-						? suggestions.mentions.activeNote
-						: null,
+					activeNote: suggestions.mentions.activeNote,
 					vaultBasePath: vaultPath,
 					isAutoMentionDisabled:
 						suggestions.mentions.isAutoMentionDisabled,
@@ -212,7 +210,6 @@ export function useChatActions(
 			session.sessionId,
 			sessionHistory.saveSessionLocally,
 			logger,
-			settings.autoMentionActiveNote,
 			suggestions.mentions.activeNote,
 			suggestions.mentions.isAutoMentionDisabled,
 			shouldConvertToWsl,
