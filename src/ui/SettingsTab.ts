@@ -423,6 +423,8 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.autoAllowPermissions = value;
 						await this.plugin.saveSettings();
+						// Propagate to all live AcpClient instances
+						this.plugin.updateAllAutoAllow(value);
 					}),
 			);
 
