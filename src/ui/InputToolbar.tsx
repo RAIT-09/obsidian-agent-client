@@ -1,6 +1,6 @@
 import * as React from "react";
-const { useRef, useEffect, useCallback } = React;
-import { setIcon, DropdownComponent } from "obsidian";
+const { useRef, useEffect, useCallback, useMemo } = React;
+import { setIcon, Menu } from "obsidian";
 
 import {
 	flattenConfigSelectOptions,
@@ -12,65 +12,128 @@ import {
 } from "../types/session";
 
 // ============================================================================
-// Obsidian Dropdown Hook
+// ToolbarDropdown — themed dropdown using Obsidian's Menu
 // ============================================================================
 
+interface ToolbarDropdownItem {
+	value: string;
+	label: string;
+	groupName?: string;
+}
+
+interface ToolbarDropdownProps {
+	label: string;
+	title: string;
+	items: ToolbarDropdownItem[];
+	currentValue: string | undefined;
+	onChange: (value: string) => void;
+	icon?: string;
+	className?: string;
+}
+
 /**
- * Hook for managing an Obsidian DropdownComponent lifecycle.
- * Handles creation, option population, value sync, and cleanup.
+ * Themed dropdown trigger. Uses Obsidian's Menu instead of a native <select>
+ * so the open state respects Obsidian theme tokens, supports keyboard nav,
+ * and can be positioned above the trigger to avoid covering the input.
  */
-function useObsidianDropdown(
-	containerRef: React.RefObject<HTMLDivElement | null>,
-	options: Array<{ value: string; label: string }> | undefined,
-	currentValue: string | undefined,
-	onChangeRef: React.RefObject<((value: string) => void) | undefined>,
-): void {
-	const instanceRef = useRef<DropdownComponent | null>(null);
+function ToolbarDropdown({
+	label,
+	title,
+	items,
+	currentValue,
+	onChange,
+	icon,
+	className,
+}: ToolbarDropdownProps) {
+	const buttonRef = useRef<HTMLButtonElement>(null);
+	const iconRef = useRef<HTMLSpanElement>(null);
+	const chevronRef = useRef<HTMLSpanElement>(null);
 
-	// Create/destroy dropdown when options change
 	useEffect(() => {
-		const containerEl = containerRef.current;
-		if (!containerEl) return;
-
-		if (!options || options.length <= 1) {
-			if (instanceRef.current) {
-				containerEl.empty();
-				instanceRef.current = null;
-			}
-			return;
+		if (icon && iconRef.current) {
+			setIcon(iconRef.current, icon);
 		}
+	}, [icon]);
 
-		if (!instanceRef.current) {
-			const dropdown = new DropdownComponent(containerEl);
-			instanceRef.current = dropdown;
+	useEffect(() => {
+		if (chevronRef.current) {
+			setIcon(chevronRef.current, "chevron-down");
+		}
+	}, []);
 
-			for (const opt of options) {
-				dropdown.addOption(opt.value, opt.label);
+	const handleClick = useCallback(
+		(e: React.MouseEvent<HTMLButtonElement>) => {
+			e.preventDefault();
+			e.stopPropagation();
+
+			const button = buttonRef.current;
+			if (!button) return;
+
+			const menu = new Menu();
+
+			let lastGroupName: string | undefined;
+			for (const item of items) {
+				if (
+					item.groupName &&
+					item.groupName !== lastGroupName &&
+					lastGroupName !== undefined
+				) {
+					menu.addSeparator();
+				}
+				lastGroupName = item.groupName;
+
+				menu.addItem((menuItem) => {
+					menuItem
+						.setTitle(item.label)
+						.setChecked(item.value === currentValue)
+						.onClick(() => {
+							onChange(item.value);
+						});
+				});
 			}
 
-			if (currentValue) {
-				dropdown.setValue(currentValue);
-			}
+			// Position menu above the button so it doesn't cover the input.
+			// Estimate height (28px per item + 8px padding) and clamp to viewport.
+			const rect = button.getBoundingClientRect();
+			const estimatedHeight = Math.min(
+				items.length * 28 + 8,
+				window.innerHeight * 0.6,
+			);
+			const targetY = Math.max(8, rect.top - estimatedHeight - 4);
 
-			dropdown.onChange((value) => {
-				onChangeRef.current?.(value);
+			menu.showAtPosition({
+				x: rect.left,
+				y: targetY,
 			});
-		}
+		},
+		[items, currentValue, onChange],
+	);
 
-		return () => {
-			if (instanceRef.current) {
-				containerEl.empty();
-				instanceRef.current = null;
-			}
-		};
-	}, [options, containerRef, onChangeRef, currentValue]);
+	const wrapperClass = `agent-client-toolbar-dropdown${className ? ` ${className}` : ""}`;
 
-	// Sync value when it changes externally
-	useEffect(() => {
-		if (instanceRef.current && currentValue) {
-			instanceRef.current.setValue(currentValue);
-		}
-	}, [currentValue]);
+	return (
+		<button
+			ref={buttonRef}
+			type="button"
+			className={wrapperClass}
+			title={title}
+			onClick={handleClick}
+		>
+			{icon && (
+				<span
+					ref={iconRef}
+					className="agent-client-toolbar-dropdown-icon"
+					aria-hidden="true"
+				/>
+			)}
+			<span className="agent-client-toolbar-dropdown-label">{label}</span>
+			<span
+				ref={chevronRef}
+				className="agent-client-toolbar-dropdown-chevron"
+				aria-hidden="true"
+			/>
+		</button>
+	);
 }
 
 // ============================================================================
@@ -90,6 +153,24 @@ function getUsageColorClass(percentage: number): string {
 	if (percentage >= 80) return "agent-client-usage-warning";
 	if (percentage >= 70) return "agent-client-usage-caution";
 	return "agent-client-usage-normal";
+}
+
+/** Pick an icon for a config option based on its category. */
+function iconForCategory(
+	category: string | null | undefined,
+): string | undefined {
+	switch (category) {
+		case "permission":
+			return "shield";
+		case "mode":
+			return "sliders-horizontal";
+		case "model":
+			return "cpu";
+		case "reasoning":
+			return "brain";
+		default:
+			return undefined;
+	}
 }
 
 // ============================================================================
@@ -125,28 +206,8 @@ export function InputToolbar({
 	usage,
 	isSessionReady,
 }: InputToolbarProps) {
-	// Refs
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
-	const modeDropdownRef = useRef<HTMLDivElement>(null);
-	const modelDropdownRef = useRef<HTMLDivElement>(null);
-	const configOptionsRef = useRef<HTMLDivElement>(null);
-	const configDropdownInstances = useRef<Map<string, DropdownComponent>>(
-		new Map(),
-	);
 
-	// Stable callback refs
-	const onModeChangeRef = useRef(onModeChange);
-	onModeChangeRef.current = onModeChange;
-
-	const onModelChangeRef = useRef(onModelChange);
-	onModelChangeRef.current = onModelChange;
-
-	const onConfigOptionChangeRef = useRef(onConfigOptionChange);
-	onConfigOptionChangeRef.current = onConfigOptionChange;
-
-	/**
-	 * Update send button icon color based on state.
-	 */
 	const updateIconColor = useCallback(
 		(svg: SVGElement) => {
 			svg.classList.remove(
@@ -168,7 +229,6 @@ export function InputToolbar({
 		[isSending, hasContent],
 	);
 
-	// Update send button icon based on sending state
 	useEffect(() => {
 		if (sendButtonRef.current) {
 			const iconName = isSending ? "square" : "send-horizontal";
@@ -180,7 +240,6 @@ export function InputToolbar({
 		}
 	}, [isSending, updateIconColor]);
 
-	// Update icon color when hasContent changes
 	useEffect(() => {
 		if (sendButtonRef.current) {
 			const svg = sendButtonRef.current.querySelector("svg");
@@ -190,101 +249,40 @@ export function InputToolbar({
 		}
 	}, [updateIconColor]);
 
-	// Mode dropdown
-	const modeOptions = modes?.availableModes?.map((m) => ({
-		value: m.id,
-		label: m.name,
-	}));
-	useObsidianDropdown(
-		modeDropdownRef,
-		modeOptions,
-		modes?.currentModeId,
-		onModeChangeRef,
-	);
+	// ----- Build dropdown item lists (memoized) -----
 
-	// Model dropdown
-	const modelOptions = models?.availableModels?.map((m) => ({
-		value: m.modelId,
-		label: m.name,
-	}));
-	useObsidianDropdown(
-		modelDropdownRef,
-		modelOptions,
-		models?.currentModelId,
-		onModelChangeRef,
-	);
+	const modeItems = useMemo<ToolbarDropdownItem[]>(() => {
+		if (!modes?.availableModes) return [];
+		return modes.availableModes.map((m) => ({
+			value: m.id,
+			label: m.name,
+		}));
+	}, [modes]);
 
-	// Initialize configOptions dropdowns (dynamic, replaces mode/model when present)
-	useEffect(() => {
-		const containerEl = configOptionsRef.current;
-		if (!containerEl) return;
+	const modelItems = useMemo<ToolbarDropdownItem[]>(() => {
+		if (!models?.availableModels) return [];
+		return models.availableModels.map((m) => ({
+			value: m.modelId,
+			label: m.name,
+		}));
+	}, [models]);
 
-		// Clean up existing dropdowns
-		containerEl.empty();
-		configDropdownInstances.current.clear();
+	const currentModeLabel = useMemo(() => {
+		const id = modes?.currentModeId;
+		return (
+			modes?.availableModes?.find((m) => m.id === id)?.name ?? "Mode"
+		);
+	}, [modes]);
 
-		if (!configOptions || configOptions.length === 0) return;
+	const currentModelLabel = useMemo(() => {
+		const id = models?.currentModelId;
+		return (
+			models?.availableModels?.find((m) => m.modelId === id)?.name ??
+			"Model"
+		);
+	}, [models]);
 
-		for (const option of configOptions) {
-			// Flatten options (handle both flat and grouped)
-			const flatOptions = flattenConfigSelectOptions(option.options);
-
-			// Only show if there are multiple values
-			if (flatOptions.length <= 1) continue;
-
-			// Create wrapper div with appropriate class based on category
-			const categoryClass = option.category
-				? `agent-client-config-selector-${option.category}`
-				: "agent-client-config-selector";
-			const wrapperEl = containerEl.createDiv({
-				cls: `agent-client-config-selector ${categoryClass}`,
-				attr: { title: option.description ?? option.name },
-			});
-
-			const dropdownContainer = wrapperEl.createDiv();
-			const dropdown = new DropdownComponent(dropdownContainer);
-
-			// Add options (with group prefix for grouped options)
-			if (option.options.length > 0 && "group" in option.options[0]) {
-				for (const group of option.options as SessionConfigSelectGroup[]) {
-					for (const opt of group.options) {
-						dropdown.addOption(
-							opt.value,
-							`${group.name} / ${opt.name}`,
-						);
-					}
-				}
-			} else {
-				for (const opt of flatOptions) {
-					dropdown.addOption(opt.value, opt.name);
-				}
-			}
-
-			// Set current value
-			dropdown.setValue(option.currentValue);
-
-			// Handle change
-			const configId = option.id;
-			dropdown.onChange((value) => {
-				if (onConfigOptionChangeRef.current) {
-					onConfigOptionChangeRef.current(configId, value);
-				}
-			});
-
-			// Add chevron icon
-			const iconEl = wrapperEl.createSpan({
-				cls: "agent-client-config-selector-icon",
-			});
-			setIcon(iconEl, "chevron-down");
-
-			configDropdownInstances.current.set(option.id, dropdown);
-		}
-
-		return () => {
-			containerEl.empty();
-			configDropdownInstances.current.clear();
-		};
-	}, [configOptions]);
+	// ----- Render -----
 
 	return (
 		<div className="agent-client-chat-input-actions">
@@ -303,54 +301,100 @@ export function InputToolbar({
 			)}
 
 			{/* Config Options (supersedes legacy mode/model selectors) */}
-			{configOptions && configOptions.length > 0 ? (
-				<div
-					ref={configOptionsRef}
-					className="agent-client-config-options-container"
-				/>
-			) : (
-				<>
-					{/* Legacy Mode Selector */}
-					{modes && modes.availableModes.length > 1 && (
-						<div
-							className="agent-client-mode-selector"
-							title={
-								modes.availableModes.find(
-									(m) => m.id === modes.currentModeId,
-								)?.description ?? "Select mode"
-							}
-						>
-							<div ref={modeDropdownRef} />
-							<span
-								className="agent-client-mode-selector-icon"
-								ref={(el) => {
-									if (el) setIcon(el, "chevron-down");
-								}}
-							/>
-						</div>
-					)}
+			{configOptions && configOptions.length > 0
+				? configOptions.map((option) => {
+						const flatOptions = flattenConfigSelectOptions(
+							option.options,
+						);
+						if (flatOptions.length <= 1) return null;
 
-					{/* Legacy Model Selector */}
-					{models && models.availableModels.length > 1 && (
-						<div
-							className="agent-client-model-selector"
-							title={
-								models.availableModels.find(
-									(m) => m.modelId === models.currentModelId,
-								)?.description ?? "Select model"
+						const isGrouped =
+							option.options.length > 0 &&
+							"group" in option.options[0];
+
+						let items: ToolbarDropdownItem[];
+						if (isGrouped) {
+							items = [];
+							for (const group of option.options as SessionConfigSelectGroup[]) {
+								for (const opt of group.options) {
+									items.push({
+										value: opt.value,
+										label: `${group.name} / ${opt.name}`,
+										groupName: group.name,
+									});
+								}
 							}
-						>
-							<div ref={modelDropdownRef} />
-							<span
-								className="agent-client-model-selector-icon"
-								ref={(el) => {
-									if (el) setIcon(el, "chevron-down");
+						} else {
+							items = flatOptions.map((opt) => ({
+								value: opt.value,
+								label: opt.name,
+							}));
+						}
+
+						const currentItem = items.find(
+							(it) => it.value === option.currentValue,
+						);
+						const label = currentItem?.label ?? option.name;
+						const title = option.description ?? option.name;
+
+						return (
+							<ToolbarDropdown
+								key={option.id}
+								label={label}
+								title={title}
+								items={items}
+								currentValue={option.currentValue}
+								onChange={(value) => {
+									onConfigOptionChange?.(option.id, value);
 								}}
+								icon={iconForCategory(option.category)}
+								className={
+									option.category
+										? `agent-client-config-selector-${option.category}`
+										: undefined
+								}
 							/>
-						</div>
-					)}
-				</>
-			)}
+						);
+					})
+				: (
+					<>
+						{modes && modes.availableModes.length > 1 && onModeChange && (
+							<ToolbarDropdown
+								label={currentModeLabel}
+								title={
+									modes.availableModes.find(
+										(m) => m.id === modes.currentModeId,
+									)?.description ?? "Select mode"
+								}
+								items={modeItems}
+								currentValue={modes.currentModeId ?? undefined}
+								onChange={onModeChange}
+								icon="sliders-horizontal"
+							/>
+						)}
+
+						{models &&
+							models.availableModels.length > 1 &&
+							onModelChange && (
+								<ToolbarDropdown
+									label={currentModelLabel}
+									title={
+										models.availableModels.find(
+											(m) =>
+												m.modelId ===
+												models.currentModelId,
+										)?.description ?? "Select model"
+									}
+									items={modelItems}
+									currentValue={
+										models.currentModelId ?? undefined
+									}
+									onChange={onModelChange}
+									icon="cpu"
+								/>
+							)}
+					</>
+				)}
 
 			{/* Send/Stop Button */}
 			<button
