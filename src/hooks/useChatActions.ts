@@ -109,13 +109,15 @@ export function useChatActions(
 
 			try {
 				const exporter = new ChatExporter(plugin);
+				const openFile =
+					plugin.settings.exportSettings.openFileAfterExport;
 				const filePath = await exporter.exportToMarkdown(
 					triggerMessages,
 					triggerSession.agentDisplayName,
 					triggerSession.agentId,
 					triggerSession.sessionId,
 					triggerSession.createdAt,
-					false,
+					openFile,
 				);
 				if (filePath) {
 					const context =
