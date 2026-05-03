@@ -137,6 +137,22 @@ export interface IChatViewContainer {
 	cancelOperation(): Promise<void>;
 
 	// ============================================================
+	// Session Info
+	// ============================================================
+
+	/**
+	 * Get the current session status for display in session lists.
+	 * Combines session state and permission status into a simplified status.
+	 */
+	getSessionStatus(): "ready" | "busy" | "permission" | "error" | "disconnected";
+
+	/**
+	 * Get the session title for display in session lists.
+	 * Returns "New session" before the first message, then the first user message (truncated).
+	 */
+	getSessionTitle(): string;
+
+	// ============================================================
 	// Container Access
 	// ============================================================
 
@@ -151,6 +167,8 @@ export class ChatViewRegistry {
 	private views = new Map<string, IChatViewContainer>();
 	private focusedViewId: string | null = null;
 	private logger = getLogger();
+	private changeListeners = new Set<() => void>();
+	private snapshotCache: IChatViewContainer[] | null = null;
 
 	// ============================================================
 	// Registration
@@ -170,6 +188,7 @@ export class ChatViewRegistry {
 		if (this.views.size === 1) {
 			this.setFocused(view.viewId);
 		}
+		this.notifyChange();
 	}
 
 	/**
@@ -192,6 +211,7 @@ export class ChatViewRegistry {
 				this.views.get(this.focusedViewId)?.onActivate();
 			}
 		}
+		this.notifyChange();
 	}
 
 	/**
@@ -206,6 +226,8 @@ export class ChatViewRegistry {
 		}
 		this.views.clear();
 		this.focusedViewId = null;
+		this.changeListeners.clear();
+		this.snapshotCache = null;
 	}
 
 	// ============================================================
@@ -244,6 +266,7 @@ export class ChatViewRegistry {
 		this.focusedViewId = viewId;
 		this.views.get(viewId)?.onActivate();
 		this.logger.log(`[ChatViewRegistry] Focus changed to: ${viewId}`);
+		this.notifyChange();
 	}
 
 	/**
@@ -342,4 +365,39 @@ export class ChatViewRegistry {
 	get size(): number {
 		return this.views.size;
 	}
+
+	// ============================================================
+	// Change Notification (for Session Manager)
+	// ============================================================
+
+	/**
+	 * Subscribe to registry changes (view register/unregister, focus change, state change).
+	 * Pattern: same as SettingsService.subscribe (for useSyncExternalStore).
+	 */
+	subscribe = (listener: () => void): (() => void) => {
+		this.changeListeners.add(listener);
+		return () => this.changeListeners.delete(listener);
+	};
+
+	/**
+	 * Notify all subscribers that something changed.
+	 * Called from: register, unregister, setFocused, and externally by ChatPanel on state change.
+	 */
+	notifyChange(): void {
+		this.snapshotCache = null;
+		for (const listener of this.changeListeners) {
+			listener();
+		}
+	}
+
+	/**
+	 * Get a stable snapshot of all views for useSyncExternalStore.
+	 * Returns the same array reference until notifyChange() invalidates it.
+	 */
+	getSnapshot = (): IChatViewContainer[] => {
+		if (!this.snapshotCache) {
+			this.snapshotCache = Array.from(this.views.values());
+		}
+		return this.snapshotCache;
+	};
 }
