@@ -158,12 +158,6 @@ export interface IChatViewContainer {
 	 */
 	getSessionId(): string | null;
 
-	/**
-	 * Update the session title for display.
-	 * Does not persist — caller is responsible for persistence.
-	 */
-	setSessionTitle(title: string): void;
-
 	// ============================================================
 	// Container Access
 	// ============================================================

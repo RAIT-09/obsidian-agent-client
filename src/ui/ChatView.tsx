@@ -219,10 +219,6 @@ export class ChatView extends ItemView implements IChatViewContainer {
 		return this.callbacks?.getSessionId() ?? null;
 	}
 
-	setSessionTitle(title: string): void {
-		this.callbacks?.setSessionTitle(title);
-	}
-
 	/**
 	 * Get current input state (text + images).
 	 * Returns null if React component not mounted.

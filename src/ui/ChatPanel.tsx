@@ -62,7 +62,6 @@ export interface ChatPanelCallbacks {
 	getSessionStatus: () => "ready" | "busy" | "permission" | "error" | "disconnected";
 	getSessionTitle: () => string;
 	getSessionId: () => string | null;
-	setSessionTitle: (title: string) => void;
 	getInputState: () => ChatInputState | null;
 	setInputState: (state: ChatInputState) => void;
 	canSend: () => boolean;
@@ -739,28 +738,6 @@ export function ChatPanel({
 	]);
 
 	// ============================================================
-	// Effects - Session Title Update
-	// ============================================================
-	useEffect(() => {
-		if (messages.length === 0) {
-			sessionTitleRef.current = "New session";
-			return;
-		}
-		const firstUserMessage = messages.find((m) => m.role === "user");
-		if (firstUserMessage) {
-			const textContent = firstUserMessage.content.find(
-				(c) => c.type === "text" || c.type === "text_with_context",
-			);
-			if (textContent && "text" in textContent) {
-				const title = textContent.text.length > 50
-					? textContent.text.substring(0, 50) + "..."
-					: textContent.text;
-				sessionTitleRef.current = title;
-			}
-		}
-	}, [messages]);
-
-	// ============================================================
 	// Effects - Notify ViewRegistry of State Changes
 	// ============================================================
 	useEffect(() => {
@@ -961,7 +938,6 @@ export function ChatPanel({
 	const sessionStateRef = useRef(session.state);
 	const sessionIdRef = useRef(session.sessionId);
 	const hasActivePermissionRef = useRef(agent.hasActivePermission);
-	const sessionTitleRef = useRef("New session");
 	const sessionHistoryLoadingRef = useRef(sessionHistory.loading);
 	const handleSendMessageRef = useRef(handleSendMessage);
 	inputValueRef.current = inputValue;
@@ -986,12 +962,32 @@ export function ChatPanel({
 				if (state === "ready") return "ready";
 				return "busy";
 			},
-			getSessionTitle: () => sessionTitleRef.current,
-			getSessionId: () => sessionIdRef.current,
-			setSessionTitle: (title: string) => {
-				sessionTitleRef.current = title;
-				plugin.viewRegistry.notifyChange();
+			getSessionTitle: () => {
+				const sessionId = sessionIdRef.current;
+				if (sessionId) {
+					const saved = plugin.settingsService
+						.getSavedSessions()
+						.find((s) => s.sessionId === sessionId);
+					if (saved?.title) return saved.title;
+				}
+				const firstUserMessage = messagesRef.current.find(
+					(m) => m.role === "user",
+				);
+				if (firstUserMessage) {
+					const textContent = firstUserMessage.content.find(
+						(c) =>
+							c.type === "text" ||
+							c.type === "text_with_context",
+					);
+					if (textContent && "text" in textContent) {
+						return textContent.text.length > 50
+							? textContent.text.substring(0, 50) + "..."
+							: textContent.text;
+					}
+				}
+				return "New session";
 			},
+			getSessionId: () => sessionIdRef.current,
 			getInputState: () => ({
 				text: inputValueRef.current,
 				files: attachedFilesRef.current,

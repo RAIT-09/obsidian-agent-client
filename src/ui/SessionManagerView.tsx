@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import type AgentClientPlugin from "../plugin";
 import type { IChatViewContainer } from "../services/view-registry";
 import { EditTitleModal } from "./EditTitleModal";
+import { useSettings } from "../hooks/useSettings";
 
 export const VIEW_TYPE_SESSION_MANAGER = "agent-client-session-manager";
 
@@ -88,7 +89,6 @@ function SessionItem({
 							plugin.app,
 							currentTitle,
 							async (newTitle) => {
-								view.setSessionTitle(newTitle);
 								await plugin.settingsService.updateSessionTitle(
 									sessionId,
 									newTitle,
@@ -161,6 +161,9 @@ function SessionManagerComponent({
 		plugin.viewRegistry.getSnapshot,
 		plugin.viewRegistry.getSnapshot,
 	);
+
+	// Subscribe to settings changes so renamed titles are reflected immediately
+	useSettings(plugin);
 
 	const focusedId = plugin.viewRegistry.getFocusedId();
 
