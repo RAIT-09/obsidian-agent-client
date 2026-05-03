@@ -245,6 +245,8 @@ export interface InputAreaProps {
 	onClearAgentUpdate: () => void;
 	/** Messages array for input history navigation */
 	messages: ChatMessage[];
+	/** Whether this tab is the currently active tab (focuses textarea on activation) */
+	isActive?: boolean;
 }
 
 /**
@@ -295,6 +297,7 @@ export function InputArea({
 	onClearAgentUpdate,
 	// Input history
 	messages,
+	isActive,
 }: InputAreaProps) {
 	const { mentions, commands: slashCommands } = suggestions;
 	const logger = getLogger();
@@ -320,12 +323,28 @@ export function InputArea({
 
 	// Refs
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const autoMentionToggleRef = useRef<HTMLButtonElement | null>(null);
 	const dragCounterRef = useRef(0);
+
+	// Stable callback ref for auto-mention toggle button — sets icon on mount
+	const autoMentionToggleCallbackRef = useCallback((el: HTMLButtonElement | null) => {
+		autoMentionToggleRef.current = el;
+		if (el) {
+			setIcon(el, "x"); // default: auto-mention enabled → show × to disable
+		}
+	}, []);
 
 	// Clear attached files when agent changes
 	useEffect(() => {
 		onAttachedFilesChange([]);
 	}, [agentId, onAttachedFilesChange]);
+
+	// Sync auto-mention toggle icon when disabled state changes
+	useEffect(() => {
+		if (autoMentionToggleRef.current) {
+			setIcon(autoMentionToggleRef.current, mentions.isAutoMentionDisabled ? "plus" : "x");
+		}
+	}, [mentions.isAutoMentionDisabled]);
 
 	/**
 	 * Add multiple attachments at once with limit enforcement.
@@ -919,6 +938,43 @@ export function InputArea({
 		}, 0);
 	}, []);
 
+	// Focus textarea when this tab becomes active (I19)
+	// Tabs are kept mounted and hidden via display:none; without this, hotkey-
+	// driven tab switches leave focus on the previously active tab's textarea.
+	useEffect(() => {
+		if (isActive) {
+			window.setTimeout(() => {
+				if (textareaRef.current) {
+					textareaRef.current.focus();
+				}
+			}, 0);
+		}
+	}, [isActive]);
+
+	// Focus textarea when the ACP panel regains visibility from another
+	// Obsidian pane. The isActive effect above only fires on tab switches
+	// within ACP, not on leaf-level focus changes. (I26)
+	const panelWasVisibleRef = useRef(true);
+	useEffect(() => {
+		const textarea = textareaRef.current;
+		if (!textarea) return;
+
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				const visible = entry.isIntersecting;
+				if (visible && !panelWasVisibleRef.current && isActive) {
+					window.setTimeout(() => {
+						textareaRef.current?.focus();
+					}, 0);
+				}
+				panelWasVisibleRef.current = visible;
+			},
+			{ threshold: 0.1 },
+		);
+		observer.observe(textarea);
+		return () => observer.disconnect();
+	}, [isActive]);
+
 	// Restore message when provided (e.g., after cancellation)
 	// Only restore if input is empty to avoid overwriting user's new input
 	useEffect(() => {
@@ -1018,29 +1074,17 @@ export function InputArea({
 						</span>
 						<button
 							className="agent-client-auto-mention-toggle-btn"
-							onClick={(e) => {
-								const newDisabledState =
-									!mentions.isAutoMentionDisabled;
-								mentions.toggleAutoMention(newDisabledState);
-								const iconName = newDisabledState
-									? "x"
-									: "plus";
-								setIcon(e.currentTarget, iconName);
+							onClick={() => {
+								mentions.toggleAutoMention(
+									!mentions.isAutoMentionDisabled,
+								);
 							}}
 							title={
 								mentions.isAutoMentionDisabled
 									? "Enable auto-mention"
 									: "Temporarily disable auto-mention"
 							}
-							ref={(el) => {
-								if (el) {
-									const iconName =
-										mentions.isAutoMentionDisabled
-											? "plus"
-											: "x";
-									setIcon(el, iconName);
-								}
-							}}
+							ref={autoMentionToggleCallbackRef}
 						/>
 					</div>
 				)}

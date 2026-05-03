@@ -94,7 +94,7 @@ class ConfirmDeleteModal extends Modal {
  * Displays a text input pre-filled with the current title.
  * Calls onSave callback with the new title when user clicks Save.
  */
-class EditTitleModal extends Modal {
+export class EditTitleModal extends Modal {
 	private currentTitle: string;
 	private onSave: (newTitle: string) => void | Promise<void>;
 
@@ -579,17 +579,8 @@ function SessionHistoryContent({
 		return sessions.filter((s) => localSessionIds.has(s.sessionId));
 	}, [sessions, isUsingLocalSessions, hideNonLocalSessions, localSessionIds]);
 
-	// Show preparing message if agent is not ready
-	if (!isAgentReady) {
-		return (
-			<div className="agent-client-session-history-loading">
-				<p>Preparing agent...</p>
-			</div>
-		);
-	}
-
-	// Check if any session operation is available
-	const canPerformAnyOperation = canRestore || canFork;
+	// Check if any session operation is available (requires agent connection)
+	const canPerformAnyOperation = isAgentReady && (canRestore || canFork);
 
 	// Show local sessions list (always show for delete functionality)
 	// - If agent supports list: use agent's session/list
@@ -609,10 +600,13 @@ function SessionHistoryContent({
 				/>
 			)}
 
-			{/* Warning banner for agents that don't support restoration */}
+			{/* Warning banner for agents that don't support restoration or aren't connected */}
 			{!canPerformAnyOperation && (
 				<div className="agent-client-session-history-warning-banner">
-					<p>This agent does not support session restoration.</p>
+					<p>{!isAgentReady
+						? "Connect to an agent to restore or fork sessions."
+						: "This agent does not support session restoration."
+					}</p>
 				</div>
 			)}
 
@@ -702,8 +696,8 @@ function SessionHistoryContent({
 								<SessionItem
 									key={session.sessionId}
 									session={session}
-									canRestore={canRestore}
-									canFork={canFork}
+									canRestore={isAgentReady && canRestore}
+									canFork={isAgentReady && canFork}
 									currentCwd={currentCwd}
 									onRestoreSession={onRestoreSession}
 									onForkSession={onForkSession}
@@ -757,10 +751,12 @@ export type SessionHistoryModalProps = Omit<
 export class SessionHistoryModal extends Modal {
 	private root: Root | null = null;
 	private props: SessionHistoryModalProps;
+	private onModalClose?: () => void;
 
-	constructor(app: App, props: SessionHistoryModalProps) {
+	constructor(app: App, props: SessionHistoryModalProps, onModalClose?: () => void) {
 		super(app);
 		this.props = props;
+		this.onModalClose = onModalClose;
 	}
 
 	/**
@@ -817,5 +813,6 @@ export class SessionHistoryModal extends Modal {
 		}
 		const { contentEl } = this;
 		contentEl.empty();
+		this.onModalClose?.();
 	}
 }

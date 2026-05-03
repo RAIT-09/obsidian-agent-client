@@ -129,6 +129,10 @@ export interface AgentClientPluginSettings {
 	floatingWindowSize: { width: number; height: number };
 	floatingWindowPosition: { x: number; y: number } | null;
 	floatingButtonPosition: { x: number; y: number } | null;
+
+	// Tab settings
+	/** Maximum number of session tabs per view (default: 10) */
+	maxSessionTabs: number;
 }
 
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
@@ -200,6 +204,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	floatingWindowSize: { width: 400, height: 500 },
 	floatingWindowPosition: null,
 	floatingButtonPosition: null,
+	maxSessionTabs: 10,
 };
 
 export default class AgentClientPlugin extends Plugin {
@@ -270,6 +275,55 @@ export default class AgentClientPlugin extends Plugin {
 				void this.openNewChatViewWithAgent(
 					this.settings.defaultAgentId,
 				);
+			},
+		});
+
+		// Tab commands
+		this.addCommand({
+			id: "new-session-tab",
+			name: "New session tab",
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
+				view.addTab();
+			},
+		});
+
+		this.addCommand({
+			id: "close-session-tab",
+			name: "Close session tab",
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
+				view.closeActiveTab();
+			},
+		});
+
+		this.addCommand({
+			id: "next-session-tab",
+			name: "Next session tab",
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
+				view.nextTab();
+			},
+		});
+
+		this.addCommand({
+			id: "previous-session-tab",
+			name: "Previous session tab",
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
+				view.prevTab();
 			},
 		});
 
@@ -645,6 +699,22 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	/**
+	 * Get the active sidebar ChatView (for tab commands).
+	 */
+	getActiveChatView(): ChatView | null {
+		const focusedId = this.lastActiveChatViewId;
+		if (!focusedId) return null;
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
+		for (const leaf of leaves) {
+			const view = leaf.view;
+			if (view instanceof ChatView && view.viewId === focusedId) {
+				return view;
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * Get all available agents (claude, codex, gemini, custom)
 	 */
 	getAvailableAgents(): Array<{ id: string; displayName: string }> {
@@ -681,10 +751,14 @@ export default class AgentClientPlugin extends Plugin {
 			this.addCommand({
 				id: `switch-agent-to-${agent.id}`,
 				name: `Switch agent to ${agent.displayName}`,
-				callback: () => {
+				checkCallback: (checking) => {
+					const view =
+						this.app.workspace.getActiveViewOfType(ChatView);
+					if (!view) return false;
+					if (checking) return true;
 					this.app.workspace.trigger(
 						"agent-client:new-chat-requested" as "quit",
-						this.lastActiveChatViewId,
+						view.getActiveTabId(),
 						agent.id,
 					);
 				},
@@ -696,10 +770,14 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "approve-active-permission",
 			name: "Approve active permission",
-			callback: () => {
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:approve-active-permission" as "quit",
-					this.lastActiveChatViewId,
+					view.getActiveTabId(),
 				);
 			},
 		});
@@ -707,10 +785,14 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "reject-active-permission",
 			name: "Reject active permission",
-			callback: () => {
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:reject-active-permission" as "quit",
-					this.lastActiveChatViewId,
+					view.getActiveTabId(),
 				);
 			},
 		});
@@ -718,10 +800,14 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "toggle-auto-mention",
 			name: "Toggle auto-mention",
-			callback: () => {
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:toggle-auto-mention" as "quit",
-					this.lastActiveChatViewId,
+					view.getActiveTabId(),
 				);
 			},
 		});
@@ -729,10 +815,14 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "new-chat",
 			name: "New chat",
-			callback: () => {
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:new-chat-requested" as "quit",
-					this.lastActiveChatViewId,
+					view.getActiveTabId(),
 				);
 			},
 		});
@@ -740,10 +830,14 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "cancel-current-message",
 			name: "Cancel current message",
-			callback: () => {
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:cancel-message" as "quit",
-					this.lastActiveChatViewId,
+					view.getActiveTabId(),
 				);
 			},
 		});
@@ -751,10 +845,14 @@ export default class AgentClientPlugin extends Plugin {
 		this.addCommand({
 			id: "export-chat",
 			name: "Export chat",
-			callback: () => {
+			checkCallback: (checking) => {
+				const view =
+					this.app.workspace.getActiveViewOfType(ChatView);
+				if (!view) return false;
+				if (checking) return true;
 				this.app.workspace.trigger(
 					"agent-client:export-chat" as "quit",
-					this.lastActiveChatViewId,
+					view.getActiveTabId(),
 				);
 			},
 		});
@@ -1082,6 +1180,11 @@ export default class AgentClientPlugin extends Plugin {
 			})(),
 			floatingWindowPosition: xyPoint(raw.floatingWindowPosition),
 			floatingButtonPosition: xyPoint(raw.floatingButtonPosition),
+			maxSessionTabs: num(
+				raw.maxSessionTabs,
+				D.maxSessionTabs,
+				1,
+			),
 		};
 
 		this.ensureDefaultAgentId();

@@ -48,3 +48,6 @@ dev/
 
 # Local implementation plans and working documents
 plan/
+
+# Local dev tooling
+acp-swap.sh
