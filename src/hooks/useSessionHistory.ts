@@ -714,7 +714,6 @@ export function useSessionHistory(
 	 */
 	const updateSessionTitle = useCallback(
 		async (sessionId: string, newTitle: string, sessionCwd: string) => {
-			// Read current title for potential rollback
 			const savedSessions = settingsAccess.getSavedSessions();
 			const existing = savedSessions.find(
 				(s) => s.sessionId === sessionId,
@@ -729,28 +728,14 @@ export function useSessionHistory(
 			);
 
 			try {
-				if (existing) {
-					await settingsAccess.saveSession({
-						...existing,
-						title: newTitle,
-						updatedAt: new Date().toISOString(),
-					});
-				} else {
-					// Session exists only on agent side — create local entry
-					// Use sessionCwd (from SessionInfo) instead of hook's cwd
-					await settingsAccess.saveSession({
-						sessionId,
-						agentId: session.agentId,
-						cwd: sessionCwd,
-						title: newTitle,
-						createdAt: new Date().toISOString(),
-						updatedAt: new Date().toISOString(),
-					});
-				}
-
+				await settingsAccess.updateSessionTitle(
+					sessionId,
+					newTitle,
+					{ agentId: session.agentId, cwd: sessionCwd },
+				);
 				invalidateCache();
 			} catch (err) {
-				// Rollback optimistic update
+				// Rollback
 				setSessions((prev) =>
 					prev.map((s) =>
 						s.sessionId === sessionId

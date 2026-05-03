@@ -93,6 +93,16 @@ export interface ISettingsAccess {
 	 */
 	deleteSession(sessionId: string): Promise<void>;
 
+	/**
+	 * Update the title of a saved session.
+	 * If createIfMissing is provided and session doesn't exist, creates a new entry.
+	 */
+	updateSessionTitle(
+		sessionId: string,
+		newTitle: string,
+		createIfMissing?: { agentId: string; cwd: string },
+	): Promise<void>;
+
 	// ============================================================
 	// Session Message History Methods
 	// ============================================================
@@ -255,6 +265,18 @@ export class SettingsService implements ISettingsAccess {
 
 	async deleteSession(sessionId: string): Promise<void> {
 		return this.sessionStorage.deleteSession(sessionId);
+	}
+
+	async updateSessionTitle(
+		sessionId: string,
+		newTitle: string,
+		createIfMissing?: { agentId: string; cwd: string },
+	): Promise<void> {
+		return this.sessionStorage.updateSessionTitle(
+			sessionId,
+			newTitle,
+			createIfMissing,
+		);
 	}
 
 	async saveSessionMessages(

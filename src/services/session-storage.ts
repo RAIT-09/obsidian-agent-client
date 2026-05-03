@@ -155,6 +155,43 @@ export class SessionStorage {
 		await this.sessionLock;
 	}
 
+	/**
+	 * Update the title of a saved session.
+	 * If createIfMissing is provided and session doesn't exist, creates a new entry.
+	 */
+	async updateSessionTitle(
+		sessionId: string,
+		newTitle: string,
+		createIfMissing?: { agentId: string; cwd: string },
+	): Promise<void> {
+		this.sessionLock = this.sessionLock.then(async () => {
+			const state = this.settingsAccess.getSnapshot();
+			const sessions = [...(state.savedSessions || [])];
+			const existing = sessions.find((s) => s.sessionId === sessionId);
+
+			if (existing) {
+				existing.title = newTitle;
+				existing.updatedAt = new Date().toISOString();
+			} else if (createIfMissing) {
+				sessions.unshift({
+					sessionId,
+					agentId: createIfMissing.agentId,
+					cwd: createIfMissing.cwd,
+					title: newTitle,
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				});
+			} else {
+				return;
+			}
+
+			await this.settingsAccess.updateSettings({
+				savedSessions: sessions,
+			});
+		});
+		await this.sessionLock;
+	}
+
 	// ============================================================
 	// Session Message History Methods
 	// ============================================================
