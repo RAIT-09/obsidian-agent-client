@@ -8,6 +8,10 @@ import {
 import * as semver from "semver";
 import { ChatView, VIEW_TYPE_CHAT } from "./ui/ChatView";
 import {
+	SessionManagerView,
+	VIEW_TYPE_SESSION_MANAGER,
+} from "./ui/SessionManagerView";
+import {
 	createFloatingChat,
 	FloatingViewContainer,
 } from "./ui/FloatingChatView";
@@ -230,6 +234,12 @@ export default class AgentClientPlugin extends Plugin {
 		this.app.workspace.detachLeavesOfType(VIEW_TYPE_CHAT);
 		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
 
+		this.app.workspace.detachLeavesOfType(VIEW_TYPE_SESSION_MANAGER);
+		this.registerView(
+			VIEW_TYPE_SESSION_MANAGER,
+			(leaf) => new SessionManagerView(leaf, this),
+		);
+
 		const ribbonIconEl = this.addRibbonIcon(
 			"bot-message-square",
 			"Open agent client",
@@ -270,6 +280,14 @@ export default class AgentClientPlugin extends Plugin {
 				void this.openNewChatViewWithAgent(
 					this.settings.defaultAgentId,
 				);
+			},
+		});
+
+		this.addCommand({
+			id: "open-session-manager",
+			name: "Open session manager",
+			callback: () => {
+				void this.activateSessionManager();
 			},
 		});
 
@@ -479,6 +497,25 @@ export default class AgentClientPlugin extends Plugin {
 		if (leaf) {
 			await workspace.revealLeaf(leaf);
 			this.focusTextarea(leaf);
+		}
+	}
+
+	async activateSessionManager(): Promise<void> {
+		const { workspace } = this.app;
+
+		const leaves = workspace.getLeavesOfType(VIEW_TYPE_SESSION_MANAGER);
+		if (leaves.length > 0) {
+			await workspace.revealLeaf(leaves[0]);
+			return;
+		}
+
+		const leaf = workspace.getLeftLeaf(false);
+		if (leaf) {
+			await leaf.setViewState({
+				type: VIEW_TYPE_SESSION_MANAGER,
+				active: true,
+			});
+			await workspace.revealLeaf(leaf);
 		}
 	}
 

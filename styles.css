@@ -7,6 +7,84 @@ If your plugin does not need CSS, delete this file.
 
 */
 
+/* ===== Session Manager ===== */
+
+.agent-client-session-manager {
+	padding: 4px 0;
+}
+
+.agent-client-session-manager-empty {
+	padding: 16px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	text-align: center;
+}
+
+.agent-client-session-manager .tree-item-self {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.agent-client-session-item-text {
+	min-width: 0;
+	flex: 1;
+}
+
+.agent-client-session-item-title {
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-semibold);
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.agent-client-session-item-agent {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.agent-client-session-status-icon {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+}
+
+.agent-client-session-status-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.agent-client-session-status-ready svg {
+	color: var(--text-muted);
+}
+
+.agent-client-session-status-busy svg {
+	color: var(--text-accent);
+	animation: agent-client-spin 1.5s linear infinite;
+}
+
+.agent-client-session-status-permission svg {
+	color: var(--color-yellow);
+}
+
+.agent-client-session-status-error svg {
+	color: var(--color-red);
+}
+
+.agent-client-session-status-disconnected svg {
+	color: var(--text-faint);
+}
+
+@keyframes agent-client-spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
 /* ===== Settings Tab Documentation Link ===== */
 .agent-client-doc-link {
 	padding: 12px 16px;
