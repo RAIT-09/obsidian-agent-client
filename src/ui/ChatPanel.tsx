@@ -742,7 +742,7 @@ export function ChatPanel({
 	// ============================================================
 	useEffect(() => {
 		plugin.viewRegistry.notifyChange();
-	}, [plugin.viewRegistry, session.state, isSending, agent.hasActivePermission, messages.length]);
+	}, [plugin.viewRegistry, session.state, isSending, agent.hasActivePermission, sessionHistory.loading, messages.length]);
 
 	// ============================================================
 	// Effects - System Notification on Permission Request
@@ -958,7 +958,7 @@ export function ChatPanel({
 				if (state === "error") return "error";
 				if (state === "disconnected") return "disconnected";
 				if (hasActivePermissionRef.current) return "permission";
-				if (isSendingRef.current) return "busy";
+				if (isSendingRef.current || sessionHistoryLoadingRef.current) return "busy";
 				if (state === "ready") return "ready";
 				return "busy";
 			},
