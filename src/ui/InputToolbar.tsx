@@ -57,9 +57,6 @@ function ToolbarDropdown({
 			e.preventDefault();
 			e.stopPropagation();
 
-			const button = buttonRef.current;
-			if (!button) return;
-
 			const menu = new Menu();
 
 			menu.addItem((menuItem) => {
@@ -87,20 +84,8 @@ function ToolbarDropdown({
 				});
 			}
 
-			// Position menu above the button so it doesn't cover the input.
-			// Estimate height (28px per item + 8px padding) and clamp to viewport.
-			const rect = button.getBoundingClientRect();
-			const estimatedHeight = Math.min(
-				items.length * 28 + 8,
-				window.innerHeight * 0.6,
-			);
-			const targetY = Math.max(8, rect.top - estimatedHeight - 4);
-
-			menu.showAtPosition({
-				x: rect.left,
-				y: targetY,
-			});
-			button.blur();
+			menu.showAtMouseEvent(e.nativeEvent);
+			buttonRef.current?.blur();
 		},
 		[items, currentValue, onChange],
 	);
