@@ -59,6 +59,8 @@ import type { IChatViewHost } from "./view-host";
  */
 export interface ChatPanelCallbacks {
 	getDisplayName: () => string;
+	getSessionStatus: () => "ready" | "busy" | "permission" | "error" | "disconnected";
+	getSessionTitle: () => string;
 	getInputState: () => ChatInputState | null;
 	setInputState: (state: ChatInputState) => void;
 	canSend: () => boolean;
@@ -414,6 +416,14 @@ export function ChatPanel({
 					});
 			});
 
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("Open session manager")
+					.setIcon("layout-list")
+					.onClick(() => {
+						void plugin.activateSessionManager();
+					});
+			});
+
 			menu.addSeparator();
 
 			menu.addItem((item: MenuItem) => {
@@ -498,6 +508,14 @@ export function ChatPanel({
 							},
 						);
 						modal.open();
+					});
+			});
+
+			menu.addItem((item: MenuItem) => {
+				item.setTitle("Open session manager")
+					.setIcon("layout-list")
+					.onClick(() => {
+						void plugin.activateSessionManager();
 					});
 			});
 
@@ -719,6 +737,35 @@ export function ChatPanel({
 	]);
 
 	// ============================================================
+	// Effects - Session Title Update
+	// ============================================================
+	useEffect(() => {
+		if (messages.length === 0) {
+			sessionTitleRef.current = "New session";
+			return;
+		}
+		const firstUserMessage = messages.find((m) => m.role === "user");
+		if (firstUserMessage) {
+			const textContent = firstUserMessage.content.find(
+				(c) => c.type === "text" || c.type === "text_with_context",
+			);
+			if (textContent && "text" in textContent) {
+				const title = textContent.text.length > 50
+					? textContent.text.substring(0, 50) + "..."
+					: textContent.text;
+				sessionTitleRef.current = title;
+			}
+		}
+	}, [messages]);
+
+	// ============================================================
+	// Effects - Notify ViewRegistry of State Changes
+	// ============================================================
+	useEffect(() => {
+		plugin.viewRegistry.notifyChange();
+	}, [plugin.viewRegistry, session.state, isSending, agent.hasActivePermission, messages.length]);
+
+	// ============================================================
 	// Effects - System Notification on Permission Request
 	// ============================================================
 	const prevHasActivePermissionRef = useRef<boolean>(false);
@@ -909,18 +956,33 @@ export function ChatPanel({
 	const attachedFilesRef = useRef(attachedFiles);
 	const isSessionReadyRef = useRef(isSessionReady);
 	const isSendingRef = useRef(isSending);
+	const sessionStateRef = useRef(session.state);
+	const hasActivePermissionRef = useRef(agent.hasActivePermission);
+	const sessionTitleRef = useRef("New session");
 	const sessionHistoryLoadingRef = useRef(sessionHistory.loading);
 	const handleSendMessageRef = useRef(handleSendMessage);
 	inputValueRef.current = inputValue;
 	attachedFilesRef.current = attachedFiles;
 	isSessionReadyRef.current = isSessionReady;
 	isSendingRef.current = isSending;
+	sessionStateRef.current = session.state;
+	hasActivePermissionRef.current = agent.hasActivePermission;
 	sessionHistoryLoadingRef.current = sessionHistory.loading;
 	handleSendMessageRef.current = handleSendMessage;
 
 	useEffect(() => {
 		onRegisterCallbacks?.({
 			getDisplayName: () => activeAgentLabel,
+			getSessionStatus: () => {
+				const state = sessionStateRef.current;
+				if (state === "error") return "error";
+				if (state === "disconnected") return "disconnected";
+				if (hasActivePermissionRef.current) return "permission";
+				if (isSendingRef.current) return "busy";
+				if (state === "ready") return "ready";
+				return "busy";
+			},
+			getSessionTitle: () => sessionTitleRef.current,
 			getInputState: () => ({
 				text: inputValueRef.current,
 				files: attachedFilesRef.current,

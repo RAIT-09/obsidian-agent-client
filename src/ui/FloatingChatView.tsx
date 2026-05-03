@@ -142,6 +142,14 @@ export class FloatingViewContainer implements IChatViewContainer {
 		return this.callbacks?.getDisplayName() ?? "Chat";
 	}
 
+	getSessionStatus(): "ready" | "busy" | "permission" | "error" | "disconnected" {
+		return this.callbacks?.getSessionStatus() ?? "disconnected";
+	}
+
+	getSessionTitle(): string {
+		return this.callbacks?.getSessionTitle() ?? "New session";
+	}
+
 	onActivate(): void {
 		this.containerEl.classList.add("is-focused");
 	}
