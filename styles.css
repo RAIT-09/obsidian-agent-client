@@ -27,6 +27,29 @@ If your plugin does not need CSS, delete this file.
 	padding-inline-start: 12px;
 }
 
+.agent-client-session-item-more {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	opacity: 0;
+	cursor: pointer;
+	color: var(--text-muted);
+	margin-left: auto;
+}
+
+.agent-client-session-manager .tree-item-self:hover .agent-client-session-item-more {
+	opacity: 1;
+}
+
+.agent-client-session-item-more:hover {
+	color: var(--text-normal);
+}
+
+.agent-client-session-item-more svg {
+	width: 14px;
+	height: 14px;
+}
+
 .agent-client-session-item-text {
 	min-width: 0;
 	flex: 1;

@@ -520,6 +520,24 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	/**
+	 * Close a specific chat view (sidebar or floating).
+	 */
+	closeView(viewId: string): void {
+		const container = this.viewRegistry.get(viewId);
+		if (container && container instanceof FloatingViewContainer) {
+			container.unmount();
+			return;
+		}
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
+		const leaf = leaves.find(
+			(l) => (l.view as ChatView)?.viewId === viewId,
+		);
+		if (leaf) {
+			leaf.detach();
+		}
+	}
+
+	/**
 	 * Focus the textarea in a ChatView leaf.
 	 */
 	private focusTextarea(leaf: WorkspaceLeaf): void {

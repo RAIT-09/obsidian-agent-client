@@ -1,6 +1,6 @@
-import { ItemView, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, WorkspaceLeaf, setIcon, Menu } from "obsidian";
 import * as React from "react";
-const { useRef, useEffect } = React;
+const { useRef, useEffect, useCallback } = React;
 import { useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
@@ -49,26 +49,71 @@ function SessionItem({
 	view,
 	isFocused,
 	onClick,
+	plugin,
 }: {
 	view: IChatViewContainer;
 	isFocused: boolean;
 	onClick: () => void;
+	plugin: AgentClientPlugin;
 }) {
 	const status = view.getSessionStatus();
 	const title = view.getSessionTitle();
 	const agentName = view.getDisplayName();
+	const moreRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (moreRef.current) setIcon(moreRef.current, "more-horizontal");
+	}, []);
+
+	const showMenu = useCallback(
+		(position: { x: number; y: number }) => {
+			const menu = new Menu();
+			menu.addItem((item) => {
+				item.setTitle("Close")
+					.setIcon("x")
+					.onClick(() => {
+						plugin.closeView(view.viewId);
+					});
+			});
+			menu.showAtPosition(position);
+		},
+		[plugin, view.viewId],
+	);
+
+	const handleMoreClick = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			showMenu({ x: e.clientX, y: e.clientY });
+		},
+		[showMenu],
+	);
+
+	const handleContextMenu = useCallback(
+		(e: React.MouseEvent) => {
+			e.preventDefault();
+			e.stopPropagation();
+			showMenu({ x: e.clientX, y: e.clientY });
+		},
+		[showMenu],
+	);
 
 	return (
 		<div className="tree-item">
 			<div
 				className={`tree-item-self is-clickable ${isFocused ? "is-active" : ""}`}
 				onClick={onClick}
+				onContextMenu={handleContextMenu}
 			>
 				<SessionStatusIcon status={status} />
 				<div className="tree-item-inner agent-client-session-item-text">
 					<div className="agent-client-session-item-title">{title}</div>
 					<div className="agent-client-session-item-agent">{agentName}</div>
 				</div>
+				<div
+					ref={moreRef}
+					className="agent-client-session-item-more"
+					onClick={handleMoreClick}
+				/>
 			</div>
 		</div>
 	);
@@ -103,6 +148,7 @@ function SessionManagerComponent({
 					view={view}
 					isFocused={view.viewId === focusedId}
 					onClick={() => view.focus()}
+					plugin={plugin}
 				/>
 			))}
 		</div>
