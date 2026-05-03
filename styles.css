@@ -24,6 +24,7 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	align-items: center;
 	gap: 8px;
+	padding-inline-start: 12px;
 }
 
 .agent-client-session-item-text {
