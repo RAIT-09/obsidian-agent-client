@@ -150,6 +150,14 @@ export class FloatingViewContainer implements IChatViewContainer {
 		return this.callbacks?.getSessionTitle() ?? "New session";
 	}
 
+	getSessionId(): string | null {
+		return this.callbacks?.getSessionId() ?? null;
+	}
+
+	setSessionTitle(title: string): void {
+		this.callbacks?.setSessionTitle(title);
+	}
+
 	onActivate(): void {
 		this.containerEl.classList.add("is-focused");
 	}

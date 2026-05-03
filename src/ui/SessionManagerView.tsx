@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../plugin";
 import type { IChatViewContainer } from "../services/view-registry";
+import { EditTitleModal } from "./EditTitleModal";
 
 export const VIEW_TYPE_SESSION_MANAGER = "agent-client-session-manager";
 
@@ -68,6 +69,36 @@ function SessionItem({
 	const showMenu = useCallback(
 		(position: { x: number; y: number }) => {
 			const menu = new Menu();
+
+			const sessionId = view.getSessionId();
+			const hasSavedSession = sessionId
+				? plugin.settingsService
+						.getSavedSessions()
+						.some((s) => s.sessionId === sessionId)
+				: false;
+
+			menu.addItem((item) => {
+				item.setTitle("Rename")
+					.setIcon("pencil")
+					.setDisabled(!hasSavedSession)
+					.onClick(() => {
+						if (!sessionId || !hasSavedSession) return;
+						const currentTitle = view.getSessionTitle();
+						const modal = new EditTitleModal(
+							plugin.app,
+							currentTitle,
+							async (newTitle) => {
+								view.setSessionTitle(newTitle);
+								await plugin.settingsService.updateSessionTitle(
+									sessionId,
+									newTitle,
+								);
+							},
+						);
+						modal.open();
+					});
+			});
+
 			menu.addItem((item) => {
 				item.setTitle("Close")
 					.setIcon("x")
@@ -75,9 +106,10 @@ function SessionItem({
 						plugin.closeView(view.viewId);
 					});
 			});
+
 			menu.showAtPosition(position);
 		},
-		[plugin, view.viewId],
+		[plugin, view],
 	);
 
 	const handleMoreClick = useCallback(

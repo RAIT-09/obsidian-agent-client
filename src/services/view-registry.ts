@@ -152,6 +152,18 @@ export interface IChatViewContainer {
 	 */
 	getSessionTitle(): string;
 
+	/**
+	 * Get the current ACP session ID.
+	 * Returns null if no session has been created yet.
+	 */
+	getSessionId(): string | null;
+
+	/**
+	 * Update the session title for display.
+	 * Does not persist — caller is responsible for persistence.
+	 */
+	setSessionTitle(title: string): void;
+
 	// ============================================================
 	// Container Access
 	// ============================================================

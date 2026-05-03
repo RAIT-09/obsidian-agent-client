@@ -61,6 +61,8 @@ export interface ChatPanelCallbacks {
 	getDisplayName: () => string;
 	getSessionStatus: () => "ready" | "busy" | "permission" | "error" | "disconnected";
 	getSessionTitle: () => string;
+	getSessionId: () => string | null;
+	setSessionTitle: (title: string) => void;
 	getInputState: () => ChatInputState | null;
 	setInputState: (state: ChatInputState) => void;
 	canSend: () => boolean;
@@ -957,6 +959,7 @@ export function ChatPanel({
 	const isSessionReadyRef = useRef(isSessionReady);
 	const isSendingRef = useRef(isSending);
 	const sessionStateRef = useRef(session.state);
+	const sessionIdRef = useRef(session.sessionId);
 	const hasActivePermissionRef = useRef(agent.hasActivePermission);
 	const sessionTitleRef = useRef("New session");
 	const sessionHistoryLoadingRef = useRef(sessionHistory.loading);
@@ -966,6 +969,7 @@ export function ChatPanel({
 	isSessionReadyRef.current = isSessionReady;
 	isSendingRef.current = isSending;
 	sessionStateRef.current = session.state;
+	sessionIdRef.current = session.sessionId;
 	hasActivePermissionRef.current = agent.hasActivePermission;
 	sessionHistoryLoadingRef.current = sessionHistory.loading;
 	handleSendMessageRef.current = handleSendMessage;
@@ -983,6 +987,11 @@ export function ChatPanel({
 				return "busy";
 			},
 			getSessionTitle: () => sessionTitleRef.current,
+			getSessionId: () => sessionIdRef.current,
+			setSessionTitle: (title: string) => {
+				sessionTitleRef.current = title;
+				plugin.viewRegistry.notifyChange();
+			},
 			getInputState: () => ({
 				text: inputValueRef.current,
 				files: attachedFilesRef.current,
