@@ -681,31 +681,49 @@ export function ChatPanel({
 	}, [isSessionReady, session.agentInfo, logger]);
 
 	// ============================================================
-	// Effects - Save Session Messages on Turn End
+	// Effects - Save Session Messages on Turn End + track turn duration
 	// ============================================================
 	const prevIsSendingRef = useRef<boolean>(false);
+	const turnStartedAtRef = useRef<number | null>(null);
+	const [lastTurnDuration, setLastTurnDuration] = useState<number | null>(
+		null,
+	);
 
 	useEffect(() => {
 		const wasSending = prevIsSendingRef.current;
 		prevIsSendingRef.current = isSending;
 
-		// Save when turn ends (isSending: true -> false) and has messages
-		if (
-			wasSending &&
-			!isSending &&
-			session.sessionId &&
-			messages.length > 0
-		) {
-			sessionHistory.saveSessionMessages(session.sessionId, messages);
-			logger.log(
-				`[ChatPanel] Session messages saved: ${session.sessionId}`,
-			);
+		// Turn START — stamp the clock and clear the previous footer.
+		if (!wasSending && isSending) {
+			turnStartedAtRef.current = Date.now();
+			setLastTurnDuration(null);
+		}
 
-			// System notification on response completion
-			if (settings.enableSystemNotifications && !document.hasFocus()) {
-				new Notification("Agent Client", {
-					body: `${activeAgentLabel} has completed the response.`,
-				});
+		// Turn END — save messages, compute duration, and surface the
+		// "* Took N.Ns" footer line.
+		if (wasSending && !isSending) {
+			if (turnStartedAtRef.current != null) {
+				setLastTurnDuration(Date.now() - turnStartedAtRef.current);
+				turnStartedAtRef.current = null;
+			}
+			if (session.sessionId && messages.length > 0) {
+				sessionHistory.saveSessionMessages(
+					session.sessionId,
+					messages,
+				);
+				logger.log(
+					`[ChatPanel] Session messages saved: ${session.sessionId}`,
+				);
+
+				// System notification on response completion
+				if (
+					settings.enableSystemNotifications &&
+					!document.hasFocus()
+				) {
+					new Notification("Agent Client", {
+						body: `${activeAgentLabel} has completed the response.`,
+					});
+				}
 			}
 		}
 	}, [
@@ -717,6 +735,22 @@ export function ChatPanel({
 		activeAgentLabel,
 		logger,
 	]);
+
+	// Format duration as "0.4s" (sub-second), "12s" (whole seconds), or
+	// "1m 23s" (minute+). Avoids "0s" for very fast turns.
+	const formatDuration = (ms: number): string => {
+		if (ms < 1000) return `${(ms / 1000).toFixed(1)}s`;
+		const totalSec = Math.round(ms / 1000);
+		if (totalSec < 60) return `${totalSec}s`;
+		return `${Math.floor(totalSec / 60)}m ${totalSec % 60}s`;
+	};
+
+	const turnMetaElement =
+		!isSending && lastTurnDuration != null && lastTurnDuration >= 100 ? (
+			<div className="agent-client-turn-meta">
+				* Took {formatDuration(lastTurnDuration)}
+			</div>
+		) : null;
 
 	// ============================================================
 	// Effects - System Notification on Permission Request
@@ -1095,6 +1129,7 @@ export function ChatPanel({
 				<div className="agent-client-floating-content">
 					<div className="agent-client-floating-messages-container">
 						{messageListElement}
+						{turnMetaElement}
 					</div>
 					{inputAreaElement}
 				</div>
@@ -1112,6 +1147,7 @@ export function ChatPanel({
 			{headerElement}
 			{cwdBanner}
 			{messageListElement}
+			{turnMetaElement}
 			{inputAreaElement}
 		</div>
 	);
