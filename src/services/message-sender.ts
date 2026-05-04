@@ -257,12 +257,23 @@ async function readSelection(
 /**
  * Build auto-mention prefix string for session/load recovery.
  * Format: "@[[note name]]:from-to\n" or "@[[note name]]\n"
+ *
+ * Returns empty string when the user message starts with "/" to avoid
+ * corrupting ACP slash-command recognition at the text-block level.
+ * Agents detect slash commands by matching "/" at character 0 of a
+ * text ContentBlock's text field; the prefix would push "/" off char 0.
+ * The resource-block channel (autoMentionBlocks) still carries the
+ * note context for slash-command turns — see the ACP spec at
+ * https://agentclientprotocol.com/protocol/slash-commands which allows
+ * resource blocks alongside slash-command text blocks.
  */
 function buildAutoMentionPrefix(
 	activeNote: NoteMetadata | null | undefined,
 	isDisabled: boolean | undefined,
+	message: string,
 ): string {
 	if (!activeNote || isDisabled) return "";
+	if (message.startsWith("/")) return "";
 	if (activeNote.selection) {
 		return `@[[${activeNote.name}]]:${activeNote.selection.from.line + 1}-${activeNote.selection.to.line + 1}\n`;
 	}
@@ -454,6 +465,7 @@ async function preparePromptWithEmbeddedContext(
 	const autoMentionPrefix = buildAutoMentionPrefix(
 		input.activeNote,
 		input.isAutoMentionDisabled,
+		input.message,
 	);
 
 	// Build system prompt instructions (first message only)
@@ -549,6 +561,7 @@ async function preparePromptWithTextContext(
 	const autoMentionPrefix = buildAutoMentionPrefix(
 		input.activeNote,
 		input.isAutoMentionDisabled,
+		input.message,
 	);
 
 	const agentMessageText = buildAgentMessageText(
