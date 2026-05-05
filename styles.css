@@ -251,32 +251,14 @@ If your plugin does not need CSS, delete this file.
 	font-size: 0.9em;
 }
 
-.agent-client-tool-call-output-toggle {
-	margin-left: auto;
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	padding: 2px 6px !important;
-	border: 1px solid var(--background-modifier-border) !important;
-	border-radius: 4px !important;
-	background: var(--background-secondary) !important;
-	color: var(--text-muted) !important;
-	font-size: 0.85em;
-	cursor: pointer;
-	outline: none !important;
-	box-shadow: none !important;
-	min-height: unset !important;
-	line-height: 1.2;
-}
-
-.agent-client-tool-call-output-toggle:hover {
-	background: var(--background-modifier-hover) !important;
-	color: var(--text-normal) !important;
-}
-
-.agent-client-tool-call-output-toggle-icon svg {
-	width: 13px;
-	height: 13px;
+.agent-client-message-tool-call-content {
+	padding: 8px 12px;
+	font-size: 13px;
+	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
+	max-width: 100%;
 }
 
 /* Plan */

@@ -43,9 +43,6 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 	const [selectedOptionId, setSelectedOptionId] = useState<
 		string | undefined
 	>(permissionRequest?.selectedOptionId);
-	const hasToolOutput = Boolean(toolContent && toolContent.length > 0);
-	const [isOutputExpanded, setIsOutputExpanded] = useState(false);
-	const hadToolOutputRef = React.useRef(hasToolOutput);
 
 	// Update selectedOptionId when permissionRequest changes
 	React.useEffect(() => {
@@ -53,18 +50,6 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 			setSelectedOptionId(permissionRequest?.selectedOptionId);
 		}
 	}, [permissionRequest?.selectedOptionId]);
-
-	React.useEffect(() => {
-		if (!hadToolOutputRef.current && hasToolOutput) {
-			setIsOutputExpanded(status === "failed");
-		}
-
-		if (status === "failed") {
-			setIsOutputExpanded(true);
-		}
-
-		hadToolOutputRef.current = hasToolOutput;
-	}, [hasToolOutput, status]);
 
 	// Get vault path for relative path display
 	const vaultPath = useMemo(() => {
@@ -125,27 +110,6 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 						/>
 					)}
 				</div>
-				{hasToolOutput && (
-					<button
-						type="button"
-						className="agent-client-tool-call-output-toggle"
-						onClick={() => setIsOutputExpanded(!isOutputExpanded)}
-					>
-						<span className="agent-client-tool-call-output-toggle-text">
-							{isOutputExpanded
-								? "Hide tool output"
-								: "Show tool output"}
-						</span>
-						<LucideIcon
-							name={
-								isOutputExpanded
-									? "chevron-up"
-									: "chevron-right"
-							}
-							className="agent-client-tool-call-output-toggle-icon"
-						/>
-					</button>
-				)}
 				{kind === "execute" &&
 					rawInput &&
 					typeof rawInput.command === "string" && (
@@ -174,8 +138,7 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 			</div>
 
 			{/* Tool call content (diffs, terminal output, etc.) */}
-			{isOutputExpanded &&
-				toolContent &&
+			{toolContent &&
 				toolContent.map((item, index) => {
 					if (item.type === "terminal") {
 						return (
