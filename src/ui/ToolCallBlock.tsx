@@ -9,7 +9,7 @@ import { PermissionBanner } from "./PermissionBanner";
 import { LucideIcon } from "./shared/IconButton";
 import { toRelativePath } from "../utils/paths";
 import * as Diff from "diff";
-// import { MarkdownRenderer } from "./shared/MarkdownRenderer";
+import { MarkdownRenderer } from "./shared/MarkdownRenderer";
 
 interface ToolCallBlockProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
@@ -165,6 +165,19 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 										.diffCollapseThreshold
 								}
 							/>
+						);
+					}
+					if (item.type === "content") {
+						return (
+							<div
+								key={index}
+								className="agent-client-message-tool-call-content"
+							>
+								<MarkdownRenderer
+									text={item.text}
+									plugin={plugin}
+								/>
+							</div>
 						);
 					}
 					return null;

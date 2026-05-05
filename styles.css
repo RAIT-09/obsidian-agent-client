@@ -251,6 +251,16 @@ If your plugin does not need CSS, delete this file.
 	font-size: 0.9em;
 }
 
+.agent-client-message-tool-call-content {
+	padding: 8px 12px;
+	font-size: 13px;
+	user-select: text;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
+	max-width: 100%;
+}
+
 /* Plan */
 .agent-client-message-plan {
 	padding: 8px;
