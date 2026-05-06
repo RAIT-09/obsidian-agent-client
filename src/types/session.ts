@@ -268,6 +268,25 @@ export interface ChatSession {
 
 	/** Working directory for agent file operations */
 	workingDirectory: string;
+
+	/**
+	 * Agent Workspace snapshot for seed-then-delta context shipping.
+	 * `null` until the first successful prompt; subsequent prompts use this
+	 * to compute deltas. Held in memory only — not persisted across reloads.
+	 */
+	workspaceSnapshot?: WorkspaceSnapshot | null;
+}
+
+/**
+ * Hash digest set captured at the end of each successful agent turn.
+ * Used by AgentWorkspace to compute the seed-vs-delta prelude on the next
+ * prompt without re-walking files unchanged since the snapshot.
+ */
+export interface WorkspaceSnapshot {
+	focusContextHash: string;
+	resourcesManifestHash: string;
+	outputDateString: string;
+	hasSeed: boolean;
 }
 /**
  * Domain Models for Session Updates

@@ -174,6 +174,7 @@ export function ChatPanel({
 		vaultService,
 		agentCwd,
 		initialAgentId,
+		plugin.agentWorkspace ?? null,
 	);
 
 	const {

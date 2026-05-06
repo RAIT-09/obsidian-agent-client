@@ -14,6 +14,7 @@ import type {
 	SessionModelState,
 	SessionUpdate,
 	SessionConfigOption,
+	WorkspaceSnapshot,
 } from "../types/session";
 import type { AcpClient } from "../acp/acp-client";
 import type { ISettingsAccess } from "../services/settings-service";
@@ -65,6 +66,9 @@ export interface UseAgentSessionReturn {
 	setMode: (modeId: string) => Promise<void>;
 	setModel: (modelId: string) => Promise<void>;
 	setConfigOption: (configId: string, value: string) => Promise<void>;
+
+	/** Update the per-session Agent Workspace snapshot (post-turn). */
+	setWorkspaceSnapshot: (snapshot: WorkspaceSnapshot | null) => void;
 
 	/** Handle session-level updates (commands, mode, config, usage, error) */
 	handleSessionUpdate: (update: SessionUpdate) => void;
@@ -521,6 +525,13 @@ export function useAgentSession(
 		[agentClient, settingsAccess],
 	);
 
+	const setWorkspaceSnapshot = useCallback(
+		(snapshot: WorkspaceSnapshot | null) => {
+			setSession((prev) => ({ ...prev, workspaceSnapshot: snapshot }));
+		},
+		[],
+	);
+
 	// ============================================================
 	// Return
 	// ============================================================
@@ -538,6 +549,7 @@ export function useAgentSession(
 		setMode,
 		setModel,
 		setConfigOption,
+		setWorkspaceSnapshot,
 		handleSessionUpdate,
 	};
 }

@@ -247,6 +247,21 @@ export function strRecord(raw: unknown): Record<string, string> {
 	return result;
 }
 
+/**
+ * Sanitize a workspace folder path string.
+ * - Trim whitespace, strip leading/trailing slashes.
+ * - Reject empty / parent-traversal segments → fallback.
+ */
+export function normalizeWorkspacePath(raw: unknown, fallback: string): string {
+	if (typeof raw !== "string") return fallback;
+	const trimmed = raw.trim().replace(/^\/+|\/+$/g, "");
+	if (!trimmed) return fallback;
+	if (trimmed.split("/").some((seg) => seg === "" || seg === "..")) {
+		return fallback;
+	}
+	return trimmed;
+}
+
 /** Extract an {x, y} point, or return null if invalid */
 export function xyPoint(raw: unknown): { x: number; y: number } | null {
 	const o = obj(raw);
