@@ -21,6 +21,8 @@ https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 ## 機能
 
 - **ノートメンション**: `@ノート名`でノートを参照
+- **Wikilink コンテキスト**: メンションしたノート内の `[[wikilink]]` を解決済みファイルパスとしてエージェントに提示。読み込むかどうかはエージェントが判断
+- **エージェントワークスペース**: 専用の `/Agent-Client/` フォルダ（`Focus_Context.md`：キュレーション索引、`Resources/`：素材置き場、`Agent_Output/YYYY-MM-DD/`：日付付き出力）を seed-then-delta 方式でエージェントに送信
 - **画像添付**: チャットに画像をペーストまたはドラッグ&ドロップ
 - **スラッシュコマンド**: エージェントが提供する`/`コマンドを使用
 - **マルチエージェント**: Claude Code、Codex、Gemini CLI、カスタムエージェントを切り替え

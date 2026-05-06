@@ -22,14 +22,15 @@ src/
 │   └── terminal-handler.ts         # Terminal process create/output/kill
 │
 ├── services/                       # Business Logic (non-React, no React imports)
-│   ├── vault-service.ts            # Vault access + fuzzy search + CM6 selection tracking
+│   ├── vault-service.ts            # Vault access + fuzzy search + CM6 selection tracking + wikilink resolver
 │   ├── settings-service.ts         # Reactive settings store (observer pattern only)
 │   ├── session-storage.ts          # Session metadata + message file I/O (sessions/*.json)
-│   ├── settings-normalizer.ts      # Settings validation helpers (str, bool, num, enumVal, etc.)
+│   ├── settings-normalizer.ts      # Settings validation helpers (str, bool, num, enumVal, normalizeWorkspacePath, etc.)
 │   ├── session-helpers.ts          # Agent config building, API key injection (pure functions)
 │   ├── session-state.ts            # Session state updates (legacy mode/model, config restore)
 │   ├── message-state.ts            # Message array transforms (upsert, merge, streaming apply)
-│   ├── message-sender.ts           # Prompt preparation + sending (pure functions)
+│   ├── message-sender.ts           # Prompt preparation + sending (pure functions, workspace prelude injection)
+│   ├── agent-workspace.ts          # /Agent-Client/ folder bootstrap, vault-event manifest, seed-then-delta prelude builder
 │   ├── chat-exporter.ts            # Markdown export with frontmatter
 │   ├── view-registry.ts            # Multi-view management, focus, broadcast
 │   └── update-checker.ts           # Agent/plugin version checking
@@ -73,6 +74,8 @@ src/
 │   ├── paths.ts                    # Path resolution, file:// URI
 │   ├── error-utils.ts              # ACP error conversion
 │   ├── mention-parser.ts           # @[[note]] detection/extraction
+│   ├── wikilink-resolver.ts        # `[[wikilink]]` extraction + basename index + ambiguity surfacing
+│   ├── wikilink-formatter.ts       # `<obsidian_metadata>` XML prelude builder for resolved links
 │   └── logger.ts                   # Debug-mode logger
 │
 ├── plugin.ts                       # Obsidian plugin lifecycle, commands, view management
@@ -88,7 +91,7 @@ src/
 | File | Contents |
 |------|----------|
 | `chat.ts` | ChatMessage, MessageContent (8+ type union), Role, ToolCallStatus, ToolKind, AttachedFile, ActivePermission, PromptContent |
-| `session.ts` | ChatSession, SessionState, SessionUpdate (12-type union incl. ProcessErrorUpdate), SessionConfigOption, Capabilities, SessionInfo |
+| `session.ts` | ChatSession (incl. workspaceSnapshot), SessionState, SessionUpdate (12-type union incl. ProcessErrorUpdate), SessionConfigOption, WorkspaceSnapshot, Capabilities, SessionInfo |
 | `agent.ts` | AgentEnvVar, BaseAgentSettings, ClaudeAgentSettings, GeminiAgentSettings, CodexAgentSettings |
 | `errors.ts` | AcpErrorCode, AcpError, ProcessError, ErrorInfo |
 
@@ -116,14 +119,15 @@ src/
 
 | File | Purpose |
 |------|---------|
-| `vault-service.ts` | `VaultService` class — vault note access, fuzzy search, CM6 selection tracking. Exports `IVaultAccess`, `NoteMetadata`. |
+| `vault-service.ts` | `VaultService` class — vault note access, fuzzy search, CM6 selection tracking, wikilink resolver port. Exports `IVaultAccess`, `NoteMetadata`. Implements `IWikilinkResolver`. |
 | `settings-service.ts` | `SettingsService` class — reactive settings store (observer pattern). Delegates session storage to `SessionStorage`. Exports `ISettingsAccess`. |
 | `session-storage.ts` | `SessionStorage` class — session metadata CRUD (in plugin settings) + message file I/O (sessions/*.json). |
-| `settings-normalizer.ts` | Pure functions — settings validation helpers (`str`, `bool`, `num`, `enumVal`, `obj`, `strRecord`, `xyPoint`), `toAgentConfig`, `parseChatFontSize`. |
+| `settings-normalizer.ts` | Pure functions — settings validation helpers (`str`, `bool`, `num`, `enumVal`, `obj`, `strRecord`, `xyPoint`, `normalizeWorkspacePath`), `toAgentConfig`, `parseChatFontSize`. |
 | `session-helpers.ts` | Pure functions — agent config building, API key injection, agent settings resolution |
 | `session-state.ts` | Pure functions — legacy mode/model application, config option restoration |
 | `message-state.ts` | Pure functions — message array transforms (streaming apply, tool call upsert with O(1) index, permission scanning) |
-| `message-sender.ts` | Pure functions — prompt preparation (embedded context vs XML text, shared helpers), sending with auth retry |
+| `message-sender.ts` | Pure functions — prompt preparation (embedded context vs XML text, shared helpers, workspace prelude prepended to first text block), sending with auth retry |
+| `agent-workspace.ts` | `AgentWorkspace` class — bootstraps `/Agent-Client/` (Focus_Context.md, Resources/, Agent_Output/), watches Resources/ via vault events with dirty-flag manifest, builds seed `<obsidian_workspace>` and delta `<obsidian_workspace_update>` preludes, recomputes `WorkspaceSnapshot` post-turn so agent self-edits don't round-trip. Exports `IAgentWorkspace`. |
 | `chat-exporter.ts` | `ChatExporter` class — markdown export with frontmatter, image handling |
 | `view-registry.ts` | `ChatViewRegistry` class — multi-view focus tracking, broadcast commands. Exports `IChatViewContainer`. |
 | `update-checker.ts` | Agent version checking via npm registry |
@@ -209,6 +213,8 @@ ChatView / FloatingChatView
 | `paths.ts` | Path resolution (which/where), file:// URI building, relative path conversion |
 | `error-utils.ts` | ACP error code → user-friendly title/suggestion conversion |
 | `mention-parser.ts` | @[[note]] detection, replacement, extraction from text |
+| `wikilink-resolver.ts` | `[[wikilink]]` extraction from note content; basename index + `getFirstLinkpathDest` for resolution; surfaces unresolved/ambiguous candidates. Skips `![[embeds]]`. Exports `IWikilinkResolver`. |
+| `wikilink-formatter.ts` | Builds `<obsidian_metadata><links>...` XML prelude from resolved metadata (50-link cap, `truncated="N"`) for prepending to mentioned-note bodies and `Focus_Context.md`. |
 | `logger.ts` | Singleton logger respecting debugMode setting |
 
 ---
@@ -302,6 +308,17 @@ ChatView / FloatingChatView
 - Workspace event handlers use refs to avoid re-registration
 - Unmount cleanup uses refs to access latest state
 
+### 8. Seed-then-Delta Context Economy (Agent Workspace)
+- `/Agent-Client/` workspace ships full state once per session (`<obsidian_workspace>` seed)
+- Subsequent prompts compare against a `WorkspaceSnapshot` and emit only changed zones (`<obsidian_workspace_update>` delta) — empty when nothing changed
+- Post-turn recomputation invariant: after every successful agent turn, snapshot ≡ current workspace state, so agent-self-edits never round-trip
+- Resources/ manifest maintained via vault events (`create | modify | delete | rename`) with O(1) dirty-flag check at prompt time
+- Hash via cyrb53 (fast, sufficient for change detection — not cryptographic)
+
+### 9. Wikilink Resolution
+- `IWikilinkResolver` (implemented by `VaultService`, consumed by `agent-workspace` and `message-sender`) extracts `[[wikilinks]]` and resolves them via Obsidian's `getFirstLinkpathDest` plus a basename index for ambiguity detection
+- Resolved metadata is rendered as `<obsidian_metadata><links>` and prepended to note bodies, letting the agent decide which links to read on demand without embedding their content
+
 ---
 
 ## Key Benefits
@@ -376,6 +393,13 @@ Refactored from Port/Adapter Architecture to simplified layered architecture:
 - **Merged**: VaultAdapter + MentionService → VaultService, useMentions + useAutoMention → useMentions
 - **Removed**: useChatController (god hook → ChatPanel component), Port files (no implementation swapping planned)
 - **Result**: 76 → 50 files, 5 → 4 layers, flat directory structure
+
+### May 2026: Wikilink Context + Agent Workspace
+
+Added two complementary context features that minimize per-turn token cost:
+
+- **Wikilink Context** (settings: `expandWikilinkContext`, default on): `[[wikilinks]]` inside mentioned notes are surfaced as resolved file paths via a new `<obsidian_metadata><links>` prelude. Agents see *pointers*, not embedded bodies, and decide which to read. Files: `utils/wikilink-resolver.ts`, `utils/wikilink-formatter.ts`; integrated in `vault-service.ts` and `message-sender.ts`.
+- **Agent Workspace** (settings group `agentWorkspace`, default on): A fixed `/Agent-Client/` folder at the vault root with `Focus_Context.md` (curated index, wikilink-decorated), `Resources/` (raw materials, manifest only), and `Agent_Output/YYYY-MM-DD/` (dated output). Shipped to the agent on a seed-then-delta cadence with a per-session `WorkspaceSnapshot`. Files: `services/agent-workspace.ts`, `types/session.ts` (WorkspaceSnapshot + ChatSession.workspaceSnapshot), `services/settings-normalizer.ts` (normalizeWorkspacePath); plumbed through `useAgentSession` (setWorkspaceSnapshot), `useAgentMessages` (post-turn snapshot commit), `useAgent` (facade), and `ChatPanel` (passes `plugin.agentWorkspace`). Bootstrap in `plugin.ts onload`, teardown in `onunload`. Settings UI: new "Agent Workspace" section in `SettingsTab.ts`.
 
 ### April 2026: Simplification & Performance Refactoring
 

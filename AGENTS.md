@@ -21,14 +21,15 @@ src/
 │   ├── permission-handler.ts    # Permission queue, auto-approve, Promise resolution
 │   └── terminal-handler.ts      # Terminal process create/output/kill
 ├── services/                    # Business logic (non-React, no React imports)
-│   ├── vault-service.ts         # Vault access + fuzzy search + CM6 selection tracking
+│   ├── vault-service.ts         # Vault access + fuzzy search + CM6 selection tracking + wikilink resolver
 │   ├── settings-service.ts      # Reactive settings store (observer pattern only)
 │   ├── session-storage.ts       # Session metadata + message file I/O (sessions/*.json)
-│   ├── settings-normalizer.ts   # Settings validation helpers (str, bool, num, enumVal, etc.)
+│   ├── settings-normalizer.ts   # Settings validation helpers (str, bool, num, enumVal, normalizeWorkspacePath, etc.)
 │   ├── session-helpers.ts       # Agent config building, API key injection (pure functions)
 │   ├── session-state.ts         # Session state updates (legacy mode/model, config restore)
 │   ├── message-state.ts         # Message array transforms (upsert, merge, streaming apply)
-│   ├── message-sender.ts        # Prompt preparation + sending (pure functions)
+│   ├── message-sender.ts        # Prompt preparation + sending (pure functions, prepends workspace prelude)
+│   ├── agent-workspace.ts       # /Agent-Client/ bootstrap + Resources manifest + seed-then-delta prelude
 │   ├── chat-exporter.ts         # Markdown export with frontmatter
 │   ├── view-registry.ts         # Multi-view management, focus, broadcast
 │   └── update-checker.ts        # Agent/plugin version checking
@@ -69,6 +70,8 @@ src/
 │   ├── paths.ts                 # Path resolution, file:// URI
 │   ├── error-utils.ts           # ACP error conversion
 │   ├── mention-parser.ts        # @[[note]] detection/extraction
+│   ├── wikilink-resolver.ts     # `[[wikilink]]` extraction + basename index + ambiguity
+│   ├── wikilink-formatter.ts    # `<obsidian_metadata><links>` XML prelude builder
 │   └── logger.ts                # Debug-mode logger
 ├── plugin.ts                    # Obsidian plugin lifecycle, settings persistence
 └── main.ts                      # Entry point
@@ -172,14 +175,15 @@ FloatingChatView uses `onRegisterExpanded` callback (not CustomEvent) for expand
 
 ### Services (`services/`)
 
-**VaultService**: Vault access + file index + fuzzy search + CM6 selection tracking
+**VaultService**: Vault access + file index + fuzzy search + CM6 selection tracking. Implements `IWikilinkResolver` (used by message-sender and agent-workspace).
 **SettingsService**: Reactive settings store (observer pattern for useSyncExternalStore). Session storage delegated to SessionStorage.
 **SessionStorage**: Session metadata CRUD (in plugin settings) + message file I/O (sessions/*.json)
-**settings-normalizer**: Validation helpers (str, bool, num, enumVal, obj, strRecord, xyPoint) + toAgentConfig + parseChatFontSize
+**settings-normalizer**: Validation helpers (str, bool, num, enumVal, obj, strRecord, xyPoint, normalizeWorkspacePath) + toAgentConfig + parseChatFontSize
 **session-helpers**: Pure functions — buildAgentConfigWithApiKey, findAgentSettings, getAvailableAgents
 **session-state**: Pure functions — applyLegacyValue, tryRestoreConfigOption, restoreLegacyConfig
 **message-state**: Pure functions — applySingleUpdate, applyUpsertToolCall, mergeToolCallContent, findActivePermission, selectOption
-**message-sender**: Pure functions — preparePrompt (embedded context vs XML text, shared helpers), sendPreparedPrompt (auth retry)
+**message-sender**: Pure functions — preparePrompt (embedded context vs XML text, shared helpers, builds + prepends workspace prelude), sendPreparedPrompt (auth retry). PreparePromptInput accepts `agentWorkspace?: { service, snapshot }`; PreparePromptResult returns `pendingWorkspaceSnapshot?` for the hook to commit on success.
+**AgentWorkspace** (`agent-workspace.ts`): Bootstraps `/<workspacePath>/` (Focus_Context.md, Resources/, Agent_Output/), watches Resources/ via vault events with O(1) dirty-flag manifest, builds seed `<obsidian_workspace>` and delta `<obsidian_workspace_update>` preludes, recomputes `WorkspaceSnapshot` from disk after each successful turn so agent self-edits don't round-trip. Singleton at plugin level; per-session snapshot held on `ChatSession.workspaceSnapshot`.
 
 ## Types
 
@@ -213,6 +217,16 @@ interface IVaultAccess {
   listNotes(): Promise<NoteMetadata[]>;
 }
 
+// utils/wikilink-resolver.ts
+interface IWikilinkResolver {
+  buildBasenameIndex(): BasenameIndex;
+  extractLinkedNoteMetadata(
+    content: string,
+    sourcePath: string,
+    basenameIndex: BasenameIndex,
+  ): LinkedNoteMetadata[];
+}
+
 // services/settings-service.ts
 interface ISettingsAccess {
   getSnapshot(): AgentClientPluginSettings;
@@ -225,6 +239,26 @@ interface ISettingsAccess {
   saveSessionMessages(sessionId: string, agentId: string, messages: ChatMessage[]): Promise<void>;
   loadSessionMessages(sessionId: string): Promise<ChatMessage[] | null>;
   deleteSessionMessages(sessionId: string): Promise<void>;
+}
+
+// services/agent-workspace.ts
+interface IAgentWorkspace {
+  ensureBootstrapped(): Promise<void>;
+  isEnabled(): boolean;
+  buildPrelude(
+    snapshot: WorkspaceSnapshot | null,
+    options: BuildPreludeOptions,
+  ): Promise<{ prelude: string; pendingSnapshot: WorkspaceSnapshot }>;
+  postTurnSnapshot(): Promise<WorkspaceSnapshot>;
+  destroy(): void;
+}
+
+// types/session.ts
+interface WorkspaceSnapshot {
+  focusContextHash: string;
+  resourcesManifestHash: string;
+  outputDateString: string;  // YYYY-MM-DD (rolls at midnight)
+  hasSeed: boolean;          // false until first successful prompt
 }
 ```
 
@@ -305,10 +339,25 @@ interface ISettingsAccess {
 4. Or handle via `applySingleUpdate()` in `services/message-state.ts` (for message-level)
 5. No routing needed in ChatPanel — useAgent handles dispatch internally
 
+### Modify Agent Workspace Behavior
+1. Settings shape lives on `AgentClientPluginSettings.agentWorkspace` (`src/plugin.ts`); `normalizeWorkspacePath` enforces vault-relative paths
+2. Service: `src/services/agent-workspace.ts` — bootstrap, vault event subscription, manifest builder (depth/entry caps), seed/delta prelude formatters
+3. Snapshot type: `WorkspaceSnapshot` in `types/session.ts`; lives on `ChatSession.workspaceSnapshot` (in-memory only)
+4. Integration: `message-sender.ts` calls `agentWorkspace.buildPrelude(...)` and prepends to first text block; `useAgentMessages.ts` commits `postTurnSnapshot()` on success via `setWorkspaceSnapshot`
+5. Settings UI: `src/ui/SettingsTab.ts` "Agent Workspace" section; `plugin.refreshAgentWorkspace()` re-bootstraps after path/enable changes
+6. Reference: `docs/design/agent-workspace.md` (15 decisions D1–D15)
+
+### Modify Wikilink Context Behavior
+1. Setting: `expandWikilinkContext` (`src/plugin.ts`)
+2. Resolver: `src/utils/wikilink-resolver.ts` — basename index, `getFirstLinkpathDest` resolution, ambiguity surfacing, skips `![[embeds]]`
+3. Formatter: `src/utils/wikilink-formatter.ts` — `<obsidian_metadata><links>` XML prelude, 50-link cap with `truncated="N"`
+4. Wired in `vault-service.ts` (`IWikilinkResolver` impl) and `message-sender.ts` (decorates mentioned-note bodies in both transports). Also used inside `agent-workspace.ts` to decorate Focus_Context.md
+5. Reference: `docs/design/wikilink-context.md`
+
 ### Debug
 1. Settings → Developer Settings → Debug Mode ON
 2. Open DevTools (Cmd+Option+I / Ctrl+Shift+I)
-3. Filter logs: `[AcpClient]`, `[AcpHandler]`, `[PermissionManager]`, `[VaultService]`
+3. Filter logs: `[AcpClient]`, `[AcpHandler]`, `[PermissionManager]`, `[VaultService]`, `[AgentWorkspace]`
 
 ## ACP Protocol
 
@@ -327,4 +376,4 @@ interface ISettingsAccess {
 
 ---
 
-**Last Updated**: April 2026 | **Architecture**: useAgent facade + sub-hooks | **Version**: 0.10.0-preview.1
+**Last Updated**: May 2026 | **Architecture**: useAgent facade + sub-hooks; Agent Workspace seed-then-delta context | **Version**: 0.10.2

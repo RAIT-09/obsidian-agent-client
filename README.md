@@ -25,6 +25,8 @@ https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 ## Features
 
 - **Note Mentions**: Reference your notes with `@notename` syntax
+- **Wikilink Context**: `[[wikilinks]]` inside mentioned notes are surfaced as resolved file paths so the agent can decide which to read
+- **Agent Workspace**: A dedicated `/Agent-Client/` folder with `Focus_Context.md` (curated index), `Resources/` (raw materials), and `Agent_Output/YYYY-MM-DD/` (dated outputs) shipped to the agent on a seed-then-delta cadence
 - **Image Attachments**: Paste or drag-and-drop images into the chat
 - **Slash Commands**: Use `/` commands provided by your agent
 - **Multi-Agent Support**: Switch between Claude Code, Codex, Gemini CLI, and custom agents
