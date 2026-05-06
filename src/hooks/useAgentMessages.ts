@@ -15,12 +15,18 @@ import type {
 	ImagePromptContent,
 	ResourceLinkPromptContent,
 } from "../types/chat";
-import type { ChatSession, SessionUpdate } from "../types/session";
+import type {
+	ChatSession,
+	SessionUpdate,
+	WorkspaceSnapshot,
+} from "../types/session";
 import type { AcpClient } from "../acp/acp-client";
 import type { IVaultAccess, NoteMetadata } from "../services/vault-service";
+import type { IWikilinkResolver } from "../utils/wikilink-resolver";
 import type { ISettingsAccess } from "../services/settings-service";
 import type { ErrorInfo } from "../types/errors";
 import type { IMentionService } from "../utils/mention-parser";
+import type { IAgentWorkspace } from "../services/agent-workspace";
 import { preparePrompt, sendPreparedPrompt } from "../services/message-sender";
 import { Platform } from "obsidian";
 import {
@@ -91,9 +97,11 @@ export interface UseAgentMessagesReturn {
 export function useAgentMessages(
 	agentClient: AcpClient,
 	settingsAccess: ISettingsAccess,
-	vaultAccess: IVaultAccess & IMentionService,
+	vaultAccess: IVaultAccess & IMentionService & IWikilinkResolver,
 	session: ChatSession,
 	setErrorInfo: (error: ErrorInfo | null) => void,
+	agentWorkspace: IAgentWorkspace | null,
+	setWorkspaceSnapshot: (snapshot: WorkspaceSnapshot | null) => void,
 ): UseAgentMessagesReturn {
 	// ============================================================
 	// Message State
@@ -233,6 +241,14 @@ export function useAgentMessages(
 
 			const settings = settingsAccess.getSnapshot();
 
+			const workspaceInput =
+				agentWorkspace && agentWorkspace.isEnabled()
+					? {
+							service: agentWorkspace,
+							snapshot: session.workspaceSnapshot ?? null,
+						}
+					: undefined;
+
 			const prepared = await preparePrompt(
 				{
 					message: content,
@@ -247,6 +263,9 @@ export function useAgentMessages(
 					maxNoteLength: settings.displaySettings.maxNoteLength,
 					maxSelectionLength:
 						settings.displaySettings.maxSelectionLength,
+					expandWikilinkContext: settings.expandWikilinkContext,
+					wikilinkResolver: vaultAccess,
+					agentWorkspace: workspaceInput,
 				},
 				vaultAccess,
 				vaultAccess, // IMentionService (same object)
@@ -314,6 +333,28 @@ export function useAgentMessages(
 				if (result.success) {
 					setIsSending(false);
 					setLastUserMessage(null);
+
+					// Commit post-turn workspace snapshot — recompute from disk
+					// so that any agent-self-edits during the turn are folded
+					// in and not re-shipped on the next prompt.
+					if (workspaceInput) {
+						try {
+							const next =
+								await agentWorkspace!.postTurnSnapshot();
+							setWorkspaceSnapshot(next);
+						} catch (error) {
+							console.warn(
+								"[useAgentMessages] postTurnSnapshot failed:",
+								error,
+							);
+							// Fall back to the pending snapshot computed pre-send.
+							if (prepared.pendingWorkspaceSnapshot) {
+								setWorkspaceSnapshot(
+									prepared.pendingWorkspaceSnapshot,
+								);
+							}
+						}
+					}
 				} else {
 					setIsSending(false);
 					setErrorInfo(
@@ -344,6 +385,9 @@ export function useAgentMessages(
 			session.sessionId,
 			session.authMethods,
 			session.promptCapabilities,
+			session.workspaceSnapshot,
+			agentWorkspace,
+			setWorkspaceSnapshot,
 			shouldConvertToWsl,
 			addMessage,
 			setErrorInfo,

@@ -130,6 +130,20 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Expand wikilink context")
+			.setDesc(
+				"Surface [[wikilinks]] inside mentioned notes as resolved file paths so the agent can choose which to read. Does not embed linked content.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.expandWikilinkContext)
+					.onChange(async (value) => {
+						this.plugin.settings.expandWikilinkContext = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
 			.setName("Max note length")
 			.setDesc(
 				"Maximum characters per mentioned note. Notes longer than this will be truncated.",
@@ -171,6 +185,137 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						if (!isNaN(num) && num >= 1) {
 							this.plugin.settings.displaySettings.maxSelectionLength =
 								num;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
+		// ─────────────────────────────────────────────────────────────────────
+		// Agent Workspace
+		// ─────────────────────────────────────────────────────────────────────
+
+		new Setting(containerEl).setName("Agent Workspace").setHeading();
+
+		new Setting(containerEl)
+			.setName("Enable agent workspace")
+			.setDesc(
+				"Maintain a dedicated /Agent-Client/ folder (Focus_Context.md, Resources/, Agent_Output/) and ship its structure to the agent on every session.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.agentWorkspace.enabled)
+					.onChange(async (value) => {
+						this.plugin.settings.agentWorkspace.enabled = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshAgentWorkspace();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Workspace folder")
+			.setDesc(
+				"Vault-relative folder name. Existing content is preserved; missing structure is created on load.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Agent-Client")
+					.setValue(this.plugin.settings.agentWorkspace.path)
+					.onChange(async (value) => {
+						const trimmed = value
+							.trim()
+							.replace(/^\/+|\/+$/g, "");
+						if (!trimmed) return;
+						if (
+							trimmed
+								.split("/")
+								.some((seg) => !seg || seg === "..")
+						) {
+							return;
+						}
+						this.plugin.settings.agentWorkspace.path = trimmed;
+						await this.plugin.saveSettings();
+						this.plugin.refreshAgentWorkspace();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Emit instructions block")
+			.setDesc(
+				"Include a short instructions block in the seed prelude describing each zone's role.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(
+						this.plugin.settings.agentWorkspace.emitInstructions,
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.agentWorkspace.emitInstructions =
+							value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Agent-assisted Focus_Context updates")
+			.setDesc(
+				"Tell the agent to append a `[[link]]: summary` line to Focus_Context.md after creating each output note. Default off.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(
+						this.plugin.settings.agentWorkspace
+							.agentAssistedFocusUpdate,
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.agentWorkspace.agentAssistedFocusUpdate =
+							value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Resources max entries")
+			.setDesc(
+				"Cap the number of files listed in the Resources/ manifest. Older files are dropped first.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("200")
+					.setValue(
+						String(
+							this.plugin.settings.agentWorkspace
+								.resourcesMaxEntries,
+						),
+					)
+					.onChange(async (value) => {
+						const n = parseInt(value, 10);
+						if (!isNaN(n) && n >= 1) {
+							this.plugin.settings.agentWorkspace.resourcesMaxEntries =
+								n;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Resources max depth")
+			.setDesc(
+				"Maximum subdirectory depth to scan inside Resources/. 0 = top level only.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("3")
+					.setValue(
+						String(
+							this.plugin.settings.agentWorkspace
+								.resourcesMaxDepth,
+						),
+					)
+					.onChange(async (value) => {
+						const n = parseInt(value, 10);
+						if (!isNaN(n) && n >= 0) {
+							this.plugin.settings.agentWorkspace.resourcesMaxDepth =
+								n;
 							await this.plugin.saveSettings();
 						}
 					}),

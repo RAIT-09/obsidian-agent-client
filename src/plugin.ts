@@ -19,6 +19,7 @@ import {
 } from "./services/settings-service";
 import { AgentClientSettingTab } from "./ui/SettingsTab";
 import { AcpClient } from "./acp/acp-client";
+import { AgentWorkspace } from "./services/agent-workspace";
 import {
 	sanitizeArgs,
 	normalizeEnvVars,
@@ -32,6 +33,7 @@ import {
 	obj,
 	strRecord,
 	xyPoint,
+	normalizeWorkspacePath,
 } from "./services/settings-normalizer";
 import {
 	AgentEnvVar,
@@ -75,6 +77,17 @@ export interface AgentClientPluginSettings {
 	defaultAgentId: string;
 	autoAllowPermissions: boolean;
 	autoMentionActiveNote: boolean;
+	/** Surface `[[wikilinks]]` inside note content as resolved metadata so the agent can decide which links to follow */
+	expandWikilinkContext: boolean;
+	/** Agent Workspace — opinionated /Agent-Client/ folder with seed-then-delta context shipping */
+	agentWorkspace: {
+		enabled: boolean;
+		path: string;
+		emitInstructions: boolean;
+		agentAssistedFocusUpdate: boolean;
+		resourcesMaxEntries: number;
+		resourcesMaxDepth: number;
+	};
 	/** Show OS system notifications on response completion and permission requests */
 	enableSystemNotifications: boolean;
 	debugMode: boolean;
@@ -149,6 +162,15 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	defaultAgentId: "claude-code-acp",
 	autoAllowPermissions: false,
 	autoMentionActiveNote: true,
+	expandWikilinkContext: true,
+	agentWorkspace: {
+		enabled: true,
+		path: "Agent-Client",
+		emitInstructions: true,
+		agentAssistedFocusUpdate: false,
+		resourcesMaxEntries: 200,
+		resourcesMaxDepth: 3,
+	},
 	enableSystemNotifications: true,
 	debugMode: false,
 	nodePath: "",
@@ -188,6 +210,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 export default class AgentClientPlugin extends Plugin {
 	settings: AgentClientPluginSettings;
 	settingsService!: SettingsService;
+	agentWorkspace!: AgentWorkspace;
 
 	/** Registry for all chat view containers (sidebar + floating) */
 	viewRegistry = new ChatViewRegistry();
@@ -206,6 +229,10 @@ export default class AgentClientPlugin extends Plugin {
 
 		// Initialize settings store
 		this.settingsService = createSettingsService(this.settings, this);
+
+		// Initialize Agent Workspace (folder bootstrap is async; fire and forget)
+		this.agentWorkspace = new AgentWorkspace(this, this.settingsService);
+		void this.agentWorkspace.ensureBootstrapped();
 
 		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
 
@@ -346,6 +373,9 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	onunload() {
+		// Tear down Agent Workspace (unsubscribe vault events)
+		this.agentWorkspace?.destroy();
+
 		// Unmount floating button
 		this.floatingButton?.unmount();
 		this.floatingButton = null;
@@ -837,6 +867,7 @@ export default class AgentClientPlugin extends Plugin {
 		const rg = obj(raw.gemini) ?? {};
 		const re = obj(raw.exportSettings) ?? {};
 		const rd = obj(raw.displaySettings) ?? {};
+		const rw = obj(raw.agentWorkspace) ?? {};
 
 		// Normalize custom agents
 		const customAgents = Array.isArray(raw.customAgents)
@@ -907,6 +938,32 @@ export default class AgentClientPlugin extends Plugin {
 				raw.autoMentionActiveNote,
 				D.autoMentionActiveNote,
 			),
+			expandWikilinkContext: bool(
+				raw.expandWikilinkContext,
+				D.expandWikilinkContext,
+			),
+			agentWorkspace: {
+				enabled: bool(rw.enabled, D.agentWorkspace.enabled),
+				path: normalizeWorkspacePath(rw.path, D.agentWorkspace.path),
+				emitInstructions: bool(
+					rw.emitInstructions,
+					D.agentWorkspace.emitInstructions,
+				),
+				agentAssistedFocusUpdate: bool(
+					rw.agentAssistedFocusUpdate,
+					D.agentWorkspace.agentAssistedFocusUpdate,
+				),
+				resourcesMaxEntries: num(
+					rw.resourcesMaxEntries,
+					D.agentWorkspace.resourcesMaxEntries,
+					1,
+				),
+				resourcesMaxDepth: num(
+					rw.resourcesMaxDepth,
+					D.agentWorkspace.resourcesMaxDepth,
+					0,
+				),
+			},
 			enableSystemNotifications: bool(
 				raw.enableSystemNotifications,
 				D.enableSystemNotifications,
@@ -1099,6 +1156,16 @@ export default class AgentClientPlugin extends Plugin {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Re-bootstrap the Agent Workspace after settings changes
+	 * (path or enable toggle). Discards in-memory manifest and snapshots.
+	 */
+	refreshAgentWorkspace(): void {
+		this.agentWorkspace?.destroy();
+		this.agentWorkspace = new AgentWorkspace(this, this.settingsService);
+		void this.agentWorkspace.ensureBootstrapped();
 	}
 
 	ensureDefaultAgentId(): void {

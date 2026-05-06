@@ -37,6 +37,15 @@ import {
 } from "../utils/mention-parser";
 import { convertWindowsPathToWsl } from "../utils/platform";
 import { buildFileUri } from "../utils/paths";
+import {
+	type IWikilinkResolver,
+	type BasenameIndex,
+} from "../utils/wikilink-resolver";
+import { formatLinkedNotesPrelude } from "../utils/wikilink-formatter";
+import type {
+	IAgentWorkspace,
+	WorkspaceSnapshot,
+} from "./agent-workspace";
 
 // ============================================================================
 // Types
@@ -75,6 +84,23 @@ export interface PreparePromptInput {
 
 	/** Maximum characters for selection (default: 10000) */
 	maxSelectionLength?: number;
+
+	/** Whether to enrich note content with wikilink metadata (default: false) */
+	expandWikilinkContext?: boolean;
+
+	/** Resolver for `[[wikilinks]]` inside note content; required when expandWikilinkContext=true */
+	wikilinkResolver?: IWikilinkResolver | null;
+
+	/**
+	 * Agent Workspace integration. When provided, a `<obsidian_workspace>` seed
+	 * (or `<obsidian_workspace_update>` delta) is prepended to the prompt.
+	 * `snapshot=null` triggers a seed; otherwise the service computes a delta
+	 * relative to the snapshot.
+	 */
+	agentWorkspace?: {
+		service: IAgentWorkspace;
+		snapshot: WorkspaceSnapshot | null;
+	};
 }
 
 /**
@@ -96,6 +122,12 @@ export interface PreparePromptResult {
 			toLine: number;
 		};
 	};
+
+	/**
+	 * Agent Workspace snapshot to commit on successful send. Always defined
+	 * when `input.agentWorkspace` was provided; otherwise omitted.
+	 */
+	pendingWorkspaceSnapshot?: WorkspaceSnapshot;
 }
 
 /**
@@ -286,6 +318,55 @@ function buildAutoMentionContext(
 }
 
 /**
+ * Per-prompt scan context: built once at the top of `preparePrompt`,
+ * threaded into helpers so the basename index isn't rebuilt per mention.
+ */
+interface WikilinkScanContext {
+	resolver: IWikilinkResolver;
+	basenameIndex: BasenameIndex;
+	vaultBasePath: string;
+	convertToWsl: boolean;
+}
+
+/**
+ * Build the wikilink scan context, or null when expansion is disabled
+ * or the resolver port wasn't provided.
+ */
+function buildWikilinkContext(
+	input: PreparePromptInput,
+): WikilinkScanContext | null {
+	if (!input.expandWikilinkContext || !input.wikilinkResolver) return null;
+	return {
+		resolver: input.wikilinkResolver,
+		basenameIndex: input.wikilinkResolver.buildBasenameIndex(),
+		vaultBasePath: input.vaultBasePath,
+		convertToWsl: input.convertToWsl ?? false,
+	};
+}
+
+/**
+ * Prepend the `<obsidian_metadata>` prelude to note content when wikilinks
+ * are present. No-op when ctx is null or the note has no resolvable links.
+ */
+function decorateWithLinkedNotes(
+	rawContent: string,
+	sourcePath: string,
+	ctx: WikilinkScanContext | null,
+): string {
+	if (!ctx) return rawContent;
+	const links = ctx.resolver.extractLinkedNoteMetadata(
+		rawContent,
+		sourcePath,
+		ctx.basenameIndex,
+	);
+	const prelude = formatLinkedNotesPrelude(links, {
+		vaultBasePath: ctx.vaultBasePath,
+		convertToWsl: ctx.convertToWsl,
+	});
+	return prelude + rawContent;
+}
+
+/**
  * Resolve absolute path with optional WSL conversion.
  */
 function resolveAbsolutePath(
@@ -325,15 +406,62 @@ export async function preparePrompt(
 	// Step 1: Extract all mentioned notes from the message
 	const mentionedNotes = extractMentionedNotes(input.message, mentionService);
 
-	// Step 2: Build context based on agent capabilities
-	if (input.supportsEmbeddedContext) {
-		return preparePromptWithEmbeddedContext(
-			input,
-			vaultAccess,
-			mentionedNotes,
+	// Step 2: Build the Agent Workspace prelude (seed or delta) up-front so
+	// both transport branches can prepend it to their first text block.
+	const workspace = await buildAgentWorkspacePrelude(input);
+
+	// Step 3: Build context based on agent capabilities
+	const result = input.supportsEmbeddedContext
+		? await preparePromptWithEmbeddedContext(
+				input,
+				vaultAccess,
+				mentionedNotes,
+				workspace.prelude,
+			)
+		: await preparePromptWithTextContext(
+				input,
+				vaultAccess,
+				mentionedNotes,
+				workspace.prelude,
+			);
+
+	if (workspace.pendingSnapshot) {
+		result.pendingWorkspaceSnapshot = workspace.pendingSnapshot;
+	}
+	return result;
+}
+
+/**
+ * Compute the Agent Workspace prelude string + the snapshot to commit on
+ * successful send. Returns empty prelude when the integration is not enabled.
+ */
+async function buildAgentWorkspacePrelude(
+	input: PreparePromptInput,
+): Promise<{
+	prelude: string;
+	pendingSnapshot: WorkspaceSnapshot | undefined;
+}> {
+	if (!input.agentWorkspace) {
+		return { prelude: "", pendingSnapshot: undefined };
+	}
+	try {
+		const result = await input.agentWorkspace.service.buildPrelude(
+			input.agentWorkspace.snapshot,
+			{
+				vaultBasePath: input.vaultBasePath,
+				convertToWsl: input.convertToWsl ?? false,
+				wikilinkResolver: input.wikilinkResolver ?? null,
+				expandWikilinkContext:
+					input.expandWikilinkContext ?? false,
+			},
 		);
-	} else {
-		return preparePromptWithTextContext(input, vaultAccess, mentionedNotes);
+		return {
+			prelude: result.prelude,
+			pendingSnapshot: result.pendingSnapshot,
+		};
+	} catch (error) {
+		console.error("[message-sender] Workspace prelude failed:", error);
+		return { prelude: "", pendingSnapshot: undefined };
 	}
 }
 
@@ -347,8 +475,10 @@ async function preparePromptWithEmbeddedContext(
 		noteTitle: string;
 		file: { path: string; stat: { mtime: number } } | undefined;
 	}>,
+	workspacePrelude: string,
 ): Promise<PreparePromptResult> {
 	const maxNoteLen = input.maxNoteLength ?? DEFAULT_MAX_NOTE_LENGTH;
+	const wikilinkCtx = buildWikilinkContext(input);
 	const resourceBlocks: ResourcePromptContent[] = [];
 
 	// Build Resource blocks for each mentioned note
@@ -364,10 +494,11 @@ async function preparePromptWithEmbeddedContext(
 		);
 		if (!note) continue;
 
-		const text = note.wasTruncated
+		const baseText = note.wasTruncated
 			? note.content +
 				`\n\n[Note: Truncated from ${note.originalLength} to ${maxNoteLen} characters]`
 			: note.content;
+		const text = decorateWithLinkedNotes(baseText, file.path, wikilinkCtx);
 
 		resourceBlocks.push({
 			type: "resource",
@@ -389,6 +520,7 @@ async function preparePromptWithEmbeddedContext(
 			vaultAccess,
 			input.convertToWsl ?? false,
 			input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
+			wikilinkCtx,
 		);
 		autoMentionBlocks.push(...autoMentionResource);
 	}
@@ -398,14 +530,18 @@ async function preparePromptWithEmbeddedContext(
 		input.isAutoMentionDisabled,
 	);
 
+	const messageText = autoMentionPrefix + input.message;
+	const includeTextBlock =
+		messageText.length > 0 || workspacePrelude.length > 0;
+
 	const agentContent: PromptContent[] = [
 		...resourceBlocks,
 		...autoMentionBlocks,
-		...(input.message || autoMentionPrefix
+		...(includeTextBlock
 			? [
 					{
 						type: "text" as const,
-						text: autoMentionPrefix + input.message,
+						text: workspacePrelude + messageText,
 					},
 				]
 			: []),
@@ -433,8 +569,10 @@ async function preparePromptWithTextContext(
 		noteTitle: string;
 		file: { path: string; stat: { mtime: number } } | undefined;
 	}>,
+	workspacePrelude: string,
 ): Promise<PreparePromptResult> {
 	const maxNoteLen = input.maxNoteLength ?? DEFAULT_MAX_NOTE_LENGTH;
+	const wikilinkCtx = buildWikilinkContext(input);
 	const contextBlocks: string[] = [];
 
 	// Build XML context blocks for each mentioned note
@@ -454,8 +592,14 @@ async function preparePromptWithTextContext(
 			? `\n\n[Note: This note was truncated. Original length: ${note.originalLength} characters, showing first ${maxNoteLen} characters]`
 			: "";
 
+		const decoratedBody = decorateWithLinkedNotes(
+			note.content,
+			file.path,
+			wikilinkCtx,
+		);
+
 		contextBlocks.push(
-			`<obsidian_mentioned_note ref="${note.absolutePath}">\n${note.content}${truncationNote}\n</obsidian_mentioned_note>`,
+			`<obsidian_mentioned_note ref="${note.absolutePath}">\n${decoratedBody}${truncationNote}\n</obsidian_mentioned_note>`,
 		);
 	}
 
@@ -468,6 +612,7 @@ async function preparePromptWithTextContext(
 			input.convertToWsl ?? false,
 			input.activeNote.selection,
 			input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
+			wikilinkCtx,
 		);
 		contextBlocks.push(autoMentionContextBlock);
 	}
@@ -477,14 +622,15 @@ async function preparePromptWithTextContext(
 		input.isAutoMentionDisabled,
 	);
 
-	// Build agent message text (context blocks + auto-mention prefix + original message)
-	const agentMessageText =
+	// Build agent message text (workspace prelude + context blocks + auto-mention prefix + original message)
+	const baseText =
 		contextBlocks.length > 0
 			? contextBlocks.join("\n") +
 				"\n\n" +
 				autoMentionPrefix +
 				input.message
 			: autoMentionPrefix + input.message;
+	const agentMessageText = workspacePrelude + baseText;
 
 	const agentContent: PromptContent[] = [
 		...(agentMessageText
@@ -513,6 +659,7 @@ async function buildAutoMentionResource(
 	vaultAccess: IVaultAccess,
 	convertToWsl: boolean,
 	maxSelectionLength: number,
+	wikilinkCtx: WikilinkScanContext | null,
 ): Promise<PromptContent[]> {
 	const absolutePath = resolveAbsolutePath(
 		activeNote.path,
@@ -540,10 +687,15 @@ async function buildAutoMentionResource(
 			];
 		}
 
-		const text = sel.wasTruncated
+		const baseText = sel.wasTruncated
 			? sel.text +
 				`\n\n[Note: Truncated from ${sel.originalLength} to ${maxSelectionLength} characters]`
 			: sel.text;
+		const text = decorateWithLinkedNotes(
+			baseText,
+			activeNote.path,
+			wikilinkCtx,
+		);
 
 		return [
 			{
@@ -580,6 +732,7 @@ async function buildAutoMentionTextContext(
 	convertToWsl: boolean,
 	selection: { from: EditorPosition; to: EditorPosition } | undefined,
 	maxSelectionLength: number,
+	wikilinkCtx: WikilinkScanContext | null,
 ): Promise<string> {
 	const absolutePath = resolveAbsolutePath(notePath, vaultPath, convertToWsl);
 
@@ -601,10 +754,16 @@ async function buildAutoMentionTextContext(
 			? `\n\n[Note: The selection was truncated. Original length: ${sel.originalLength} characters, showing first ${maxSelectionLength} characters]`
 			: "";
 
+		const decoratedSelection = decorateWithLinkedNotes(
+			sel.text,
+			notePath,
+			wikilinkCtx,
+		);
+
 		return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">
 The user opened the note ${absolutePath} in Obsidian and selected the following text (lines ${fromLine}-${toLine}):
 
-${sel.text}${truncationNote}
+${decoratedSelection}${truncationNote}
 
 This is what the user is currently focusing on.
 </obsidian_opened_note>`;
