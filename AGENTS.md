@@ -182,7 +182,7 @@ FloatingChatView uses `onRegisterExpanded` callback (not CustomEvent) for expand
 **session-helpers**: Pure functions — buildAgentConfigWithApiKey, findAgentSettings, getAvailableAgents
 **session-state**: Pure functions — applyLegacyValue, tryRestoreConfigOption, restoreLegacyConfig
 **message-state**: Pure functions — applySingleUpdate, applyUpsertToolCall, mergeToolCallContent, findActivePermission, selectOption
-**message-sender**: Pure functions — preparePrompt (embedded context vs XML text, shared helpers, ships workspace state + optional instructions). For embeddedContext-capable agents, each non-null workspace block becomes a `type: "resource"` PromptContent at the head of agentContent (`audience: ["assistant"]`, `mimeType: "application/xml"`, priority 0.9 / 0.7). For text-fallback agents, the same XML is concatenated and prepended to the user-text block. PreparePromptInput accepts `agentWorkspace?: { service, snapshot }`; PreparePromptResult returns `pendingWorkspaceSnapshot?` for the hook to commit on success.
+**message-sender**: Pure functions — preparePrompt (embedded context vs XML text, shared helpers, ships workspace state + optional instructions). For embeddedContext-capable agents, each non-null workspace block becomes a `type: "resource"` PromptContent at the head of agentContent (`audience: ["assistant"]`, `mimeType: "application/xml"`, priority 0.9 / 0.7). For text-fallback agents, the same XML is concatenated and prepended to the user-text block. PreparePromptInput accepts `agentWorkspace?: { service, snapshot }`; PreparePromptResult returns `pendingWorkspaceSnapshot?` for the hook to commit on success. Auto-mention follows the same seed-then-delta pattern: a single `buildAutoMentionPayload` (signature gate `(notePath, selFrom, selTo, mtime)` + shared body builder) emits one Resource block (priority 0.8, `audience: ["assistant"]`) for embedded agents, or a byte-identical body wrapped in `<obsidian_opened_note ref="…">…</obsidian_opened_note>` for fallback agents — only on signature change. The cheap `@[[Note]]:lines\n` user-text prefix is unconditional. PreparePromptInput accepts `autoMentionSnapshot?`; PreparePromptResult returns `pendingAutoMentionSnapshot?` (defined only when actually emitted; tab-close/disabled/unchanged leave the snapshot in place).
 **AgentWorkspace** (`agent-workspace.ts`): Bootstraps `/<workspacePath>/` (Focus_Context.md, Resources/, Agent_Output/), watches Resources/ via vault events with O(1) dirty-flag manifest, builds seed `<obsidian_workspace>` state + optional `<obsidian_workspace_instructions>` (seed only) + delta `<obsidian_workspace_update>` blocks, recomputes `WorkspaceSnapshot` from disk after each successful turn so agent self-edits don't round-trip. State Resource URI = workspace folder (`file://`); instructions Resource URI = synthetic `obsidian://agent-workspace/instructions`. Singleton at plugin level; per-session snapshot held on `ChatSession.workspaceSnapshot`.
 
 ## Types
@@ -265,6 +265,13 @@ interface WorkspaceSnapshot {
   resourcesManifestHash: string;
   outputDateString: string;  // YYYY-MM-DD (rolls at midnight)
   hasSeed: boolean;          // false until first successful prompt
+}
+
+interface AutoMentionSnapshot {
+  notePath: string;          // vault-relative
+  selFrom: number | null;    // 0-based; null when no selection
+  selTo: number | null;      // 0-based inclusive; null when no selection
+  mtime: number;             // file.stat.mtime when last shipped
 }
 ```
 
@@ -360,6 +367,16 @@ interface WorkspaceSnapshot {
 4. Wired in `vault-service.ts` (`IWikilinkResolver` impl) and `message-sender.ts` (decorates mentioned-note bodies in both transports). Also used inside `agent-workspace.ts` to decorate Focus_Context.md
 5. Reference: `docs/design/wikilink-context.md`
 
+### Modify Auto-Mention Context Behavior
+1. Setting: `autoMentionActiveNote` (`src/plugin.ts`) — single boolean toggle for the whole feature
+2. Snapshot type: `AutoMentionSnapshot` in `types/session.ts`; lives on `ChatSession.autoMentionSnapshot` (in-memory only, mirrors `workspaceSnapshot` lifecycle). Signature is `(notePath, selFrom, selTo, mtime)`
+3. Lifecycle reset (CRITICAL): `useAgentSession.ts` resets `autoMentionSnapshot: undefined` in BOTH `createSession` and `updateSessionFromLoad` spreads. Forgetting either leaks state across sessions (same trap as `workspaceSnapshot`)
+4. Payload builder: `src/services/message-sender.ts` — single `buildAutoMentionPayload` with signature gate; single `buildAutoMentionBody` produces a byte-identical body for both transports (D8 symmetry). Embedded → one Resource block (`audience: ["assistant"]`, priority 0.8). Fallback → `<obsidian_opened_note ref="…">body</obsidian_opened_note>` concatenated into user-text prelude. NO sibling `type: "text"` block (D5 channel uniformity)
+5. Per-turn prefix: `buildAutoMentionPrefix` emits `@[[Note]]:from-to\n` unconditionally (cheap focus indicator, independent of signature gate). Suppressed only when `activeNote=null` or feature disabled
+6. Integration: `useAgentMessages.ts` passes `session.autoMentionSnapshot` into `preparePrompt`; commits `prepared.pendingAutoMentionSnapshot` on success only when defined (tab-close / disabled / unchanged-signature leave snapshot in place per D7)
+7. Progressive disclosure: pointer text for tab-open-no-selection, slice for selection, full note for explicit `@[[…]]` mention (separate code path, unchanged)
+8. Reference: `docs/design/auto-mention-context.md` (11 decisions D1–D11)
+
 ### Debug
 1. Settings → Developer Settings → Debug Mode ON
 2. Open DevTools (Cmd+Option+I / Ctrl+Shift+I)
@@ -382,4 +399,4 @@ interface WorkspaceSnapshot {
 
 ---
 
-**Last Updated**: May 2026 | **Architecture**: useAgent facade + sub-hooks; Agent Workspace seed-then-delta context | **Version**: 0.10.2
+**Last Updated**: May 2026 | **Architecture**: useAgent facade + sub-hooks; Agent Workspace + auto-mention seed-then-delta context | **Version**: 0.10.2

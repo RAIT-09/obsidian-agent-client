@@ -19,6 +19,7 @@ import type {
 	ChatSession,
 	SessionUpdate,
 	WorkspaceSnapshot,
+	AutoMentionSnapshot,
 } from "../types/session";
 import type { AcpClient } from "../acp/acp-client";
 import type { IVaultAccess, NoteMetadata } from "../services/vault-service";
@@ -102,6 +103,7 @@ export function useAgentMessages(
 	setErrorInfo: (error: ErrorInfo | null) => void,
 	agentWorkspace: IAgentWorkspace | null,
 	setWorkspaceSnapshot: (snapshot: WorkspaceSnapshot | null) => void,
+	setAutoMentionSnapshot: (snapshot: AutoMentionSnapshot | null) => void,
 ): UseAgentMessagesReturn {
 	// ============================================================
 	// Message State
@@ -266,6 +268,7 @@ export function useAgentMessages(
 					expandWikilinkContext: settings.expandWikilinkContext,
 					wikilinkResolver: vaultAccess,
 					agentWorkspace: workspaceInput,
+					autoMentionSnapshot: session.autoMentionSnapshot ?? null,
 				},
 				vaultAccess,
 				vaultAccess, // IMentionService (same object)
@@ -355,6 +358,16 @@ export function useAgentMessages(
 							}
 						}
 					}
+
+					// Commit post-turn auto-mention snapshot. `undefined` means
+					// preparePrompt didn't ship a new payload (signature equal,
+					// activeNote null, or feature disabled) — leave the
+					// existing snapshot in place per D7.
+					if (prepared.pendingAutoMentionSnapshot) {
+						setAutoMentionSnapshot(
+							prepared.pendingAutoMentionSnapshot,
+						);
+					}
 				} else {
 					setIsSending(false);
 					setErrorInfo(
@@ -386,8 +399,10 @@ export function useAgentMessages(
 			session.authMethods,
 			session.promptCapabilities,
 			session.workspaceSnapshot,
+			session.autoMentionSnapshot,
 			agentWorkspace,
 			setWorkspaceSnapshot,
+			setAutoMentionSnapshot,
 			shouldConvertToWsl,
 			addMessage,
 			setErrorInfo,

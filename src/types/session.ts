@@ -275,6 +275,15 @@ export interface ChatSession {
 	 * to compute deltas. Held in memory only — not persisted across reloads.
 	 */
 	workspaceSnapshot?: WorkspaceSnapshot | null;
+
+	/**
+	 * Auto-mention snapshot for seed-then-delta payload shipping.
+	 * Tracks (notePath, selection range, mtime) of the most recently shipped
+	 * auto-mention so the next prompt can skip the Resource/XML block when
+	 * the signature is unchanged. Held in memory only — not persisted across
+	 * reloads. See docs/design/auto-mention-context.md.
+	 */
+	autoMentionSnapshot?: AutoMentionSnapshot | null;
 }
 
 /**
@@ -287,6 +296,23 @@ export interface WorkspaceSnapshot {
 	resourcesManifestHash: string;
 	outputDateString: string;
 	hasSeed: boolean;
+}
+
+/**
+ * Signature of the auto-mention payload last shipped to the agent.
+ * Two snapshots are equal iff all four fields match exactly. `selFrom` /
+ * `selTo` are `null` when no selection was active; a no-selection snapshot
+ * is never equal to a with-selection snapshot, even if line numbers coincide.
+ */
+export interface AutoMentionSnapshot {
+	/** Vault-relative path of the active note when last shipped. */
+	notePath: string;
+	/** 0-based start line of the selection, or null for no-selection mode. */
+	selFrom: number | null;
+	/** 0-based inclusive end line of the selection, or null for no-selection mode. */
+	selTo: number | null;
+	/** `TFile.stat.mtime` (milliseconds) at the time of shipping. */
+	mtime: number;
 }
 /**
  * Domain Models for Session Updates

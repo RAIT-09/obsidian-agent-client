@@ -147,6 +147,7 @@ export function useAgent(
 		setErrorInfo,
 		agentWorkspace,
 		agentSession.setWorkspaceSnapshot,
+		agentSession.setAutoMentionSnapshot,
 	);
 
 	// ============================================================

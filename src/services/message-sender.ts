@@ -24,7 +24,10 @@ import {
 	toAcpError,
 	isEmptyResponseError,
 } from "../utils/error-utils";
-import type { AuthenticationMethod } from "../types/session";
+import type {
+	AuthenticationMethod,
+	AutoMentionSnapshot,
+} from "../types/session";
 import type {
 	PromptContent,
 	ImagePromptContent,
@@ -102,6 +105,14 @@ export interface PreparePromptInput {
 		service: IAgentWorkspace;
 		snapshot: WorkspaceSnapshot | null;
 	};
+
+	/**
+	 * Last auto-mention payload signature shipped to the agent. The auto-mention
+	 * Resource/XML block is suppressed when the current activeNote signature
+	 * equals this snapshot (seed-then-delta gate). `null`/`undefined` triggers
+	 * a fresh seed. See docs/design/auto-mention-context.md.
+	 */
+	autoMentionSnapshot?: AutoMentionSnapshot | null;
 }
 
 /**
@@ -129,6 +140,14 @@ export interface PreparePromptResult {
 	 * when `input.agentWorkspace` was provided; otherwise omitted.
 	 */
 	pendingWorkspaceSnapshot?: WorkspaceSnapshot;
+
+	/**
+	 * Auto-mention snapshot to commit on successful send. Defined only when
+	 * the auto-mention block was actually emitted this turn (signature
+	 * differed from `input.autoMentionSnapshot`). When omitted, the hook
+	 * leaves the existing per-session snapshot untouched.
+	 */
+	pendingAutoMentionSnapshot?: AutoMentionSnapshot;
 }
 
 /**
@@ -403,23 +422,43 @@ export async function preparePrompt(
 	// up-front so both transport branches can place them appropriately.
 	const workspace = await buildAgentWorkspaceBlocks(input);
 
-	// Step 3: Build context based on agent capabilities
+	// Step 3: Wikilink scan context — single basename-index build per prompt,
+	// reused by mentioned-note decoration and by the auto-mention slice.
+	const wikilinkCtx = buildWikilinkContext(input);
+
+	// Step 4: Auto-mention payload — single signature gate, single body
+	// builder, two transport-shaped outputs. See D9 in
+	// docs/design/auto-mention-context.md.
+	const autoMention = await buildAutoMentionPayload(
+		input,
+		vaultAccess,
+		wikilinkCtx,
+	);
+
+	// Step 5: Build context based on agent capabilities
 	const result = input.supportsEmbeddedContext
 		? await preparePromptWithEmbeddedContext(
 				input,
 				vaultAccess,
 				mentionedNotes,
 				workspace,
+				autoMention,
+				wikilinkCtx,
 			)
 		: await preparePromptWithTextContext(
 				input,
 				vaultAccess,
 				mentionedNotes,
 				workspace,
+				autoMention,
+				wikilinkCtx,
 			);
 
 	if (workspace.pendingSnapshot) {
 		result.pendingWorkspaceSnapshot = workspace.pendingSnapshot;
+	}
+	if (autoMention.pendingSnapshot) {
+		result.pendingAutoMentionSnapshot = autoMention.pendingSnapshot;
 	}
 	return result;
 }
@@ -519,9 +558,10 @@ async function preparePromptWithEmbeddedContext(
 		file: { path: string; stat: { mtime: number } } | undefined;
 	}>,
 	workspace: WorkspacePayload,
+	autoMention: AutoMentionPayload,
+	wikilinkCtx: WikilinkScanContext | null,
 ): Promise<PreparePromptResult> {
 	const maxNoteLen = input.maxNoteLength ?? DEFAULT_MAX_NOTE_LENGTH;
-	const wikilinkCtx = buildWikilinkContext(input);
 
 	// Workspace Resource blocks at the head of agentContent — broadest system
 	// context first, before user-specific references. `audience: ["assistant"]`
@@ -573,20 +613,6 @@ async function preparePromptWithEmbeddedContext(
 		});
 	}
 
-	// Build auto-mention Resource block
-	const autoMentionBlocks: PromptContent[] = [];
-	if (input.activeNote && !input.isAutoMentionDisabled) {
-		const autoMentionResource = await buildAutoMentionResource(
-			input.activeNote,
-			input.vaultBasePath,
-			vaultAccess,
-			input.convertToWsl ?? false,
-			input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
-			wikilinkCtx,
-		);
-		autoMentionBlocks.push(...autoMentionResource);
-	}
-
 	const autoMentionPrefix = buildAutoMentionPrefix(
 		input.activeNote,
 		input.isAutoMentionDisabled,
@@ -597,7 +623,7 @@ async function preparePromptWithEmbeddedContext(
 	const agentContent: PromptContent[] = [
 		...workspaceResources,
 		...resourceBlocks,
-		...autoMentionBlocks,
+		...autoMention.embeddedBlocks,
 		...(messageText.length > 0
 			? [{ type: "text" as const, text: messageText }]
 			: []),
@@ -626,10 +652,11 @@ async function preparePromptWithTextContext(
 		file: { path: string; stat: { mtime: number } } | undefined;
 	}>,
 	workspace: WorkspacePayload,
+	autoMention: AutoMentionPayload,
+	wikilinkCtx: WikilinkScanContext | null,
 ): Promise<PreparePromptResult> {
 	const workspacePrelude = concatWorkspaceXml(workspace);
 	const maxNoteLen = input.maxNoteLength ?? DEFAULT_MAX_NOTE_LENGTH;
-	const wikilinkCtx = buildWikilinkContext(input);
 	const contextBlocks: string[] = [];
 
 	// Build XML context blocks for each mentioned note
@@ -660,18 +687,9 @@ async function preparePromptWithTextContext(
 		);
 	}
 
-	// Build auto-mention XML context
-	if (input.activeNote && !input.isAutoMentionDisabled) {
-		const autoMentionContextBlock = await buildAutoMentionTextContext(
-			input.activeNote.path,
-			input.vaultBasePath,
-			vaultAccess,
-			input.convertToWsl ?? false,
-			input.activeNote.selection,
-			input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
-			wikilinkCtx,
-		);
-		contextBlocks.push(autoMentionContextBlock);
+	// Auto-mention XML — only present when the signature gate let it through.
+	if (autoMention.fallbackXml) {
+		contextBlocks.push(autoMention.fallbackXml);
 	}
 
 	const autoMentionPrefix = buildAutoMentionPrefix(
@@ -707,121 +725,167 @@ async function preparePromptWithTextContext(
 	};
 }
 
+// ============================================================================
+// Auto-mention payload — seed-then-delta gate
+// ============================================================================
+
 /**
- * Build Resource content blocks for auto-mentioned note.
+ * Per-prompt auto-mention payload threaded into both transport branches.
+ * Shaped so the embedded branch picks `embeddedBlocks` and the fallback
+ * branch picks `fallbackXml`; identical body string across the two
+ * (D8 symmetry contract).
  */
-async function buildAutoMentionResource(
-	activeNote: NoteMetadata,
-	vaultPath: string,
-	vaultAccess: IVaultAccess,
-	convertToWsl: boolean,
-	maxSelectionLength: number,
-	wikilinkCtx: WikilinkScanContext | null,
-): Promise<PromptContent[]> {
-	const uri = resolveFileUri(activeNote.path, vaultPath, convertToWsl);
+interface AutoMentionPayload {
+	/** Single Resource block, or `[]` when suppressed. */
+	embeddedBlocks: PromptContent[];
+	/** `<obsidian_opened_note …>…</obsidian_opened_note>` string, or `""` when suppressed. */
+	fallbackXml: string;
+	/** Signature to commit on successful send; `undefined` when nothing was emitted. */
+	pendingSnapshot: AutoMentionSnapshot | undefined;
+}
 
-	if (activeNote.selection) {
-		const fromLine = activeNote.selection.from.line + 1;
-		const toLine = activeNote.selection.to.line + 1;
+const AUTO_MENTION_PRIORITY = 0.8;
 
-		const sel = await readSelection(
-			activeNote.path,
-			activeNote.selection,
-			vaultAccess,
-			maxSelectionLength,
-		);
-		if (!sel) {
-			return [
-				{
-					type: "text",
-					text: `The user has selected lines ${fromLine}-${toLine} in ${uri}. If relevant, use the Read tool to examine the specific lines.`,
-				},
-			];
-		}
-
-		const baseText = sel.wasTruncated
-			? sel.text +
-				`\n\n[Note: Truncated from ${sel.originalLength} to ${maxSelectionLength} characters]`
-			: sel.text;
-		const text = decorateWithLinkedNotes(
-			baseText,
-			activeNote.path,
-			wikilinkCtx,
-		);
-
-		return [
-			{
-				type: "resource",
-				resource: { uri, mimeType: "text/markdown", text },
-				annotations: {
-					audience: ["assistant"],
-					priority: 0.8,
-					lastModified: new Date(activeNote.modified).toISOString(),
-				},
-			} as ResourcePromptContent,
-			{
-				type: "text",
-				text: `The user has selected lines ${fromLine}-${toLine} in the above note. This is what they are currently focusing on.`,
-			},
-		];
-	}
-
-	return [
-		{
-			type: "text",
-			text: `The user has opened the note ${uri} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine its content.`,
-		},
-	];
+/**
+ * Compute the current auto-mention signature from `activeNote`.
+ * Returns `null` when there is no active note (caller should treat as
+ * "no payload to ship").
+ */
+function buildAutoMentionSignature(
+	activeNote: NoteMetadata | null | undefined,
+): AutoMentionSnapshot | null {
+	if (!activeNote) return null;
+	return {
+		notePath: activeNote.path,
+		selFrom: activeNote.selection ? activeNote.selection.from.line : null,
+		selTo: activeNote.selection ? activeNote.selection.to.line : null,
+		mtime: activeNote.modified,
+	};
 }
 
 /**
- * Build XML text context from auto-mentioned note (fallback format).
+ * Strict equality on all four signature fields. `null` selFrom/selTo
+ * (no-selection) never equals a numeric selFrom/selTo.
  */
-async function buildAutoMentionTextContext(
-	notePath: string,
-	vaultPath: string,
+function autoMentionSignaturesEqual(
+	a: AutoMentionSnapshot | null | undefined,
+	b: AutoMentionSnapshot | null | undefined,
+): boolean {
+	if (!a || !b) return false;
+	return (
+		a.notePath === b.notePath &&
+		a.selFrom === b.selFrom &&
+		a.selTo === b.selTo &&
+		a.mtime === b.mtime
+	);
+}
+
+/**
+ * Build the auto-mention body string. Byte-identical between the two
+ * transports — only the wrapper (Resource vs `<obsidian_opened_note>`)
+ * differs. See D8 in docs/design/auto-mention-context.md.
+ */
+async function buildAutoMentionBody(
+	activeNote: NoteMetadata,
+	uri: string,
 	vaultAccess: IVaultAccess,
-	convertToWsl: boolean,
-	selection: { from: EditorPosition; to: EditorPosition } | undefined,
 	maxSelectionLength: number,
 	wikilinkCtx: WikilinkScanContext | null,
 ): Promise<string> {
-	const uri = resolveFileUri(notePath, vaultPath, convertToWsl);
-
-	if (selection) {
-		const fromLine = selection.from.line + 1;
-		const toLine = selection.to.line + 1;
-
-		const sel = await readSelection(
-			notePath,
-			selection,
-			vaultAccess,
-			maxSelectionLength,
-		);
-		if (!sel) {
-			return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">The user opened the note ${uri} in Obsidian and is focusing on lines ${fromLine}-${toLine}. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the specific lines.</obsidian_opened_note>`;
-		}
-
-		const truncationNote = sel.wasTruncated
-			? `\n\n[Note: The selection was truncated. Original length: ${sel.originalLength} characters, showing first ${maxSelectionLength} characters]`
-			: "";
-
-		const decoratedSelection = decorateWithLinkedNotes(
-			sel.text,
-			notePath,
-			wikilinkCtx,
-		);
-
-		return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">
-The user opened the note ${uri} in Obsidian and selected the following text (lines ${fromLine}-${toLine}):
-
-${decoratedSelection}${truncationNote}
-
-This is what the user is currently focusing on.
-</obsidian_opened_note>`;
+	if (!activeNote.selection) {
+		return `User has opened the note ${uri} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine its content.`;
 	}
 
-	return `<obsidian_opened_note>The user opened the note ${uri} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the content.</obsidian_opened_note>`;
+	const fromLine = activeNote.selection.from.line + 1;
+	const toLine = activeNote.selection.to.line + 1;
+
+	const sel = await readSelection(
+		activeNote.path,
+		activeNote.selection,
+		vaultAccess,
+		maxSelectionLength,
+	);
+	if (!sel) {
+		return `Lines ${fromLine}-${toLine} of this note are the user's current focus, but the slice could not be read. Use the Read tool to examine those lines.`;
+	}
+
+	const baseSlice = sel.wasTruncated
+		? sel.text +
+			`\n\n[Note: Truncated from ${sel.originalLength} to ${maxSelectionLength} characters]`
+		: sel.text;
+	const decorated = decorateWithLinkedNotes(
+		baseSlice,
+		activeNote.path,
+		wikilinkCtx,
+	);
+
+	return `Lines ${fromLine}-${toLine} of this note are the user's current focus.\n\n${decorated}`;
+}
+
+/**
+ * Compute the auto-mention payload for both transports, gated by the
+ * signature snapshot. Returns empty blocks when:
+ *  - no active note
+ *  - auto-mention disabled
+ *  - current signature equals `input.autoMentionSnapshot` (seed already shipped)
+ *
+ * Otherwise builds the body once and shapes it for both transports. The
+ * caller picks the field matching the agent's capability.
+ */
+async function buildAutoMentionPayload(
+	input: PreparePromptInput,
+	vaultAccess: IVaultAccess,
+	wikilinkCtx: WikilinkScanContext | null,
+): Promise<AutoMentionPayload> {
+	const empty: AutoMentionPayload = {
+		embeddedBlocks: [],
+		fallbackXml: "",
+		pendingSnapshot: undefined,
+	};
+
+	if (!input.activeNote || input.isAutoMentionDisabled) {
+		return empty;
+	}
+
+	const currentSig = buildAutoMentionSignature(input.activeNote);
+	if (!currentSig) return empty;
+
+	if (autoMentionSignaturesEqual(currentSig, input.autoMentionSnapshot)) {
+		return empty;
+	}
+
+	const uri = resolveFileUri(
+		input.activeNote.path,
+		input.vaultBasePath,
+		input.convertToWsl ?? false,
+	);
+	const body = await buildAutoMentionBody(
+		input.activeNote,
+		uri,
+		vaultAccess,
+		input.maxSelectionLength ?? DEFAULT_MAX_SELECTION_LENGTH,
+		wikilinkCtx,
+	);
+
+	const embeddedBlock: ResourcePromptContent = {
+		type: "resource",
+		resource: { uri, mimeType: "text/markdown", text: body },
+		annotations: {
+			audience: ["assistant"],
+			priority: AUTO_MENTION_PRIORITY,
+			lastModified: new Date(input.activeNote.modified).toISOString(),
+		},
+	};
+
+	const fallbackXml = input.activeNote.selection
+		? `<obsidian_opened_note ref="${uri}" selection="lines ${input.activeNote.selection.from.line + 1}-${input.activeNote.selection.to.line + 1}">\n${body}\n</obsidian_opened_note>`
+		: `<obsidian_opened_note ref="${uri}">${body}</obsidian_opened_note>`;
+
+	return {
+		embeddedBlocks: [embeddedBlock],
+		fallbackXml,
+		pendingSnapshot: currentSig,
+	};
 }
 
 // ============================================================================

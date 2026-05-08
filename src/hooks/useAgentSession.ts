@@ -15,6 +15,7 @@ import type {
 	SessionUpdate,
 	SessionConfigOption,
 	WorkspaceSnapshot,
+	AutoMentionSnapshot,
 } from "../types/session";
 import type { AcpClient } from "../acp/acp-client";
 import type { ISettingsAccess } from "../services/settings-service";
@@ -69,6 +70,9 @@ export interface UseAgentSessionReturn {
 
 	/** Update the per-session Agent Workspace snapshot (post-turn). */
 	setWorkspaceSnapshot: (snapshot: WorkspaceSnapshot | null) => void;
+
+	/** Update the per-session auto-mention snapshot (post-turn). */
+	setAutoMentionSnapshot: (snapshot: AutoMentionSnapshot | null) => void;
 
 	/** Handle session-level updates (commands, mode, config, usage, error) */
 	handleSessionUpdate: (update: SessionUpdate) => void;
@@ -191,6 +195,8 @@ export function useAgentSession(
 				promptCapabilities: prev.promptCapabilities,
 				agentCapabilities: prev.agentCapabilities,
 				agentInfo: prev.agentInfo,
+				workspaceSnapshot: undefined,
+				autoMentionSnapshot: undefined,
 				createdAt: new Date(),
 				lastActivityAt: new Date(),
 			}));
@@ -356,6 +362,8 @@ export function useAgentSession(
 				modes: modes ?? prev.modes,
 				models: models ?? prev.models,
 				configOptions: configOptions ?? prev.configOptions,
+				workspaceSnapshot: undefined,
+				autoMentionSnapshot: undefined,
 				lastActivityAt: new Date(),
 			}));
 
@@ -532,6 +540,13 @@ export function useAgentSession(
 		[],
 	);
 
+	const setAutoMentionSnapshot = useCallback(
+		(snapshot: AutoMentionSnapshot | null) => {
+			setSession((prev) => ({ ...prev, autoMentionSnapshot: snapshot }));
+		},
+		[],
+	);
+
 	// ============================================================
 	// Return
 	// ============================================================
@@ -550,6 +565,7 @@ export function useAgentSession(
 		setModel,
 		setConfigOption,
 		setWorkspaceSnapshot,
+		setAutoMentionSnapshot,
 		handleSessionUpdate,
 	};
 }
