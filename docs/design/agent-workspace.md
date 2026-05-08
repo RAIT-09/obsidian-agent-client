@@ -25,7 +25,7 @@ deltas as files change.
 ### Goals
 - Provide a single fixed workspace under `/<configurable-path>/` (default
   `Agent-Client/`) that every chat session shares.
-- Define `Focus_Context.md` as a plugin-aware exposure note that gets
+- Define `Index.md` as a plugin-aware exposure note that gets
   auto-included in the prompt prelude and benefits from the wikilink
   resolver shipped previously.
 - Provide a manifest of `Resources/` (metadata only — never content) so the
@@ -62,11 +62,11 @@ Git-on-Windows. Stability over aesthetics.
 ### D3. Folder collision behavior — adopt
 On bootstrap, if the workspace path already exists with unrelated content,
 **adopt** it: ensure the two subfolders (`Resources/`, `Agent_Output/`) and
-`Focus_Context.md` exist, leave any existing files alone. Combined with the
+`Index.md` exist, leave any existing files alone. Combined with the
 configurable path (D1), users with collisions can either rename their
 existing folder or point us elsewhere.
 
-### D4. `Focus_Context.md` is plugin-aware
+### D4. `Index.md` is plugin-aware
 Auto-prepended in the prompt prelude as the *exposure zone*. Its `[[links]]`
 get the same resolver treatment as mentioned-note content. The plugin reads
 it lazily on prompt prep — users edit it freely in Obsidian's normal editor;
@@ -84,8 +84,8 @@ no special UI.
 This invariant is the core: *after every successful agent turn, our
 snapshot ≡ current workspace state*. Agent-self-edits never round-trip.
 
-### D6. Send full Focus_Context content on change (not a diff)
-Focus_Context.md is small by design (curated link list with one-line
+### D6. Send full Index content on change (not a diff)
+Index.md is small by design (curated link list with one-line
 summaries). Diffing markdown is a tarpit — alignment, formatting, and
 escaping all introduce footguns. Send the full new content; agent re-anchors
 in one read.
@@ -138,16 +138,16 @@ distinct from the workspace state Resource. This split lets the agent
 treat policy (static contract) as separate from state (mutable). Default
 on; settable off for users with their own system prompt.
 
-### D13. Inline description of `<focus_context>` purpose
-Inside `<focus_context>`, lead with a one-line description: this is the
+### D13. Inline description of `<index>` purpose
+Inside `<index>`, lead with a one-line description: this is the
 user's curated index, not raw content. Without this hint, agents tend to
 treat the contents as authoritative source material rather than as
 "pointers to read on demand."
 
-### D14. Agent-assisted Focus_Context update — opt-in setting, default off
+### D14. Agent-assisted Index update — opt-in setting, default off
 When on, the seed instructions tell the agent: *"after creating a note in
 `output_directory`, append a line `[[<basename>]]: <one-line summary>` to
-Focus_Context.md."* Default off because models will sometimes do this
+Index.md."* Default off because models will sometimes do this
 wrong; users can opt in once they trust their agent. Either way, D5 ensures
 agent-self-edits don't trigger re-transmission.
 
@@ -163,7 +163,7 @@ workspace settings group for users who want to opt out.
 
 ```
 /<agentWorkspace.path>/        (default: Agent-Client)
-├── Focus_Context.md           Exposure zone — curated [[links]] + summaries
+├── Index.md           Exposure zone — curated [[links]] + summaries
 ├── Resources/                 Input zone — raw files awaiting processing
 └── Agent_Output/              Output zone — agent-written notes, dated subfolders
     └── YYYY-MM-DD/            Created lazily by the agent on first write of a day
@@ -175,7 +175,7 @@ When `agentWorkspace.enabled === true`:
 1. Ensure `<vault>/<workspacePath>/` exists.
 2. Ensure `<vault>/<workspacePath>/Resources/` exists.
 3. Ensure `<vault>/<workspacePath>/Agent_Output/` exists.
-4. Ensure `<vault>/<workspacePath>/Focus_Context.md` exists. If created, seed
+4. Ensure `<vault>/<workspacePath>/Index.md` exists. If created, seed
    it with a short header explaining the file's purpose and an empty bullet
    list. (Existing files are never overwritten — D3.)
 5. Subscribe vault events (D9) and build the initial in-memory Resources
@@ -195,16 +195,16 @@ they're concatenated with a newline separator.
 
 ```xml
 <obsidian_workspace>
-  <focus_context path="/abs/vault/Agent-Client/Focus_Context.md">
+  <index path="/abs/vault/Agent-Client/Index.md">
     This file is the user's curated index of existing knowledge. Each line
     is a [[link]] to an existing note plus a one-line summary of why it
     matters. Treat these as pointers — read the linked notes only when
     relevant to the current task.
 
-    {{full content of Focus_Context.md, with [[links]] resolved by the
+    {{full content of Index.md, with [[links]] resolved by the
     wikilink extractor (file paths surfaced as <obsidian_metadata> the
     same way mentioned notes do)}}
-  </focus_context>
+  </index>
 
   <resources directory="/abs/vault/Agent-Client/Resources/" max_entries="200" max_depth="3">
     <document path="/abs/.../annual_report_2023.pdf" size="4718592" last_modified="2026-03-15T..." extension="pdf" />
@@ -225,9 +225,9 @@ re-send it):
   Resources/ contains user-submitted raw materials; read them on demand
   using your file tools.
   Write any new notes to output_directory using absolute paths.
-  Focus_Context.md is jointly maintained by the user.
+  Index.md is jointly maintained by the user.
   {{ if agentAssistedFocusUpdate: "After creating a note in output_directory,
-  append a line `[[<basename>]]: <one-line summary>` to Focus_Context.md." }}
+  append a line `[[<basename>]]: <one-line summary>` to Index.md." }}
 </obsidian_workspace_instructions>
 ```
 
@@ -235,10 +235,10 @@ re-send it):
 
 ```xml
 <obsidian_workspace_update>
-  <!-- only present if Focus_Context.md hash changed since last snapshot -->
-  <focus_context path="...">
+  <!-- only present if Index.md hash changed since last snapshot -->
+  <index path="...">
     {{full new content, with wikilinks resolved}}
-  </focus_context>
+  </index>
 
   <!-- only present if Resources/ manifest changed; only the diffs -->
   <resources directory="...">
@@ -268,7 +268,7 @@ resume):
 
 ```ts
 interface WorkspaceSnapshot {
-  focusContextHash: string;           // SHA-1 of Focus_Context.md content
+  indexHash: string;           // SHA-1 of Index.md content
   resourcesManifestHash: string;      // SHA-1 of canonicalized manifest
   outputDateString: string;           // YYYY-MM-DD
   hasSeed: boolean;                   // false until first successful prompt
@@ -278,7 +278,7 @@ interface WorkspaceSnapshot {
 - **Before sending a prompt:** if `!hasSeed`, emit `<obsidian_workspace>` (4.3).
   Else compute current hashes, build delta if any field differs, prepend.
 - **After successful turn (`stopReason` received):** recompute hashes from
-  current state (Focus_Context.md content, Resources manifest, today's
+  current state (Index.md content, Resources manifest, today's
   date) and overwrite the snapshot. `hasSeed = true`.
 - **On send failure:** do not update the snapshot. Next prompt retries the
   same prelude.
@@ -308,7 +308,7 @@ Internal responsibilities:
 - Bootstrap (4.2).
 - Vault event subscription; in-memory manifest with `dirty` flag.
 - Hash computation (SHA-1 of content / canonical JSON manifest).
-- Delegation to `wikilink-resolver` for `[[links]]` inside `Focus_Context.md`.
+- Delegation to `wikilink-resolver` for `[[links]]` inside `Index.md`.
 - XML formatting (delegated to a `wikilink-formatter`-style helper, possibly
   in a sibling `agent-workspace-formatter.ts`).
 
@@ -327,7 +327,7 @@ re-bootstrap.
   `destroy()`.
 - Filters events by path prefix (`<workspacePath>/Resources/`).
 - Updates in-memory manifest synchronously; flips `manifestDirty = true`.
-- Note: Focus_Context.md doesn't need vault events — it's read fresh per
+- Note: Index.md doesn't need vault events — it's read fresh per
   prompt (cheap for one small file).
 
 ### 5.4 Snapshot tracking per session
@@ -398,10 +398,10 @@ Settings tab: new heading "Agent Workspace" between "Mentions" and
 
 | Case | Behavior |
 |---|---|
-| User deletes the workspace folder mid-session | Next prompt's bootstrap call recreates it. Snapshot stays valid (Focus_Context.md hash will mismatch the empty file → re-seeded as full content). |
+| User deletes the workspace folder mid-session | Next prompt's bootstrap call recreates it. Snapshot stays valid (Index.md hash will mismatch the empty file → re-seeded as full content). |
 | User renames the workspace folder | Treated as deletion + creation; bootstrap recreates the original path. User should adjust the setting if they wanted the rename. Not an automatic rename detection (out of scope). |
 | File outside `max_depth` modified | Ignored — outside the manifest's view. |
-| Focus_Context.md doesn't exist on prompt prep | Bootstrap creates it (idempotent). Read returns the empty seed content. |
+| Index.md doesn't exist on prompt prep | Bootstrap creates it (idempotent). Read returns the empty seed content. |
 | Session resumed; workspace changed since last prompt | Persisted snapshot vs current state → delta on first prompt of resumed session. Standard path. |
 | Session resumed; legacy session with no `workspaceSnapshot` field | Treat as new session — emit full seed. |
 | Two views with two sessions on the same vault | Each session has its own snapshot; vault events update the shared manifest in-memory. Both sessions get correct deltas independently. |
@@ -412,7 +412,7 @@ Settings tab: new heading "Agent Workspace" between "Mentions" and
 | Manifest exceeds `max_entries` | Truncate to first 200 (sorted by `last_modified` desc, so most recent files surface first). Emit `truncated="N"`. |
 | Workspace path setting changed at runtime | Destroy old service, re-bootstrap with new path, invalidate all session snapshots (force re-seed). |
 | User has many sessions; storage bloat from snapshots | Snapshot is ~100 bytes per session — negligible. |
-| Agent edits Focus_Context.md AND user edits it during the same turn | User can't realistically edit during a turn (they're waiting). If they do, the post-turn snapshot captures the merged state; next turn's diff is whatever differs from that. No special handling. |
+| Agent edits Index.md AND user edits it during the same turn | User can't realistically edit during a turn (they're waiting). If they do, the post-turn snapshot captures the merged state; next turn's diff is whatever differs from that. No special handling. |
 
 ## 7. Settings / opt-out
 
@@ -428,7 +428,7 @@ See §5.6 for the full shape. Quick reference:
 
 Future settings (out of scope for v1):
 - `agentWorkspace.includeHiddenFiles` — opt-in to dotfiles in manifest.
-- `agentWorkspace.includeFrontmatter` — frontmatter in `<focus_context>`.
+- `agentWorkspace.includeFrontmatter` — frontmatter in `<index>`.
 
 ## 8. Testing plan
 
@@ -436,18 +436,18 @@ Future settings (out of scope for v1):
 - `ensureBootstrapped()` creates all four artifacts when missing.
 - `ensureBootstrapped()` adopts existing folder (no overwrite of existing
   files).
-- Seed prelude shape: `<obsidian_workspace>` contains `<focus_context>`,
+- Seed prelude shape: `<obsidian_workspace>` contains `<index>`,
   `<resources>`, `<output_directory>`, and `<instructions>` when enabled.
 - Seed prelude omits `<instructions>` when `emitInstructions === false`.
 - Delta with no changes → empty string.
-- Delta with Focus_Context.md modified → contains `<focus_context>` only.
+- Delta with Index.md modified → contains `<index>` only.
 - Delta with one Resources/ file added → `<added>` only.
 - Delta on midnight rollover → `<output_directory>` only.
 - Hash invariance: same content → same hash → no spurious delta.
 - `max_entries` cap: 250 files → 200 emitted, `truncated="50"`.
 - `max_depth` cap: file at depth 4 with `max_depth=3` → not emitted.
 - Hidden files filtered.
-- `[[links]]` inside Focus_Context.md surface via wikilink resolver — the
+- `[[links]]` inside Index.md surface via wikilink resolver — the
   same `<obsidian_metadata>` block as for mentioned notes.
 
 ### Integration tests (`message-sender.test.ts`)
@@ -460,22 +460,22 @@ Future settings (out of scope for v1):
   appropriate wrapping.
 
 ### Manual / end-to-end
-- Create note containing `[[OldNote]]`. Add to Focus_Context.md. Send
+- Create note containing `[[OldNote]]`. Add to Index.md. Send
   prompt. Verify agent sees resolved path in `<obsidian_metadata>`.
 - Drop a PDF into Resources/. Send prompt. Verify `<resources>` lists it.
 - Wait until midnight. Send prompt. Verify `<output_directory>` updates.
 - Turn `agentAssistedFocusUpdate` on. Ask agent to summarize a resource.
-  Verify agent appends a link to Focus_Context.md without the plugin
+  Verify agent appends a link to Index.md without the plugin
   re-sending the file on the next turn.
 
 ## 9. Open questions
 
 1. **O1: Embedded vs text prelude shape.** For agents with `embeddedContext`
    capability, do we send `<obsidian_workspace>` as a `Resource` block (URI =
-   the `Focus_Context.md` path) or as a leading text block? Argument for
+   the `Index.md` path) or as a leading text block? Argument for
    Resource: matches the wikilink-context shape, lets the agent treat
-   Focus_Context.md as a first-class file. Argument for text block: the
-   workspace prelude is broader than just Focus_Context.md; a text block
+   Index.md as a first-class file. Argument for text block: the
+   workspace prelude is broader than just Index.md; a text block
    reads more naturally. Tentative: leading text block for the seed,
    matching delta-block shape. Confirm during impl.
 
@@ -495,7 +495,7 @@ Future settings (out of scope for v1):
 
 ## 10. Non-obvious risks
 
-- **Snapshot-update race vs `stopReason`.** If the agent edits Focus_Context.md
+- **Snapshot-update race vs `stopReason`.** If the agent edits Index.md
   in the *last* tool call before `stopReason`, the post-turn snapshot must
   read the file *after* the edit lands on disk. Vault events fire async;
   we need to either await an idle vault tick or read file content directly.
@@ -504,21 +504,21 @@ Future settings (out of scope for v1):
   workspace settings change or plugin unload. Mitigation: `destroy()` is
   the only place that calls `vault.offref` and is wired into both plugin
   unload and the settings-change handler.
-- **Focus_Context.md grows unbounded.** Users may keep adding lines for
+- **Index.md grows unbounded.** Users may keep adding lines for
   years. Document the soft expectation: "keep this lean, it ships every
   time it changes." Hard truncation is a v2 concern.
 - **Snapshot persisted mid-resume corruption.** If the persisted snapshot
   hash is malformed (bad upgrade, manual edit of session JSON), don't
   crash — fall back to "no snapshot" → re-seed.
 - **Cross-feature interaction with mention auto-mention.** If a user has
-  the active note also referenced in Focus_Context.md, both will appear in
-  the prompt — once via auto-mention (full body) and once via Focus_Context
-  (link only). Acceptable: the link is cheap and Focus_Context's job is
+  the active note also referenced in Index.md, both will appear in
+  the prompt — once via auto-mention (full body) and once via Index
+  (link only). Acceptable: the link is cheap and Index's job is
   inventory, not duplication. Document so users aren't surprised.
-- **Wikilink resolver hot path on Focus_Context.md.** The resolver runs on
+- **Wikilink resolver hot path on Index.md.** The resolver runs on
   every prompt the prelude ships. Already cheap (it's bounded by
-  Focus_Context.md size + basename index lookup), but worth flagging — if
-  Focus_Context.md grows to thousands of links, performance degrades.
+  Index.md size + basename index lookup), but worth flagging — if
+  Index.md grows to thousands of links, performance degrades.
   Apply the same 50-link cap as for mentioned notes (D9 in wikilink-context).
 
 ## 11. Out of scope (v2+ candidates)
@@ -526,8 +526,8 @@ Future settings (out of scope for v1):
 - Per-project / per-session subworkspaces.
 - Routing user-dropped files into `Resources/` automatically.
 - Auto-extracting PDF / XLSX / image content for the manifest.
-- Backlinks for `Focus_Context.md`.
-- Frontmatter (aliases, tags) export in `<focus_context>`.
+- Backlinks for `Index.md`.
+- Frontmatter (aliases, tags) export in `<index>`.
 - "Refresh workspace" command users can run manually to force re-seed.
 - Soft cap / auto-archival of old `Agent_Output/YYYY-MM-DD/` folders.
 - Per-resource preview (first 200 chars of text files in the manifest).

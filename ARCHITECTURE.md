@@ -127,7 +127,7 @@ src/
 | `session-state.ts` | Pure functions — legacy mode/model application, config option restoration |
 | `message-state.ts` | Pure functions — message array transforms (streaming apply, tool call upsert with O(1) index, permission scanning) |
 | `message-sender.ts` | Pure functions — prompt preparation (embedded context vs XML text, shared helpers, workspace prelude prepended to first text block), sending with auth retry |
-| `agent-workspace.ts` | `AgentWorkspace` class — bootstraps `/Agent-Client/` (Focus_Context.md, Resources/, Agent_Output/), watches Resources/ via vault events with dirty-flag manifest, builds seed `<obsidian_workspace>` and delta `<obsidian_workspace_update>` preludes, recomputes `WorkspaceSnapshot` post-turn so agent self-edits don't round-trip. Exports `IAgentWorkspace`. |
+| `agent-workspace.ts` | `AgentWorkspace` class — bootstraps `/Agent-Client/` (Index.md, Resources/, Agent_Output/), watches Resources/ via vault events with dirty-flag manifest, builds seed `<obsidian_workspace>` and delta `<obsidian_workspace_update>` preludes, recomputes `WorkspaceSnapshot` post-turn so agent self-edits don't round-trip. Exports `IAgentWorkspace`. |
 | `chat-exporter.ts` | `ChatExporter` class — markdown export with frontmatter, image handling |
 | `view-registry.ts` | `ChatViewRegistry` class — multi-view focus tracking, broadcast commands. Exports `IChatViewContainer`. |
 | `update-checker.ts` | Agent version checking via npm registry |
@@ -214,7 +214,7 @@ ChatView / FloatingChatView
 | `error-utils.ts` | ACP error code → user-friendly title/suggestion conversion |
 | `mention-parser.ts` | @[[note]] detection, replacement, extraction from text |
 | `wikilink-resolver.ts` | `[[wikilink]]` extraction from note content; basename index + `getFirstLinkpathDest` for resolution; surfaces unresolved/ambiguous candidates. Skips `![[embeds]]`. Exports `IWikilinkResolver`. |
-| `wikilink-formatter.ts` | Builds `<obsidian_metadata><links>...` XML prelude from resolved metadata (50-link cap, `truncated="N"`) for prepending to mentioned-note bodies and `Focus_Context.md`. |
+| `wikilink-formatter.ts` | Builds `<obsidian_metadata><links>...` XML prelude from resolved metadata (50-link cap, `truncated="N"`) for prepending to mentioned-note bodies and `Index.md`. |
 | `logger.ts` | Singleton logger respecting debugMode setting |
 
 ---
@@ -399,7 +399,7 @@ Refactored from Port/Adapter Architecture to simplified layered architecture:
 Added two complementary context features that minimize per-turn token cost:
 
 - **Wikilink Context** (settings: `expandWikilinkContext`, default on): `[[wikilinks]]` inside mentioned notes are surfaced as resolved file paths via a new `<obsidian_metadata><links>` prelude. Agents see *pointers*, not embedded bodies, and decide which to read. Files: `utils/wikilink-resolver.ts`, `utils/wikilink-formatter.ts`; integrated in `vault-service.ts` and `message-sender.ts`.
-- **Agent Workspace** (settings group `agentWorkspace`, default on): A fixed `/Agent-Client/` folder at the vault root with `Focus_Context.md` (curated index, wikilink-decorated), `Resources/` (raw materials, manifest only), and `Agent_Output/YYYY-MM-DD/` (dated output). Shipped to the agent on a seed-then-delta cadence with a per-session `WorkspaceSnapshot`. Files: `services/agent-workspace.ts`, `types/session.ts` (WorkspaceSnapshot + ChatSession.workspaceSnapshot), `services/settings-normalizer.ts` (normalizeWorkspacePath); plumbed through `useAgentSession` (setWorkspaceSnapshot), `useAgentMessages` (post-turn snapshot commit), `useAgent` (facade), and `ChatPanel` (passes `plugin.agentWorkspace`). Bootstrap in `plugin.ts onload`, teardown in `onunload`. Settings UI: new "Agent Workspace" section in `SettingsTab.ts`.
+- **Agent Workspace** (settings group `agentWorkspace`, default on): A fixed `/Agent-Client/` folder at the vault root with `Index.md` (curated index, wikilink-decorated), `Resources/` (raw materials, manifest only), and `Agent_Output/YYYY-MM-DD/` (dated output). Shipped to the agent on a seed-then-delta cadence with a per-session `WorkspaceSnapshot`. Files: `services/agent-workspace.ts`, `types/session.ts` (WorkspaceSnapshot + ChatSession.workspaceSnapshot), `services/settings-normalizer.ts` (normalizeWorkspacePath); plumbed through `useAgentSession` (setWorkspaceSnapshot), `useAgentMessages` (post-turn snapshot commit), `useAgent` (facade), and `ChatPanel` (passes `plugin.agentWorkspace`). Bootstrap in `plugin.ts onload`, teardown in `onunload`. Settings UI: new "Agent Workspace" section in `SettingsTab.ts`.
 
 ### April 2026: Simplification & Performance Refactoring
 

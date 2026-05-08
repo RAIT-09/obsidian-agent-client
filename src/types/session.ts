@@ -292,7 +292,7 @@ export interface ChatSession {
  * prompt without re-walking files unchanged since the snapshot.
  */
 export interface WorkspaceSnapshot {
-	focusContextHash: string;
+	indexHash: string;
 	resourcesManifestHash: string;
 	outputDateString: string;
 	hasSeed: boolean;

@@ -2,7 +2,7 @@
  * Agent Workspace
  *
  * Maintains a fixed `/<workspacePath>/` folder at the vault root with three
- * zones (Focus_Context.md, Resources/, Agent_Output/YYYY-MM-DD/) and ships
+ * zones (Index.md, Resources/, Agent_Output/YYYY-MM-DD/) and ships
  * structured XML preludes to the agent on a seed-then-delta cadence.
  *
  * Design ref: docs/design/agent-workspace.md
@@ -157,11 +157,12 @@ function todayDateString(): string {
 // Implementation
 // ============================================================================
 
-const FOCUS_CONTEXT_FILENAME = "Focus_Context.md";
+const INDEX_FILENAME = "Index.md";
+const LEGACY_INDEX_FILENAME = "Focus_Context.md";
 const RESOURCES_DIRNAME = "Resources";
 const AGENT_OUTPUT_DIRNAME = "Agent_Output";
 
-const FOCUS_CONTEXT_SEED = `# Focus Context
+const INDEX_SEED = `# Index
 
 This is your curated index of existing notes. Each line below should be a
 \`[[wikilink]]\` to a note already in your vault, followed by a one-line
@@ -215,9 +216,30 @@ export class AgentWorkspace implements IAgentWorkspace {
 			await this.ensureFolder(joinVaultPath(root, RESOURCES_DIRNAME));
 			await this.ensureFolder(joinVaultPath(root, AGENT_OUTPUT_DIRNAME));
 
-			const focusPath = joinVaultPath(root, FOCUS_CONTEXT_FILENAME);
-			if (!(await adapter.exists(focusPath))) {
-				await adapter.write(focusPath, FOCUS_CONTEXT_SEED);
+			const indexPath = joinVaultPath(root, INDEX_FILENAME);
+			const legacyPath = joinVaultPath(root, LEGACY_INDEX_FILENAME);
+			// One-time migration: a previous version of this plugin called the
+			// curated index `Focus_Context.md`. If the legacy file exists and
+			// the new one does not, rename it so the user's curated content
+			// carries over instead of being overwritten by an empty seed.
+			if (
+				(await adapter.exists(legacyPath)) &&
+				!(await adapter.exists(indexPath))
+			) {
+				try {
+					await adapter.rename(legacyPath, indexPath);
+					this.logger.log(
+						`[AgentWorkspace] Migrated ${LEGACY_INDEX_FILENAME} → ${INDEX_FILENAME}`,
+					);
+				} catch (error) {
+					this.logger.error(
+						`[AgentWorkspace] Failed to migrate ${LEGACY_INDEX_FILENAME}; leaving it in place:`,
+						error,
+					);
+				}
+			}
+			if (!(await adapter.exists(indexPath))) {
+				await adapter.write(indexPath, INDEX_SEED);
 			}
 
 			this.subscribeVaultEvents();
@@ -369,19 +391,16 @@ export class AgentWorkspace implements IAgentWorkspace {
 	// Snapshot
 	// ========================================================================
 
-	private async readFocusContext(): Promise<string> {
+	private async readIndex(): Promise<string> {
 		const settings = this.settingsAccess.getSnapshot().agentWorkspace;
-		const focusPath = joinVaultPath(
-			settings.path,
-			FOCUS_CONTEXT_FILENAME,
-		);
-		const file = this.app.vault.getAbstractFileByPath(focusPath);
+		const indexPath = joinVaultPath(settings.path, INDEX_FILENAME);
+		const file = this.app.vault.getAbstractFileByPath(indexPath);
 		if (file instanceof TFile) {
 			try {
 				return await this.app.vault.read(file);
 			} catch (error) {
 				this.logger.warn(
-					"[AgentWorkspace] Failed to read Focus_Context.md:",
+					`[AgentWorkspace] Failed to read ${INDEX_FILENAME}:`,
 					error,
 				);
 				return "";
@@ -391,12 +410,12 @@ export class AgentWorkspace implements IAgentWorkspace {
 	}
 
 	private computeSnapshotFromState(
-		focusContent: string,
+		indexContent: string,
 		manifest: ResourcesManifest,
 		hasSeed: boolean,
 	): WorkspaceSnapshot {
 		return {
-			focusContextHash: this.hashContent(focusContent),
+			indexHash: this.hashContent(indexContent),
 			resourcesManifestHash: this.hashManifest(manifest),
 			outputDateString: todayDateString(),
 			hasSeed,
@@ -406,8 +425,8 @@ export class AgentWorkspace implements IAgentWorkspace {
 	async postTurnSnapshot(): Promise<WorkspaceSnapshot> {
 		await this.ensureBootstrapped();
 		this.rebuildManifestIfDirty();
-		const focus = await this.readFocusContext();
-		return this.computeSnapshotFromState(focus, this.manifest, true);
+		const indexContent = await this.readIndex();
+		return this.computeSnapshotFromState(indexContent, this.manifest, true);
 	}
 
 	// ========================================================================
@@ -423,7 +442,7 @@ export class AgentWorkspace implements IAgentWorkspace {
 		if (!this.bootstrapped || this.bootstrapFailed) {
 			// Feature disabled at runtime due to bootstrap failure — emit nothing.
 			const fallback: WorkspaceSnapshot = {
-				focusContextHash: "",
+				indexHash: "",
 				resourcesManifestHash: "",
 				outputDateString: todayDateString(),
 				hasSeed: snapshot?.hasSeed ?? false,
@@ -438,10 +457,10 @@ export class AgentWorkspace implements IAgentWorkspace {
 		this.rebuildManifestIfDirty();
 
 		const settings = this.settingsAccess.getSnapshot().agentWorkspace;
-		const focusContent = await this.readFocusContext();
+		const indexContent = await this.readIndex();
 		const today = todayDateString();
 		const pendingSnapshot = this.computeSnapshotFromState(
-			focusContent,
+			indexContent,
 			this.manifest,
 			true,
 		);
@@ -451,7 +470,7 @@ export class AgentWorkspace implements IAgentWorkspace {
 
 		if (isSeed) {
 			const xml = this.buildSeedStateXml(
-				focusContent,
+				indexContent,
 				this.manifest,
 				today,
 				settings,
@@ -473,7 +492,7 @@ export class AgentWorkspace implements IAgentWorkspace {
 		const xml = this.buildDeltaStateXml(
 			snapshot,
 			pendingSnapshot,
-			focusContent,
+			indexContent,
 			this.manifest,
 			today,
 			settings,
@@ -499,7 +518,7 @@ export class AgentWorkspace implements IAgentWorkspace {
 	}
 
 	private buildSeedStateXml(
-		focusContent: string,
+		indexContent: string,
 		manifest: ResourcesManifest,
 		today: string,
 		settings: ReturnType<
@@ -507,8 +526,8 @@ export class AgentWorkspace implements IAgentWorkspace {
 		>["agentWorkspace"],
 		options: BuildPreludeOptions,
 	): string {
-		const focusBlock = this.formatFocusContextBlock(
-			focusContent,
+		const indexBlock = this.formatIndexBlock(
+			indexContent,
 			settings.path,
 			options,
 		);
@@ -526,7 +545,7 @@ export class AgentWorkspace implements IAgentWorkspace {
 
 		return [
 			"<obsidian_workspace>",
-			focusBlock,
+			indexBlock,
 			resourcesBlock,
 			outputBlock,
 			"</obsidian_workspace>",
@@ -536,7 +555,7 @@ export class AgentWorkspace implements IAgentWorkspace {
 	private buildDeltaStateXml(
 		prev: WorkspaceSnapshot,
 		next: WorkspaceSnapshot,
-		focusContent: string,
+		indexContent: string,
 		manifest: ResourcesManifest,
 		today: string,
 		settings: ReturnType<
@@ -544,22 +563,22 @@ export class AgentWorkspace implements IAgentWorkspace {
 		>["agentWorkspace"],
 		options: BuildPreludeOptions,
 	): string {
-		const focusChanged =
-			prev.focusContextHash !== next.focusContextHash;
+		const indexChanged =
+			prev.indexHash !== next.indexHash;
 		const manifestChanged =
 			prev.resourcesManifestHash !== next.resourcesManifestHash;
 		const dateChanged = prev.outputDateString !== next.outputDateString;
 
-		if (!focusChanged && !manifestChanged && !dateChanged) {
+		if (!indexChanged && !manifestChanged && !dateChanged) {
 			return "";
 		}
 
 		const parts: string[] = ["<obsidian_workspace_update>"];
 
-		if (focusChanged) {
+		if (indexChanged) {
 			parts.push(
-				this.formatFocusContextBlock(
-					focusContent,
+				this.formatIndexBlock(
+					indexContent,
 					settings.path,
 					options,
 				),
@@ -595,17 +614,17 @@ export class AgentWorkspace implements IAgentWorkspace {
 	// XML formatters
 	// ========================================================================
 
-	private formatFocusContextBlock(
+	private formatIndexBlock(
 		content: string,
 		workspacePath: string,
 		options: BuildPreludeOptions,
 	): string {
-		const focusVaultPath = joinVaultPath(
+		const indexVaultPath = joinVaultPath(
 			workspacePath,
-			FOCUS_CONTEXT_FILENAME,
+			INDEX_FILENAME,
 		);
 		const absolutePath = resolveAbsolute(
-			focusVaultPath,
+			indexVaultPath,
 			options.vaultBasePath,
 			options.convertToWsl,
 		);
@@ -613,20 +632,20 @@ export class AgentWorkspace implements IAgentWorkspace {
 		const description =
 			"This file is the user's curated index of existing knowledge. Each line is a `[[link]]` to an existing note plus a one-line summary of why it matters. Treat these as pointers — read the linked notes only when relevant to the current task.";
 
-		const decoratedContent = this.decorateFocusWithLinks(
+		const decoratedContent = this.decorateIndexWithLinks(
 			content,
-			focusVaultPath,
+			indexVaultPath,
 			options,
 		);
 
-		return `  <focus_context path="${escapeXml(absolutePath)}">
+		return `  <index path="${escapeXml(absolutePath)}">
     ${description}
 
 ${decoratedContent}
-  </focus_context>`;
+  </index>`;
 	}
 
-	private decorateFocusWithLinks(
+	private decorateIndexWithLinks(
 		content: string,
 		sourceVaultPath: string,
 		options: BuildPreludeOptions,
@@ -654,7 +673,7 @@ ${decoratedContent}
 			return prelude + content;
 		} catch (error) {
 			this.logger.warn(
-				"[AgentWorkspace] Failed to expand wikilinks in Focus_Context:",
+				"[AgentWorkspace] Failed to expand wikilinks in Index:",
 				error,
 			);
 			return content;
@@ -730,17 +749,17 @@ ${decoratedContent}
 	}
 
 	private formatInstructionsXml(agentAssistedFocusUpdate: boolean): string {
-		const focusUpdateLine = agentAssistedFocusUpdate
-			? "After creating a note in output_directory, append a line `[[<basename>]]: <one-line summary>` to Focus_Context.md."
+		const indexUpdateLine = agentAssistedFocusUpdate
+			? "After creating a note in output_directory, append a line `[[<basename>]]: <one-line summary>` to Index.md."
 			: "";
 		const lines = [
 			"<obsidian_workspace_instructions>",
 			"  Resources/ contains user-submitted raw materials; read them on demand using your file tools.",
 			"  Write any new notes to output_directory using absolute paths.",
-			"  Focus_Context.md is jointly maintained by the user.",
+			"  Index.md is jointly maintained by the user.",
 		];
-		if (focusUpdateLine) {
-			lines.push(`  ${focusUpdateLine}`);
+		if (indexUpdateLine) {
+			lines.push(`  ${indexUpdateLine}`);
 		}
 		lines.push("</obsidian_workspace_instructions>");
 		return lines.join("\n");

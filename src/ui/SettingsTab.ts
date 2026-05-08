@@ -199,7 +199,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Enable agent workspace")
 			.setDesc(
-				"Maintain a dedicated /Agent-Client/ folder (Focus_Context.md, Resources/, Agent_Output/) and ship its structure to the agent on every session.",
+				"Maintain a dedicated /Agent-Client/ folder (Index.md, Resources/, Agent_Output/) and ship its structure to the agent on every session.",
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -256,9 +256,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Agent-assisted Focus_Context updates")
+			.setName("Agent-assisted Index updates")
 			.setDesc(
-				"Tell the agent to append a `[[link]]: summary` line to Focus_Context.md after creating each output note. Default off.",
+				"Tell the agent to append a `[[link]]: summary` line to Index.md after creating each output note. Default off.",
 			)
 			.addToggle((toggle) =>
 				toggle

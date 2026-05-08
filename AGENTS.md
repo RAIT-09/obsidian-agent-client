@@ -183,7 +183,7 @@ FloatingChatView uses `onRegisterExpanded` callback (not CustomEvent) for expand
 **session-state**: Pure functions — applyLegacyValue, tryRestoreConfigOption, restoreLegacyConfig
 **message-state**: Pure functions — applySingleUpdate, applyUpsertToolCall, mergeToolCallContent, findActivePermission, selectOption
 **message-sender**: Pure functions — preparePrompt (embedded context vs XML text, shared helpers, ships workspace state + optional instructions). For embeddedContext-capable agents, each non-null workspace block becomes a `type: "resource"` PromptContent at the head of agentContent (`audience: ["assistant"]`, `mimeType: "application/xml"`, priority 0.9 / 0.7). For text-fallback agents, the same XML is concatenated and prepended to the user-text block. PreparePromptInput accepts `agentWorkspace?: { service, snapshot }`; PreparePromptResult returns `pendingWorkspaceSnapshot?` for the hook to commit on success. Auto-mention follows the same seed-then-delta pattern: a single `buildAutoMentionPayload` (signature gate `(notePath, selFrom, selTo, mtime)` + shared body builder) emits one Resource block (priority 0.8, `audience: ["assistant"]`) for embedded agents, or a byte-identical body wrapped in `<obsidian_opened_note ref="…">…</obsidian_opened_note>` for fallback agents — only on signature change. The cheap `@[[Note]]:lines\n` user-text prefix is unconditional. PreparePromptInput accepts `autoMentionSnapshot?`; PreparePromptResult returns `pendingAutoMentionSnapshot?` (defined only when actually emitted; tab-close/disabled/unchanged leave the snapshot in place).
-**AgentWorkspace** (`agent-workspace.ts`): Bootstraps `/<workspacePath>/` (Focus_Context.md, Resources/, Agent_Output/), watches Resources/ via vault events with O(1) dirty-flag manifest, builds seed `<obsidian_workspace>` state + optional `<obsidian_workspace_instructions>` (seed only) + delta `<obsidian_workspace_update>` blocks, recomputes `WorkspaceSnapshot` from disk after each successful turn so agent self-edits don't round-trip. State Resource URI = workspace folder (`file://`); instructions Resource URI = synthetic `obsidian://agent-workspace/instructions`. Singleton at plugin level; per-session snapshot held on `ChatSession.workspaceSnapshot`.
+**AgentWorkspace** (`agent-workspace.ts`): Bootstraps `/<workspacePath>/` (Index.md, Resources/, Agent_Output/), watches Resources/ via vault events with O(1) dirty-flag manifest, builds seed `<obsidian_workspace>` state + optional `<obsidian_workspace_instructions>` (seed only) + delta `<obsidian_workspace_update>` blocks, recomputes `WorkspaceSnapshot` from disk after each successful turn so agent self-edits don't round-trip. State Resource URI = workspace folder (`file://`); instructions Resource URI = synthetic `obsidian://agent-workspace/instructions`. One-time bootstrap migration renames a legacy `Focus_Context.md` to `Index.md` if present. Singleton at plugin level; per-session snapshot held on `ChatSession.workspaceSnapshot`.
 
 ## Types
 
@@ -261,7 +261,7 @@ interface IAgentWorkspace {
 
 // types/session.ts
 interface WorkspaceSnapshot {
-  focusContextHash: string;
+  indexHash: string;
   resourcesManifestHash: string;
   outputDateString: string;  // YYYY-MM-DD (rolls at midnight)
   hasSeed: boolean;          // false until first successful prompt
@@ -364,7 +364,7 @@ interface AutoMentionSnapshot {
 1. Setting: `expandWikilinkContext` (`src/plugin.ts`)
 2. Resolver: `src/utils/wikilink-resolver.ts` — basename index, `getFirstLinkpathDest` resolution, ambiguity surfacing, skips `![[embeds]]`
 3. Formatter: `src/utils/wikilink-formatter.ts` — `<obsidian_metadata><links>` XML prelude, 50-link cap with `truncated="N"`
-4. Wired in `vault-service.ts` (`IWikilinkResolver` impl) and `message-sender.ts` (decorates mentioned-note bodies in both transports). Also used inside `agent-workspace.ts` to decorate Focus_Context.md
+4. Wired in `vault-service.ts` (`IWikilinkResolver` impl) and `message-sender.ts` (decorates mentioned-note bodies in both transports). Also used inside `agent-workspace.ts` to decorate Index.md
 5. Reference: `docs/design/wikilink-context.md`
 
 ### Modify Auto-Mention Context Behavior
