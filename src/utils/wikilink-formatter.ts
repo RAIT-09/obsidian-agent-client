@@ -69,31 +69,30 @@ function formatLink(
 	}
 
 	if (link.candidates.length === 1) {
-		const c = link.candidates[0];
-		const absolutePath = resolveAbsolute(c.path, vaultBasePath, convertToWsl);
-		attrs.push(`path="${escapeAttr(absolutePath)}"`);
-		attrs.push(`uri="${escapeAttr(buildFileUri(absolutePath))}"`);
+		const uri = resolveUri(link.candidates[0].path, vaultBasePath, convertToWsl);
+		attrs.push(`uri="${escapeAttr(uri)}"`);
 		attrs.push(`resolved="true"`);
 		return `    <link ${attrs.join(" ")} />`;
 	}
 
 	attrs.push(`resolved="ambiguous"`);
 	const candidateLines = link.candidates.map((c) => {
-		const absolutePath = resolveAbsolute(c.path, vaultBasePath, convertToWsl);
-		return `      <candidate path="${escapeAttr(absolutePath)}" uri="${escapeAttr(buildFileUri(absolutePath))}" />`;
+		const uri = resolveUri(c.path, vaultBasePath, convertToWsl);
+		return `      <candidate uri="${escapeAttr(uri)}" />`;
 	});
 	return `    <link ${attrs.join(" ")}>\n${candidateLines.join("\n")}\n    </link>`;
 }
 
-function resolveAbsolute(
+function resolveUri(
 	relativePath: string,
 	vaultBasePath: string,
 	convertToWsl: boolean,
 ): string {
-	const absolutePath = vaultBasePath
+	const joined = vaultBasePath
 		? `${vaultBasePath}/${relativePath}`
 		: relativePath;
-	return convertToWsl ? convertWindowsPathToWsl(absolutePath) : absolutePath;
+	const absolutePath = convertToWsl ? convertWindowsPathToWsl(joined) : joined;
+	return buildFileUri(absolutePath);
 }
 
 /** XML attribute-value escaping. Covers all five XML predefined entities. */

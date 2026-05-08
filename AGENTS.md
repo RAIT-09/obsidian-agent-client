@@ -28,8 +28,8 @@ src/
 │   ├── session-helpers.ts       # Agent config building, API key injection (pure functions)
 │   ├── session-state.ts         # Session state updates (legacy mode/model, config restore)
 │   ├── message-state.ts         # Message array transforms (upsert, merge, streaming apply)
-│   ├── message-sender.ts        # Prompt preparation + sending (pure functions, prepends workspace prelude)
-│   ├── agent-workspace.ts       # /Agent-Client/ bootstrap + Resources manifest + seed-then-delta prelude
+│   ├── message-sender.ts        # Prompt preparation + sending (pure functions, ships workspace as Resource block / text prefix)
+│   ├── agent-workspace.ts       # /Agent-Client/ bootstrap + Resources manifest + seed-then-delta state/instructions blocks
 │   ├── chat-exporter.ts         # Markdown export with frontmatter
 │   ├── view-registry.ts         # Multi-view management, focus, broadcast
 │   └── update-checker.ts        # Agent/plugin version checking
@@ -182,8 +182,8 @@ FloatingChatView uses `onRegisterExpanded` callback (not CustomEvent) for expand
 **session-helpers**: Pure functions — buildAgentConfigWithApiKey, findAgentSettings, getAvailableAgents
 **session-state**: Pure functions — applyLegacyValue, tryRestoreConfigOption, restoreLegacyConfig
 **message-state**: Pure functions — applySingleUpdate, applyUpsertToolCall, mergeToolCallContent, findActivePermission, selectOption
-**message-sender**: Pure functions — preparePrompt (embedded context vs XML text, shared helpers, builds + prepends workspace prelude), sendPreparedPrompt (auth retry). PreparePromptInput accepts `agentWorkspace?: { service, snapshot }`; PreparePromptResult returns `pendingWorkspaceSnapshot?` for the hook to commit on success.
-**AgentWorkspace** (`agent-workspace.ts`): Bootstraps `/<workspacePath>/` (Focus_Context.md, Resources/, Agent_Output/), watches Resources/ via vault events with O(1) dirty-flag manifest, builds seed `<obsidian_workspace>` and delta `<obsidian_workspace_update>` preludes, recomputes `WorkspaceSnapshot` from disk after each successful turn so agent self-edits don't round-trip. Singleton at plugin level; per-session snapshot held on `ChatSession.workspaceSnapshot`.
+**message-sender**: Pure functions — preparePrompt (embedded context vs XML text, shared helpers, ships workspace state + optional instructions). For embeddedContext-capable agents, each non-null workspace block becomes a `type: "resource"` PromptContent at the head of agentContent (`audience: ["assistant"]`, `mimeType: "application/xml"`, priority 0.9 / 0.7). For text-fallback agents, the same XML is concatenated and prepended to the user-text block. PreparePromptInput accepts `agentWorkspace?: { service, snapshot }`; PreparePromptResult returns `pendingWorkspaceSnapshot?` for the hook to commit on success.
+**AgentWorkspace** (`agent-workspace.ts`): Bootstraps `/<workspacePath>/` (Focus_Context.md, Resources/, Agent_Output/), watches Resources/ via vault events with O(1) dirty-flag manifest, builds seed `<obsidian_workspace>` state + optional `<obsidian_workspace_instructions>` (seed only) + delta `<obsidian_workspace_update>` blocks, recomputes `WorkspaceSnapshot` from disk after each successful turn so agent self-edits don't round-trip. State Resource URI = workspace folder (`file://`); instructions Resource URI = synthetic `obsidian://agent-workspace/instructions`. Singleton at plugin level; per-session snapshot held on `ChatSession.workspaceSnapshot`.
 
 ## Types
 
@@ -242,13 +242,19 @@ interface ISettingsAccess {
 }
 
 // services/agent-workspace.ts
+interface WorkspaceXmlBlock { uri: string; xml: string; }
+
 interface IAgentWorkspace {
   ensureBootstrapped(): Promise<void>;
   isEnabled(): boolean;
   buildPrelude(
     snapshot: WorkspaceSnapshot | null,
     options: BuildPreludeOptions,
-  ): Promise<{ prelude: string; pendingSnapshot: WorkspaceSnapshot }>;
+  ): Promise<{
+    state: WorkspaceXmlBlock | null;        // null when delta has no changes
+    instructions: WorkspaceXmlBlock | null; // non-null only on seed when emitInstructions=true
+    pendingSnapshot: WorkspaceSnapshot;
+  }>;
   postTurnSnapshot(): Promise<WorkspaceSnapshot>;
   destroy(): void;
 }
@@ -343,7 +349,7 @@ interface WorkspaceSnapshot {
 1. Settings shape lives on `AgentClientPluginSettings.agentWorkspace` (`src/plugin.ts`); `normalizeWorkspacePath` enforces vault-relative paths
 2. Service: `src/services/agent-workspace.ts` — bootstrap, vault event subscription, manifest builder (depth/entry caps), seed/delta prelude formatters
 3. Snapshot type: `WorkspaceSnapshot` in `types/session.ts`; lives on `ChatSession.workspaceSnapshot` (in-memory only)
-4. Integration: `message-sender.ts` calls `agentWorkspace.buildPrelude(...)` and prepends to first text block; `useAgentMessages.ts` commits `postTurnSnapshot()` on success via `setWorkspaceSnapshot`
+4. Integration: `message-sender.ts` calls `agentWorkspace.buildPrelude(...)`; for embeddedContext-capable agents emits state/instructions as `type: "resource"` blocks at the head of agentContent, otherwise concatenates the XML and prepends to the first text block. `useAgentMessages.ts` commits `postTurnSnapshot()` on success via `setWorkspaceSnapshot`
 5. Settings UI: `src/ui/SettingsTab.ts` "Agent Workspace" section; `plugin.refreshAgentWorkspace()` re-bootstraps after path/enable changes
 6. Reference: `docs/design/agent-workspace.md` (15 decisions D1–D15)
 

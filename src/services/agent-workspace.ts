@@ -20,6 +20,7 @@ import type AgentClientPlugin from "../plugin";
 import type { ISettingsAccess } from "./settings-service";
 import { getLogger, Logger } from "../utils/logger";
 import { convertWindowsPathToWsl } from "../utils/platform";
+import { buildFileUri } from "../utils/paths";
 import { formatLinkedNotesPrelude } from "../utils/wikilink-formatter";
 import type { IWikilinkResolver } from "../utils/wikilink-resolver";
 import type { WorkspaceSnapshot } from "../types/session";
@@ -37,8 +38,22 @@ export interface BuildPreludeOptions {
 	expandWikilinkContext: boolean;
 }
 
+/**
+ * One workspace XML payload paired with the `uri` callers should use when
+ * wrapping it as an ACP `type: "resource"` block. Text-fallback callers can
+ * ignore `uri` and concatenate the `xml` strings.
+ */
+export interface WorkspaceXmlBlock {
+	uri: string;
+	xml: string;
+}
+
 export interface BuildPreludeResult {
-	prelude: string;
+	/** Workspace state (`<obsidian_workspace>` seed or `<obsidian_workspace_update>` delta). null when delta has no changes or bootstrap failed. */
+	state: WorkspaceXmlBlock | null;
+	/** Static protocol/instructions block, emitted only on seed when `emitInstructions=true`. */
+	instructions: WorkspaceXmlBlock | null;
+	/** Snapshot to commit after a successful turn. */
 	pendingSnapshot: WorkspaceSnapshot;
 }
 
@@ -52,6 +67,9 @@ export interface IAgentWorkspace {
 	postTurnSnapshot(): Promise<WorkspaceSnapshot>;
 	destroy(): void;
 }
+
+/** Synthetic URI for the instructions Resource — no real file behind it. */
+const WORKSPACE_INSTRUCTIONS_URI = "obsidian://agent-workspace/instructions";
 
 // ============================================================================
 // Internal types
@@ -410,7 +428,11 @@ export class AgentWorkspace implements IAgentWorkspace {
 				outputDateString: todayDateString(),
 				hasSeed: snapshot?.hasSeed ?? false,
 			};
-			return { prelude: "", pendingSnapshot: fallback };
+			return {
+				state: null,
+				instructions: null,
+				pendingSnapshot: fallback,
+			};
 		}
 
 		this.rebuildManifestIfDirty();
@@ -424,20 +446,31 @@ export class AgentWorkspace implements IAgentWorkspace {
 			true,
 		);
 
+		const stateUri = this.buildWorkspaceFolderUri(settings.path, options);
 		const isSeed = !snapshot || !snapshot.hasSeed;
 
 		if (isSeed) {
-			const prelude = this.buildSeedPrelude(
+			const xml = this.buildSeedStateXml(
 				focusContent,
 				this.manifest,
 				today,
 				settings,
 				options,
 			);
-			return { prelude, pendingSnapshot };
+			const state: WorkspaceXmlBlock = { uri: stateUri, xml };
+			const instructions: WorkspaceXmlBlock | null =
+				settings.emitInstructions
+					? {
+							uri: WORKSPACE_INSTRUCTIONS_URI,
+							xml: this.formatInstructionsXml(
+								settings.agentAssistedFocusUpdate,
+							),
+						}
+					: null;
+			return { state, instructions, pendingSnapshot };
 		}
 
-		const prelude = this.buildDeltaPrelude(
+		const xml = this.buildDeltaStateXml(
 			snapshot,
 			pendingSnapshot,
 			focusContent,
@@ -446,10 +479,26 @@ export class AgentWorkspace implements IAgentWorkspace {
 			settings,
 			options,
 		);
-		return { prelude, pendingSnapshot };
+		const state: WorkspaceXmlBlock | null =
+			xml.length > 0 ? { uri: stateUri, xml } : null;
+		return { state, instructions: null, pendingSnapshot };
 	}
 
-	private buildSeedPrelude(
+	private buildWorkspaceFolderUri(
+		workspacePath: string,
+		options: BuildPreludeOptions,
+	): string {
+		const abs = resolveAbsolute(
+			workspacePath,
+			options.vaultBasePath,
+			options.convertToWsl,
+		);
+		// Trailing slash signals folder intent.
+		const withSlash = abs.endsWith("/") ? abs : `${abs}/`;
+		return buildFileUri(withSlash);
+	}
+
+	private buildSeedStateXml(
 		focusContent: string,
 		manifest: ResourcesManifest,
 		today: string,
@@ -474,24 +523,17 @@ export class AgentWorkspace implements IAgentWorkspace {
 			settings.path,
 			options,
 		);
-		const instructionsBlock = settings.emitInstructions
-			? this.formatInstructionsBlock(settings.agentAssistedFocusUpdate)
-			: "";
 
 		return [
 			"<obsidian_workspace>",
 			focusBlock,
 			resourcesBlock,
 			outputBlock,
-			instructionsBlock,
 			"</obsidian_workspace>",
-			"",
-		]
-			.filter((s) => s.length > 0)
-			.join("\n");
+		].join("\n");
 	}
 
-	private buildDeltaPrelude(
+	private buildDeltaStateXml(
 		prev: WorkspaceSnapshot,
 		next: WorkspaceSnapshot,
 		focusContent: string,
@@ -546,7 +588,6 @@ export class AgentWorkspace implements IAgentWorkspace {
 		}
 
 		parts.push("</obsidian_workspace_update>");
-		parts.push("");
 		return parts.join("\n");
 	}
 
@@ -688,20 +729,20 @@ ${decoratedContent}
 		return `  <output_directory absolute_path="${escapeXml(abs)}/" />`;
 	}
 
-	private formatInstructionsBlock(agentAssistedFocusUpdate: boolean): string {
+	private formatInstructionsXml(agentAssistedFocusUpdate: boolean): string {
 		const focusUpdateLine = agentAssistedFocusUpdate
 			? "After creating a note in output_directory, append a line `[[<basename>]]: <one-line summary>` to Focus_Context.md."
 			: "";
 		const lines = [
-			"  <instructions>",
-			"    Resources/ contains user-submitted raw materials; read them on demand using your file tools.",
-			"    Write any new notes to output_directory using absolute paths.",
-			"    Focus_Context.md is jointly maintained by the user.",
+			"<obsidian_workspace_instructions>",
+			"  Resources/ contains user-submitted raw materials; read them on demand using your file tools.",
+			"  Write any new notes to output_directory using absolute paths.",
+			"  Focus_Context.md is jointly maintained by the user.",
 		];
 		if (focusUpdateLine) {
-			lines.push(`    ${focusUpdateLine}`);
+			lines.push(`  ${focusUpdateLine}`);
 		}
-		lines.push("  </instructions>");
+		lines.push("</obsidian_workspace_instructions>");
 		return lines.join("\n");
 	}
 

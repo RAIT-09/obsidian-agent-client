@@ -45,6 +45,7 @@ import { formatLinkedNotesPrelude } from "../utils/wikilink-formatter";
 import type {
 	IAgentWorkspace,
 	WorkspaceSnapshot,
+	WorkspaceXmlBlock,
 } from "./agent-workspace";
 
 // ============================================================================
@@ -186,7 +187,6 @@ const DEFAULT_MAX_SELECTION_LENGTH = 10000; // Default maximum characters for se
  */
 interface ProcessedNote {
 	content: string;
-	absolutePath: string;
 	uri: string;
 	lastModified: string;
 	wasTruncated: boolean;
@@ -194,7 +194,7 @@ interface ProcessedNote {
 }
 
 /**
- * Read a note, truncate if needed, and resolve its absolute path.
+ * Read a note, truncate if needed, and resolve its `file://` URI.
  */
 async function processNote(
 	file: { path: string; stat: { mtime: number } },
@@ -206,13 +206,7 @@ async function processNote(
 	try {
 		const content = await vaultAccess.readNote(file.path);
 
-		let absolutePath = vaultBasePath
-			? `${vaultBasePath}/${file.path}`
-			: file.path;
-
-		if (convertToWsl) {
-			absolutePath = convertWindowsPathToWsl(absolutePath);
-		}
+		const uri = resolveFileUri(file.path, vaultBasePath, convertToWsl);
 
 		const wasTruncated = content.length > maxNoteLength;
 		const processedContent = wasTruncated
@@ -221,8 +215,7 @@ async function processNote(
 
 		return {
 			content: processedContent,
-			absolutePath,
-			uri: buildFileUri(absolutePath),
+			uri,
 			lastModified: new Date(file.stat.mtime).toISOString(),
 			wasTruncated,
 			originalLength: content.length,
@@ -367,20 +360,20 @@ function decorateWithLinkedNotes(
 }
 
 /**
- * Resolve absolute path with optional WSL conversion.
+ * Resolve a `file://` URI for a vault-relative path, applying optional WSL
+ * conversion first. Single canonical reference for all emitted prompt
+ * content — see CLAUDE.md "Prefer URI over absolute path" note.
  */
-function resolveAbsolutePath(
+function resolveFileUri(
 	relativePath: string,
 	vaultBasePath: string,
 	convertToWsl: boolean,
 ): string {
-	let absolutePath = vaultBasePath
+	const joined = vaultBasePath
 		? `${vaultBasePath}/${relativePath}`
 		: relativePath;
-	if (convertToWsl) {
-		absolutePath = convertWindowsPathToWsl(absolutePath);
-	}
-	return absolutePath;
+	const absolutePath = convertToWsl ? convertWindowsPathToWsl(joined) : joined;
+	return buildFileUri(absolutePath);
 }
 
 // ============================================================================
@@ -406,9 +399,9 @@ export async function preparePrompt(
 	// Step 1: Extract all mentioned notes from the message
 	const mentionedNotes = extractMentionedNotes(input.message, mentionService);
 
-	// Step 2: Build the Agent Workspace prelude (seed or delta) up-front so
-	// both transport branches can prepend it to their first text block.
-	const workspace = await buildAgentWorkspacePrelude(input);
+	// Step 2: Build the Agent Workspace blocks (state + optional instructions)
+	// up-front so both transport branches can place them appropriately.
+	const workspace = await buildAgentWorkspaceBlocks(input);
 
 	// Step 3: Build context based on agent capabilities
 	const result = input.supportsEmbeddedContext
@@ -416,13 +409,13 @@ export async function preparePrompt(
 				input,
 				vaultAccess,
 				mentionedNotes,
-				workspace.prelude,
+				workspace,
 			)
 		: await preparePromptWithTextContext(
 				input,
 				vaultAccess,
 				mentionedNotes,
-				workspace.prelude,
+				workspace,
 			);
 
 	if (workspace.pendingSnapshot) {
@@ -432,17 +425,26 @@ export async function preparePrompt(
 }
 
 /**
- * Compute the Agent Workspace prelude string + the snapshot to commit on
- * successful send. Returns empty prelude when the integration is not enabled.
+ * Per-prompt agent-workspace payload threaded into both transport branches.
+ * `state`/`instructions` are null when there's nothing to emit (delta with no
+ * changes, instructions disabled, bootstrap failed, or feature off).
  */
-async function buildAgentWorkspacePrelude(
-	input: PreparePromptInput,
-): Promise<{
-	prelude: string;
+interface WorkspacePayload {
+	state: WorkspaceXmlBlock | null;
+	instructions: WorkspaceXmlBlock | null;
 	pendingSnapshot: WorkspaceSnapshot | undefined;
-}> {
+}
+
+/**
+ * Resolve workspace state + instructions from the service, or empty payload
+ * when integration is disabled or fails. Errors are swallowed (with a log)
+ * so the user's prompt always still goes through.
+ */
+async function buildAgentWorkspaceBlocks(
+	input: PreparePromptInput,
+): Promise<WorkspacePayload> {
 	if (!input.agentWorkspace) {
-		return { prelude: "", pendingSnapshot: undefined };
+		return { state: null, instructions: null, pendingSnapshot: undefined };
 	}
 	try {
 		const result = await input.agentWorkspace.service.buildPrelude(
@@ -456,14 +458,55 @@ async function buildAgentWorkspacePrelude(
 			},
 		);
 		return {
-			prelude: result.prelude,
+			state: result.state,
+			instructions: result.instructions,
 			pendingSnapshot: result.pendingSnapshot,
 		};
 	} catch (error) {
 		console.error("[message-sender] Workspace prelude failed:", error);
-		return { prelude: "", pendingSnapshot: undefined };
+		return { state: null, instructions: null, pendingSnapshot: undefined };
 	}
 }
+
+/**
+ * Concatenate workspace XML blocks for the text-fallback transport.
+ * Returns empty string when both blocks are null.
+ */
+function concatWorkspaceXml(workspace: WorkspacePayload): string {
+	const parts: string[] = [];
+	if (workspace.state) parts.push(workspace.state.xml);
+	if (workspace.instructions) parts.push(workspace.instructions.xml);
+	if (parts.length === 0) return "";
+	return parts.join("\n") + "\n";
+}
+
+/**
+ * Wrap an XML block as a `type: "resource"` PromptContent for embedded-context
+ * agents. `priority` differentiates state (broader background, lower) from
+ * mentioned-note resources (1.0) and auto-mention (0.8). `audience: ["assistant"]`
+ * marks this as runtime-injected briefing, not user-authored content.
+ */
+function buildWorkspaceResource(
+	block: WorkspaceXmlBlock,
+	priority: number,
+): ResourcePromptContent {
+	return {
+		type: "resource",
+		resource: {
+			uri: block.uri,
+			mimeType: "application/xml",
+			text: block.xml,
+		},
+		annotations: {
+			audience: ["assistant"],
+			priority,
+			lastModified: new Date().toISOString(),
+		},
+	};
+}
+
+const WORKSPACE_STATE_PRIORITY = 0.9;
+const WORKSPACE_INSTRUCTIONS_PRIORITY = 0.7;
 
 /**
  * Prepare prompt using embedded Resource format (for embeddedContext-capable agents).
@@ -475,10 +518,29 @@ async function preparePromptWithEmbeddedContext(
 		noteTitle: string;
 		file: { path: string; stat: { mtime: number } } | undefined;
 	}>,
-	workspacePrelude: string,
+	workspace: WorkspacePayload,
 ): Promise<PreparePromptResult> {
 	const maxNoteLen = input.maxNoteLength ?? DEFAULT_MAX_NOTE_LENGTH;
 	const wikilinkCtx = buildWikilinkContext(input);
+
+	// Workspace Resource blocks at the head of agentContent — broadest system
+	// context first, before user-specific references. `audience: ["assistant"]`
+	// keeps these out of the user-text channel.
+	const workspaceResources: PromptContent[] = [];
+	if (workspace.state) {
+		workspaceResources.push(
+			buildWorkspaceResource(workspace.state, WORKSPACE_STATE_PRIORITY),
+		);
+	}
+	if (workspace.instructions) {
+		workspaceResources.push(
+			buildWorkspaceResource(
+				workspace.instructions,
+				WORKSPACE_INSTRUCTIONS_PRIORITY,
+			),
+		);
+	}
+
 	const resourceBlocks: ResourcePromptContent[] = [];
 
 	// Build Resource blocks for each mentioned note
@@ -531,19 +593,13 @@ async function preparePromptWithEmbeddedContext(
 	);
 
 	const messageText = autoMentionPrefix + input.message;
-	const includeTextBlock =
-		messageText.length > 0 || workspacePrelude.length > 0;
 
 	const agentContent: PromptContent[] = [
+		...workspaceResources,
 		...resourceBlocks,
 		...autoMentionBlocks,
-		...(includeTextBlock
-			? [
-					{
-						type: "text" as const,
-						text: workspacePrelude + messageText,
-					},
-				]
+		...(messageText.length > 0
+			? [{ type: "text" as const, text: messageText }]
 			: []),
 		...(input.images || []),
 		...(input.resourceLinks || []),
@@ -569,8 +625,9 @@ async function preparePromptWithTextContext(
 		noteTitle: string;
 		file: { path: string; stat: { mtime: number } } | undefined;
 	}>,
-	workspacePrelude: string,
+	workspace: WorkspacePayload,
 ): Promise<PreparePromptResult> {
+	const workspacePrelude = concatWorkspaceXml(workspace);
 	const maxNoteLen = input.maxNoteLength ?? DEFAULT_MAX_NOTE_LENGTH;
 	const wikilinkCtx = buildWikilinkContext(input);
 	const contextBlocks: string[] = [];
@@ -599,7 +656,7 @@ async function preparePromptWithTextContext(
 		);
 
 		contextBlocks.push(
-			`<obsidian_mentioned_note ref="${note.absolutePath}">\n${decoratedBody}${truncationNote}\n</obsidian_mentioned_note>`,
+			`<obsidian_mentioned_note ref="${note.uri}">\n${decoratedBody}${truncationNote}\n</obsidian_mentioned_note>`,
 		);
 	}
 
@@ -661,12 +718,7 @@ async function buildAutoMentionResource(
 	maxSelectionLength: number,
 	wikilinkCtx: WikilinkScanContext | null,
 ): Promise<PromptContent[]> {
-	const absolutePath = resolveAbsolutePath(
-		activeNote.path,
-		vaultPath,
-		convertToWsl,
-	);
-	const uri = buildFileUri(absolutePath);
+	const uri = resolveFileUri(activeNote.path, vaultPath, convertToWsl);
 
 	if (activeNote.selection) {
 		const fromLine = activeNote.selection.from.line + 1;
@@ -734,7 +786,7 @@ async function buildAutoMentionTextContext(
 	maxSelectionLength: number,
 	wikilinkCtx: WikilinkScanContext | null,
 ): Promise<string> {
-	const absolutePath = resolveAbsolutePath(notePath, vaultPath, convertToWsl);
+	const uri = resolveFileUri(notePath, vaultPath, convertToWsl);
 
 	if (selection) {
 		const fromLine = selection.from.line + 1;
@@ -747,7 +799,7 @@ async function buildAutoMentionTextContext(
 			maxSelectionLength,
 		);
 		if (!sel) {
-			return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">The user opened the note ${absolutePath} in Obsidian and is focusing on lines ${fromLine}-${toLine}. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the specific lines.</obsidian_opened_note>`;
+			return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">The user opened the note ${uri} in Obsidian and is focusing on lines ${fromLine}-${toLine}. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the specific lines.</obsidian_opened_note>`;
 		}
 
 		const truncationNote = sel.wasTruncated
@@ -761,7 +813,7 @@ async function buildAutoMentionTextContext(
 		);
 
 		return `<obsidian_opened_note selection="lines ${fromLine}-${toLine}">
-The user opened the note ${absolutePath} in Obsidian and selected the following text (lines ${fromLine}-${toLine}):
+The user opened the note ${uri} in Obsidian and selected the following text (lines ${fromLine}-${toLine}):
 
 ${decoratedSelection}${truncationNote}
 
@@ -769,7 +821,7 @@ This is what the user is currently focusing on.
 </obsidian_opened_note>`;
 	}
 
-	return `<obsidian_opened_note>The user opened the note ${absolutePath} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the content.</obsidian_opened_note>`;
+	return `<obsidian_opened_note>The user opened the note ${uri} in Obsidian. This may or may not be related to the current conversation. If it seems relevant, consider using the Read tool to examine the content.</obsidian_opened_note>`;
 }
 
 // ============================================================================

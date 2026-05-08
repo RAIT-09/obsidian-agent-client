@@ -106,11 +106,22 @@ workspace bootstrap. Keep the manifest in memory; flip a dirty flag when
 events touch paths inside `Resources/`. At prompt time, the dirty check is
 O(1). Avoids stat-ing 200 files per prompt.
 
-### D10. Delta block prepended to the next user message
-`<obsidian_workspace_update>` is concatenated to the user's prompt as a
-prefix in the same turn — *not* as a separate prior turn. This avoids
-doubling round-trips and keeps the agent's understanding aligned with the
-user's intent within a single turn.
+### D10. Workspace shipped as Resource block (embedded transport) or text-prefix (fallback)
+For agents that advertise `embeddedContext`, the workspace seed/delta is
+sent as its own `type: "resource"` block at the head of the prompt's
+`agentContent`, with `audience: ["assistant"]`, `mimeType: "application/xml"`,
+and `priority: 0.9` (state) / `0.7` (instructions). State and instructions
+are emitted as **two separate Resources** so seeds carry both while deltas
+carry only state. The state Resource's `uri` is the workspace folder
+(`file:///<vault>/<path>/`); the instructions Resource uses a synthetic URI
+`obsidian://agent-workspace/instructions`.
+
+For agents without `embeddedContext`, the same XML is concatenated and
+prepended to the user-text block (legacy behavior). This keeps non-capable
+agents working without a second round-trip.
+
+In both transports the workspace is sent in the **same turn** as the user
+message — never as a separate prior turn.
 
 ### D11. Plugin-generated dated output directory, rolls at midnight
 Plugin computes `Agent_Output/YYYY-MM-DD/` (today's date) on every prompt.
@@ -118,10 +129,14 @@ If the date string differs from the snapshot, the next prompt's update
 emits a fresh `<output_directory>`. Sessions spanning midnight roll forward
 cleanly — the agent always writes to *today's* folder.
 
-### D12. Minimal `<instructions>` block in seed, default on
-The seed prelude includes a short instructions block that names each zone's
-purpose and tells the agent to use absolute paths. Default on; settable
-off for users who want a clean prompt or have their own system prompt.
+### D12. Instructions emitted as a separate seed-only block, default on
+A short `<obsidian_workspace_instructions>` block names each zone's purpose
+and tells the agent to use absolute paths. It's emitted **only on seed**
+(once per session) — deltas never re-send it. Under the embedded-context
+transport (D10) it ships as its own Resource with `priority: 0.7`,
+distinct from the workspace state Resource. This split lets the agent
+treat policy (static contract) as separate from state (mutable). Default
+on; settable off for users with their own system prompt.
 
 ### D13. Inline description of `<focus_context>` purpose
 Inside `<focus_context>`, lead with a one-line description: this is the
@@ -171,6 +186,13 @@ warning and disable the feature for the session. Surface in settings.
 
 ### 4.3 Seed prelude (first prompt of a session)
 
+The seed is two XML payloads — workspace **state** plus an optional
+**instructions** block. Under the embedded-context transport (D10) each
+payload becomes its own Resource block; under the text-prefix fallback
+they're concatenated with a newline separator.
+
+**State payload** (`obsidian_workspace`):
+
 ```xml
 <obsidian_workspace>
   <focus_context path="/abs/vault/Agent-Client/Focus_Context.md">
@@ -191,16 +213,22 @@ warning and disable the feature for the session. Surface in settings.
   </resources>
 
   <output_directory absolute_path="/abs/vault/Agent-Client/Agent_Output/2026-05-06/" />
-
-  <!-- D12: emitted iff agentWorkspace.emitInstructions === true -->
-  <instructions>
-    Resources/ contains user-submitted raw materials; read them on demand
-    using your file tools. Write any new notes to output_directory using
-    absolute paths. Focus_Context.md is jointly maintained by the user.
-    {{ if agentAssistedFocusUpdate: "After creating a note in output_directory,
-    append a line `[[<basename>]]: <one-line summary>` to Focus_Context.md." }}
-  </instructions>
 </obsidian_workspace>
+```
+
+**Instructions payload** (`obsidian_workspace_instructions`) — emitted iff
+`agentWorkspace.emitInstructions === true`, **seed only** (deltas never
+re-send it):
+
+```xml
+<obsidian_workspace_instructions>
+  Resources/ contains user-submitted raw materials; read them on demand
+  using your file tools.
+  Write any new notes to output_directory using absolute paths.
+  Focus_Context.md is jointly maintained by the user.
+  {{ if agentAssistedFocusUpdate: "After creating a note in output_directory,
+  append a line `[[<basename>]]: <one-line summary>` to Focus_Context.md." }}
+</obsidian_workspace_instructions>
 ```
 
 ### 4.4 Delta block (subsequent prompts on change)
@@ -311,7 +339,7 @@ sessions (which signals "needs seed"). Resume reuses the persisted value.
 
 ### 5.5 Integration with `message-sender.ts`
 
-`PreparePromptInput` gets one new optional field:
+`PreparePromptInput` carries one optional field:
 ```ts
 agentWorkspace?: {
   service: IAgentWorkspace;
@@ -319,20 +347,34 @@ agentWorkspace?: {
 };
 ```
 
+`IAgentWorkspace.buildPrelude(snapshot, options)` returns:
+```ts
+interface BuildPreludeResult {
+  state: { uri: string; xml: string } | null;        // null = empty delta or bootstrap failed
+  instructions: { uri: string; xml: string } | null; // non-null only on seed when emitInstructions=true
+  pendingSnapshot: WorkspaceSnapshot;
+}
+```
+
 In `preparePrompt`:
-1. If `agentWorkspace` present, call `getSeedPrelude()` (when `snapshot ===
-   null`) or `getDeltaPrelude(snapshot)`. Capture the returned `nextSnapshot`.
-2. Prepend the prelude string to the **first text block of the prompt**
-   (or, in embedded transport, prepend a sibling resource block with the
-   seed/delta content; tentative — see open question O1).
-3. Return `nextSnapshot` in `PreparePromptResult` so the caller can persist
-   it after a successful send.
+1. If `agentWorkspace` present, call `service.buildPrelude(snapshot, options)`.
+   Capture `pendingSnapshot` for return.
+2. **Embedded-context transport**: wrap each non-null block as a
+   `type: "resource"` PromptContent and place at the **head** of
+   `agentContent`, before mentioned-note resources, auto-mention, and the
+   user-text block. Annotations: `audience: ["assistant"]`,
+   `priority: 0.9` (state) / `0.7` (instructions),
+   `mimeType: "application/xml"`.
+3. **Text-fallback transport**: concatenate the non-null XML strings with
+   newline separators and prepend to the first text block (legacy behavior).
+4. Return `pendingWorkspaceSnapshot` in `PreparePromptResult` so the caller
+   can persist it after a successful send.
 
 In `useAgentMessages.ts`:
 - After `sendPreparedPrompt` resolves successfully, call
-  `agentWorkspace.postTurnSnapshot()` and store on the session.
-- On `stopReason` arrival via `onSessionUpdate`, do the same — covers cases
-  where the agent edited files mid-turn before the prompt promise resolved.
+  `agentWorkspace.postTurnSnapshot()` and store on the session via
+  `setWorkspaceSnapshot`. Falls back to `prepared.pendingWorkspaceSnapshot`
+  if `postTurnSnapshot` throws.
 
 ### 5.6 Settings shape
 
