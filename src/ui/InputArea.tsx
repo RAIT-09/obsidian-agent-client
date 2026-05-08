@@ -300,6 +300,20 @@ export function InputArea({
 	const logger = getLogger();
 	const settings = useSettings(plugin);
 	const showEmojis = plugin.settings.displaySettings.showEmojis;
+	const agentWorkspaceEnabled = settings.agentWorkspace.enabled;
+
+	const handleToggleAgentWorkspace = useCallback(() => {
+		void (async () => {
+			const next = !plugin.settings.agentWorkspace.enabled;
+			await plugin.settingsService.updateSettings({
+				agentWorkspace: {
+					...plugin.settings.agentWorkspace,
+					enabled: next,
+				},
+			});
+			plugin.refreshAgentWorkspace();
+		})();
+	}, [plugin]);
 
 	// Unofficial Obsidian API: app.vault.getConfig() is not in the public type definitions
 	// but is widely used by the plugin community for accessing editor settings.
@@ -1091,6 +1105,8 @@ export function InputArea({
 					onConfigOptionChange={onConfigOptionChange}
 					usage={usage}
 					isSessionReady={isSessionReady}
+					agentWorkspaceEnabled={agentWorkspaceEnabled}
+					onToggleAgentWorkspace={handleToggleAgentWorkspace}
 				/>
 			</div>
 		</div>

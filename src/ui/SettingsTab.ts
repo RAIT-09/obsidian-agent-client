@@ -196,20 +196,10 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl).setName("Agent Workspace").setHeading();
 
-		new Setting(containerEl)
-			.setName("Enable agent workspace")
-			.setDesc(
-				"Maintain a dedicated /Agent-Client/ folder (Index.md, Resources/, Agent_Output/) and ship its structure to the agent on every session.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.agentWorkspace.enabled)
-					.onChange(async (value) => {
-						this.plugin.settings.agentWorkspace.enabled = value;
-						await this.plugin.saveSettings();
-						this.plugin.refreshAgentWorkspace();
-					}),
-			);
+		containerEl.createEl("p", {
+			cls: "setting-item-description",
+			text: "Toggle the workspace on/off via the brain icon in the chat toolbar (next to the send button). The settings below configure its behavior when enabled.",
+		});
 
 		new Setting(containerEl)
 			.setName("Workspace folder")

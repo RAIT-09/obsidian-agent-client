@@ -357,8 +357,9 @@ interface AutoMentionSnapshot {
 2. Service: `src/services/agent-workspace.ts` — bootstrap, vault event subscription, manifest builder (depth/entry caps), seed/delta prelude formatters
 3. Snapshot type: `WorkspaceSnapshot` in `types/session.ts`; lives on `ChatSession.workspaceSnapshot` (in-memory only)
 4. Integration: `message-sender.ts` calls `agentWorkspace.buildPrelude(...)`; for embeddedContext-capable agents emits state/instructions as `type: "resource"` blocks at the head of agentContent, otherwise concatenates the XML and prepends to the first text block. `useAgentMessages.ts` commits `postTurnSnapshot()` on success via `setWorkspaceSnapshot`
-5. Settings UI: `src/ui/SettingsTab.ts` "Agent Workspace" section; `plugin.refreshAgentWorkspace()` re-bootstraps after path/enable changes
-6. Reference: `docs/design/agent-workspace.md` (15 decisions D1–D15)
+5. Settings UI: `src/ui/SettingsTab.ts` "Agent Workspace" section configures behavior (path, instructions, manifest caps); `plugin.refreshAgentWorkspace()` re-bootstraps after path/enable changes
+6. Toolbar toggle: brain icon in `src/ui/InputToolbar.tsx` (left of the send button) flips `agentWorkspace.enabled` via `plugin.settingsService.updateSettings(...)` + `plugin.refreshAgentWorkspace()`. The toggle does NOT touch `session.workspaceSnapshot` — the seed-then-delta gate handles OFF→ON cycles correctly because Resource blocks already in the agent transcript are pinned and the snapshot tracks transcript state, not toolbar state (see `docs/design/agent-workspace-toolbar.md` D10)
+7. Reference: `docs/design/agent-workspace.md` (15 decisions D1–D15), `docs/design/agent-workspace-toolbar.md` (10 decisions D1–D10)
 
 ### Modify Wikilink Context Behavior
 1. Setting: `expandWikilinkContext` (`src/plugin.ts`)

@@ -1109,6 +1109,43 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-muted);
 }
 
+/* Agent Workspace Toggle (brain icon, sits left of send button) */
+.agent-client-workspace-toggle {
+	width: 20px;
+	height: 20px;
+	padding: 0 !important;
+	margin: 0 !important;
+	border: none !important;
+	border-radius: 4px !important;
+	background-color: transparent !important;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	outline: none !important;
+	appearance: none;
+	box-shadow: none !important;
+	transition: background-color 0.15s ease;
+}
+
+.agent-client-workspace-toggle:hover {
+	background-color: var(--background-modifier-hover) !important;
+}
+
+.agent-client-workspace-toggle svg {
+	width: 16px;
+	height: 16px;
+	transition: color 0.2s ease;
+}
+
+.agent-client-workspace-toggle svg.agent-client-icon-active {
+	color: var(--interactive-accent);
+}
+
+.agent-client-workspace-toggle svg.agent-client-icon-inactive {
+	color: var(--text-muted);
+}
+
 /* ===== Other Chat Components ===== */
 
 /* Collapsible Thought */

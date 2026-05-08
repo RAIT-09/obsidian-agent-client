@@ -109,6 +109,10 @@ export interface InputToolbarProps {
 	onConfigOptionChange?: (configId: string, value: string) => void;
 	usage?: SessionUsage;
 	isSessionReady: boolean;
+	/** Whether the Agent Workspace feature is currently enabled. */
+	agentWorkspaceEnabled: boolean;
+	/** Toggle the Agent Workspace feature on/off (persists + re-bootstraps). */
+	onToggleAgentWorkspace: () => void;
 }
 
 export function InputToolbar({
@@ -124,9 +128,12 @@ export function InputToolbar({
 	onConfigOptionChange,
 	usage,
 	isSessionReady,
+	agentWorkspaceEnabled,
+	onToggleAgentWorkspace,
 }: InputToolbarProps) {
 	// Refs
 	const sendButtonRef = useRef<HTMLButtonElement>(null);
+	const workspaceButtonRef = useRef<HTMLButtonElement>(null);
 	const modeDropdownRef = useRef<HTMLDivElement>(null);
 	const modelDropdownRef = useRef<HTMLDivElement>(null);
 	const configOptionsRef = useRef<HTMLDivElement>(null);
@@ -189,6 +196,25 @@ export function InputToolbar({
 			}
 		}
 	}, [updateIconColor]);
+
+	// Render brain icon and reflect the workspace-enabled state via SVG color class.
+	useEffect(() => {
+		const btn = workspaceButtonRef.current;
+		if (!btn) return;
+		setIcon(btn, "brain");
+		const svg = btn.querySelector("svg");
+		if (svg) {
+			svg.classList.remove(
+				"agent-client-icon-active",
+				"agent-client-icon-inactive",
+			);
+			svg.classList.add(
+				agentWorkspaceEnabled
+					? "agent-client-icon-active"
+					: "agent-client-icon-inactive",
+			);
+		}
+	}, [agentWorkspaceEnabled]);
 
 	// Mode dropdown
 	const modeOptions = modes?.availableModes?.map((m) => ({
@@ -351,6 +377,19 @@ export function InputToolbar({
 					)}
 				</>
 			)}
+
+			{/* Agent Workspace Toggle (brain icon) */}
+			<button
+				ref={workspaceButtonRef}
+				onClick={onToggleAgentWorkspace}
+				className={`agent-client-workspace-toggle ${agentWorkspaceEnabled ? "agent-client-active" : ""}`}
+				title={
+					agentWorkspaceEnabled
+						? "Agent Workspace enabled — click to disable"
+						: "Agent Workspace disabled — click to enable"
+				}
+				aria-pressed={agentWorkspaceEnabled}
+			></button>
 
 			{/* Send/Stop Button */}
 			<button
