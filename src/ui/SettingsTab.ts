@@ -77,13 +77,15 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.setPlaceholder("Leave blank (login shell auto-resolves)")
 					.setValue(this.plugin.settings.nodePath)
 					.onChange(async (value) => {
-						this.plugin.settings.nodePath = value.trim();
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							nodePath: value.trim(),
+						});
 					});
 			});
 		this.addAutoDetectButton(nodePathSetting, "node", async (path) => {
-			this.plugin.settings.nodePath = path;
-			await this.plugin.saveSettings();
+			await this.plugin.settingsService.updateSettings({
+				nodePath: path,
+			});
 		});
 
 		new Setting(containerEl)
@@ -103,10 +105,11 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					)
 					.setValue(this.plugin.settings.sendMessageShortcut)
 					.onChange(async (value) => {
-						this.plugin.settings.sendMessageShortcut = value as
-							| "enter"
-							| "cmd-enter";
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							sendMessageShortcut: value as
+								| "enter"
+								| "cmd-enter",
+						});
 					}),
 			);
 
@@ -125,8 +128,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.autoMentionActiveNote)
 					.onChange(async (value) => {
-						this.plugin.settings.autoMentionActiveNote = value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							autoMentionActiveNote: value,
+						});
 					}),
 			);
 
@@ -146,9 +150,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						const num = parseInt(value, 10);
 						if (!isNaN(num) && num >= 1) {
-							this.plugin.settings.displaySettings.maxNoteLength =
-								num;
-							await this.plugin.saveSettings();
+							await this.plugin.settingsService.updateSettings({
+								displaySettings: {
+									...this.plugin.settings.displaySettings,
+									maxNoteLength: num,
+								},
+							});
 						}
 					}),
 			);
@@ -170,9 +177,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						const num = parseInt(value, 10);
 						if (!isNaN(num) && num >= 1) {
-							this.plugin.settings.displaySettings.maxSelectionLength =
-								num;
-							await this.plugin.saveSettings();
+							await this.plugin.settingsService.updateSettings({
+								displaySettings: {
+									...this.plugin.settings.displaySettings,
+									maxSelectionLength: num,
+								},
+							});
 						}
 					}),
 			);
@@ -194,9 +204,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.addOption("editor-split", "Editor area (split)")
 					.setValue(this.plugin.settings.chatViewLocation)
 					.onChange(async (value) => {
-						this.plugin.settings.chatViewLocation =
-							value as ChatViewLocation;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							chatViewLocation: value as ChatViewLocation,
+						});
 					}),
 			);
 
@@ -306,8 +316,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.displaySettings.showEmojis)
 					.onChange(async (value) => {
-						this.plugin.settings.displaySettings.showEmojis = value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							displaySettings: {
+								...this.plugin.settings.displaySettings,
+								showEmojis: value,
+							},
+						});
 					}),
 			);
 
@@ -322,9 +336,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						this.plugin.settings.displaySettings.autoCollapseDiffs,
 					)
 					.onChange(async (value) => {
-						this.plugin.settings.displaySettings.autoCollapseDiffs =
-							value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							displaySettings: {
+								...this.plugin.settings.displaySettings,
+								autoCollapseDiffs: value,
+							},
+						});
 						this.display();
 					}),
 			);
@@ -347,9 +364,15 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						.onChange(async (value) => {
 							const num = parseInt(value, 10);
 							if (!isNaN(num) && num > 0) {
-								this.plugin.settings.displaySettings.diffCollapseThreshold =
-									num;
-								await this.plugin.saveSettings();
+								await this.plugin.settingsService.updateSettings(
+									{
+										displaySettings: {
+											...this.plugin.settings
+												.displaySettings,
+											diffCollapseThreshold: num,
+										},
+									},
+								);
 							}
 						}),
 				);
@@ -401,8 +424,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.setPlaceholder("https://example.com/avatar.png")
 					.setValue(this.plugin.settings.floatingButtonImage)
 					.onChange(async (value) => {
-						this.plugin.settings.floatingButtonImage = value.trim();
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							floatingButtonImage: value.trim(),
+						});
 					}),
 			);
 
@@ -421,8 +445,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.autoAllowPermissions)
 					.onChange(async (value) => {
-						this.plugin.settings.autoAllowPermissions = value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							autoAllowPermissions: value,
+						});
 						// Propagate to all live AcpClient instances
 						this.plugin.updateAllAutoAllow(value);
 					}),
@@ -443,8 +468,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.enableSystemNotifications)
 					.onChange(async (value) => {
-						this.plugin.settings.enableSystemNotifications = value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							enableSystemNotifications: value,
+						});
 					}),
 			);
 
@@ -534,8 +560,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					toggle
 						.setValue(this.plugin.settings.windowsWslMode)
 						.onChange(async (value) => {
-							this.plugin.settings.windowsWslMode = value;
-							await this.plugin.saveSettings();
+							await this.plugin.settingsService.updateSettings({
+								windowsWslMode: value,
+							});
 							this.display(); // Refresh to show/hide distribution setting
 						}),
 				);
@@ -554,9 +581,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 									"",
 							)
 							.onChange(async (value) => {
-								this.plugin.settings.windowsWslDistribution =
-									value.trim() || undefined;
-								await this.plugin.saveSettings();
+								await this.plugin.settingsService.updateSettings(
+									{
+										windowsWslDistribution:
+											value.trim() || undefined,
+									},
+								);
 							}),
 					);
 			}
@@ -590,9 +620,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.setPlaceholder("Agent Client")
 					.setValue(this.plugin.settings.exportSettings.defaultFolder)
 					.onChange(async (value) => {
-						this.plugin.settings.exportSettings.defaultFolder =
-							value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							exportSettings: {
+								...this.plugin.settings.exportSettings,
+								defaultFolder: value,
+							},
+						});
 					}),
 			);
 
@@ -608,9 +641,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						this.plugin.settings.exportSettings.filenameTemplate,
 					)
 					.onChange(async (value) => {
-						this.plugin.settings.exportSettings.filenameTemplate =
-							value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							exportSettings: {
+								...this.plugin.settings.exportSettings,
+								filenameTemplate: value,
+							},
+						});
 					}),
 			);
 
@@ -626,9 +662,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						this.plugin.settings.exportSettings.frontmatterTag,
 					)
 					.onChange(async (value) => {
-						this.plugin.settings.exportSettings.frontmatterTag =
-							value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							exportSettings: {
+								...this.plugin.settings.exportSettings,
+								frontmatterTag: value,
+							},
+						});
 					}),
 			);
 
@@ -639,9 +678,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.exportSettings.includeImages)
 					.onChange(async (value) => {
-						this.plugin.settings.exportSettings.includeImages =
-							value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							exportSettings: {
+								...this.plugin.settings.exportSettings,
+								includeImages: value,
+							},
+						});
 						this.display();
 					}),
 			);
@@ -665,9 +707,15 @@ export class AgentClientSettingTab extends PluginSettingTab {
 							this.plugin.settings.exportSettings.imageLocation,
 						)
 						.onChange(async (value) => {
-							this.plugin.settings.exportSettings.imageLocation =
-								value as "obsidian" | "custom" | "base64";
-							await this.plugin.saveSettings();
+							await this.plugin.settingsService.updateSettings({
+								exportSettings: {
+									...this.plugin.settings.exportSettings,
+									imageLocation: value as
+										| "obsidian"
+										| "custom"
+										| "base64",
+								},
+							});
 							this.display();
 						}),
 				);
@@ -688,9 +736,15 @@ export class AgentClientSettingTab extends PluginSettingTab {
 									.imageCustomFolder,
 							)
 							.onChange(async (value) => {
-								this.plugin.settings.exportSettings.imageCustomFolder =
-									value;
-								await this.plugin.saveSettings();
+								await this.plugin.settingsService.updateSettings(
+									{
+										exportSettings: {
+											...this.plugin.settings
+												.exportSettings,
+											imageCustomFolder: value,
+										},
+									},
+								);
 							}),
 					);
 			}
@@ -707,9 +761,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						this.plugin.settings.exportSettings.autoExportOnNewChat,
 					)
 					.onChange(async (value) => {
-						this.plugin.settings.exportSettings.autoExportOnNewChat =
-							value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							exportSettings: {
+								...this.plugin.settings.exportSettings,
+								autoExportOnNewChat: value,
+							},
+						});
 					}),
 			);
 
@@ -725,9 +782,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 							.autoExportOnCloseChat,
 					)
 					.onChange(async (value) => {
-						this.plugin.settings.exportSettings.autoExportOnCloseChat =
-							value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							exportSettings: {
+								...this.plugin.settings.exportSettings,
+								autoExportOnCloseChat: value,
+							},
+						});
 					}),
 			);
 
@@ -740,9 +800,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						this.plugin.settings.exportSettings.openFileAfterExport,
 					)
 					.onChange(async (value) => {
-						this.plugin.settings.exportSettings.openFileAfterExport =
-							value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							exportSettings: {
+								...this.plugin.settings.exportSettings,
+								openFileAfterExport: value,
+							},
+						});
 					}),
 			);
 
@@ -761,8 +824,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.debugMode)
 					.onChange(async (value) => {
-						await this.plugin.saveSettingsAndNotify({
-							...this.plugin.settings,
+						await this.plugin.settingsService.updateSettings({
 							debugMode: value,
 						});
 					}),
@@ -892,8 +954,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				new SecretComponent(this.app, el)
 					.setValue(gemini.apiKeySecretId)
 					.onChange(async (value) => {
-						this.plugin.settings.gemini.apiKeySecretId = value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							gemini: {
+								...this.plugin.settings.gemini,
+								apiKeySecretId: value,
+							},
+						});
 					}),
 			);
 
@@ -906,13 +972,21 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.setPlaceholder("gemini")
 					.setValue(gemini.command)
 					.onChange(async (value) => {
-						this.plugin.settings.gemini.command = value.trim();
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							gemini: {
+								...this.plugin.settings.gemini,
+								command: value.trim(),
+							},
+						});
 					});
 			});
 		this.addAutoDetectButton(geminiPathSetting, "gemini", async (path) => {
-			this.plugin.settings.gemini.command = path;
-			await this.plugin.saveSettings();
+			await this.plugin.settingsService.updateSettings({
+				gemini: {
+					...this.plugin.settings.gemini,
+					command: path,
+				},
+			});
 		});
 		this.addInstallHint(sectionEl, "@google/gemini-cli");
 
@@ -925,9 +999,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.setPlaceholder("")
 					.setValue(this.formatArgs(gemini.args))
 					.onChange(async (value) => {
-						this.plugin.settings.gemini.args =
-							this.parseArgs(value);
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							gemini: {
+								...this.plugin.settings.gemini,
+								args: this.parseArgs(value),
+							},
+						});
 					});
 				text.inputEl.rows = 3;
 			});
@@ -941,8 +1018,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.setPlaceholder("GOOGLE_CLOUD_PROJECT=...")
 					.setValue(this.formatEnv(gemini.env))
 					.onChange(async (value) => {
-						this.plugin.settings.gemini.env = this.parseEnv(value);
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							gemini: {
+								...this.plugin.settings.gemini,
+								env: this.parseEnv(value),
+							},
+						});
 					});
 				text.inputEl.rows = 3;
 			});
@@ -964,8 +1045,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				new SecretComponent(this.app, el)
 					.setValue(claude.apiKeySecretId)
 					.onChange(async (value) => {
-						this.plugin.settings.claude.apiKeySecretId = value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							claude: {
+								...this.plugin.settings.claude,
+								apiKeySecretId: value,
+							},
+						});
 					}),
 			);
 
@@ -978,16 +1063,24 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.setPlaceholder("claude-agent-acp")
 					.setValue(claude.command)
 					.onChange(async (value) => {
-						this.plugin.settings.claude.command = value.trim();
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							claude: {
+								...this.plugin.settings.claude,
+								command: value.trim(),
+							},
+						});
 					});
 			});
 		this.addAutoDetectButton(
 			claudePathSetting,
 			"claude-agent-acp",
 			async (path) => {
-				this.plugin.settings.claude.command = path;
-				await this.plugin.saveSettings();
+				await this.plugin.settingsService.updateSettings({
+					claude: {
+						...this.plugin.settings.claude,
+						command: path,
+					},
+				});
 			},
 		);
 		this.addInstallHint(sectionEl, "@agentclientprotocol/claude-agent-acp");
@@ -1001,9 +1094,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.setPlaceholder("")
 					.setValue(this.formatArgs(claude.args))
 					.onChange(async (value) => {
-						this.plugin.settings.claude.args =
-							this.parseArgs(value);
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							claude: {
+								...this.plugin.settings.claude,
+								args: this.parseArgs(value),
+							},
+						});
 					});
 				text.inputEl.rows = 3;
 			});
@@ -1017,8 +1113,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.setPlaceholder("")
 					.setValue(this.formatEnv(claude.env))
 					.onChange(async (value) => {
-						this.plugin.settings.claude.env = this.parseEnv(value);
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							claude: {
+								...this.plugin.settings.claude,
+								env: this.parseEnv(value),
+							},
+						});
 					});
 				text.inputEl.rows = 3;
 			});
@@ -1040,8 +1140,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				new SecretComponent(this.app, el)
 					.setValue(codex.apiKeySecretId)
 					.onChange(async (value) => {
-						this.plugin.settings.codex.apiKeySecretId = value;
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							codex: {
+								...this.plugin.settings.codex,
+								apiKeySecretId: value,
+							},
+						});
 					}),
 			);
 
@@ -1054,16 +1158,24 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.setPlaceholder("codex-acp")
 					.setValue(codex.command)
 					.onChange(async (value) => {
-						this.plugin.settings.codex.command = value.trim();
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							codex: {
+								...this.plugin.settings.codex,
+								command: value.trim(),
+							},
+						});
 					});
 			});
 		this.addAutoDetectButton(
 			codexPathSetting,
 			"codex-acp",
 			async (path) => {
-				this.plugin.settings.codex.command = path;
-				await this.plugin.saveSettings();
+				await this.plugin.settingsService.updateSettings({
+					codex: {
+						...this.plugin.settings.codex,
+						command: path,
+					},
+				});
 			},
 		);
 		this.addInstallHint(sectionEl, "@zed-industries/codex-acp");
@@ -1077,8 +1189,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.setPlaceholder("")
 					.setValue(this.formatArgs(codex.args))
 					.onChange(async (value) => {
-						this.plugin.settings.codex.args = this.parseArgs(value);
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							codex: {
+								...this.plugin.settings.codex,
+								args: this.parseArgs(value),
+							},
+						});
 					});
 				text.inputEl.rows = 3;
 			});
@@ -1092,8 +1208,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				text.setPlaceholder("")
 					.setValue(this.formatEnv(codex.env))
 					.onChange(async (value) => {
-						this.plugin.settings.codex.env = this.parseEnv(value);
-						await this.plugin.saveSettings();
+						await this.plugin.settingsService.updateSettings({
+							codex: {
+								...this.plugin.settings.codex,
+								env: this.parseEnv(value),
+							},
+						});
 					});
 				text.inputEl.rows = 3;
 			});
@@ -1126,7 +1246,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						env: [],
 					});
 					this.plugin.ensureDefaultAgentId();
-					await this.plugin.saveSettings();
+					await this.flushSettings();
 					this.display();
 				});
 		});
@@ -1163,7 +1283,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 							this.plugin.settings.defaultAgentId = nextId;
 						}
 						this.plugin.ensureDefaultAgentId();
-						await this.plugin.saveSettings();
+						await this.flushSettings();
 						this.refreshAgentDropdown();
 					});
 			});
@@ -1175,7 +1295,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				.onClick(async () => {
 					this.plugin.settings.customAgents.splice(index, 1);
 					this.plugin.ensureDefaultAgentId();
-					await this.plugin.saveSettings();
+					await this.flushSettings();
 					this.display();
 				});
 		});
@@ -1192,7 +1312,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 							trimmed.length > 0
 								? trimmed
 								: this.plugin.settings.customAgents[index].id;
-						await this.plugin.saveSettings();
+						await this.flushSettings();
 						this.refreshAgentDropdown();
 					});
 			});
@@ -1208,7 +1328,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.customAgents[index].command =
 							value.trim();
-						await this.plugin.saveSettings();
+						await this.flushSettings();
 					});
 			});
 
@@ -1223,7 +1343,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.customAgents[index].args =
 							this.parseArgs(value);
-						await this.plugin.saveSettings();
+						await this.flushSettings();
 					});
 				text.inputEl.rows = 3;
 			});
@@ -1239,10 +1359,25 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.customAgents[index].env =
 							this.parseEnv(value);
-						await this.plugin.saveSettings();
+						await this.flushSettings();
 					});
 				text.inputEl.rows = 3;
 			});
+	}
+
+	/**
+	 * Flush the current `plugin.settings` state through `settingsService.updateSettings()`
+	 * so that React components subscribed via `useSettings` re-render.
+	 *
+	 * Use this after calling legacy helpers (e.g. `ensureDefaultAgentId`) that mutate
+	 * `plugin.settings` directly. Passes the current values as the "update" to trigger
+	 * the notification pipeline without re-merging.
+	 */
+	private async flushSettings(): Promise<void> {
+		await this.plugin.settingsService.updateSettings({
+			customAgents: this.plugin.settings.customAgents,
+			defaultAgentId: this.plugin.settings.defaultAgentId,
+		});
 	}
 
 	private generateCustomAgentDisplayName(): string {
