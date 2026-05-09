@@ -37,8 +37,8 @@ https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 - **Terminal Integration**: Let agents execute commands and return results
 - **MCP Support**: Agents use their configured MCP servers — no extra setup needed in the plugin
 
-## LLM-wiki
-![video](https://github.com/user-attachments/assets/0e176e1a-ebea-49c2-9f40-8371274605e9)
+## LLM-wiki mode
+https://github.com/user-attachments/assets/0a8a3d26-0c03-4a52-a803-87ac2b8a3a55
 
 See [wiki-mode](docs/usage/wiki-mode.md) for details.
 

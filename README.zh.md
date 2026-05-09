@@ -33,7 +33,7 @@
 - **MCP 支持**：代理使用其配置的 MCP 服务器 — 插件中无需额外设置
 
 ## LLM-wiki 模式
-![video](https://github.com/user-attachments/assets/0e176e1a-ebea-49c2-9f40-8371274605e9)
+https://github.com/user-attachments/assets/0a8a3d26-0c03-4a52-a803-87ac2b8a3a55
 
 详见 [wiki-mode](docs/usage/wiki-mode.md)
 

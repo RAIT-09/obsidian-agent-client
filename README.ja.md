@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 - **MCPサポート**: エージェントに設定済みのMCPサーバーがそのまま利用可能 — プラグイン側の追加設定は不要
 
 ## LLM-wiki mode
-![video](https://github.com/user-attachments/assets/0e176e1a-ebea-49c2-9f40-8371274605e9)
+https://github.com/user-attachments/assets/0a8a3d26-0c03-4a52-a803-87ac2b8a3a55
 
 詳細については、[wiki-mode](docs/usage/wiki-mode.md) を参照してください
 
