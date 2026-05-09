@@ -9,16 +9,15 @@
 </p>
 
 <p align="center">
-  <a href="README.ja.md">日本語はこちら</a>
-</p>
-
-<p align="center">
-  <a href="https://www.buymeacoffee.com/rait09" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="180" height="50" ></a>
+  <a href="README.ja.md">日本語</a> |
+  <a href="README.zh.md">简体中文</a>
 </p>
 
 Bring AI agents (Claude Code, Codex, Gemini CLI) directly into Obsidian. Chat with your AI assistant right from your vault.
 
 Built on [Agent Client Protocol (ACP)](https://github.com/agentclientprotocol/agent-client-protocol) by Zed.
+
+Based on Andrej Karpathy's LLM-wiki concept [LLM-wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
 
 https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 
@@ -37,6 +36,11 @@ https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 - **Chat Export**: Save conversations as Markdown notes
 - **Terminal Integration**: Let agents execute commands and return results
 - **MCP Support**: Agents use their configured MCP servers — no extra setup needed in the plugin
+
+## LLM-wiki
+![video](https://github.com/user-attachments/assets/0e176e1a-ebea-49c2-9f40-8371274605e9)
+
+See [wiki-mode](docs/usage/wiki-mode.md) for details.
 
 ## Installation
 

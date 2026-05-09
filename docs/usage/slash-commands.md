@@ -18,11 +18,11 @@ If the input field placeholder shows `/ for commands`, the current agent support
 4. Press `Enter` to execute the command
 
 <p align="center">
-  <img src="/images/slash-commands-1.webp" alt="Slash commands dropdown" width="400" />
+  <img src="../public/images/slash-commands-1.webp" alt="Slash commands dropdown" width="400" />
 </p>
 
 <p align="center">
-  <img src="/images/slash-commands-2.webp" alt="Filtering slash commands" width="400" />
+  <img src="../public/images/slash-commands-2.webp" alt="Filtering slash commands" width="400" />
 </p>
 
 ## Available Commands

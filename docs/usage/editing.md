@@ -12,7 +12,7 @@ When you ask the agent to modify files:
 4. Changes are applied to your files
 
 <p align="center">
-  <img src="/images/editing.webp" alt="Editing files with agents" width="400" />
+  <img src="../public/images/editing.webp" alt="Editing files with agents" width="400" />
 </p>
 
 ## Permission Controls

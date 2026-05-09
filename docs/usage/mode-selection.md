@@ -16,7 +16,7 @@ Modes are predefined configurations that alter the agent's behavior for specific
 3. Select the desired mode from the available options
 
 <p align="center">
-  <img src="/images/mode-selection.webp" alt="Mode selection dropdown" width="400" />
+  <img src="../public/images/mode-selection.webp" alt="Mode selection dropdown" width="400" />
 </p>
 
 ::: tip

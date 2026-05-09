@@ -11,7 +11,7 @@ Session history features are agent-specific. Not all agents support all features
 Click the **History** button (clock icon) in the chat header to open the session history modal.
 
 <p align="center">
-  <img src="/images/session-history-button.webp" alt="Session history button in chat header" />
+  <img src="../public/images/session-history-button.webp" alt="Session history button in chat header" />
 </p>
 
 ## Available Actions

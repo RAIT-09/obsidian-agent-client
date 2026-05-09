@@ -19,7 +19,7 @@ When auto-mention is active, a badge appears above the input field showing the c
 You can temporarily disable auto-mention for a single message by clicking the **×** button next to the badge. Click the **+** button to re-enable it. This toggle only affects the current message—auto-mention will be active again for subsequent messages.
 
 <p align="center">
-  <img src="/images/temporary-disable.gif" alt="Temporarily disabling auto-mention" />
+  <img src="../public/images/temporary-disable.gif" alt="Temporarily disabling auto-mention" />
 </p>
 
 ### Selection Context
@@ -27,7 +27,7 @@ You can temporarily disable auto-mention for a single message by clicking the **
 If you select text in your note, the selected lines are passed as context to the agent. The badge will show the line range (e.g., `@My Note:5-10`), and the agent receives both the file path and the selected content.
 
 <p align="center">
-  <img src="/images/selection-context.gif" alt="Selection context feature" />
+  <img src="../public/images/selection-context.gif" alt="Selection context feature" />
 </p>
 
 ## Manual Mentions

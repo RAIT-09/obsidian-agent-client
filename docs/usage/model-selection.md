@@ -16,7 +16,7 @@ Models are different versions of the AI with varying capabilities:
 3. Select the desired model from the available options
 
 <p align="center">
-  <img src="/images/model-selection.webp" alt="Model selection dropdown" width="400" />
+  <img src="../public/images/model-selection.webp" alt="Model selection dropdown" width="400" />
 </p>
 
 ::: tip

@@ -3,7 +3,7 @@
 Run multiple independent agent conversations simultaneously.
 
 <p align="center">
-  <img src="/images/multi-session.webp" alt="Multiple chat views running simultaneously" />
+  <img src="../public/images/multi-session.webp" alt="Multiple chat views running simultaneously" />
 </p>
 
 ## Overview

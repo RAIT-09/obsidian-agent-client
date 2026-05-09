@@ -17,7 +17,7 @@ Attach images and files to your messages to provide context to the AI agent.
 3. Paste with `Cmd/Ctrl + V`
 
 <p align="center">
-  <img src="/images/sending-images.webp" alt="Sending Images and Files" width="400" />
+  <img src="../public/images/sending-images.webp" alt="Sending Images and Files" width="400" />
 </p>
 
 ::: tip
@@ -32,7 +32,7 @@ Attached files appear as thumbnails or file icons below the text area.
 - **Attachments are sent with your message**: When you send, all attached files are included
 
 <p align="center">
-  <img src="/images/remove-image.webp" alt="Remove attachment button" width="400" />
+  <img src="../public/images/remove-image.webp" alt="Remove attachment button" width="400" />
 </p>
 
 ## Supported Image Formats

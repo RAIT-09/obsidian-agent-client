@@ -34,6 +34,11 @@ https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 - **ターミナル統合**: エージェントがコマンドを実行し結果を返す
 - **MCPサポート**: エージェントに設定済みのMCPサーバーがそのまま利用可能 — プラグイン側の追加設定は不要
 
+## LLM-wiki mode
+![video](https://github.com/user-attachments/assets/0e176e1a-ebea-49c2-9f40-8371274605e9)
+
+詳細については、[wiki-mode](docs/usage/wiki-mode.md) を参照してください
+
 ## インストール
 
 ### BRAT経由（推奨）

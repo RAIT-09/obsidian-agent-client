@@ -204,7 +204,7 @@ they're concatenated with a newline separator.
     {{full content of Index.md, with [[links]] resolved by the
     wikilink extractor (file paths surfaced as <obsidian_metadata> the
     same way mentioned notes do)}}
-  </index>
+  </focus_context>
 
   <resources directory="/abs/vault/Agent-Client/Resources/" max_entries="200" max_depth="3">
     <document path="/abs/.../annual_report_2023.pdf" size="4718592" last_modified="2026-03-15T..." extension="pdf" />
@@ -238,7 +238,7 @@ re-send it):
   <!-- only present if Index.md hash changed since last snapshot -->
   <index path="...">
     {{full new content, with wikilinks resolved}}
-  </index>
+  </focus_context>
 
   <!-- only present if Resources/ manifest changed; only the diffs -->
   <resources directory="...">
@@ -268,7 +268,7 @@ resume):
 
 ```ts
 interface WorkspaceSnapshot {
-  indexHash: string;           // SHA-1 of Index.md content
+  focusContextHash: string;           // SHA-1 of Index.md content
   resourcesManifestHash: string;      // SHA-1 of canonicalized manifest
   outputDateString: string;           // YYYY-MM-DD
   hasSeed: boolean;                   // false until first successful prompt
