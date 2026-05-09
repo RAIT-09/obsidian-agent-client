@@ -796,6 +796,10 @@ export function useSessionHistory(
 	 * Save session messages locally.
 	 * Called when a turn ends (agent response complete).
 	 * Fire-and-forget (does not block UI).
+	 *
+	 * Also bumps the session's `updatedAt` metadata so that
+	 * `getSavedSessions()` (sorted by updatedAt desc) reflects actual
+	 * activity rather than just session-creation time (#257).
 	 */
 	const saveSessionMessages = useCallback(
 		(
@@ -804,12 +808,27 @@ export function useSessionHistory(
 		) => {
 			if (!session.agentId || messages.length === 0) return;
 
-			// Fire-and-forget
+			// Persist message content (fire-and-forget)
 			void settingsAccess.saveSessionMessages(
 				sessionId,
 				session.agentId,
 				messages,
 			);
+
+			// Bump updatedAt on session metadata so "last used" ordering
+			// reflects real activity. Read live snapshot (not React state)
+			// to avoid races with rapid fork/rename. Skip if the metadata
+			// entry hasn't landed yet — saveSessionLocally will create it
+			// on the first-message path.
+			const existing = settingsAccess
+				.getSavedSessions()
+				.find((s) => s.sessionId === sessionId);
+			if (existing) {
+				void settingsAccess.saveSession({
+					...existing,
+					updatedAt: new Date().toISOString(),
+				});
+			}
 		},
 		[session.agentId, settingsAccess],
 	);
