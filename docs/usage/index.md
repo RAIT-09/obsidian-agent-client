@@ -100,4 +100,4 @@ If the agent is generating a response and you want to stop it, click the **Stop*
 
 Click the **Brain** button at the bottom to activate wiki mode that the agent can obtain your resources and document links from the Index.md
 
-See 
+See [Wiki Mode](docs/usage/wiki-mode.md) for details.
