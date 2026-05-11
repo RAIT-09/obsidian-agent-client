@@ -313,10 +313,18 @@ function buildAgentMessageText(
 ): string {
 	const userMessage = autoMentionPrefix + message;
 
+	// Skip context blocks on slash-command turns to avoid colliding with
+	// the ACP command-detection rule (agents detect '/' at the start of
+	// a text ContentBlock). This is the fallback path for agents that
+	// don't support embeddedContext resource blocks; agents with
+	// embeddedContext receive note context through the separate resource
+	// ContentBlock path in preparePrompt, which stays spec-compliant
+	// alongside slash commands.
+	const isSlashCommand = message.startsWith("/");
+	const includeContext = !isSlashCommand && contextBlocks && contextBlocks.length > 0;
+
 	return [
-		...(contextBlocks && contextBlocks.length > 0
-			? [contextBlocks.join("\n")]
-			: []),
+		...(includeContext ? [contextBlocks.join("\n")] : []),
 		...(userMessage ? [userMessage] : []),
 	].join("\n\n");
 }
