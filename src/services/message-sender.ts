@@ -343,13 +343,20 @@ function buildDisplayContent(input: PreparePromptInput): PromptContent[] {
 }
 
 /**
+/**
  * Build auto-mention context metadata for UI.
+ *
+ * Skipped on slash-command turns so the chat bubble doesn't render an
+ * @[[note]] badge next to a slash command — matches the prefix/resource
+ * skip for consistent "slash commands send no context" semantics.
  */
 function buildAutoMentionContext(
 	activeNote: NoteMetadata | null | undefined,
 	isDisabled: boolean | undefined,
+	message: string,
 ): PreparePromptResult["autoMentionContext"] {
 	if (!activeNote || isDisabled) return undefined;
+	if (message.startsWith("/")) return undefined;
 	return {
 		noteName: activeNote.name,
 		notePath: activeNote.path,
@@ -457,9 +464,17 @@ async function preparePromptWithEmbeddedContext(
 		});
 	}
 
-	// Build auto-mention Resource block
+	// Build auto-mention Resource block. Skipped on slash-command turns
+	// so the agent receives just the slash command without any attached
+	// note context — matches the prefix/UI chip skip for consistent
+	// "slash commands send no context" semantics regardless of agent
+	// embeddedContext capability.
 	const autoMentionBlocks: PromptContent[] = [];
-	if (input.activeNote && !input.isAutoMentionDisabled) {
+	if (
+		input.activeNote &&
+		!input.isAutoMentionDisabled &&
+		!input.message.startsWith("/")
+	) {
 		const autoMentionResource = await buildAutoMentionResource(
 			input.activeNote,
 			input.vaultBasePath,
@@ -505,6 +520,7 @@ async function preparePromptWithEmbeddedContext(
 		autoMentionContext: buildAutoMentionContext(
 			input.activeNote,
 			input.isAutoMentionDisabled,
+			input.message,
 		),
 	};
 }
@@ -592,6 +608,7 @@ async function preparePromptWithTextContext(
 		autoMentionContext: buildAutoMentionContext(
 			input.activeNote,
 			input.isAutoMentionDisabled,
+			input.message,
 		),
 	};
 }
