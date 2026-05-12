@@ -75,6 +75,8 @@ export interface AgentClientPluginSettings {
 	defaultAgentId: string;
 	autoAllowPermissions: boolean;
 	autoMentionActiveNote: boolean;
+	/** Surface `[[wikilinks]]` inside note content as resolved metadata so the agent can decide which links to follow */
+	expandWikilinkContext: boolean;
 	/** Show OS system notifications on response completion and permission requests */
 	enableSystemNotifications: boolean;
 	/** Prompt injection settings for Obsidian-flavored Markdown guidance */
@@ -160,6 +162,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	defaultAgentId: "claude-code-acp",
 	autoAllowPermissions: false,
 	autoMentionActiveNote: true,
+	expandWikilinkContext: true,
 	enableSystemNotifications: true,
 	promptInjection: {
 		enabled: true,
@@ -228,6 +231,7 @@ export default class AgentClientPlugin extends Plugin {
 		// "Attempting to register an existing view type" when Obsidian's
 		// hot-reload races onunload/onload (e.g. rapid toggle or npm run dev).
 		this.app.workspace.detachLeavesOfType(VIEW_TYPE_CHAT);
+
 		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
 
 		const ribbonIconEl = this.addRibbonIcon(
@@ -965,6 +969,10 @@ export default class AgentClientPlugin extends Plugin {
 			autoMentionActiveNote: bool(
 				raw.autoMentionActiveNote,
 				D.autoMentionActiveNote,
+			),
+			expandWikilinkContext: bool(
+				raw.expandWikilinkContext,
+				D.expandWikilinkContext,
 			),
 			enableSystemNotifications: bool(
 				raw.enableSystemNotifications,

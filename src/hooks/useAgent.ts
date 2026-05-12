@@ -14,6 +14,7 @@ import type { IVaultAccess } from "../services/vault-service";
 import type { ISettingsAccess } from "../services/settings-service";
 import type { ErrorInfo } from "../types/errors";
 import type { IMentionService } from "../utils/mention-parser";
+import type { IWikilinkResolver } from "../utils/wikilink-resolver";
 import { useAgentSession } from "./useAgentSession";
 import { useAgentMessages, type SendMessageOptions } from "./useAgentMessages";
 
@@ -113,7 +114,7 @@ export interface UseAgentReturn {
 export function useAgent(
 	agentClient: AcpClient,
 	settingsAccess: ISettingsAccess,
-	vaultAccess: IVaultAccess & IMentionService,
+	vaultAccess: IVaultAccess & IMentionService & IWikilinkResolver,
 	workingDirectory: string,
 	initialAgentId?: string,
 ): UseAgentReturn {

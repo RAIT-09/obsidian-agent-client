@@ -18,6 +18,7 @@ import type {
 import type { ChatSession, SessionUpdate } from "../types/session";
 import type { AcpClient } from "../acp/acp-client";
 import type { IVaultAccess, NoteMetadata } from "../services/vault-service";
+import type { IWikilinkResolver } from "../utils/wikilink-resolver";
 import type { ISettingsAccess } from "../services/settings-service";
 import type { ErrorInfo } from "../types/errors";
 import type { IMentionService } from "../utils/mention-parser";
@@ -95,7 +96,7 @@ export interface UseAgentMessagesReturn {
 export function useAgentMessages(
 	agentClient: AcpClient,
 	settingsAccess: ISettingsAccess,
-	vaultAccess: IVaultAccess & IMentionService,
+	vaultAccess: IVaultAccess & IMentionService & IWikilinkResolver,
 	session: ChatSession,
 	setErrorInfo: (error: ErrorInfo | null) => void,
 ): UseAgentMessagesReturn {
@@ -284,6 +285,8 @@ export function useAgentMessages(
 								tables: settings.promptInjection.tables,
 							}
 						: undefined,
+					expandWikilinkContext: settings.expandWikilinkContext,
+					wikilinkResolver: vaultAccess,
 				},
 				vaultAccess,
 				vaultAccess, // IMentionService (same object)
