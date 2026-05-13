@@ -469,7 +469,7 @@ export class AcpClient {
 				promptResult.stopReason === "end_turn"
 			) {
 				// Allow pending stderr data events to flush before checking
-				await new Promise((r) => setTimeout(r, 100));
+				await new Promise((r) => activeWindow.setTimeout(r, 100));
 
 				const stderrHint = extractStderrErrorHint(this.recentStderr);
 				if (stderrHint) {

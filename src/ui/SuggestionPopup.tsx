@@ -60,9 +60,10 @@ export function SuggestionPopup({
 			}
 		};
 
-		document.addEventListener("mousedown", handleClickOutside);
+		const doc = activeDocument;
+		doc.addEventListener("mousedown", handleClickOutside);
 		return () => {
-			document.removeEventListener("mousedown", handleClickOutside);
+			doc.removeEventListener("mousedown", handleClickOutside);
 		};
 	}, [onClose]);
 

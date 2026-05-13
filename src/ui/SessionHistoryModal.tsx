@@ -123,7 +123,7 @@ class EditTitleModal extends Modal {
 		inputEl.value = this.currentTitle;
 
 		// Focus and select all text for easy replacement
-		setTimeout(() => {
+		activeWindow.setTimeout(() => {
 			inputEl.focus();
 			inputEl.select();
 		}, 10);

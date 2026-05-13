@@ -57,7 +57,7 @@ export class ChangeDirectoryModal extends Modal {
 		});
 
 		// Focus and select all text
-		setTimeout(() => {
+		activeWindow.setTimeout(() => {
 			inputEl.focus();
 			inputEl.select();
 		}, 10);
