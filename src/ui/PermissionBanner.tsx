@@ -1,4 +1,3 @@
-import type AgentClientPlugin from "../plugin";
 import { getLogger } from "../utils/logger";
 import type { PermissionOption } from "../types/chat";
 
@@ -10,8 +9,6 @@ interface PermissionBannerProps {
 		isCancelled?: boolean;
 		isActive?: boolean;
 	};
-	toolCallId: string;
-	plugin: AgentClientPlugin;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (
 		requestId: string,
@@ -22,8 +19,6 @@ interface PermissionBannerProps {
 
 export function PermissionBanner({
 	permissionRequest,
-	toolCallId,
-	plugin,
 	onApprovePermission,
 	onOptionSelected,
 }: PermissionBannerProps) {

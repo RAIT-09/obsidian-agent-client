@@ -146,7 +146,6 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 								key={index}
 								terminalId={item.terminalId}
 								terminalClient={terminalClient || null}
-								plugin={plugin}
 							/>
 						);
 					}
@@ -177,8 +176,6 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 						...permissionRequest,
 						selectedOptionId: selectedOptionId,
 					}}
-					toolCallId={toolCallId}
-					plugin={plugin}
 					onApprovePermission={onApprovePermission}
 					onOptionSelected={setSelectedOptionId}
 				/>

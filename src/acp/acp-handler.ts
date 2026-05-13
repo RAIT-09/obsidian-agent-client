@@ -182,11 +182,11 @@ export class AcpHandler {
 	// File System Stubs
 	// ====================================================================
 
-	readTextFile(params: acp.ReadTextFileRequest) {
+	readTextFile(_params: acp.ReadTextFileRequest) {
 		return Promise.resolve({ content: "" });
 	}
 
-	writeTextFile(params: acp.WriteTextFileRequest) {
+	writeTextFile(_params: acp.WriteTextFileRequest) {
 		return Promise.resolve({});
 	}
 

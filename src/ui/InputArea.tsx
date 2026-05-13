@@ -537,7 +537,7 @@ export function InputArea({
 	/**
 	 * Handle drag leave event to reset visual feedback.
 	 */
-	const handleDragLeave = useCallback((e: React.DragEvent) => {
+	const handleDragLeave = useCallback((_e: React.DragEvent) => {
 		dragCounterRef.current--;
 		if (dragCounterRef.current === 0) {
 			setIsDraggingOver(false);
@@ -970,8 +970,6 @@ export function InputArea({
 					selectedIndex={mentions.selectedIndex}
 					onSelect={selectMention}
 					onClose={mentions.close}
-					plugin={plugin}
-					view={view}
 				/>
 			)}
 
@@ -983,8 +981,6 @@ export function InputArea({
 					selectedIndex={slashCommands.selectedIndex}
 					onSelect={handleSelectSlashCommand}
 					onClose={slashCommands.close}
-					plugin={plugin}
-					view={view}
 				/>
 			)}
 
