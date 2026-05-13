@@ -301,12 +301,9 @@ export function InputArea({
 	const settings = useSettings(plugin);
 	const showEmojis = plugin.settings.displaySettings.showEmojis;
 
-	// Unofficial Obsidian API: app.vault.getConfig() is not in the public type definitions
-	// but is widely used by the plugin community for accessing editor settings.
-	/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
-	const obsidianSpellcheck: boolean =
-		(plugin.app.vault as any).getConfig("spellcheck") ?? true;
-	/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
+	// Unofficial Obsidian API (see src/types/obsidian-internals.d.ts)
+	const obsidianSpellcheck =
+		(plugin.app.vault.getConfig("spellcheck") as boolean | undefined) ?? true;
 
 	// Local state (hint and command are still local - not needed for broadcast)
 	const [hintText, setHintText] = useState<string | null>(null);
@@ -418,7 +415,7 @@ export function InputArea({
 	const convertFilesToAttachments = useCallback(
 		(files: File[]): AttachedFile[] => {
 			// Get file path via Electron's webUtils API (File.path was removed in Electron 32)
-			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			// eslint-disable-next-line @typescript-eslint/no-require-imports -- electron is a runtime-only module provided by Obsidian's host environment
 			const { webUtils } = require("electron") as {
 				webUtils: { getPathForFile: (file: File) => string };
 			};
