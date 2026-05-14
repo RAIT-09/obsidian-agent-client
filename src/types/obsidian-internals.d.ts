@@ -1,3 +1,5 @@
+export {};
+
 /**
  * Type augmentation for unofficial Obsidian APIs.
  *
