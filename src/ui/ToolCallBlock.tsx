@@ -32,7 +32,6 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 		kind,
 		title,
 		status,
-		toolCallId,
 		permissionRequest,
 		locations,
 		rawInput,
