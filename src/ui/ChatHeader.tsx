@@ -17,8 +17,6 @@ export interface SidebarHeaderProps {
 	agentLabel: string;
 	/** Whether a plugin update is available */
 	isUpdateAvailable: boolean;
-	/** Whether session history is supported (show History button) */
-	hasHistoryCapability?: boolean;
 	/** Callback to create a new chat session */
 	onNewChat: () => void;
 	/** Callback to export the chat */
@@ -105,7 +103,6 @@ function NavActionButton({
 function SidebarHeader({
 	agentLabel,
 	isUpdateAvailable,
-	hasHistoryCapability = false,
 	onNewChat,
 	onExportChat,
 	onShowMenu,
