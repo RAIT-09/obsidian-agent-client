@@ -131,7 +131,7 @@ export function MessageList({
 		if (scrollSmoothRef.current) {
 			// User sent a message — smooth scroll regardless of isAtBottom
 			scrollSmoothRef.current = false;
-			requestAnimationFrame(() => {
+			window.requestAnimationFrame(() => {
 				virtualizer.scrollToIndex(messages.length - 1, {
 					align: "end",
 					behavior: "smooth",
@@ -142,7 +142,7 @@ export function MessageList({
 
 		if (isAtBottomRef.current) {
 			// Use requestAnimationFrame to ensure virtualizer has measured
-			requestAnimationFrame(() => {
+			window.requestAnimationFrame(() => {
 				virtualizer.scrollToIndex(messages.length - 1, {
 					align: "end",
 				});

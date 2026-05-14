@@ -318,7 +318,7 @@ function CopyButton({ contents }: { contents: MessageContent[] }) {
 			.writeText(text)
 			.then(() => {
 				setCopied(true);
-				activeWindow.setTimeout(() => setCopied(false), 2000);
+				window.setTimeout(() => setCopied(false), 2000);
 			})
 			.catch(() => {});
 	}, [contents]);

@@ -153,7 +153,7 @@ export function useAgentMessages(
 			pendingUpdatesRef.current.push(update);
 			if (!flushScheduledRef.current) {
 				flushScheduledRef.current = true;
-				requestAnimationFrame(flushPendingUpdates);
+				window.requestAnimationFrame(flushPendingUpdates);
 			}
 		},
 		[flushPendingUpdates],
