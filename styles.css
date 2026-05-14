@@ -694,8 +694,17 @@ If your plugin does not need CSS, delete this file.
 	justify-content: space-between;
 	gap: 4px;
 	padding: 6px 12px;
+	width: 100%;
 	cursor: pointer;
+	background: none;
 	background-color: transparent;
+	border: none;
+	outline: none;
+	appearance: none;
+	box-shadow: none;
+	text-align: left;
+	font: inherit;
+	color: inherit;
 }
 
 .agent-client-mention-badge {
@@ -705,7 +714,7 @@ If your plugin does not need CSS, delete this file.
 	font-size: var(--font-text-size);
 	font-weight: 500;
 	line-height: var(--line-height-normal);
-	cursor: default;
+	cursor: pointer;
 	user-select: none;
 	white-space: nowrap;
 	overflow: hidden;
@@ -718,19 +727,9 @@ If your plugin does not need CSS, delete this file.
 	text-decoration: line-through;
 }
 
-.agent-client-auto-mention-toggle-btn {
-	background: none;
-	background-color: transparent !important;
-	border: none !important;
+.agent-client-auto-mention-toggle-icon {
 	color: var(--text-muted);
-	cursor: pointer;
-	padding: 0 !important;
-	margin: 0 !important;
-	pointer-events: auto;
 	transition: color 0.2s;
-	outline: none !important;
-	appearance: none;
-	box-shadow: none !important;
 	width: 16px;
 	height: 16px;
 	display: flex;
@@ -739,23 +738,14 @@ If your plugin does not need CSS, delete this file.
 	flex-shrink: 0;
 }
 
-.agent-client-auto-mention-toggle-btn svg {
+.agent-client-auto-mention-toggle-icon svg {
 	width: 14px;
 	height: 14px;
 	color: inherit;
 }
 
-.agent-client-auto-mention-toggle-btn:hover {
-	background: none;
-	box-shadow: none;
+.agent-client-auto-mention-inline:hover .agent-client-auto-mention-toggle-icon {
 	color: var(--interactive-accent);
-}
-
-.agent-client-auto-mention-toggle-btn:active,
-.agent-client-auto-mention-toggle-btn:focus {
-	background: none;
-	box-shadow: none;
-	outline: none;
 }
 
 .agent-client-chat-input-textarea {
