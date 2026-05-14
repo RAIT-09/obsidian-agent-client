@@ -47,7 +47,7 @@ Before writing, think through what each change means from a user's perspective:
 - **What existing behavior got better?** → Improvements (🔧 Improvements)
 - **What was broken and is now fixed?** → Bug fixes (🐛 Fixes)
 - **Did anything get faster?** → Performance (⚡ Performance)
-- **Does anything require user action on upgrade?** → Breaking changes (⚠️ Breaking Changes)
+- **Does anything require user action on upgrade?** → Breaking changes (⚠ Breaking Changes)
 
 For stable releases aggregating prereleases: exclude bugs that were both introduced and resolved during the prerelease cycle. Those never affected stable users and do not belong in the stable release notes.
 
@@ -61,7 +61,7 @@ Breaking changes are easy to miss in diffs. Actively look for these patterns:
 - **Changed default behavior** that users relied on (e.g., a button that now does something different)
 - **Removed features or settings**
 
-If any are found, they MUST appear in the `### ⚠️ Breaking Changes:` section AND be mentioned in the Upgrade section. If the migration is automatic, say so — users still need to know something changed.
+If any are found, they MUST appear in the `### ⚠ Breaking Changes:` section AND be mentioned in the Upgrade section. If the migration is automatic, say so — users still need to know something changed.
 
 ## Step 4: Write the draft
 
@@ -89,7 +89,7 @@ Choose the release type and emoji based on content:
 For ALL preview releases — regardless of size — add this immediately after the title line (with a blank line before and after):
 
 ```
-⚠️ **This is a preview release** — Features are experimental and may change. Please report any issues!
+⚠ **This is a preview release** — Features are experimental and may change. Please report any issues!
 ```
 
 This is mandatory for every prerelease. Never omit it.
@@ -113,7 +113,7 @@ Include only sections that have content, in this order:
 
 ### 🐛 Fixes:
 
-### ⚠️ Breaking Changes:
+### ⚠ Breaking Changes:
 
 ### 🚀 Upgrade:
 
@@ -135,7 +135,7 @@ Each item follows this pattern:
 ```
 
 Rules:
-- The **emoji** indicates the category (🪟 window/floating, ⌨️ keyboard/input, 📋 copy/clipboard, 🔗 links/paths, 🐧 Linux/WSL, 🍎 macOS, 📦 packages/SDK, 🔔 notifications, 📂 files/directories, 🔐 permissions, 📊 data/charts, 📜 scrolling, 🔍 search/focus, 🎨 styling/UI, 🖥️ terminal, 📝 text/editing, 🔄 sync/restore, 🗑️ deletion, 📏 sizing/layout, etc.)
+- The **emoji** indicates the category (🪟 window/floating, ⌨ keyboard/input, 📋 copy/clipboard, 🔗 links/paths, 🐧 Linux/WSL, 🍎 macOS, 📦 packages/SDK, 🔔 notifications, 📂 files/directories, 🔐 permissions, 📊 data/charts, 📜 scrolling, 🔍 search/focus, 🎨 styling/UI, 🖥 terminal, 📝 text/editing, 🔄 sync/restore, 🗑 deletion, 📏 sizing/layout, etc.)
 - The **short title** is 2-5 words, bold, and scannable — readers should understand the topic from the title alone.
 - The **description** explains what changed from the user's perspective. Do not describe implementation details — no function names, class names, React hooks, framework APIs, or internal architecture. If a change is purely internal (refactoring, performance optimization), describe its user-visible effect.
 - **Issue numbers** go at the end in parentheses. Omit if no issue is referenced.
@@ -147,7 +147,7 @@ Always present. Keep it short and plain — no links, no blockquotes, no extra f
 
 - For patch/preview: `Simply update from v{prev} — no configuration needed.` or `Update from v{prev}. No configuration changes needed.`
 - For stable 0.X.0: `Update from v{prev} — no extra configuration required.` with additional migration notes if there are breaking changes.
-- If there are breaking changes, add a `⚠️` warning with specific user action required.
+- If there are breaking changes, add a `⚠` warning with specific user action required.
 
 ### New Contributors section
 
@@ -207,7 +207,7 @@ Note: One fix, one item. Short title tells you the topic. Description includes t
 ```
 🔬 **Preview Release (v0.10.0-preview.3)**
 
-⚠️ **This is a preview release** — Features are experimental and may change. Please report any issues!
+⚠ **This is a preview release** — Features are experimental and may change. Please report any issues!
 
 ### 🐛 Fixes:
 
@@ -315,7 +315,7 @@ This release introduces multi-agent session support, allowing you to run multipl
 - **🍔 Header Menu**: New ellipsis menu in chat header for quick agent switching, opening new views, restarting agent, and accessing plugin settings.
 - **🚨 Error Overlay**: Errors are now displayed as a dismissible overlay above the input area instead of replacing the entire chat.
 
-### ⚠️ Breaking Changes:
+### ⚠ Breaking Changes:
 
 - **Setting Renamed**: `activeAgentId` → `defaultAgentId` (automatically migrated)
 
