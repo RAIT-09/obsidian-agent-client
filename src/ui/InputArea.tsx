@@ -1001,7 +1001,14 @@ export function InputArea({
 			>
 				{/* Auto-mention Badge */}
 				{autoMentionEnabled && mentions.activeNote && (
-					<div className="agent-client-auto-mention-inline">
+					<div
+						className="agent-client-auto-mention-inline"
+						onClick={() =>
+							mentions.toggleAutoMention(
+								!mentions.isAutoMentionDisabled,
+							)
+						}
+					>
 						<span
 							className={`agent-client-mention-badge ${mentions.isAutoMentionDisabled ? "agent-client-disabled" : ""}`}
 						>
@@ -1017,15 +1024,6 @@ export function InputArea({
 						</span>
 						<button
 							className="agent-client-auto-mention-toggle-btn"
-							onClick={(e) => {
-								const newDisabledState =
-									!mentions.isAutoMentionDisabled;
-								mentions.toggleAutoMention(newDisabledState);
-								const iconName = newDisabledState
-									? "x"
-									: "plus";
-								setIcon(e.currentTarget, iconName);
-							}}
 							title={
 								mentions.isAutoMentionDisabled
 									? "Enable auto-mention"
