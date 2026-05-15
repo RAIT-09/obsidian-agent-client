@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="obsidian://show-plugin?id=agent-client"><img src="https://img.shields.io/badge/Add%20to%20Obsidian-7c3aed?logo=obsidian&logoColor=white&style=for-the-badge" alt="Add to Obsidian"></a>
+  <a href="https://community.obsidian.md/plugins/agent-client"><img src="https://img.shields.io/badge/Add%20to%20Obsidian-7c3aed?logo=obsidian&logoColor=white&style=for-the-badge" alt="Add to Obsidian"></a>
 </p>
 
 <p align="center">
