@@ -157,7 +157,7 @@ export class FloatingViewContainer implements IChatViewContainer {
 			this.setExpanded?.(true);
 		}
 		// Focus after next render (expansion may need a frame)
-		requestAnimationFrame(() => {
+		window.requestAnimationFrame(() => {
 			const textarea = this.containerRefEl?.querySelector(
 				"textarea.agent-client-chat-input-textarea",
 			);
@@ -411,11 +411,10 @@ function FloatingChatComponent({
 			}
 		};
 
-		const win = activeWindow;
-		const timer = win.setTimeout(() => {
+		const timer = window.setTimeout(() => {
 			void saveSize();
 		}, 500);
-		return () => win.clearTimeout(timer);
+		return () => window.clearTimeout(timer);
 	}, [size, plugin, settings.floatingWindowSize]);
 
 	// Save position to settings
@@ -433,11 +432,10 @@ function FloatingChatComponent({
 			}
 		};
 
-		const win = activeWindow;
-		const timer = win.setTimeout(() => {
+		const timer = window.setTimeout(() => {
 			void savePosition();
 		}, 500);
-		return () => win.clearTimeout(timer);
+		return () => window.clearTimeout(timer);
 	}, [position, plugin, settings.floatingWindowPosition]);
 
 	// ============================================================
