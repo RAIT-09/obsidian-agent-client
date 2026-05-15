@@ -26,6 +26,15 @@ export interface IChatViewHost {
 	app: App;
 
 	/**
+	 * Registry-recognized container ID. For sidebar (ChatView) this is
+	 * the workspace leaf.id. For floating (FloatingChatView shim) this is
+	 * the floating-chat-N viewId. Used by ChatPanel's focus tracking to
+	 * write the value that ViewRegistry.setFocused() accepts (it rejects
+	 * unknown viewIds, so writing tab.tabId would silently no-op).
+	 */
+	readonly viewId: string;
+
+	/**
 	 * Register a DOM event listener that will be cleaned up when the view closes.
 	 *
 	 * In sidebar ChatView, this delegates to Obsidian's Component.registerDomEvent.

@@ -594,6 +594,7 @@ export function ChatPanel({
 		// Floating: create a shim with listener tracking
 		return {
 			app: plugin.app,
+			viewId,
 			registerDomEvent: ((
 				target: Window | Document | HTMLElement,
 				type: string,
@@ -994,7 +995,11 @@ export function ChatPanel({
 	const containerRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		const handleFocus = () => {
-			plugin.setLastActiveChatViewId(viewId);
+			// Use viewHost.viewId (leaf.id for sidebar, floating-chat-N
+			// for floating) — the registry-recognized container ID. Writing
+			// the bare `viewId` prop would be tab.tabId on sidebar tabs and
+			// silently rejected by ViewRegistry.setFocused (I34).
+			plugin.setLastActiveChatViewId(viewHost.viewId);
 		};
 
 		const container = containerElProp ?? containerRef.current;
@@ -1007,7 +1012,7 @@ export function ChatPanel({
 			container.removeEventListener("focus", handleFocus, true);
 			container.removeEventListener("click", handleFocus);
 		};
-	}, [plugin, viewId, containerElProp]);
+	}, [plugin, viewHost, containerElProp]);
 
 	// ============================================================
 	// Callback Registration for IChatViewContainer
