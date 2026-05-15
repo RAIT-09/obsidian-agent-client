@@ -486,6 +486,27 @@ export default class AgentClientPlugin extends Plugin {
 		}
 	}
 
+	/**
+	 * Resolve the registry-stored leaf-level ID to the active tab's
+	 * tab.tabId, which is what ChatPanel listeners filter on. For floating
+	 * chats (no tabs) the floating viewId is returned unchanged because it
+	 * already matches what the registry stores.
+	 *
+	 * Use this in `addCommand` callbacks instead of `this.lastActiveChatViewId`
+	 * to ensure events route to the active tab's ChatPanel listener (I33).
+	 */
+	private getDispatchTargetId(): string | null {
+		const focusedId = this.lastActiveChatViewId;
+		if (!focusedId) return null;
+
+		const chatView = this.app.workspace
+			.getLeavesOfType(VIEW_TYPE_CHAT)
+			.find((l) => (l.view as ChatView)?.viewId === focusedId)
+			?.view as ChatView | undefined;
+
+		return chatView?.getActiveTabId() ?? focusedId;
+	}
+
 	async activateView() {
 		const { workspace } = this.app;
 
@@ -737,7 +758,7 @@ export default class AgentClientPlugin extends Plugin {
 				callback: () => {
 					this.app.workspace.trigger(
 						"agent-client:new-chat-requested",
-						this.lastActiveChatViewId,
+						this.getDispatchTargetId(),
 						agent.id,
 					);
 				},
@@ -752,7 +773,7 @@ export default class AgentClientPlugin extends Plugin {
 			callback: () => {
 				this.app.workspace.trigger(
 					"agent-client:approve-active-permission",
-					this.lastActiveChatViewId,
+					this.getDispatchTargetId(),
 				);
 			},
 		});
@@ -763,7 +784,7 @@ export default class AgentClientPlugin extends Plugin {
 			callback: () => {
 				this.app.workspace.trigger(
 					"agent-client:reject-active-permission",
-					this.lastActiveChatViewId,
+					this.getDispatchTargetId(),
 				);
 			},
 		});
@@ -774,7 +795,7 @@ export default class AgentClientPlugin extends Plugin {
 			callback: () => {
 				this.app.workspace.trigger(
 					"agent-client:toggle-auto-mention",
-					this.lastActiveChatViewId,
+					this.getDispatchTargetId(),
 				);
 			},
 		});
@@ -785,7 +806,7 @@ export default class AgentClientPlugin extends Plugin {
 			callback: () => {
 				this.app.workspace.trigger(
 					"agent-client:new-chat-requested",
-					this.lastActiveChatViewId,
+					this.getDispatchTargetId(),
 				);
 			},
 		});
@@ -796,7 +817,7 @@ export default class AgentClientPlugin extends Plugin {
 			callback: () => {
 				this.app.workspace.trigger(
 					"agent-client:cancel-message",
-					this.lastActiveChatViewId,
+					this.getDispatchTargetId(),
 				);
 			},
 		});
@@ -807,7 +828,7 @@ export default class AgentClientPlugin extends Plugin {
 			callback: () => {
 				this.app.workspace.trigger(
 					"agent-client:export-chat",
-					this.lastActiveChatViewId,
+					this.getDispatchTargetId(),
 				);
 			},
 		});

@@ -536,6 +536,11 @@ export class ChatView extends ItemView implements IChatViewContainer {
 		}
 	}
 
+	/** Get the active tab's ID (used as viewId by ChatPanel) */
+	getActiveTabId(): string {
+		return this.tabManagerRef?.activeTabId ?? this.viewId;
+	}
+
 	/** Close the active tab (for Obsidian commands) */
 	closeActiveTab(): void {
 		if (this.tabManagerRef) {
