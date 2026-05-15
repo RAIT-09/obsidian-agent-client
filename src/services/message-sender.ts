@@ -554,7 +554,7 @@ async function buildAutoMentionResource(
 					priority: 0.8,
 					lastModified: new Date(activeNote.modified).toISOString(),
 				},
-			} as ResourcePromptContent,
+			},
 			{
 				type: "text",
 				text: `The user has selected lines ${fromLine}-${toLine} in the above note. This is what they are currently focusing on.`,
