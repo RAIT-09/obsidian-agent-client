@@ -1003,9 +1003,6 @@ export function ChatPanel({
 		container.addEventListener("focus", handleFocus, true);
 		container.addEventListener("click", handleFocus);
 
-		// Set as active on mount (first opened view becomes active)
-		plugin.setLastActiveChatViewId(viewId);
-
 		return () => {
 			container.removeEventListener("focus", handleFocus, true);
 			container.removeEventListener("click", handleFocus);
