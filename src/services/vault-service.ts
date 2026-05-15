@@ -17,6 +17,13 @@ import {
 import { EditorView } from "@codemirror/view";
 import { Compartment, StateEffect } from "@codemirror/state";
 import { getLogger, Logger } from "../utils/logger";
+import {
+	buildBasenameIndex,
+	extractLinkedNoteMetadata,
+	type BasenameIndex,
+	type IWikilinkResolver,
+	type LinkedNoteMetadata,
+} from "../utils/wikilink-resolver";
 
 // ============================================================================
 // Port Types (from vault-access.port.ts)
@@ -116,7 +123,7 @@ export interface IVaultAccess {
  * providing built-in fuzzy search (formerly NoteMentionService),
  * and tracking editor selection state.
  */
-export class VaultService implements IVaultAccess {
+export class VaultService implements IVaultAccess, IWikilinkResolver {
 	private files: TFile[] = [];
 	private lastBuild = 0;
 	private logger: Logger;
@@ -295,6 +302,27 @@ export class VaultService implements IVaultAccess {
 	listNotes(): Promise<NoteMetadata[]> {
 		return Promise.resolve(
 			this.files.map((file) => this.convertToMetadata(file)),
+		);
+	}
+
+	// ========================================================================
+	// IWikilinkResolver Implementation
+	// ========================================================================
+
+	buildBasenameIndex(): BasenameIndex {
+		return buildBasenameIndex(this.plugin.app);
+	}
+
+	extractLinkedNoteMetadata(
+		content: string,
+		sourcePath: string,
+		basenameIndex: BasenameIndex,
+	): LinkedNoteMetadata[] {
+		return extractLinkedNoteMetadata(
+			content,
+			sourcePath,
+			basenameIndex,
+			this.plugin.app,
 		);
 	}
 

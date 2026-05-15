@@ -135,6 +135,21 @@ export class AgentClientSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Expand wikilink context")
+			.setDesc(
+				"Surface [[wikilinks]] inside mentioned notes as resolved file paths so the agent can choose which to read. Does not embed linked content.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.expandWikilinkContext)
+					.onChange(async (value) => {
+						await this.plugin.settingsService.updateSettings({
+							expandWikilinkContext: value,
+						});
+					}),
+			);
+
+		new Setting(containerEl)
 			.setName("Max note length")
 			.setDesc(
 				"Maximum characters per mentioned note. Notes longer than this will be truncated.",
