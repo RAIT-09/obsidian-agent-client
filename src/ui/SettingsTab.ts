@@ -1441,7 +1441,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				void navigator.clipboard.writeText(command).then(
 					() => {
 						btn.setButtonText("Copied!");
-						activeWindow.setTimeout(() => {
+						window.setTimeout(() => {
 							btn.setButtonText("Copy");
 						}, 1500);
 					},
@@ -1484,14 +1484,14 @@ export class AgentClientSettingTab extends PluginSettingTab {
 							this.display();
 						} else {
 							btn.setButtonText("Not found");
-							activeWindow.setTimeout(() => {
+							window.setTimeout(() => {
 								btn.setButtonText("Auto-detect");
 								btn.setDisabled(false);
 							}, 2000);
 						}
 					} catch {
 						btn.setButtonText("Error");
-						activeWindow.setTimeout(() => {
+						window.setTimeout(() => {
 							btn.setButtonText("Auto-detect");
 							btn.setDisabled(false);
 						}, 2000);

@@ -195,8 +195,7 @@ function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 	// Save button position to settings (debounced)
 	useEffect(() => {
 		if (!position) return;
-		const win = activeWindow;
-		const timer = win.setTimeout(() => {
+		const timer = window.setTimeout(() => {
 			if (
 				!settings.floatingButtonPosition ||
 				position.x !== settings.floatingButtonPosition.x ||
@@ -208,7 +207,7 @@ function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 				});
 			}
 		}, 500);
-		return () => win.clearTimeout(timer);
+		return () => window.clearTimeout(timer);
 	}, [position, plugin, settings.floatingButtonPosition]);
 
 	// Button click handler
