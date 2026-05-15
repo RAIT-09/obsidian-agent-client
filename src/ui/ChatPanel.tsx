@@ -552,7 +552,7 @@ export function ChatPanel({
 			) => {
 				target.addEventListener(type, callback);
 				registeredListenersRef.current.push({ target, type, callback });
-			}) as IChatViewHost["registerDomEvent"],
+			}),
 		};
 	}, [viewHostProp, plugin.app]);
 

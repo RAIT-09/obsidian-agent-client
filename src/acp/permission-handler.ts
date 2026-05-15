@@ -156,7 +156,7 @@ export class PermissionManager {
 			status: toolCallInfo?.status || "pending",
 			kind: (toolCallInfo?.kind as acp.ToolKind | undefined) ?? undefined,
 			content: AcpTypeConverter.toToolCallContent(
-				toolCallInfo?.content as acp.ToolCallContent[] | undefined,
+				toolCallInfo?.content,
 			),
 			rawInput: toolCallInfo?.rawInput as
 				| { [k: string]: unknown }

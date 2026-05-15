@@ -1,7 +1,6 @@
 import {
 	Plugin,
 	WorkspaceLeaf,
-	WorkspaceSplit,
 	Notice,
 	requestUrl,
 } from "obsidian";
@@ -556,7 +555,7 @@ export default class AgentClientPlugin extends Plugin {
 			const tabGroup = sidebarLeaf.parent;
 			// Index is clamped by Obsidian, so a large value appends to the end
 			return workspace.createLeafInParent(
-				tabGroup as unknown as WorkspaceSplit,
+				tabGroup,
 				Number.MAX_SAFE_INTEGER,
 			);
 		}
@@ -683,7 +682,7 @@ export default class AgentClientPlugin extends Plugin {
 				name: `Switch agent to ${agent.displayName}`,
 				callback: () => {
 					this.app.workspace.trigger(
-						"agent-client:new-chat-requested" as "quit",
+						"agent-client:new-chat-requested",
 						this.lastActiveChatViewId,
 						agent.id,
 					);
@@ -698,7 +697,7 @@ export default class AgentClientPlugin extends Plugin {
 			name: "Approve active permission",
 			callback: () => {
 				this.app.workspace.trigger(
-					"agent-client:approve-active-permission" as "quit",
+					"agent-client:approve-active-permission",
 					this.lastActiveChatViewId,
 				);
 			},
@@ -709,7 +708,7 @@ export default class AgentClientPlugin extends Plugin {
 			name: "Reject active permission",
 			callback: () => {
 				this.app.workspace.trigger(
-					"agent-client:reject-active-permission" as "quit",
+					"agent-client:reject-active-permission",
 					this.lastActiveChatViewId,
 				);
 			},
@@ -720,7 +719,7 @@ export default class AgentClientPlugin extends Plugin {
 			name: "Toggle auto-mention",
 			callback: () => {
 				this.app.workspace.trigger(
-					"agent-client:toggle-auto-mention" as "quit",
+					"agent-client:toggle-auto-mention",
 					this.lastActiveChatViewId,
 				);
 			},
@@ -731,7 +730,7 @@ export default class AgentClientPlugin extends Plugin {
 			name: "New chat",
 			callback: () => {
 				this.app.workspace.trigger(
-					"agent-client:new-chat-requested" as "quit",
+					"agent-client:new-chat-requested",
 					this.lastActiveChatViewId,
 				);
 			},
@@ -742,7 +741,7 @@ export default class AgentClientPlugin extends Plugin {
 			name: "Cancel current message",
 			callback: () => {
 				this.app.workspace.trigger(
-					"agent-client:cancel-message" as "quit",
+					"agent-client:cancel-message",
 					this.lastActiveChatViewId,
 				);
 			},
@@ -753,7 +752,7 @@ export default class AgentClientPlugin extends Plugin {
 			name: "Export chat",
 			callback: () => {
 				this.app.workspace.trigger(
-					"agent-client:export-chat" as "quit",
+					"agent-client:export-chat",
 					this.lastActiveChatViewId,
 				);
 			},
