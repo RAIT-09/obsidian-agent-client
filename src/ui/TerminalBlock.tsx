@@ -2,17 +2,14 @@ import * as React from "react";
 const { useState, useRef, useEffect } = React;
 import type { AcpClient } from "../acp/acp-client";
 import { getLogger } from "../utils/logger";
-import type AgentClientPlugin from "../plugin";
 interface TerminalBlockProps {
 	terminalId: string;
 	terminalClient: AcpClient | null;
-	plugin: AgentClientPlugin;
 }
 
 export const TerminalBlock = React.memo(function TerminalBlock({
 	terminalId,
 	terminalClient,
-	plugin,
 }: TerminalBlockProps) {
 	const logger = getLogger();
 	const [output, setOutput] = useState("");
@@ -32,6 +29,7 @@ export const TerminalBlock = React.memo(function TerminalBlock({
 			`[TerminalBlock] useEffect triggered for ${terminalId}, terminalClient: ${!!terminalClient}`,
 		);
 		if (!terminalId || !terminalClient) return;
+		const win = activeWindow;
 
 		const pollOutput = async () => {
 			try {
@@ -49,7 +47,7 @@ export const TerminalBlock = React.memo(function TerminalBlock({
 					});
 					setIsRunning(false);
 					if (intervalRef.current) {
-						window.clearInterval(intervalRef.current);
+						win.clearInterval(intervalRef.current);
 						intervalRef.current = null;
 					}
 				}
@@ -63,7 +61,7 @@ export const TerminalBlock = React.memo(function TerminalBlock({
 
 				setIsRunning(false);
 				if (intervalRef.current) {
-					window.clearInterval(intervalRef.current);
+					win.clearInterval(intervalRef.current);
 					intervalRef.current = null;
 				}
 			}
@@ -73,13 +71,13 @@ export const TerminalBlock = React.memo(function TerminalBlock({
 		void pollOutput();
 
 		// Set up polling interval with shorter interval to catch fast commands
-		intervalRef.current = window.setInterval(() => {
+		intervalRef.current = win.setInterval(() => {
 			void pollOutput();
 		}, 100);
 
 		return () => {
 			if (intervalRef.current) {
-				window.clearInterval(intervalRef.current);
+				win.clearInterval(intervalRef.current);
 				intervalRef.current = null;
 			}
 		};
@@ -88,7 +86,7 @@ export const TerminalBlock = React.memo(function TerminalBlock({
 	// Separate effect to stop polling when no longer running
 	useEffect(() => {
 		if (!isRunning && intervalRef.current) {
-			window.clearInterval(intervalRef.current);
+			activeWindow.clearInterval(intervalRef.current);
 			intervalRef.current = null;
 		}
 	}, [isRunning]);

@@ -281,7 +281,7 @@ export class ChatView extends ItemView implements IChatViewContainer {
 	 * Check if this view currently has focus.
 	 */
 	hasFocus(): boolean {
-		return this.containerEl.contains(document.activeElement);
+		return this.containerEl.contains(activeDocument.activeElement);
 	}
 
 	/**

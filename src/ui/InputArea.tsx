@@ -301,12 +301,9 @@ export function InputArea({
 	const settings = useSettings(plugin);
 	const showEmojis = plugin.settings.displaySettings.showEmojis;
 
-	// Unofficial Obsidian API: app.vault.getConfig() is not in the public type definitions
-	// but is widely used by the plugin community for accessing editor settings.
-	/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
-	const obsidianSpellcheck: boolean =
-		(plugin.app.vault as any).getConfig("spellcheck") ?? true;
-	/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
+	// Unofficial Obsidian API (see src/types/obsidian-internals.d.ts)
+	const obsidianSpellcheck =
+		(plugin.app.vault.getConfig("spellcheck") as boolean | undefined) ?? true;
 
 	// Local state (hint and command are still local - not needed for broadcast)
 	const [hintText, setHintText] = useState<string | null>(null);
@@ -419,7 +416,7 @@ export function InputArea({
 	const convertFilesToAttachments = useCallback(
 		(files: File[]): AttachedFile[] => {
 			// Get file path via Electron's webUtils API (File.path was removed in Electron 32)
-			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			// eslint-disable-next-line @typescript-eslint/no-require-imports -- electron is a runtime-only module provided by Obsidian's host environment
 			const { webUtils } = require("electron") as {
 				webUtils: { getPathForFile: (file: File) => string };
 			};
@@ -541,7 +538,7 @@ export function InputArea({
 	/**
 	 * Handle drag leave event to reset visual feedback.
 	 */
-	const handleDragLeave = useCallback((e: React.DragEvent) => {
+	const handleDragLeave = useCallback((_e: React.DragEvent) => {
 		dragCounterRef.current--;
 		if (dragCounterRef.current === 0) {
 			setIsDraggingOver(false);
@@ -974,8 +971,6 @@ export function InputArea({
 					selectedIndex={mentions.selectedIndex}
 					onSelect={selectMention}
 					onClose={mentions.close}
-					plugin={plugin}
-					view={view}
 				/>
 			)}
 
@@ -987,8 +982,6 @@ export function InputArea({
 					selectedIndex={slashCommands.selectedIndex}
 					onSelect={handleSelectSlashCommand}
 					onClose={slashCommands.close}
-					plugin={plugin}
-					view={view}
 				/>
 			)}
 
@@ -1002,7 +995,19 @@ export function InputArea({
 			>
 				{/* Auto-mention Badge */}
 				{autoMentionEnabled && mentions.activeNote && (
-					<div className="agent-client-auto-mention-inline">
+					<button
+						className="agent-client-auto-mention-inline"
+						onClick={() =>
+							mentions.toggleAutoMention(
+								!mentions.isAutoMentionDisabled,
+							)
+						}
+						title={
+							mentions.isAutoMentionDisabled
+								? "Enable auto-mention"
+								: "Temporarily disable auto-mention"
+						}
+					>
 						<span
 							className={`agent-client-mention-badge ${mentions.isAutoMentionDisabled ? "agent-client-disabled" : ""}`}
 						>
@@ -1016,22 +1021,8 @@ export function InputArea({
 								</span>
 							)}
 						</span>
-						<button
-							className="agent-client-auto-mention-toggle-btn"
-							onClick={(e) => {
-								const newDisabledState =
-									!mentions.isAutoMentionDisabled;
-								mentions.toggleAutoMention(newDisabledState);
-								const iconName = newDisabledState
-									? "x"
-									: "plus";
-								setIcon(e.currentTarget, iconName);
-							}}
-							title={
-								mentions.isAutoMentionDisabled
-									? "Enable auto-mention"
-									: "Temporarily disable auto-mention"
-							}
+						<span
+							className="agent-client-auto-mention-toggle-icon"
 							ref={(el) => {
 								if (el) {
 									const iconName =
@@ -1042,7 +1033,7 @@ export function InputArea({
 								}
 							}}
 						/>
-					</div>
+					</button>
 				)}
 
 				{/* Textarea with Hint Overlay */}

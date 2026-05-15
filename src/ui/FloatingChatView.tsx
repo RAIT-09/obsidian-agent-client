@@ -83,7 +83,7 @@ export class FloatingViewContainer implements IChatViewContainer {
 		this.plugin = plugin;
 		// viewId format: "floating-chat-{instanceId}" to match adapter key
 		this.viewId = `floating-chat-${instanceId}`;
-		this.containerEl = document.body.createDiv({
+		this.containerEl = activeDocument.body.createDiv({
 			cls: "agent-client-floating-view-root",
 		});
 	}
@@ -170,7 +170,7 @@ export class FloatingViewContainer implements IChatViewContainer {
 	hasFocus(): boolean {
 		return (
 			this.isExpandedState &&
-			(this.containerRefEl?.contains(document.activeElement) ?? false)
+			(this.containerRefEl?.contains(activeDocument.activeElement) ?? false)
 		);
 	}
 
@@ -411,10 +411,11 @@ function FloatingChatComponent({
 			}
 		};
 
-		const timer = setTimeout(() => {
+		const win = activeWindow;
+		const timer = win.setTimeout(() => {
 			void saveSize();
-		}, 500); // Debounce save
-		return () => clearTimeout(timer);
+		}, 500);
+		return () => win.clearTimeout(timer);
 	}, [size, plugin, settings.floatingWindowSize]);
 
 	// Save position to settings
@@ -432,10 +433,11 @@ function FloatingChatComponent({
 			}
 		};
 
-		const timer = setTimeout(() => {
+		const win = activeWindow;
+		const timer = win.setTimeout(() => {
 			void savePosition();
-		}, 500); // Debounce save
-		return () => clearTimeout(timer);
+		}, 500);
+		return () => win.clearTimeout(timer);
 	}, [position, plugin, settings.floatingWindowPosition]);
 
 	// ============================================================
