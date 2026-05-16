@@ -9,8 +9,7 @@
  */
 
 import type { LinkedNoteMetadata } from "./wikilink-resolver";
-import { convertWindowsPathToWsl } from "./platform";
-import { buildFileUri } from "./paths";
+import { buildFileUri, resolveAbsolutePath } from "./paths";
 
 /** Hard cap on links per note (D9). Beyond this, emit `truncated="N"`. */
 const MAX_LINKS_PER_NOTE = 50;
@@ -70,7 +69,7 @@ function formatLink(
 
 	if (link.candidates.length === 1) {
 		const c = link.candidates[0];
-		const absolutePath = resolveAbsolute(c.path, vaultBasePath, convertToWsl);
+		const absolutePath = resolveAbsolutePath(c.path, vaultBasePath, convertToWsl);
 		attrs.push(`path="${escapeAttr(absolutePath)}"`);
 		attrs.push(`uri="${escapeAttr(buildFileUri(absolutePath))}"`);
 		attrs.push(`resolved="true"`);
@@ -79,21 +78,10 @@ function formatLink(
 
 	attrs.push(`resolved="ambiguous"`);
 	const candidateLines = link.candidates.map((c) => {
-		const absolutePath = resolveAbsolute(c.path, vaultBasePath, convertToWsl);
+		const absolutePath = resolveAbsolutePath(c.path, vaultBasePath, convertToWsl);
 		return `      <candidate path="${escapeAttr(absolutePath)}" uri="${escapeAttr(buildFileUri(absolutePath))}" />`;
 	});
 	return `    <link ${attrs.join(" ")}>\n${candidateLines.join("\n")}\n    </link>`;
-}
-
-function resolveAbsolute(
-	relativePath: string,
-	vaultBasePath: string,
-	convertToWsl: boolean,
-): string {
-	const absolutePath = vaultBasePath
-		? `${vaultBasePath}/${relativePath}`
-		: relativePath;
-	return convertToWsl ? convertWindowsPathToWsl(absolutePath) : absolutePath;
 }
 
 /** XML attribute-value escaping. Covers all five XML predefined entities. */

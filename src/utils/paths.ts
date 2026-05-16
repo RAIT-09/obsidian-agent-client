@@ -1,6 +1,10 @@
 import { execFile } from "child_process";
 import { Platform } from "obsidian";
-import { buildWslShellWrapper, getLoginShell } from "./platform";
+import {
+	buildWslShellWrapper,
+	convertWindowsPathToWsl,
+	getLoginShell,
+} from "./platform";
 
 /**
  * Check whether a path string is an absolute path (Unix or Windows).
@@ -161,6 +165,27 @@ export function toRelativePath(absolutePath: string, basePath: string): string {
 		return normalizedPath.slice(normalizedBase.length + 1);
 	}
 	return absolutePath;
+}
+
+/**
+ * Resolve a vault-relative path to an absolute path with optional WSL conversion.
+ *
+ * @param relativePath - Vault-relative file path (e.g., "folder/note.md")
+ * @param vaultBasePath - Absolute path to the vault root
+ * @param convertToWsl - Whether to convert the result to WSL path format
+ * @returns Absolute file path
+ */
+export function resolveAbsolutePath(
+	relativePath: string,
+	vaultBasePath: string,
+	convertToWsl: boolean,
+): string {
+	const absolutePath = vaultBasePath
+		? `${vaultBasePath}/${relativePath}`
+		: relativePath;
+	return convertToWsl
+		? convertWindowsPathToWsl(absolutePath)
+		: absolutePath;
 }
 
 /**

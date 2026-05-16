@@ -36,8 +36,7 @@ import {
 	extractMentionedNotes,
 	type IMentionService,
 } from "../utils/mention-parser";
-import { convertWindowsPathToWsl } from "../utils/platform";
-import { buildFileUri } from "../utils/paths";
+import { buildFileUri, resolveAbsolutePath } from "../utils/paths";
 import {
 	type IWikilinkResolver,
 	type BasenameIndex,
@@ -202,13 +201,11 @@ async function processNote(
 	try {
 		const content = await vaultAccess.readNote(file.path);
 
-		let absolutePath = vaultBasePath
-			? `${vaultBasePath}/${file.path}`
-			: file.path;
-
-		if (convertToWsl) {
-			absolutePath = convertWindowsPathToWsl(absolutePath);
-		}
+		const absolutePath = resolveAbsolutePath(
+			file.path,
+			vaultBasePath,
+			convertToWsl,
+		);
 
 		const wasTruncated = content.length > maxNoteLength;
 		const processedContent = wasTruncated
@@ -401,23 +398,6 @@ function decorateWithLinkedNotes(
 		convertToWsl: ctx.convertToWsl,
 	});
 	return prelude + rawContent;
-}
-
-/**
- * Resolve absolute path with optional WSL conversion.
- */
-function resolveAbsolutePath(
-	relativePath: string,
-	vaultBasePath: string,
-	convertToWsl: boolean,
-): string {
-	let absolutePath = vaultBasePath
-		? `${vaultBasePath}/${relativePath}`
-		: relativePath;
-	if (convertToWsl) {
-		absolutePath = convertWindowsPathToWsl(absolutePath);
-	}
-	return absolutePath;
 }
 
 // ============================================================================
