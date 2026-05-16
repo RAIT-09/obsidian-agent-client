@@ -76,32 +76,41 @@ export async function tryRestoreConfigOption(
 /**
  * Restore last used mode/model via legacy APIs.
  * Only called when configOptions is not available.
+ *
+ * Returns the final modes/models state after restoration (or the originals
+ * if no restoration was needed or if the agent-side calls failed).
+ * The caller is responsible for applying these to session state.
+ * This function has no side effects on React state so callers can sequence
+ * the restore BEFORE marking the session as "ready", avoiding a UI race
+ * where the dropdown briefly shows the agent's default mode/model before
+ * the user's saved selection is re-applied.
  */
 export async function restoreLegacyConfig(
 	agentClient: AcpClient,
 	sessionResult: SessionResult,
 	savedModelId: string | undefined,
 	savedModeId: string | undefined,
-	setSession: (updater: (prev: ChatSession) => ChatSession) => void,
-): Promise<void> {
-	if (!sessionResult.sessionId) return;
+): Promise<{
+	modes: SessionResult["modes"];
+	models: SessionResult["models"];
+}> {
+	let modes = sessionResult.modes;
+	let models = sessionResult.models;
+
+	if (!sessionResult.sessionId) return { modes, models };
 
 	// Legacy model restore
-	if (sessionResult.models && savedModelId) {
+	if (models && savedModelId) {
 		if (
-			savedModelId !== sessionResult.models.currentModelId &&
-			sessionResult.models.availableModels.some(
-				(m) => m.modelId === savedModelId,
-			)
+			savedModelId !== models.currentModelId &&
+			models.availableModels.some((m) => m.modelId === savedModelId)
 		) {
 			try {
 				await agentClient.setSessionModel(
 					sessionResult.sessionId,
 					savedModelId,
 				);
-				setSession((prev) =>
-					applyLegacyValue(prev, "model", savedModelId),
-				);
+				models = { ...models, currentModelId: savedModelId };
 			} catch {
 				// Agent default is fine as fallback
 			}
@@ -109,22 +118,22 @@ export async function restoreLegacyConfig(
 	}
 
 	// Legacy mode restore
-	if (sessionResult.modes && savedModeId) {
+	if (modes && savedModeId) {
 		if (
-			savedModeId !== sessionResult.modes.currentModeId &&
-			sessionResult.modes.availableModes.some((m) => m.id === savedModeId)
+			savedModeId !== modes.currentModeId &&
+			modes.availableModes.some((m) => m.id === savedModeId)
 		) {
 			try {
 				await agentClient.setSessionMode(
 					sessionResult.sessionId,
 					savedModeId,
 				);
-				setSession((prev) =>
-					applyLegacyValue(prev, "mode", savedModeId),
-				);
+				modes = { ...modes, currentModeId: savedModeId };
 			} catch {
 				// Agent default is fine as fallback
 			}
 		}
 	}
+
+	return { modes, models };
 }
