@@ -208,14 +208,8 @@ export function useSuggestions(
 
 	const commandUpdateSuggestions = useCallback(
 		(input: string, cursorPosition: number) => {
-			const wasOpen = commandSuggestions.length > 0;
-
 			// Slash commands only trigger at the very beginning of input
 			if (!input.startsWith("/")) {
-				// Re-enable auto-mention only if dropdown was showing
-				if (wasOpen) {
-					toggleAutoMention(false);
-				}
 				setCommandSuggestions([]);
 				setCommandSelectedIndex(0);
 				return;
@@ -229,8 +223,6 @@ export function useSuggestions(
 			if (afterSlash.includes(" ")) {
 				setCommandSuggestions([]);
 				setCommandSelectedIndex(0);
-				// Keep auto-mention disabled (slash command is still active)
-				toggleAutoMention(true);
 				return;
 			}
 
@@ -243,10 +235,8 @@ export function useSuggestions(
 
 			setCommandSuggestions(filtered);
 			setCommandSelectedIndex(0);
-			// Disable auto-mention when slash command is detected
-			toggleAutoMention(true);
 		},
-		[availableCommands, toggleAutoMention, commandSuggestions.length],
+		[availableCommands],
 	);
 
 	const commandSelectSuggestion = useCallback(
