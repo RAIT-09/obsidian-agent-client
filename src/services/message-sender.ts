@@ -343,20 +343,21 @@ function buildDisplayContent(input: PreparePromptInput): PromptContent[] {
 }
 
 /**
-/**
  * Build auto-mention context metadata for UI.
  *
- * Skipped on slash-command turns so the chat bubble doesn't render an
- * @[[note]] badge next to a slash command — matches the prefix/resource
- * skip for consistent "slash commands send no context" semantics.
+ * Returns metadata describing the auto-mentioned note for display as a
+ * UI badge. The caller is responsible for deciding whether the badge
+ * should reflect what was actually sent: agents that support
+ * embeddedContext receive the auto-mention as a Resource block even on
+ * slash-command turns (badge applies), while the text-context fallback
+ * path drops the note context on slash commands (badge should be
+ * skipped at the call site).
  */
 function buildAutoMentionContext(
 	activeNote: NoteMetadata | null | undefined,
 	isDisabled: boolean | undefined,
-	message: string,
 ): PreparePromptResult["autoMentionContext"] {
 	if (!activeNote || isDisabled) return undefined;
-	if (message.startsWith("/")) return undefined;
 	return {
 		noteName: activeNote.name,
 		notePath: activeNote.path,
@@ -464,17 +465,14 @@ async function preparePromptWithEmbeddedContext(
 		});
 	}
 
-	// Build auto-mention Resource block. Skipped on slash-command turns
-	// so the agent receives just the slash command without any attached
-	// note context — matches the prefix/UI chip skip for consistent
-	// "slash commands send no context" semantics regardless of agent
-	// embeddedContext capability.
+	// Build auto-mention Resource block. Sent on slash-command turns too
+	// because Resource blocks are separate ContentBlocks — they don't
+	// interfere with ACP's "/" at char 0 detection on the user-message
+	// text block. Only buildAutoMentionPrefix needs the slash guard.
+	// See https://agentclientprotocol.com/protocol/slash-commands which
+	// allows resource blocks alongside slash-command text blocks.
 	const autoMentionBlocks: PromptContent[] = [];
-	if (
-		input.activeNote &&
-		!input.isAutoMentionDisabled &&
-		!input.message.startsWith("/")
-	) {
+	if (input.activeNote && !input.isAutoMentionDisabled) {
 		const autoMentionResource = await buildAutoMentionResource(
 			input.activeNote,
 			input.vaultBasePath,
@@ -520,7 +518,6 @@ async function preparePromptWithEmbeddedContext(
 		autoMentionContext: buildAutoMentionContext(
 			input.activeNote,
 			input.isAutoMentionDisabled,
-			input.message,
 		),
 	};
 }
@@ -605,11 +602,17 @@ async function preparePromptWithTextContext(
 	return {
 		displayContent: buildDisplayContent(input),
 		agentContent,
-		autoMentionContext: buildAutoMentionContext(
-			input.activeNote,
-			input.isAutoMentionDisabled,
-			input.message,
-		),
+		// Skip the badge on slash-command turns because the text-context
+		// block was also dropped (see buildAgentMessageText). Keeping the
+		// badge state consistent with what was actually sent to the agent
+		// avoids a misleading "context attached" indicator on a turn that
+		// shipped no context.
+		autoMentionContext: input.message.startsWith("/")
+			? undefined
+			: buildAutoMentionContext(
+					input.activeNote,
+					input.isAutoMentionDisabled,
+				),
 	};
 }
 
