@@ -215,6 +215,24 @@ export function convertWslPathToWindows(wslPath: string): string {
 }
 
 /**
+ * Check whether two paths refer to the same directory, accounting for
+ * Windows ↔ WSL path format differences.
+ *
+ * Normalizes both paths to forward-slash lowercase form before comparing,
+ * so "C:\Users\foo" and "/mnt/c/Users/foo" are recognized as equal.
+ */
+export function isSameDirectory(pathA: string, pathB: string): boolean {
+	if (pathA === pathB) return true;
+
+	const normalize = (p: string): string => {
+		const win = convertWslPathToWindows(p);
+		return win.replace(/\\/g, "/").toLowerCase();
+	};
+
+	return normalize(pathA) === normalize(pathB);
+}
+
+/**
  * Build a WSL shell wrapper that sources ~/.profile, detects the user's
  * $SHELL, and falls back to /bin/sh for non-POSIX shells (fish, elvish,
  * nushell, xonsh).

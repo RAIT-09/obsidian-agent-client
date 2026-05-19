@@ -1,7 +1,8 @@
 import { useRef, useCallback, useEffect } from "react";
-import { Notice } from "obsidian";
+import { Notice, Platform } from "obsidian";
 import { SessionHistoryModal } from "../ui/SessionHistoryModal";
 import { getLogger } from "../utils/logger";
+import { convertWslPathToWindows } from "../utils/platform";
 import type AgentClientPlugin from "../plugin";
 import type { UseAgentReturn } from "./useAgent";
 import type { UseSessionHistoryReturn } from "./useSessionHistory";
@@ -39,7 +40,9 @@ export function useHistoryModal(
 				logger.log(`[ChatPanel] Restoring session: ${sessionId}`);
 				agent.clearMessages();
 				await sessionHistory.restoreSession(sessionId, cwd);
-				onAgentCwdChange?.(cwd);
+				onAgentCwdChange?.(
+					Platform.isWin ? convertWslPathToWindows(cwd) : cwd,
+				);
 				new Notice("[Agent Client] Session restored");
 			} catch (error) {
 				new Notice("[Agent Client] Failed to restore session");
@@ -60,7 +63,9 @@ export function useHistoryModal(
 				logger.log(`[ChatPanel] Forking session: ${sessionId}`);
 				agent.clearMessages();
 				await sessionHistory.forkSession(sessionId, cwd);
-				onAgentCwdChange?.(cwd);
+				onAgentCwdChange?.(
+					Platform.isWin ? convertWslPathToWindows(cwd) : cwd,
+				);
 				new Notice("[Agent Client] Session forked");
 			} catch (error) {
 				new Notice("[Agent Client] Failed to fork session");
