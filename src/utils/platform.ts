@@ -215,21 +215,20 @@ export function convertWslPathToWindows(wslPath: string): string {
 }
 
 /**
- * Check whether two paths refer to the same directory, accounting for
- * Windows ↔ WSL path format differences.
- *
- * Normalizes both paths to forward-slash lowercase form before comparing,
- * so "C:\Users\foo" and "/mnt/c/Users/foo" are recognized as equal.
+ * Compare two directory paths accounting for Windows ↔ WSL format differences.
  */
 export function isSameDirectory(pathA: string, pathB: string): boolean {
 	if (pathA === pathB) return true;
 
 	const normalize = (p: string): string => {
 		const win = convertWslPathToWindows(p);
-		return win.replace(/\\/g, "/").toLowerCase();
+		return win.replace(/\\/g, "/").replace(/\/+$/, "");
 	};
 
-	return normalize(pathA) === normalize(pathB);
+	const a = normalize(pathA);
+	const b = normalize(pathB);
+
+	return Platform.isWin ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
 /**
