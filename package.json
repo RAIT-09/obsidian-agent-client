@@ -20,8 +20,8 @@
 	"license": "Apache-2.0",
 	"devDependencies": {
 		"@types/node": "^16.11.6",
-		"@types/react": "^19.1.13",
-		"@types/react-dom": "^19.1.9",
+		"@types/react": "18.3.29",
+		"@types/react-dom": "18.3.7",
 		"@types/semver": "^7.7.1",
 		"@typescript-eslint/parser": "^8.0.0",
 		"@typescript-eslint/utils": "^8.0.0",
@@ -41,8 +41,8 @@
 		"@codemirror/view": "^6.35.0",
 		"@tanstack/react-virtual": "^3.13.23",
 		"diff": "^8.0.2",
-		"react": "^19.1.1",
-		"react-dom": "^19.1.1",
+		"react": "18.3.1",
+		"react-dom": "18.3.1",
 		"semver": "^7.7.3"
 	}
 }
