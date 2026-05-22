@@ -520,11 +520,11 @@ export default class AgentClientPlugin extends Plugin {
 
 	/**
 	 * Close a specific chat view (sidebar or floating).
-	 * Dispatch is via IChatViewContainer.close(); plugin does not need to
-	 * know the concrete container class.
+	 * Dispatch is via IChatViewContainer.closeContainer(); plugin does not
+	 * need to know the concrete container class.
 	 */
 	closeView(viewId: string): void {
-		this.viewRegistry.get(viewId)?.close();
+		this.viewRegistry.get(viewId)?.closeContainer();
 	}
 
 	/**

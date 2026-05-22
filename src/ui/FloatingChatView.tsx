@@ -155,7 +155,7 @@ export class FloatingViewContainer implements IChatViewContainer {
 		return this.callbacks?.getSessionId() ?? null;
 	}
 
-	close(): void {
+	closeContainer(): void {
 		this.unmount();
 	}
 

@@ -220,7 +220,7 @@ export class ChatView extends ItemView implements IChatViewContainer {
 		return this.callbacks?.getSessionId() ?? null;
 	}
 
-	close(): void {
+	closeContainer(): void {
 		this.leaf.detach();
 	}
 

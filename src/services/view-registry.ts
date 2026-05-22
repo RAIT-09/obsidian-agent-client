@@ -186,8 +186,13 @@ export interface IChatViewContainer {
 	 * - Floating (`FloatingViewContainer`): unmounts the React root
 	 * Implementations are responsible for triggering proper cleanup
 	 * (onClose / unmount), which transitively unregisters from the registry.
+	 *
+	 * NOTE: Named `closeContainer` (not `close`) to avoid colliding with
+	 * Obsidian's internal `View.close()` — invoked by `leaf.detach()` during
+	 * cleanup. Overriding it caused infinite recursion in ChatView, since
+	 * our impl calls `leaf.detach()` which calls `view.close()` again.
 	 */
-	close(): void;
+	closeContainer(): void;
 
 	// ============================================================
 	// Container Access
