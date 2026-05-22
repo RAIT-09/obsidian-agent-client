@@ -63,7 +63,7 @@ const SessionItem = React.memo(function SessionItem({
 	title: string;
 	agentName: string;
 }) {
-	const moreRef = useRef<HTMLDivElement>(null);
+	const moreRef = useRef<HTMLButtonElement>(null);
 
 	useEffect(() => {
 		if (moreRef.current) setIcon(moreRef.current, "more-horizontal");
@@ -127,9 +127,11 @@ const SessionItem = React.memo(function SessionItem({
 					<div className="agent-client-session-item-title">{title}</div>
 					<div className="agent-client-session-item-agent">{agentName}</div>
 				</div>
-				<div
+				<button
 					ref={moreRef}
-					className="agent-client-session-item-more"
+					type="button"
+					className="agent-client-session-item-more clickable-icon"
+					aria-label="Session actions"
 					onClick={handleMoreClick}
 				/>
 			</div>
