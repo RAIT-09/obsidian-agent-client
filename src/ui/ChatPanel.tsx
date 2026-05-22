@@ -764,9 +764,22 @@ export function ChatPanel({
 	// ============================================================
 	// Effects - Notify ViewRegistry of State Changes
 	// ============================================================
+	// `hasMessages` flips false → true on first message and then stays stable
+	// for the rest of the conversation. The Session Manager's title and
+	// status only depend on this boolean transition, not on per-chunk growth,
+	// so we avoid notifying on every streamed token.
+	const hasMessages = messages.length > 0;
 	useEffect(() => {
 		plugin.viewRegistry.notifyChange();
-	}, [plugin.viewRegistry, session.state, isSending, agent.hasActivePermission, sessionHistory.loading, messages.length]);
+	}, [
+		plugin.viewRegistry,
+		session.state,
+		session.sessionId,
+		isSending,
+		agent.hasActivePermission,
+		sessionHistory.loading,
+		hasMessages,
+	]);
 
 	// ============================================================
 	// Effects - System Notification on Permission Request
