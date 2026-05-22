@@ -215,6 +215,23 @@ export function convertWslPathToWindows(wslPath: string): string {
 }
 
 /**
+ * Compare two directory paths accounting for Windows ↔ WSL format differences.
+ */
+export function isSameDirectory(pathA: string, pathB: string): boolean {
+	if (pathA === pathB) return true;
+
+	const normalize = (p: string): string => {
+		const win = convertWslPathToWindows(p);
+		return win.replace(/\\/g, "/").replace(/\/+$/, "");
+	};
+
+	const a = normalize(pathA);
+	const b = normalize(pathB);
+
+	return Platform.isWin ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
+
+/**
  * Build a WSL shell wrapper that sources ~/.profile, detects the user's
  * $SHELL, and falls back to /bin/sh for non-POSIX shells (fish, elvish,
  * nushell, xonsh).

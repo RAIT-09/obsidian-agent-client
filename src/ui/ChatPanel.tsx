@@ -10,6 +10,7 @@ import {
 } from "obsidian";
 
 import type { AttachedFile, ChatInputState } from "../types/chat";
+import { isSameDirectory } from "../utils/platform";
 import { useHistoryModal } from "../hooks/useHistoryModal";
 import { useChatActions } from "../hooks/useChatActions";
 import { ChangeDirectoryModal } from "./ChangeDirectoryModal";
@@ -1012,7 +1013,7 @@ export function ChatPanel({
 		);
 
 	const cwdBanner =
-		agentCwd !== vaultPath ? (
+		agentCwd !== vaultPath && !isSameDirectory(agentCwd, vaultPath) ? (
 			<div className="agent-client-cwd-banner" title={agentCwd}>
 				<span
 					className="agent-client-cwd-banner-icon"
