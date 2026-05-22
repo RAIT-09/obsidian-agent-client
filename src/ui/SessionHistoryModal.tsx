@@ -11,6 +11,7 @@ import * as React from "react";
 const { useState, useCallback } = React;
 import { createRoot, Root } from "react-dom/client";
 import type { SessionInfo } from "../types/session";
+import { truncateTitle } from "../utils/text";
 
 // ============================================================
 // ConfirmDeleteModal (internal)
@@ -207,16 +208,6 @@ function formatRelativeTime(date: Date): string {
 		const year = date.getFullYear();
 		return `${month} ${day}, ${year}`;
 	}
-}
-
-/**
- * Truncate session title to 50 characters with ellipsis.
- */
-function truncateTitle(title: string): string {
-	if (title.length <= 50) {
-		return title;
-	}
-	return title.slice(0, 50) + "...";
 }
 
 /**
