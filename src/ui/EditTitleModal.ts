@@ -5,7 +5,8 @@
  * Calls onSave callback with the new title when user clicks Save.
  */
 
-import { Modal, App } from "obsidian";
+import { Modal, App, Menu } from "obsidian";
+import type AgentClientPlugin from "../plugin";
 
 export class EditTitleModal extends Modal {
 	private currentTitle: string;
@@ -80,4 +81,65 @@ export class EditTitleModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 	}
+}
+
+/**
+ * Open the EditTitleModal for renaming a saved session.
+ * Used by ChatPanel's More menu and SessionManagerView's item context menu.
+ */
+export function openRenameSessionModal(
+	plugin: AgentClientPlugin,
+	sessionId: string,
+	currentTitle: string,
+): void {
+	const modal = new EditTitleModal(
+		plugin.app,
+		currentTitle,
+		async (newTitle) => {
+			await plugin.settingsService.updateSessionTitle(
+				sessionId,
+				newTitle,
+			);
+		},
+	);
+	modal.open();
+}
+
+/**
+ * Add a "Rename session" menu item that opens the rename modal.
+ * Centralizes the disabled/enabled label so all call sites stay in sync.
+ *
+ * @param menu - The menu to which the item is added.
+ * @param plugin - The plugin instance.
+ * @param sessionId - The session ID to rename (null when not yet saved).
+ * @param currentTitle - The current title (used as the modal's initial value).
+ * @param options.label - Override the menu item label (default: "Rename session").
+ */
+export function addRenameSessionMenuItem(
+	menu: Menu,
+	plugin: AgentClientPlugin,
+	sessionId: string | null,
+	currentTitle: string,
+	options?: { label?: string },
+): void {
+	const baseLabel = options?.label ?? "Rename session";
+	const hasSavedSession = sessionId
+		? plugin.settingsService
+				.getSavedSessions()
+				.some((s) => s.sessionId === sessionId)
+		: false;
+
+	menu.addItem((item) => {
+		item.setTitle(
+			hasSavedSession
+				? baseLabel
+				: `${baseLabel} (send a message first)`,
+		)
+			.setIcon("pencil")
+			.setDisabled(!hasSavedSession)
+			.onClick(() => {
+				if (!sessionId || !hasSavedSession) return;
+				openRenameSessionModal(plugin, sessionId, currentTitle);
+			});
+	});
 }

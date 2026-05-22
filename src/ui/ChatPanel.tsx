@@ -14,7 +14,7 @@ import { isSameDirectory } from "../utils/platform";
 import { useHistoryModal } from "../hooks/useHistoryModal";
 import { useChatActions } from "../hooks/useChatActions";
 import { ChangeDirectoryModal } from "./ChangeDirectoryModal";
-import { EditTitleModal } from "./EditTitleModal";
+import { addRenameSessionMenuItem } from "./EditTitleModal";
 
 // Service imports
 import { getLogger } from "../utils/logger";
@@ -388,33 +388,15 @@ export function ChatPanel({
 			menu.addSeparator();
 
 			// -- Actions section --
-			menu.addItem((item: MenuItem) => {
-				const hasSavedSession = session.sessionId
-					? plugin.settingsService
-							.getSavedSessions()
-							.some((s) => s.sessionId === session.sessionId)
-					: false;
-				item.setTitle("Rename session")
-					.setIcon("pencil")
-					.setDisabled(!hasSavedSession)
-					.onClick(() => {
-						if (!session.sessionId || !hasSavedSession) return;
-						const saved = plugin.settingsService
-							.getSavedSessions()
-							.find((s) => s.sessionId === session.sessionId);
-						const modal = new EditTitleModal(
-							plugin.app,
-							saved?.title ?? "New session",
-							async (newTitle) => {
-								await plugin.settingsService.updateSessionTitle(
-									session.sessionId!,
-									newTitle,
-								);
-							},
-						);
-						modal.open();
-					});
-			});
+			addRenameSessionMenuItem(
+				menu,
+				plugin,
+				session.sessionId,
+				plugin.settingsService
+					.getSavedSessions()
+					.find((s) => s.sessionId === session.sessionId)?.title ??
+					"New session",
+			);
 
 			menu.addItem((item: MenuItem) => {
 				item.setTitle("Open new view")
@@ -511,33 +493,15 @@ export function ChatPanel({
 
 			menu.addSeparator();
 
-			menu.addItem((item: MenuItem) => {
-				const hasSavedSession = session.sessionId
-					? plugin.settingsService
-							.getSavedSessions()
-							.some((s) => s.sessionId === session.sessionId)
-					: false;
-				item.setTitle("Rename session")
-					.setIcon("pencil")
-					.setDisabled(!hasSavedSession)
-					.onClick(() => {
-						if (!session.sessionId || !hasSavedSession) return;
-						const saved = plugin.settingsService
-							.getSavedSessions()
-							.find((s) => s.sessionId === session.sessionId);
-						const modal = new EditTitleModal(
-							plugin.app,
-							saved?.title ?? "New session",
-							async (newTitle) => {
-								await plugin.settingsService.updateSessionTitle(
-									session.sessionId!,
-									newTitle,
-								);
-							},
-						);
-						modal.open();
-					});
-			});
+			addRenameSessionMenuItem(
+				menu,
+				plugin,
+				session.sessionId,
+				plugin.settingsService
+					.getSavedSessions()
+					.find((s) => s.sessionId === session.sessionId)?.title ??
+					"New session",
+			);
 
 			if (onOpenNewWindow) {
 				menu.addItem((item: MenuItem) => {

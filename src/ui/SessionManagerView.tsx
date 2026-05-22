@@ -9,7 +9,7 @@ import type {
 	IChatViewContainer,
 	SessionStatus,
 } from "../services/view-registry";
-import { EditTitleModal } from "./EditTitleModal";
+import { addRenameSessionMenuItem } from "./EditTitleModal";
 import { useSettings } from "../hooks/useSettings";
 
 export const VIEW_TYPE_SESSION_MANAGER = "agent-client-session-manager";
@@ -72,33 +72,13 @@ function SessionItem({
 		(position: { x: number; y: number }) => {
 			const menu = new Menu();
 
-			const sessionId = view.getSessionId();
-			const hasSavedSession = sessionId
-				? plugin.settingsService
-						.getSavedSessions()
-						.some((s) => s.sessionId === sessionId)
-				: false;
-
-			menu.addItem((item) => {
-				item.setTitle("Rename")
-					.setIcon("pencil")
-					.setDisabled(!hasSavedSession)
-					.onClick(() => {
-						if (!sessionId || !hasSavedSession) return;
-						const currentTitle = view.getSessionTitle();
-						const modal = new EditTitleModal(
-							plugin.app,
-							currentTitle,
-							async (newTitle) => {
-								await plugin.settingsService.updateSessionTitle(
-									sessionId,
-									newTitle,
-								);
-							},
-						);
-						modal.open();
-					});
-			});
+			addRenameSessionMenuItem(
+				menu,
+				plugin,
+				view.getSessionId(),
+				view.getSessionTitle(),
+				{ label: "Rename" },
+			);
 
 			menu.addItem((item) => {
 				item.setTitle("Close")
