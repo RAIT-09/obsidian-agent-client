@@ -5,7 +5,7 @@ import type {
 	SessionStatus,
 } from "../services/view-registry";
 import * as React from "react";
-const { useState, useEffect, useMemo } = React;
+const { useState, useEffect, useMemo, useCallback } = React;
 import { createRoot, Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../plugin";
@@ -66,6 +66,16 @@ function ChatComponent({
 	}, [view]);
 
 	// ============================================================
+	// Stable callback for ChatPanel.onSessionTitleChanged so the title-
+	// update effect's dep array is value-stable (not function-identity-
+	// dependent). `view` is a prop and stable across ChatComponent renders.
+	// ============================================================
+	const handleSessionTitleChanged = useCallback(
+		() => view.refreshDisplayText(),
+		[view],
+	);
+
+	// ============================================================
 	// Render
 	// ============================================================
 	return (
@@ -79,7 +89,7 @@ function ChatComponent({
 					view.setCallbacks(callbacks)
 				}
 				onAgentIdChanged={(agentId) => view.setAgentId(agentId)}
-				onSessionTitleChanged={() => view.refreshDisplayText()}
+				onSessionTitleChanged={handleSessionTitleChanged}
 			/>
 		</ChatContextProvider>
 	);
