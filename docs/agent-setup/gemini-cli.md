@@ -59,13 +59,29 @@ If you have a Gemini Code Assist License from your organization, add `GOOGLE_CLO
 If you prefer to use an API key for authentication:
 
 1. Get your API key from [Google AI Studio](https://aistudio.google.com/apikey)
-2. Enter the API key in **Settings → Agent Client → Gemini CLI → API key**
+2. Open **Settings → Agent Client → Built-in agents → Gemini CLI → API key**
+3. Click the **Link...** button next to the API key field
+4. In the **Select secret** dialog:
+   - To use an existing secret: select it from the list and click **Save**
+   - To create a new one: click **Add secret...**, enter an ID (lowercase letters, numbers, and dashes only — e.g., `gemini-api-key`), paste your API key, then click **Save**
+
+Once linked, the field shows the masked secret value with a **Change** button to swap secrets.
+
+::: tip Managing secrets
+API keys are stored in **Obsidian's Keychain** (Settings → Keychain). You can rename, edit, or delete secrets there at any time. The same secret can be shared across plugins by referencing the same ID.
+:::
+
+::: info Upgrading from a previous version
+If you previously stored your Gemini API key in this plugin (v0.10.x or earlier), it is automatically migrated to Obsidian's Keychain as `gemini-api-key` the first time you load the upgraded plugin. A one-time notification confirms the migration.
+
+If `gemini-api-key` is already in use by another plugin with a different value, your key is preserved under `agent-client-gemini-api-key` instead. You can rename it from **Settings → Keychain** if you prefer.
+:::
 
 ### Option C: Vertex AI
 
 If you are using Vertex AI for enterprise workloads:
 
-1. In **Settings → Agent Client → Gemini CLI → Environment variables**, add:
+1. In **Settings → Agent Client → Built-in agents → Gemini CLI → Environment variables**, add:
 
 ```
 GOOGLE_API_KEY=YOUR_API_KEY

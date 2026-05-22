@@ -42,14 +42,14 @@ The agent executable cannot be found at the specified path.
 The agent requires authentication before processing requests.
 
 **For Claude Code:**
-- **API key**: Set in **Settings → Agent Client → Claude Code (ACP) → API key**
+- **API key**: Open **Settings → Agent Client → Built-in agents → Claude Code → API key**, click **Link...**, and link or create a secret. See [Claude Code Setup](/agent-setup/claude-code#authentication).
 - **Account login**: Run `claude` in Terminal first and complete the login flow
 
 **For Codex:**
-- Set your OpenAI API key in **Settings → Agent Client → Codex → API key**
+- Open **Settings → Agent Client → Built-in agents → Codex → API key**, click **Link...**, and link or create a secret. See [Codex Setup](/agent-setup/codex#authentication).
 
 **For Gemini CLI:**
-- Set your Google API key in **Settings → Agent Client → Gemini CLI → API key**
+- Open **Settings → Agent Client → Built-in agents → Gemini CLI → API key**, click **Link...**, and link or create a secret. See [Gemini CLI Setup](/agent-setup/gemini-cli#authentication).
 - Or run `gemini` in Terminal first to authenticate with your Google account
 
 ### "No Authentication Methods" error
