@@ -501,6 +501,18 @@ If your plugin does not need CSS, delete this file.
 	overflow: hidden;
 }
 
+/* Hide only the title slot inside Obsidian's view-header (editor-area placement).
+ * The chat panel already shows the session title in the tab strip, and
+ * WorkspaceLeaf.updateHeader() does not refresh this inner title so it would
+ * otherwise be stuck at its initial value. The surrounding header bar (nav
+ * buttons, view actions from this and other plugins) is kept intact.
+ * `visibility: hidden` (not `display: none`) preserves the flex layout space,
+ * so view-actions stay on the right instead of collapsing to the left.
+ * In sidebar placement, .view-header is already absent so this is a no-op. */
+.workspace-leaf-content[data-type="agent-client-chat-view"] > .view-header .view-header-title-container {
+	visibility: hidden;
+}
+
 /* Main container */
 .agent-client-chat-view-container {
 	--ac-chat-font-size: var(--font-text-size);
