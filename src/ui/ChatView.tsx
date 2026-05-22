@@ -65,11 +65,7 @@ function ChatComponent({
 		return unsubscribe;
 	}, [view]);
 
-	// ============================================================
-	// Stable callback for ChatPanel.onSessionTitleChanged so the title-
-	// update effect's dep array is value-stable (not function-identity-
-	// dependent). `view` is a prop and stable across ChatComponent renders.
-	// ============================================================
+	// Stable so ChatPanel's title-update effect deps are value-stable.
 	const handleSessionTitleChanged = useCallback(
 		() => view.refreshDisplayText(),
 		[view],
@@ -138,8 +134,7 @@ export class ChatView extends ItemView implements IChatViewContainer {
 	}
 
 	getDisplayText() {
-		// Single source of truth: same value the Session Manager shows for
-		// this view. The fallback to "New session" lives in getSessionTitle().
+		// Tab title == Session Manager title; fallback lives in getSessionTitle().
 		return this.getSessionTitle();
 	}
 
@@ -237,16 +232,8 @@ export class ChatView extends ItemView implements IChatViewContainer {
 		this.leaf.detach();
 	}
 
-	/**
-	 * Trigger Obsidian to re-read getDisplayText() so the tab header
-	 * reflects the latest session title.
-	 *
-	 * Uses an undocumented `WorkspaceLeaf.updateHeader()` method that
-	 * Obsidian core invokes internally for the same purpose. Widely used
-	 * by community plugins. Optional chaining keeps the call safe if a
-	 * future Obsidian version ever removes or renames it.
-	 */
 	refreshDisplayText(): void {
+		// Undocumented WorkspaceLeaf.updateHeader() — Obsidian core uses the same internal method to refresh tab headers.
 		const leaf = this.leaf as unknown as { updateHeader?: () => void };
 		leaf.updateHeader?.();
 	}

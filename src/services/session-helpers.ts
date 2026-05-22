@@ -194,19 +194,7 @@ export function createInitialSession(
 // Session Title Derivation
 // ============================================================================
 
-/**
- * Derive the display title for a session from its persisted metadata and
- * in-memory message list. Returns "New session" as the well-defined fallback.
- *
- * Source-of-truth precedence (highest first):
- *   1. Locally saved title (created on first message, edited via Rename UI)
- *   2. Truncated text of the first user message (50-char limit)
- *   3. "New session" (no sessionId yet, or no user messages)
- *
- * Pure function — shared by the Session Manager (via the live ChatPanelCallbacks
- * read against settings + refs) and the chat view tab header (via a useMemo
- * over React state).
- */
+/** Derive the session display title (saved title > first user message > "New session"). */
 export function computeSessionTitle(
 	sessionId: string | null,
 	savedSessions: SavedSessionInfo[],

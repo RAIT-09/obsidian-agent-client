@@ -791,10 +791,6 @@ export function ChatPanel({
 	// ============================================================
 	// Effects - Notify Sidebar Container of Session Title Changes
 	// ============================================================
-	// Used to refresh the ChatView's Obsidian tab header.
-	// The Session Manager UI reacts via the notifyChange effect above
-	// (it re-reads getSessionTitle() during its render), so this effect is
-	// exclusively for the sidebar tab header re-paint trigger.
 	const sessionTitle = useMemo(
 		() =>
 			computeSessionTitle(
@@ -804,6 +800,7 @@ export function ChatPanel({
 			),
 		[session.sessionId, settings.savedSessions, messages],
 	);
+	// Fires on initial mount + every sessionTitle change so the tab reflects the current title.
 	useEffect(() => {
 		onSessionTitleChanged?.();
 	}, [onSessionTitleChanged, sessionTitle]);
