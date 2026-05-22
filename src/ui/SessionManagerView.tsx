@@ -52,14 +52,17 @@ const SessionItem = React.memo(function SessionItem({
 	view,
 	isFocused,
 	plugin,
+	status,
+	title,
+	agentName,
 }: {
 	view: IChatViewContainer;
 	isFocused: boolean;
 	plugin: AgentClientPlugin;
+	status: SessionStatus;
+	title: string;
+	agentName: string;
 }) {
-	const status = view.getSessionStatus();
-	const title = view.getSessionTitle();
-	const agentName = view.getDisplayName();
 	const moreRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -164,6 +167,9 @@ function SessionManagerComponent({
 					view={view}
 					isFocused={view.viewId === focusedId}
 					plugin={plugin}
+					status={view.getSessionStatus()}
+					title={view.getSessionTitle()}
+					agentName={view.getDisplayName()}
 				/>
 			))}
 		</div>
