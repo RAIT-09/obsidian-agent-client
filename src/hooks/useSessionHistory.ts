@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import type { AcpClient } from "../acp/acp-client";
 import type { ISettingsAccess } from "../services/settings-service";
 import type {
@@ -299,6 +299,38 @@ export function useSessionHistory(
 	// Cache reference (not state to avoid re-renders)
 	const cacheRef = useRef<SessionCache | null>(null);
 	const currentCwdRef = useRef<string | undefined>(undefined);
+
+	// External rename detection: when `savedSessions` changes (e.g. via Session
+	// Manager's Rename), re-merge titles into the currently displayed list
+	// without re-fetching from the agent. Subscribe to settings directly (rather
+	// than via useSettings) so we don't re-render on unrelated settings slices
+	// (windowsWslMode, fontSize, etc.). Reference comparison is sufficient
+	// because SessionStorage always writes a fresh `savedSessions` array.
+	const lastSavedSessionsRef = useRef<SavedSessionInfo[] | null>(null);
+
+	useEffect(() => {
+		return settingsAccess.subscribe(() => {
+			const next = settingsAccess.getSnapshot().savedSessions ?? [];
+			if (next === lastSavedSessionsRef.current) return;
+			lastSavedSessionsRef.current = next;
+
+			const localSessions = settingsAccess.getSavedSessions(
+				session.agentId,
+			);
+			setSessions((prev) => {
+				if (prev.length === 0) return prev;
+				const merged = mergeWithLocalTitles(prev, localSessions);
+				// Skip render if no title actually changed
+				const unchanged =
+					merged.length === prev.length &&
+					merged.every((s, i) => s.title === prev[i].title);
+				return unchanged ? prev : merged;
+			});
+			setLocalSessionIds(
+				new Set(localSessions.map((s) => s.sessionId)),
+			);
+		});
+	}, [settingsAccess, session.agentId]);
 
 	/**
 	 * Check if cache is valid.
