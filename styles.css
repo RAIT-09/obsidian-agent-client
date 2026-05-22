@@ -501,6 +501,11 @@ If your plugin does not need CSS, delete this file.
 	overflow: hidden;
 }
 
+/* Hide stale inner view-header title (updateHeader() doesn't refresh it); visibility:hidden preserves flex layout. */
+.workspace-leaf-content[data-type="agent-client-chat-view"] > .view-header .view-header-title-container {
+	visibility: hidden;
+}
+
 /* Main container */
 .agent-client-chat-view-container {
 	--ac-chat-font-size: var(--font-text-size);

@@ -5,7 +5,7 @@ import type {
 	SessionStatus,
 } from "../services/view-registry";
 import * as React from "react";
-const { useState, useEffect, useMemo } = React;
+const { useState, useEffect, useMemo, useCallback } = React;
 import { createRoot, Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../plugin";
@@ -65,6 +65,12 @@ function ChatComponent({
 		return unsubscribe;
 	}, [view]);
 
+	// Stable so ChatPanel's title-update effect deps are value-stable.
+	const handleSessionTitleChanged = useCallback(
+		() => view.refreshDisplayText(),
+		[view],
+	);
+
 	// ============================================================
 	// Render
 	// ============================================================
@@ -79,6 +85,7 @@ function ChatComponent({
 					view.setCallbacks(callbacks)
 				}
 				onAgentIdChanged={(agentId) => view.setAgentId(agentId)}
+				onSessionTitleChanged={handleSessionTitleChanged}
 			/>
 		</ChatContextProvider>
 	);
@@ -127,7 +134,8 @@ export class ChatView extends ItemView implements IChatViewContainer {
 	}
 
 	getDisplayText() {
-		return "Agent client";
+		// Tab title == Session Manager title; fallback lives in getSessionTitle().
+		return this.getSessionTitle();
 	}
 
 	getIcon() {
@@ -222,6 +230,12 @@ export class ChatView extends ItemView implements IChatViewContainer {
 
 	closeContainer(): void {
 		this.leaf.detach();
+	}
+
+	refreshDisplayText(): void {
+		// Undocumented WorkspaceLeaf.updateHeader() — Obsidian core uses the same internal method to refresh tab headers.
+		const leaf = this.leaf as unknown as { updateHeader?: () => void };
+		leaf.updateHeader?.();
 	}
 
 	/**
