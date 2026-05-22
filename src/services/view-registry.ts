@@ -226,11 +226,14 @@ export class ChatViewRegistry {
 		);
 		this.views.set(view.viewId, view);
 
-		// First view becomes focused by default
+		// First view becomes focused by default. setFocused() already calls
+		// notifyChange(), so only emit an explicit notify on subsequent
+		// registrations to keep this method's contract at "exactly one notify".
 		if (this.views.size === 1) {
 			this.setFocused(view.viewId);
+		} else {
+			this.notifyChange();
 		}
-		this.notifyChange();
 	}
 
 	/**
