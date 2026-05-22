@@ -12,6 +12,7 @@ import type {
 	AgentCapabilities,
 } from "../types/session";
 import type { ChatMessage } from "../types/chat";
+import { truncateTitle } from "../utils/text";
 
 // ============================================================================
 // Session Capability Helpers (from session-capability-utils.ts)
@@ -628,15 +629,9 @@ export function useSessionHistory(
 					);
 					const originalTitle = originalSession?.title ?? "Session";
 
-					// Truncate title to 50 characters
-					const maxTitleLength = 50;
+					// Keep "Fork: " prefix intact; truncate only the base.
 					const prefix = "Fork: ";
-					const maxBaseLength = maxTitleLength - prefix.length;
-					const truncatedTitle =
-						originalTitle.length > maxBaseLength
-							? originalTitle.substring(0, maxBaseLength) + "..."
-							: originalTitle;
-					const newTitle = `${prefix}${truncatedTitle}`;
+					const newTitle = `${prefix}${truncateTitle(originalTitle, 50 - prefix.length)}`;
 
 					const now = new Date().toISOString();
 
@@ -760,10 +755,7 @@ export function useSessionHistory(
 		async (sessionId: string, messageContent: string) => {
 			if (!session.agentId) return;
 
-			const title =
-				messageContent.length > 50
-					? messageContent.substring(0, 50) + "..."
-					: messageContent;
+			const title = truncateTitle(messageContent);
 
 			await settingsAccess.saveSession({
 				sessionId,
