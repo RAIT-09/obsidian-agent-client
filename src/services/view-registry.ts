@@ -158,6 +158,15 @@ export interface IChatViewContainer {
 	 */
 	getSessionId(): string | null;
 
+	/**
+	 * Close this view permanently.
+	 * - Sidebar (`ChatView`): detaches the workspace leaf
+	 * - Floating (`FloatingViewContainer`): unmounts the React root
+	 * Implementations are responsible for triggering proper cleanup
+	 * (onClose / unmount), which transitively unregisters from the registry.
+	 */
+	close(): void;
+
 	// ============================================================
 	// Container Access
 	// ============================================================
