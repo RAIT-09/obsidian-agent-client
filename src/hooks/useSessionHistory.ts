@@ -793,19 +793,12 @@ export function useSessionHistory(
 			);
 
 			// Bump updatedAt on session metadata so "last used" ordering
-			// reflects real activity. Read live snapshot (not React state)
-			// to avoid races with rapid fork/rename. Skip if the metadata
-			// entry hasn't landed yet — saveSessionLocally will create it
-			// on the first-message path.
-			const existing = settingsAccess
-				.getSavedSessions()
-				.find((s) => s.sessionId === sessionId);
-			if (existing) {
-				void settingsAccess.saveSession({
-					...existing,
-					updatedAt: new Date().toISOString(),
-				});
-			}
+			// reflects real activity. `updateSession` is a no-op if the entry
+			// hasn't landed yet — saveSessionLocally will create it on the
+			// first-message path.
+			void settingsAccess.updateSession(sessionId, {
+				updatedAt: new Date().toISOString(),
+			});
 		},
 		[session.agentId, settingsAccess],
 	);
