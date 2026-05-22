@@ -48,15 +48,13 @@ function SessionStatusIcon({ status }: { status: SessionStatus }) {
 	);
 }
 
-function SessionItem({
+const SessionItem = React.memo(function SessionItem({
 	view,
 	isFocused,
-	onClick,
 	plugin,
 }: {
 	view: IChatViewContainer;
 	isFocused: boolean;
-	onClick: () => void;
 	plugin: AgentClientPlugin;
 }) {
 	const status = view.getSessionStatus();
@@ -67,6 +65,10 @@ function SessionItem({
 	useEffect(() => {
 		if (moreRef.current) setIcon(moreRef.current, "more-horizontal");
 	}, []);
+
+	// `view` is stable for the same viewId (registry holds the same instance),
+	// so this callback is stable across renders — keeping React.memo effective.
+	const handleClick = useCallback(() => view.focus(), [view]);
 
 	const showMenu = useCallback(
 		(position: { x: number; y: number }) => {
@@ -114,7 +116,7 @@ function SessionItem({
 		<div className="tree-item">
 			<div
 				className={`tree-item-self is-clickable ${isFocused ? "is-active" : ""}`}
-				onClick={onClick}
+				onClick={handleClick}
 				onContextMenu={handleContextMenu}
 			>
 				<SessionStatusIcon status={status} />
@@ -130,7 +132,7 @@ function SessionItem({
 			</div>
 		</div>
 	);
-}
+});
 
 function SessionManagerComponent({
 	plugin,
@@ -161,7 +163,6 @@ function SessionManagerComponent({
 					key={view.viewId}
 					view={view}
 					isFocused={view.viewId === focusedId}
-					onClick={() => view.focus()}
 					plugin={plugin}
 				/>
 			))}
