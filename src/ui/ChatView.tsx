@@ -79,6 +79,7 @@ function ChatComponent({
 					view.setCallbacks(callbacks)
 				}
 				onAgentIdChanged={(agentId) => view.setAgentId(agentId)}
+				onSessionTitleChanged={() => view.refreshDisplayText()}
 			/>
 		</ChatContextProvider>
 	);
@@ -127,7 +128,9 @@ export class ChatView extends ItemView implements IChatViewContainer {
 	}
 
 	getDisplayText() {
-		return "Agent client";
+		// Delegate to the session title source — same value the Session Manager
+		// shows. Until ChatPanel registers callbacks, fall back to "New session".
+		return this.callbacks?.getSessionTitle() ?? "New session";
 	}
 
 	getIcon() {
@@ -222,6 +225,20 @@ export class ChatView extends ItemView implements IChatViewContainer {
 
 	closeContainer(): void {
 		this.leaf.detach();
+	}
+
+	/**
+	 * Trigger Obsidian to re-read getDisplayText() so the tab header
+	 * reflects the latest session title.
+	 *
+	 * Uses an undocumented `WorkspaceLeaf.updateHeader()` method that
+	 * Obsidian core invokes internally for the same purpose. Widely used
+	 * by community plugins. Optional chaining keeps the call safe if a
+	 * future Obsidian version ever removes or renames it.
+	 */
+	refreshDisplayText(): void {
+		const leaf = this.leaf as unknown as { updateHeader?: () => void };
+		leaf.updateHeader?.();
 	}
 
 	/**

@@ -10,8 +10,10 @@ import type {
 	GeminiAgentSettings,
 	CodexAgentSettings,
 } from "../types/agent";
-import type { ChatSession } from "../types/session";
+import type { ChatSession, SavedSessionInfo } from "../types/session";
+import type { ChatMessage } from "../types/chat";
 import { toAgentConfig } from "./settings-normalizer";
+import { truncateTitle } from "../utils/text";
 
 // ============================================================================
 // Types
@@ -186,4 +188,42 @@ export function createInitialSession(
 		lastActivityAt: new Date(),
 		workingDirectory,
 	};
+}
+
+// ============================================================================
+// Session Title Derivation
+// ============================================================================
+
+/**
+ * Derive the display title for a session from its persisted metadata and
+ * in-memory message list. Returns "New session" as the well-defined fallback.
+ *
+ * Source-of-truth precedence (highest first):
+ *   1. Locally saved title (created on first message, edited via Rename UI)
+ *   2. Truncated text of the first user message (50-char limit)
+ *   3. "New session" (no sessionId yet, or no user messages)
+ *
+ * Pure function — shared by the Session Manager (via the live ChatPanelCallbacks
+ * read against settings + refs) and the chat view tab header (via a useMemo
+ * over React state).
+ */
+export function computeSessionTitle(
+	sessionId: string | null,
+	savedSessions: SavedSessionInfo[],
+	messages: ChatMessage[],
+): string {
+	if (sessionId) {
+		const saved = savedSessions.find((s) => s.sessionId === sessionId);
+		if (saved?.title) return saved.title;
+	}
+	const firstUserMessage = messages.find((m) => m.role === "user");
+	if (firstUserMessage) {
+		const textContent = firstUserMessage.content.find(
+			(c) => c.type === "text" || c.type === "text_with_context",
+		);
+		if (textContent && "text" in textContent) {
+			return truncateTitle(textContent.text);
+		}
+	}
+	return "New session";
 }

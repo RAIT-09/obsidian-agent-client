@@ -11,7 +11,7 @@ import {
 
 import type { AttachedFile, ChatInputState } from "../types/chat";
 import { isSameDirectory } from "../utils/platform";
-import { truncateTitle } from "../utils/text";
+import { computeSessionTitle } from "../services/session-helpers";
 import { useHistoryModal } from "../hooks/useHistoryModal";
 import { useChatActions } from "../hooks/useChatActions";
 import { ChangeDirectoryModal } from "./ChangeDirectoryModal";
@@ -86,6 +86,11 @@ export interface ChatPanelProps {
 	onRegisterCallbacks?: (callbacks: ChatPanelCallbacks) => void;
 	/** Called when agent ID changes (sidebar only — persists in Obsidian state) */
 	onAgentIdChanged?: (agentId: string) => void;
+	/**
+	 * Called when the derived session title may have changed (sidebar only —
+	 * triggers Obsidian to re-read getDisplayText() and update the tab header).
+	 */
+	onSessionTitleChanged?: () => void;
 	// Floating-specific
 	onMinimize?: () => void;
 	onClose?: () => void;
@@ -130,6 +135,7 @@ export function ChatPanel({
 	config,
 	onRegisterCallbacks,
 	onAgentIdChanged,
+	onSessionTitleChanged,
 	onMinimize,
 	onClose,
 	onOpenNewWindow,
@@ -783,6 +789,26 @@ export function ChatPanel({
 	]);
 
 	// ============================================================
+	// Effects - Notify Sidebar Container of Session Title Changes
+	// ============================================================
+	// Used to refresh the ChatView's Obsidian tab header.
+	// The Session Manager UI reacts via the notifyChange effect above
+	// (it re-reads getSessionTitle() during its render), so this effect is
+	// exclusively for the sidebar tab header re-paint trigger.
+	const sessionTitle = useMemo(
+		() =>
+			computeSessionTitle(
+				session.sessionId,
+				settings.savedSessions ?? [],
+				messages,
+			),
+		[session.sessionId, settings.savedSessions, messages],
+	);
+	useEffect(() => {
+		onSessionTitleChanged?.();
+	}, [onSessionTitleChanged, sessionTitle]);
+
+	// ============================================================
 	// Effects - System Notification on Permission Request
 	// ============================================================
 	const prevHasActivePermissionRef = useRef<boolean>(false);
@@ -1000,29 +1026,12 @@ export function ChatPanel({
 				if (state === "ready") return "ready";
 				return "busy";
 			},
-			getSessionTitle: () => {
-				const sessionId = sessionIdRef.current;
-				if (sessionId) {
-					const saved = plugin.settingsService
-						.getSavedSessions()
-						.find((s) => s.sessionId === sessionId);
-					if (saved?.title) return saved.title;
-				}
-				const firstUserMessage = messagesRef.current.find(
-					(m) => m.role === "user",
-				);
-				if (firstUserMessage) {
-					const textContent = firstUserMessage.content.find(
-						(c) =>
-							c.type === "text" ||
-							c.type === "text_with_context",
-					);
-					if (textContent && "text" in textContent) {
-						return truncateTitle(textContent.text);
-					}
-				}
-				return "New session";
-			},
+			getSessionTitle: () =>
+				computeSessionTitle(
+					sessionIdRef.current,
+					plugin.settingsService.getSnapshot().savedSessions ?? [],
+					messagesRef.current,
+				),
 			getSessionId: () => sessionIdRef.current,
 			getInputState: () => ({
 				text: inputValueRef.current,
