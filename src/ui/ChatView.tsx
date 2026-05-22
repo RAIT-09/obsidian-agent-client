@@ -2,6 +2,7 @@ import { ItemView, WorkspaceLeaf } from "obsidian";
 import type {
 	IChatViewContainer,
 	ChatViewType,
+	SessionStatus,
 } from "../services/view-registry";
 import * as React from "react";
 const { useState, useEffect, useMemo } = React;
@@ -207,7 +208,7 @@ export class ChatView extends ItemView implements IChatViewContainer {
 		return this.callbacks?.getDisplayName() ?? "Chat";
 	}
 
-	getSessionStatus(): "ready" | "busy" | "permission" | "error" | "disconnected" {
+	getSessionStatus(): SessionStatus {
 		return this.callbacks?.getSessionStatus() ?? "disconnected";
 	}
 

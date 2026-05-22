@@ -5,7 +5,10 @@ import { useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../plugin";
-import type { IChatViewContainer } from "../services/view-registry";
+import type {
+	IChatViewContainer,
+	SessionStatus,
+} from "../services/view-registry";
 import { EditTitleModal } from "./EditTitleModal";
 import { useSettings } from "../hooks/useSettings";
 
@@ -15,11 +18,11 @@ export const VIEW_TYPE_SESSION_MANAGER = "agent-client-session-manager";
 // React Components
 // ============================================================================
 
-function SessionStatusIcon({ status }: { status: string }) {
+function SessionStatusIcon({ status }: { status: SessionStatus }) {
 	const iconRef = useRef<HTMLSpanElement>(null);
 
-	const iconName = (() => {
-		switch (status) {
+	const iconName = ((s: SessionStatus): string => {
+		switch (s) {
 			case "ready":
 				return "circle-check";
 			case "busy":
@@ -30,10 +33,8 @@ function SessionStatusIcon({ status }: { status: string }) {
 				return "circle-x";
 			case "disconnected":
 				return "circle-off";
-			default:
-				return "circle";
 		}
-	})();
+	})(status);
 
 	useEffect(() => {
 		if (iconRef.current) setIcon(iconRef.current, iconName);

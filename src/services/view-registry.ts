@@ -29,6 +29,17 @@ import { getLogger } from "../utils/logger";
 export type ChatViewType = "sidebar" | "floating";
 
 /**
+ * Simplified session status for display in session lists.
+ * Derived from session state, permission state, and sending state.
+ */
+export type SessionStatus =
+	| "ready"
+	| "busy"
+	| "permission"
+	| "error"
+	| "disconnected";
+
+/**
  * Interface that all chat view containers must implement.
  * Enables the plugin to manage views uniformly regardless of their implementation.
  */
@@ -144,7 +155,7 @@ export interface IChatViewContainer {
 	 * Get the current session status for display in session lists.
 	 * Combines session state and permission status into a simplified status.
 	 */
-	getSessionStatus(): "ready" | "busy" | "permission" | "error" | "disconnected";
+	getSessionStatus(): SessionStatus;
 
 	/**
 	 * Get the session title for display in session lists.

@@ -40,6 +40,7 @@ import {
 	type SessionConfigOption,
 } from "../types/session";
 import { checkAgentUpdate } from "../services/update-checker";
+import type { SessionStatus } from "../services/view-registry";
 
 /** Stable empty array for useSuggestions when no commands available */
 const EMPTY_COMMANDS: SlashCommand[] = [];
@@ -61,7 +62,7 @@ import type { IChatViewHost } from "./view-host";
  */
 export interface ChatPanelCallbacks {
 	getDisplayName: () => string;
-	getSessionStatus: () => "ready" | "busy" | "permission" | "error" | "disconnected";
+	getSessionStatus: () => SessionStatus;
 	getSessionTitle: () => string;
 	getSessionId: () => string | null;
 	getInputState: () => ChatInputState | null;
