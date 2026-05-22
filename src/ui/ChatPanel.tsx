@@ -11,6 +11,7 @@ import {
 
 import type { AttachedFile, ChatInputState } from "../types/chat";
 import { isSameDirectory } from "../utils/platform";
+import { truncateTitle } from "../utils/text";
 import { useHistoryModal } from "../hooks/useHistoryModal";
 import { useChatActions } from "../hooks/useChatActions";
 import { ChangeDirectoryModal } from "./ChangeDirectoryModal";
@@ -1017,9 +1018,7 @@ export function ChatPanel({
 							c.type === "text_with_context",
 					);
 					if (textContent && "text" in textContent) {
-						return textContent.text.length > 50
-							? textContent.text.substring(0, 50) + "..."
-							: textContent.text;
+						return truncateTitle(textContent.text);
 					}
 				}
 				return "New session";
