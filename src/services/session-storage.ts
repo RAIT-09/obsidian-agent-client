@@ -155,6 +155,75 @@ export class SessionStorage {
 		await this.sessionLock;
 	}
 
+	/**
+	 * Update the title of a saved session.
+	 * If createIfMissing is provided and session doesn't exist, creates a new entry.
+	 */
+	async updateSessionTitle(
+		sessionId: string,
+		newTitle: string,
+		createIfMissing?: { agentId: string; cwd: string },
+	): Promise<void> {
+		this.sessionLock = this.sessionLock.then(async () => {
+			const state = this.settingsAccess.getSnapshot();
+			const sessions = [...(state.savedSessions || [])];
+			const idx = sessions.findIndex((s) => s.sessionId === sessionId);
+
+			if (idx >= 0) {
+				// Immutable update: replace the object instead of mutating it,
+				// matching saveSession's pattern and keeping state objects stable.
+				sessions[idx] = {
+					...sessions[idx],
+					title: newTitle,
+					updatedAt: new Date().toISOString(),
+				};
+			} else if (createIfMissing) {
+				sessions.unshift({
+					sessionId,
+					agentId: createIfMissing.agentId,
+					cwd: createIfMissing.cwd,
+					title: newTitle,
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				});
+			} else {
+				return;
+			}
+
+			await this.settingsAccess.updateSettings({
+				savedSessions: sessions,
+			});
+		});
+		await this.sessionLock;
+	}
+
+	/**
+	 * Update fields of an existing saved session.
+	 * Silently no-op if the session does not exist (no create).
+	 * `updatedAt` is set to now unless explicitly provided in `patch`.
+	 */
+	async updateSession(
+		sessionId: string,
+		patch: Partial<Omit<SavedSessionInfo, "sessionId" | "createdAt">>,
+	): Promise<void> {
+		this.sessionLock = this.sessionLock.then(async () => {
+			const state = this.settingsAccess.getSnapshot();
+			const sessions = [...(state.savedSessions || [])];
+			const idx = sessions.findIndex((s) => s.sessionId === sessionId);
+			if (idx < 0) return;
+
+			sessions[idx] = {
+				...sessions[idx],
+				...patch,
+				updatedAt: patch.updatedAt ?? new Date().toISOString(),
+			};
+			await this.settingsAccess.updateSettings({
+				savedSessions: sessions,
+			});
+		});
+		await this.sessionLock;
+	}
+
 	// ============================================================
 	// Session Message History Methods
 	// ============================================================

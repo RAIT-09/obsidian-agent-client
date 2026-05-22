@@ -6,6 +6,7 @@ import type AgentClientPlugin from "../plugin";
 import type {
 	IChatViewContainer,
 	ChatViewType,
+	SessionStatus,
 } from "../services/view-registry";
 import type { ChatInputState } from "../types/chat";
 
@@ -140,6 +141,22 @@ export class FloatingViewContainer implements IChatViewContainer {
 
 	getDisplayName(): string {
 		return this.callbacks?.getDisplayName() ?? "Chat";
+	}
+
+	getSessionStatus(): SessionStatus {
+		return this.callbacks?.getSessionStatus() ?? "disconnected";
+	}
+
+	getSessionTitle(): string {
+		return this.callbacks?.getSessionTitle() ?? "New session";
+	}
+
+	getSessionId(): string | null {
+		return this.callbacks?.getSessionId() ?? null;
+	}
+
+	closeContainer(): void {
+		this.unmount();
 	}
 
 	onActivate(): void {
