@@ -157,7 +157,7 @@ function SessionManagerComponent({
 }: {
 	plugin: AgentClientPlugin;
 }) {
-	const views = useSyncExternalStore(
+	const { views, focusedId } = useSyncExternalStore(
 		plugin.viewRegistry.subscribe,
 		plugin.viewRegistry.getSnapshot,
 		plugin.viewRegistry.getSnapshot,
@@ -165,8 +165,6 @@ function SessionManagerComponent({
 
 	// Subscribe to settings changes so renamed titles are reflected immediately
 	useSettings(plugin);
-
-	const focusedId = plugin.viewRegistry.getFocusedId();
 
 	if (views.length === 0) {
 		return (

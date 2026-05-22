@@ -40,6 +40,17 @@ export type SessionStatus =
 	| "disconnected";
 
 /**
+ * Reactive snapshot of the view registry for `useSyncExternalStore`.
+ * Includes both the view list and the focused view ID so that consumers
+ * (e.g. SessionManagerView) can derive UI state from a single source —
+ * mirrors SettingsService's whole-state snapshot pattern.
+ */
+export interface ViewRegistrySnapshot {
+	views: IChatViewContainer[];
+	focusedId: string | null;
+}
+
+/**
  * Interface that all chat view containers must implement.
  * Enables the plugin to manage views uniformly regardless of their implementation.
  */
@@ -194,7 +205,7 @@ export class ChatViewRegistry {
 	private focusedViewId: string | null = null;
 	private logger = getLogger();
 	private changeListeners = new Set<() => void>();
-	private snapshotCache: IChatViewContainer[] | null = null;
+	private snapshotCache: ViewRegistrySnapshot | null = null;
 
 	// ============================================================
 	// Registration
@@ -417,12 +428,17 @@ export class ChatViewRegistry {
 	}
 
 	/**
-	 * Get a stable snapshot of all views for useSyncExternalStore.
-	 * Returns the same array reference until notifyChange() invalidates it.
+	 * Get a stable snapshot of the registry for useSyncExternalStore.
+	 * Returns the same object reference until notifyChange() invalidates it.
+	 * Includes both views and focusedId so consumers derive UI state from
+	 * a single source (mirrors SettingsService's whole-state snapshot pattern).
 	 */
-	getSnapshot = (): IChatViewContainer[] => {
+	getSnapshot = (): ViewRegistrySnapshot => {
 		if (!this.snapshotCache) {
-			this.snapshotCache = Array.from(this.views.values());
+			this.snapshotCache = {
+				views: Array.from(this.views.values()),
+				focusedId: this.focusedViewId,
+			};
 		}
 		return this.snapshotCache;
 	};
