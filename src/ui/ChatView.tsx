@@ -138,9 +138,9 @@ export class ChatView extends ItemView implements IChatViewContainer {
 	}
 
 	getDisplayText() {
-		// Delegate to the session title source — same value the Session Manager
-		// shows. Until ChatPanel registers callbacks, fall back to "New session".
-		return this.callbacks?.getSessionTitle() ?? "New session";
+		// Single source of truth: same value the Session Manager shows for
+		// this view. The fallback to "New session" lives in getSessionTitle().
+		return this.getSessionTitle();
 	}
 
 	getIcon() {
