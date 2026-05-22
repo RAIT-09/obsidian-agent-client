@@ -57,7 +57,7 @@ export class ChangeDirectoryModal extends Modal {
 		});
 
 		// Focus and select all text
-		setTimeout(() => {
+		window.setTimeout(() => {
 			inputEl.focus();
 			inputEl.select();
 		}, 10);
@@ -93,7 +93,7 @@ export class ChangeDirectoryModal extends Modal {
 
 	private async openFolderPicker(): Promise<string | null> {
 		try {
-			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			// eslint-disable-next-line @typescript-eslint/no-require-imports -- electron is a runtime-only module provided by Obsidian's host environment
 			const { remote } = require("electron") as {
 				remote: {
 					dialog: {

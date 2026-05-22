@@ -20,7 +20,7 @@ import { AcpErrorCode, type AcpError, type ErrorInfo } from "../types/errors";
  */
 export function extractErrorCode(error: unknown): number | undefined {
 	if (error && typeof error === "object" && "code" in error) {
-		const code = (error as { code: unknown }).code;
+		const code = error.code;
 		if (typeof code === "number") return code;
 	}
 	return undefined;
@@ -37,16 +37,16 @@ export function extractErrorMessage(error: unknown): string {
 
 	// Check data.details first (some agents use this format)
 	if ("data" in error) {
-		const data = (error as { data: unknown }).data;
+		const data = error.data;
 		if (data && typeof data === "object" && "details" in data) {
-			const details = (data as { details: unknown }).details;
+			const details = data.details;
 			if (typeof details === "string") return details;
 		}
 	}
 
 	// Then check message
 	if ("message" in error) {
-		const msg = (error as { message: unknown }).message;
+		const msg = error.message;
 		if (typeof msg === "string") return msg;
 	}
 
@@ -58,7 +58,7 @@ export function extractErrorMessage(error: unknown): string {
  */
 export function extractErrorData(error: unknown): unknown {
 	if (error && typeof error === "object" && "data" in error) {
-		return (error as { data: unknown }).data;
+		return error.data;
 	}
 	return undefined;
 }

@@ -10,6 +10,7 @@ import {
 } from "obsidian";
 
 import type { AttachedFile, ChatInputState } from "../types/chat";
+import { isSameDirectory } from "../utils/platform";
 import { useHistoryModal } from "../hooks/useHistoryModal";
 import { useChatActions } from "../hooks/useChatActions";
 import { ChangeDirectoryModal } from "./ChangeDirectoryModal";
@@ -192,6 +193,7 @@ export function ChatPanel({
 		vaultService,
 		plugin,
 		session.availableCommands || EMPTY_COMMANDS,
+		settings.autoMentionActiveNote,
 	);
 
 	// Session history hook with callback for session load
@@ -628,7 +630,7 @@ export function ChatPanel({
 			) => {
 				target.addEventListener(type, callback);
 				registeredListenersRef.current.push({ target, type, callback });
-			}) as IChatViewHost["registerDomEvent"],
+			}),
 		};
 	}, [viewHostProp, plugin.app]);
 
@@ -778,7 +780,7 @@ export function ChatPanel({
 			);
 
 			// System notification on response completion
-			if (settings.enableSystemNotifications && !document.hasFocus()) {
+			if (settings.enableSystemNotifications && !activeDocument.hasFocus()) {
 				new Notification("Agent Client", {
 					body: `${activeAgentLabel} has completed the response.`,
 				});
@@ -815,7 +817,7 @@ export function ChatPanel({
 			!wasActive &&
 			agent.hasActivePermission &&
 			settings.enableSystemNotifications &&
-			!document.hasFocus()
+			!activeDocument.hasFocus()
 		) {
 			new Notification("Agent Client", {
 				body: `${activeAgentLabel} is requesting permission.`,
@@ -1115,7 +1117,6 @@ export function ChatPanel({
 				variant="sidebar"
 				agentLabel={activeAgentLabel}
 				isUpdateAvailable={isUpdateAvailable}
-				hasHistoryCapability={sessionHistory.canShowSessionHistory}
 				onNewChat={() => void handleNewChatWithPersist()}
 				onExportChat={() => void handleExportChat()}
 				onShowMenu={handleShowSidebarMenu}
@@ -1136,7 +1137,7 @@ export function ChatPanel({
 		);
 
 	const cwdBanner =
-		agentCwd !== vaultPath ? (
+		agentCwd !== vaultPath && !isSameDirectory(agentCwd, vaultPath) ? (
 			<div className="agent-client-cwd-banner" title={agentCwd}>
 				<span
 					className="agent-client-cwd-banner-icon"

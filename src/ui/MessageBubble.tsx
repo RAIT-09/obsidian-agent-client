@@ -152,7 +152,6 @@ function CollapsibleThought({ text, plugin }: CollapsibleThoughtProps) {
 interface ContentBlockProps {
 	content: MessageContent;
 	plugin: AgentClientPlugin;
-	messageId?: string;
 	messageRole?: "user" | "assistant";
 	terminalClient?: AcpClient;
 	/** Callback to approve a permission request */
@@ -165,7 +164,6 @@ interface ContentBlockProps {
 function ContentBlock({
 	content,
 	plugin,
-	messageId,
 	messageRole,
 	terminalClient,
 	onApprovePermission,
@@ -247,7 +245,6 @@ function ContentBlock({
 				<TerminalBlock
 					terminalId={content.terminalId}
 					terminalClient={terminalClient || null}
-					plugin={plugin}
 				/>
 			);
 
@@ -321,7 +318,7 @@ function CopyButton({ contents }: { contents: MessageContent[] }) {
 			.writeText(text)
 			.then(() => {
 				setCopied(true);
-				setTimeout(() => setCopied(false), 2000);
+				window.setTimeout(() => setCopied(false), 2000);
 			})
 			.catch(() => {});
 	}, [contents]);
@@ -409,7 +406,6 @@ export const MessageBubble = React.memo(function MessageBubble({
 									key={imgIdx}
 									content={content}
 									plugin={plugin}
-									messageId={message.id}
 									messageRole={message.role}
 									terminalClient={terminalClient}
 									onApprovePermission={onApprovePermission}
@@ -424,7 +420,6 @@ export const MessageBubble = React.memo(function MessageBubble({
 							<ContentBlock
 								content={group.item}
 								plugin={plugin}
-								messageId={message.id}
 								messageRole={message.role}
 								terminalClient={terminalClient}
 								onApprovePermission={onApprovePermission}

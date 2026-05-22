@@ -34,7 +34,7 @@ export class FloatingButtonContainer {
 	private containerEl: HTMLElement;
 
 	constructor(private plugin: AgentClientPlugin) {
-		this.containerEl = document.body.createDiv({
+		this.containerEl = activeDocument.body.createDiv({
 			cls: "agent-client-floating-button-root",
 		});
 	}
@@ -195,7 +195,7 @@ function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 	// Save button position to settings (debounced)
 	useEffect(() => {
 		if (!position) return;
-		const timer = setTimeout(() => {
+		const timer = window.setTimeout(() => {
 			if (
 				!settings.floatingButtonPosition ||
 				position.x !== settings.floatingButtonPosition.x ||
@@ -207,7 +207,7 @@ function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 				});
 			}
 		}, 500);
-		return () => clearTimeout(timer);
+		return () => window.clearTimeout(timer);
 	}, [position, plugin, settings.floatingButtonPosition]);
 
 	// Button click handler
@@ -239,9 +239,10 @@ function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 			}
 		};
 
-		document.addEventListener("mousedown", handleClickOutside);
+		const doc = activeDocument;
+		doc.addEventListener("mousedown", handleClickOutside);
 		return () => {
-			document.removeEventListener("mousedown", handleClickOutside);
+			doc.removeEventListener("mousedown", handleClickOutside);
 		};
 	}, [showInstanceMenu]);
 

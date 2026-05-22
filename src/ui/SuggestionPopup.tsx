@@ -1,7 +1,5 @@
 import * as React from "react";
 const { useRef, useEffect } = React;
-import type AgentClientPlugin from "../plugin";
-import type { IChatViewHost } from "./view-host";
 import type { NoteMetadata } from "../services/vault-service";
 import type { SlashCommand } from "../types/session";
 
@@ -31,12 +29,6 @@ interface SuggestionPopupProps {
 
 	/** Callback to close the dropdown */
 	onClose: () => void;
-
-	/** Plugin instance for logging */
-	plugin: AgentClientPlugin;
-
-	/** View instance for event registration */
-	view: IChatViewHost;
 }
 
 /**
@@ -54,8 +46,6 @@ export function SuggestionPopup({
 	selectedIndex,
 	onSelect,
 	onClose,
-	plugin,
-	view,
 }: SuggestionPopupProps) {
 	const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -70,9 +60,10 @@ export function SuggestionPopup({
 			}
 		};
 
-		document.addEventListener("mousedown", handleClickOutside);
+		const doc = activeDocument;
+		doc.addEventListener("mousedown", handleClickOutside);
 		return () => {
-			document.removeEventListener("mousedown", handleClickOutside);
+			doc.removeEventListener("mousedown", handleClickOutside);
 		};
 	}, [onClose]);
 

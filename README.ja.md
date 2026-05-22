@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <a href="https://community.obsidian.md/plugins/agent-client" target="_blank"><img src="https://img.shields.io/badge/Add%20to%20Obsidian-7c3aed?logo=obsidian&logoColor=white&style=for-the-badge" alt="Add to Obsidian"></a>
+</p>
+
+<p align="center">
   <a href="https://www.buymeacoffee.com/rait09" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="180" height="50" ></a>
 </p>
 
@@ -34,7 +38,15 @@ https://github.com/user-attachments/assets/1c538349-b3fb-44dd-a163-7331cbca7824
 
 ## インストール
 
-### BRAT経由（推奨）
+### コミュニティプラグインから（推奨）
+
+1. **設定 → コミュニティプラグイン → 閲覧** を開く
+2. **「Agent Client」** を検索
+3. **インストール** → **有効化** をクリック
+
+### BRAT経由（プレリリース版）
+
+コミュニティプラグインに公開される前のプレリリース版を試すには:
 
 1. [BRAT](https://github.com/TfTHacker/obsidian42-brat) プラグインをインストール
 2. **設定 → BRAT → Add Beta Plugin** に移動
