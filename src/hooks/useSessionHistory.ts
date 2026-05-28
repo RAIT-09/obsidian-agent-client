@@ -12,6 +12,7 @@ import type {
 	AgentCapabilities,
 } from "../types/session";
 import type { ChatMessage } from "../types/chat";
+import { extractErrorMessage } from "../utils/error-utils";
 import { truncateTitle } from "../utils/text";
 
 // ============================================================================
@@ -450,8 +451,7 @@ export function useSessionHistory(
 					timestamp: Date.now(),
 				};
 			} catch (err) {
-				const errorMessage =
-					err instanceof Error ? err.message : String(err);
+				const errorMessage = extractErrorMessage(err);
 				setError(`Failed to fetch sessions: ${errorMessage}`);
 				setSessions([]);
 				setNextCursor(undefined);
@@ -517,8 +517,7 @@ export function useSessionHistory(
 				};
 			}
 		} catch (err) {
-			const errorMessage =
-				err instanceof Error ? err.message : String(err);
+			const errorMessage = extractErrorMessage(err);
 			setError(`Failed to load more sessions: ${errorMessage}`);
 		} finally {
 			setLoading(false);
@@ -605,8 +604,7 @@ export function useSessionHistory(
 					throw new Error("Session restoration is not supported");
 				}
 			} catch (err) {
-				const errorMessage =
-					err instanceof Error ? err.message : String(err);
+				const errorMessage = extractErrorMessage(err);
 				setError(`Failed to restore session: ${errorMessage}`);
 				throw err; // Re-throw to allow caller to handle
 			} finally {
@@ -689,8 +687,7 @@ export function useSessionHistory(
 				// Invalidate cache since a new session was created
 				invalidateCache();
 			} catch (err) {
-				const errorMessage =
-					err instanceof Error ? err.message : String(err);
+				const errorMessage = extractErrorMessage(err);
 				setError(`Failed to fork session: ${errorMessage}`);
 				throw err; // Re-throw to allow caller to handle
 			} finally {
@@ -726,8 +723,7 @@ export function useSessionHistory(
 				// Invalidate cache to ensure consistency
 				invalidateCache();
 			} catch (err) {
-				const errorMessage =
-					err instanceof Error ? err.message : String(err);
+				const errorMessage = extractErrorMessage(err);
 				setError(`Failed to delete session: ${errorMessage}`);
 				throw err; // Re-throw to allow caller to handle
 			}
@@ -770,8 +766,7 @@ export function useSessionHistory(
 							: s,
 					),
 				);
-				const errorMessage =
-					err instanceof Error ? err.message : String(err);
+				const errorMessage = extractErrorMessage(err);
 				setError(`Failed to update title: ${errorMessage}`);
 				throw err;
 			}
