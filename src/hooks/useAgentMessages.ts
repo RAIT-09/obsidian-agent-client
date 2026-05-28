@@ -22,6 +22,7 @@ import type { ISettingsAccess } from "../services/settings-service";
 import type { ErrorInfo } from "../types/errors";
 import type { IMentionService } from "../utils/mention-parser";
 import { preparePrompt, sendPreparedPrompt } from "../services/message-sender";
+import { extractErrorMessage } from "../utils/error-utils";
 import { Platform } from "obsidian";
 import {
 	rebuildToolCallIndex,
@@ -365,7 +366,7 @@ export function useAgentMessages(
 					setIsSending(false);
 					setErrorInfo({
 						title: "Send Message Failed",
-						message: `Failed to send message: ${error instanceof Error ? error.message : String(error)}`,
+						message: `Failed to send message: ${extractErrorMessage(error)}`,
 					});
 				}
 			})();
@@ -410,7 +411,7 @@ export function useAgentMessages(
 			} catch (error) {
 				setErrorInfo({
 					title: "Permission Error",
-					message: `Failed to respond to permission request: ${error instanceof Error ? error.message : String(error)}`,
+					message: `Failed to respond to permission request: ${extractErrorMessage(error)}`,
 				});
 			}
 		},
