@@ -188,6 +188,7 @@ export interface UseSessionHistoryReturn {
 	saveSessionLocally: (
 		sessionId: string,
 		messageContent: string,
+		sourcePath?: string,
 	) => Promise<void>;
 
 	/**
@@ -779,7 +780,11 @@ export function useSessionHistory(
 	 * Called when the first message is sent in a new session.
 	 */
 	const saveSessionLocally = useCallback(
-		async (sessionId: string, messageContent: string) => {
+		async (
+			sessionId: string,
+			messageContent: string,
+			sourcePath?: string,
+		) => {
 			if (!session.agentId) return;
 
 			const title = truncateTitle(messageContent);
@@ -789,6 +794,7 @@ export function useSessionHistory(
 				agentId: session.agentId,
 				cwd: agentCwd,
 				title,
+				sourcePath,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			});

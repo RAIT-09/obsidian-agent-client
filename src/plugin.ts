@@ -3,9 +3,14 @@ import {
 	WorkspaceLeaf,
 	Notice,
 	requestUrl,
+	MarkdownRenderChild,
+	type MarkdownPostProcessorContext,
 } from "obsidian";
 import * as semver from "semver";
 import { ChatView, VIEW_TYPE_CHAT } from "./ui/ChatView";
+import { mountCodeBlockChat } from "./ui/CodeBlockChatView";
+import { mountAgentButtonBlock } from "./ui/AgentButtonBlock";
+import { parseAgentBlock } from "./utils/agent-block-parser";
 import {
 	SessionManagerView,
 	VIEW_TYPE_SESSION_MANAGER,
@@ -62,12 +67,20 @@ export type SendMessageShortcut = "enter" | "cmd-enter";
  * - 'right-split': Open in right pane with vertical split
  * - 'editor-tab': Open in editor area as tabs
  * - 'editor-split': Open in editor area with right split
+ * - 'floating': Open as a floating chat window
  */
 export type ChatViewLocation =
 	| "right-tab"
 	| "right-split"
 	| "editor-tab"
-	| "editor-split";
+	| "editor-split"
+	| "floating";
+
+export interface EmbeddedChatRegistration {
+	viewId: string;
+	sourcePath: string;
+	lineStart: number;
+}
 
 export interface AgentClientPluginSettings {
 	gemini: GeminiAgentSettings;
@@ -218,6 +231,8 @@ export default class AgentClientPlugin extends Plugin {
 	private floatingButton: FloatingButtonContainer | null = null;
 	/** Counter for generating unique floating chat instance IDs */
 	private floatingChatCounter = 0;
+	/** Embedded chat instances mounted from markdown code blocks. */
+	private embeddedChats = new Map<string, EmbeddedChatRegistration>();
 
 	async onload() {
 		await this.loadSettings();
@@ -355,6 +370,14 @@ export default class AgentClientPlugin extends Plugin {
 		});
 
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
+
+		this.registerMarkdownCodeBlockProcessor(
+			"agent-client",
+			(source, el, ctx) => this.renderAgentBlock(source, el, ctx),
+		);
+		this.registerMarkdownCodeBlockProcessor("agent", (source, el, ctx) =>
+			this.renderAgentBlock(source, el, ctx),
+		);
 
 		// Mount floating button (always present; visibility controlled by settings inside component)
 		this.floatingButton = new FloatingButtonContainer(this);
@@ -565,6 +588,8 @@ export default class AgentClientPlugin extends Plugin {
 		const location = this.settings.chatViewLocation;
 
 		switch (location) {
+			case "floating":
+				return null;
 			case "right-tab":
 				if (isAdditional) {
 					return this.createSidebarTab("right");
@@ -616,11 +641,17 @@ export default class AgentClientPlugin extends Plugin {
 	 * Open a new chat view with a specific agent.
 	 * Always creates a new view (doesn't reuse existing).
 	 */
-	async openNewChatViewWithAgent(agentId: string): Promise<void> {
+	async openNewChatViewWithAgent(agentId: string): Promise<string | null> {
+		if (this.settings.chatViewLocation === "floating") {
+			const counterBefore = this.floatingChatCounter;
+			this.openNewFloatingChat(true);
+			return `floating-chat-${counterBefore}`;
+		}
+
 		const leaf = this.createNewChatLeaf(true);
 		if (!leaf) {
 			getLogger().warn("[AgentClient] Failed to create new leaf");
-			return;
+			return null;
 		}
 
 		await leaf.setViewState({
@@ -630,6 +661,8 @@ export default class AgentClientPlugin extends Plugin {
 		});
 
 		await this.app.workspace.revealLeaf(leaf);
+		const view = leaf.view as ChatView | null;
+		const viewId = view?.viewId ?? null;
 
 		// Focus textarea after revealing the leaf
 		const viewContainerEl = leaf.view?.containerEl;
@@ -643,6 +676,7 @@ export default class AgentClientPlugin extends Plugin {
 				}
 			}, 0);
 		}
+		return viewId;
 	}
 
 	/**
@@ -657,6 +691,35 @@ export default class AgentClientPlugin extends Plugin {
 		// FloatingViewContainer will create viewId as "floating-chat-{instanceId}"
 		const instanceId = String(this.floatingChatCounter++);
 		createFloatingChat(this, instanceId, initialExpanded, initialPosition);
+	}
+
+	registerEmbeddedChat(registration: EmbeddedChatRegistration): () => void {
+		this.embeddedChats.set(registration.viewId, registration);
+		return () => {
+			const current = this.embeddedChats.get(registration.viewId);
+			if (current === registration) {
+				this.embeddedChats.delete(registration.viewId);
+			}
+		};
+	}
+
+	findNearestEmbeddedChat(
+		sourcePath: string,
+		lineStart: number,
+	): string | null {
+		let nearest: EmbeddedChatRegistration | null = null;
+		let nearestDistance = Number.POSITIVE_INFINITY;
+
+		for (const registration of this.embeddedChats.values()) {
+			if (registration.sourcePath !== sourcePath) continue;
+			const distance = Math.abs(registration.lineStart - lineStart);
+			if (distance < nearestDistance) {
+				nearest = registration;
+				nearestDistance = distance;
+			}
+		}
+
+		return nearest?.viewId ?? null;
 	}
 
 	/**
@@ -687,6 +750,118 @@ export default class AgentClientPlugin extends Plugin {
 		if (view) {
 			view.expand();
 		}
+	}
+
+	/**
+	 * Render an `agent-client` code block. Dispatches to embedded chat or
+	 * quick-action button based on the parsed `type` field.
+	 */
+	private renderAgentBlock(
+		source: string,
+		el: HTMLElement,
+		ctx: MarkdownPostProcessorContext,
+	): void {
+		const child = new MarkdownRenderChild(el);
+		const parsed = parseAgentBlock(source);
+
+		if (!parsed.ok) {
+			const errorEl = el.createDiv({
+				cls: "agent-client-code-block-error",
+			});
+			errorEl.createSpan({
+				cls: "agent-client-code-block-error-label",
+				text: "agent-client block error: ",
+			});
+			errorEl.createSpan({ text: parsed.error });
+			const sourceEl = errorEl.createEl("pre", {
+				cls: "agent-client-code-block-error-source",
+			});
+			sourceEl.setText(source);
+			ctx.addChild(child);
+			return;
+		}
+
+		const sectionInfo = ctx.getSectionInfo(el);
+		const sourcePath = ctx.sourcePath || "";
+		const lineStart = sectionInfo?.lineStart ?? 0;
+		const blockId = `${sourcePath || "untitled"}:${lineStart}`;
+
+		if (parsed.config.type === "chat") {
+			const root = mountCodeBlockChat(this, el, parsed.config, {
+				sourcePath,
+				blockId,
+				lineStart,
+			});
+			child.onunload = () => root.unmount();
+		} else {
+			const root = mountAgentButtonBlock(this, el, parsed.config, {
+				sourcePath,
+				lineStart,
+			});
+			child.onunload = () => root.unmount();
+		}
+		ctx.addChild(child);
+	}
+
+	/**
+	 * Open a chat view and inject a prompt into it. Used by quick-action
+	 * buttons (embedded code blocks, command palette entries, etc.).
+	 *
+	 * Fires `agent-client:run-prompt` shortly after the open call so the
+	 * target ChatPanel (matched by viewId or "any") can populate its input
+	 * box, optionally auto-sending once the session is ready.
+	 */
+	async runPromptInChat(options: {
+		agentId: string;
+		prompt: string;
+		autoSend: boolean;
+		viewType: "right-pane" | "floating" | "editor-tab" | "embedded";
+		sourcePath?: string;
+		lineStart?: number;
+	}): Promise<void> {
+		const { agentId, prompt, autoSend, viewType, sourcePath, lineStart } =
+			options;
+		let targetViewId: string | null = null;
+
+		if (viewType === "embedded") {
+			targetViewId =
+				sourcePath && typeof lineStart === "number"
+					? this.findNearestEmbeddedChat(sourcePath, lineStart)
+					: null;
+			if (!targetViewId) {
+				new Notice("No embedded chat block found in this note.");
+				return;
+			}
+		} else if (viewType === "floating") {
+			const counterBefore = this.floatingChatCounter;
+			this.openNewFloatingChat(true);
+			targetViewId = `floating-chat-${counterBefore}`;
+		} else if (viewType === "editor-tab") {
+			const leaf = this.app.workspace.getLeaf("tab");
+			await leaf.setViewState({
+				type: VIEW_TYPE_CHAT,
+				active: true,
+				state: { initialAgentId: agentId },
+			});
+			await this.app.workspace.revealLeaf(leaf);
+			const view = leaf.view as ChatView;
+			targetViewId = view?.viewId ?? null;
+		} else {
+			targetViewId = await this.openNewChatViewWithAgent(agentId);
+		}
+
+		if (!targetViewId) return;
+
+		// Defer slightly so the React root has mounted and registered its
+		// `agent-client:run-prompt` listener.
+		window.setTimeout(() => {
+			this.app.workspace.trigger(
+				"agent-client:run-prompt",
+				targetViewId,
+				prompt,
+				autoSend,
+			);
+		}, 100);
 	}
 
 	/**
@@ -938,6 +1113,12 @@ export default class AgentClientPlugin extends Plugin {
 				? rawDefaultId
 				: availableAgentIds[0] || D.claude.id;
 
+		const pickAvatarImage = (value: unknown): string | undefined => {
+			if (typeof value !== "string") return undefined;
+			const trimmed = value.trim();
+			return trimmed.length > 0 ? trimmed : undefined;
+		};
+
 		this.settings = {
 			claude: {
 				id: D.claude.id, // Fixed — never from raw
@@ -959,6 +1140,7 @@ export default class AgentClientPlugin extends Plugin {
 					D.claude.command,
 				args: sanitizeArgs(rc.args),
 				env: normalizeEnvVars(rc.env),
+				avatarImage: pickAvatarImage(rc.avatarImage),
 			},
 			codex: {
 				id: D.codex.id,
@@ -976,6 +1158,7 @@ export default class AgentClientPlugin extends Plugin {
 				command: str(rk.command, "") || D.codex.command,
 				args: sanitizeArgs(rk.args),
 				env: normalizeEnvVars(rk.env),
+				avatarImage: pickAvatarImage(rk.avatarImage),
 			},
 			gemini: {
 				id: D.gemini.id,
@@ -1000,6 +1183,7 @@ export default class AgentClientPlugin extends Plugin {
 						? sanitizeArgs(rg.args)
 						: D.gemini.args,
 				env: normalizeEnvVars(rg.env),
+				avatarImage: pickAvatarImage(rg.avatarImage),
 			},
 			customAgents,
 			defaultAgentId,
@@ -1077,7 +1261,13 @@ export default class AgentClientPlugin extends Plugin {
 			),
 			chatViewLocation: enumVal(
 				raw.chatViewLocation,
-				["right-tab", "right-split", "editor-tab", "editor-split"],
+				[
+					"right-tab",
+					"right-split",
+					"editor-tab",
+					"editor-split",
+					"floating",
+				],
 				D.chatViewLocation,
 			),
 			displaySettings: {

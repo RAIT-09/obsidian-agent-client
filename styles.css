@@ -2199,48 +2199,6 @@ If your plugin does not need CSS, delete this file.
 	color: var(--interactive-accent);
 }
 
-/* ===== Code Block Chat View ===== */
-/* TODO(code-block): Styles for future code block chat view */
-.agent-client-code-block-container {
-	display: flex;
-	flex-direction: column;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
-	background: var(--background-primary);
-	overflow: hidden;
-}
-
-.agent-client-code-block-content {
-	display: flex;
-	flex-direction: column;
-	padding: 8px;
-}
-
-.agent-client-code-block-status {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	padding: 4px 8px;
-	background: var(--background-secondary);
-	border-radius: 4px;
-	margin-bottom: 4px;
-	flex-wrap: wrap;
-	gap: 8px;
-}
-
-.agent-client-code-block-status-actions {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	flex-wrap: wrap;
-}
-
-.agent-client-code-block-messages {
-	max-height: 400px;
-	overflow-y: auto;
-	margin-bottom: 8px;
-}
-
 /* ===== Agent Selector (InlineHeader) ===== */
 .agent-client-agent-selector {
 	display: inline-flex;
@@ -2304,4 +2262,161 @@ If your plugin does not need CSS, delete this file.
 .agent-client-agent-label {
 	color: var(--text-normal);
 	font-size: 12px;
+}
+
+/* ============================================================
+   Embedded agent-client code blocks
+   ============================================================ */
+
+.agent-client-code-block-error {
+	border: 1px solid var(--background-modifier-error-border, var(--text-error));
+	background: var(--background-modifier-error);
+	color: var(--text-on-accent, #fff);
+	padding: 10px 14px;
+	border-radius: 6px;
+	font-size: 0.95em;
+	margin: 4px 0;
+	font-family: var(--font-interface);
+}
+
+.agent-client-code-block-error-label {
+	font-weight: 700;
+	margin-right: 4px;
+	color: var(--text-on-accent, #fff);
+}
+
+.agent-client-code-block-error-source {
+	margin-top: 8px;
+	padding: 6px 10px;
+	background: rgba(0, 0, 0, 0.25);
+	border-radius: 4px;
+	font-family: var(--font-monospace);
+	font-size: 0.85em;
+	color: var(--text-on-accent, #fff);
+	white-space: pre-wrap;
+	word-break: break-word;
+	max-height: 200px;
+	overflow: auto;
+}
+
+.agent-client-code-block-host {
+	margin: 8px 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	overflow: hidden;
+	background: var(--background-primary);
+}
+
+.agent-client-code-block-chat {
+	display: flex;
+	flex-direction: column;
+	height: var(--ac-embedded-max-height, 520px);
+	min-height: 320px;
+	max-height: min(var(--ac-embedded-max-height, 520px), 80vh);
+	overflow: hidden;
+}
+
+.agent-client-code-block-chat-avatar-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 40px;
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+}
+
+.agent-client-code-block-chat-avatar {
+	display: block;
+	flex: 0 0 28px;
+	width: 28px !important;
+	height: 28px !important;
+	min-width: 28px;
+	min-height: 28px;
+	max-width: 28px;
+	max-height: 28px;
+	aspect-ratio: 1 / 1;
+	border-radius: 50%;
+	object-fit: cover;
+	overflow: hidden;
+}
+
+.agent-client-embedded-chat-panel {
+	flex: 1 1 auto;
+	height: 100%;
+	min-height: 0;
+	overflow: hidden;
+	background: var(--background-primary);
+}
+
+.agent-client-embedded-header {
+	flex: 0 0 auto;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+}
+
+.agent-client-embedded-header .agent-client-inline-header {
+	min-height: 34px;
+	padding: 6px 10px;
+}
+
+.agent-client-embedded-messages-container {
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.agent-client-embedded-messages-container .agent-client-chat-view-messages {
+	flex: 1 1 auto;
+	min-height: 0;
+	padding: 12px 10px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+.agent-client-embedded-chat-panel .agent-client-chat-input-container {
+	flex: 0 0 auto;
+	padding: 8px 10px 10px;
+	border-top: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+}
+
+/* ============================================================
+   Quick-action button blocks
+   ============================================================ */
+
+.agent-client-button-block {
+	display: inline-flex;
+	margin: 4px 0;
+}
+
+.agent-client-button-block-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 14px;
+	border-radius: 6px;
+	cursor: pointer;
+	font-weight: 500;
+}
+
+.agent-client-button-block-avatar {
+	display: block;
+	flex: 0 0 18px;
+	width: 18px !important;
+	height: 18px !important;
+	min-width: 18px;
+	min-height: 18px;
+	max-width: 18px;
+	max-height: 18px;
+	aspect-ratio: 1 / 1;
+	border-radius: 50%;
+	object-fit: cover;
+	overflow: hidden;
+}
+
+.agent-client-button-block-text {
+	white-space: nowrap;
 }
