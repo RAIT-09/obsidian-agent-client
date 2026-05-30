@@ -94,6 +94,15 @@ export default defineConfig({
           { text: "ACP Protocol Support", link: "/reference/acp-support" },
         ],
       },
+      {
+        text: "Announcements",
+        items: [
+          {
+            text: "Gemini CLI Discontinuation",
+            link: "/announcements/gemini-cli-deprecation",
+          },
+        ],
+      },
     ],
 
     socialLinks: [
