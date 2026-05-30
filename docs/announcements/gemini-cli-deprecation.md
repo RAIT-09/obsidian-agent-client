@@ -60,6 +60,10 @@ If Google adds ACP support — or if an adapter built on the **Antigravity SDK**
 
 A community ACP bridge, [`agy-acp`](https://github.com/openabdev/openab/tree/main/agy-acp), does exist and can be added as a [custom agent](/agent-setup/custom-agents). It works as a minimal text chat only — streaming, tool calls, and diffs don't come through — so it's an escape hatch rather than a full replacement.
 
+## Questions?
+
+If anything is unclear or you run into trouble migrating, join the discussion on [GitHub](https://github.com/RAIT-09/obsidian-agent-client/discussions/300).
+
 ## Sources
 
 - [An important update: Transitioning Gemini CLI to Antigravity CLI — Google Developers Blog](https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/)
