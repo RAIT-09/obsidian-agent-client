@@ -29,6 +29,8 @@ export interface AgentUpdateNotification {
 	message: string;
 	/** Actionable suggestion (e.g., npm command) */
 	suggestion?: string;
+	/** Optional external link rendered as an actionable anchor (e.g. docs). */
+	link?: { text: string; url: string };
 }
 
 // ============================================================================

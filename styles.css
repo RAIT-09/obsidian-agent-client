@@ -766,6 +766,18 @@ If your plugin does not need CSS, delete this file.
 	cursor: text;
 }
 
+.agent-client-error-overlay-link {
+	display: inline-block;
+	margin-top: 8px;
+	font-size: 12px;
+	color: var(--text-accent);
+	text-decoration: none;
+}
+
+.agent-client-error-overlay-link:hover {
+	text-decoration: underline;
+}
+
 /* Empty state */
 .agent-client-chat-empty-state {
 	color: var(--text-muted);

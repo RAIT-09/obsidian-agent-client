@@ -55,6 +55,9 @@ export interface ErrorInfo {
 
 	/** Optional suggestion on how to resolve the error */
 	suggestion?: string;
+
+	/** Optional external link rendered as an actionable anchor (e.g. docs). */
+	link?: { text: string; url: string };
 }
 
 // ============================================================================

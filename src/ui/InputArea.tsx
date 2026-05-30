@@ -243,6 +243,10 @@ export interface InputAreaProps {
 	agentUpdateNotification: AgentUpdateNotification | null;
 	/** Callback to dismiss the agent update notification */
 	onClearAgentUpdate: () => void;
+	/** Gemini CLI deprecation notice (shown while Gemini agent is selected) */
+	geminiNotice: AgentUpdateNotification | null;
+	/** Callback to dismiss the Gemini notice */
+	onClearGeminiNotice: () => void;
 	/** Messages array for input history navigation */
 	messages: ChatMessage[];
 }
@@ -293,6 +297,9 @@ export function InputArea({
 	// Agent update notification props
 	agentUpdateNotification,
 	onClearAgentUpdate,
+	// Gemini CLI deprecation notice props
+	geminiNotice,
+	onClearGeminiNotice,
 	// Input history
 	messages,
 }: InputAreaProps) {
@@ -960,6 +967,17 @@ export function InputArea({
 					showEmojis={showEmojis}
 					view={view}
 					variant={agentUpdateNotification.variant}
+				/>
+			)}
+
+			{/* Gemini CLI deprecation notice - lowest priority overlay */}
+			{!errorInfo && !agentUpdateNotification && geminiNotice && (
+				<ErrorBanner
+					errorInfo={geminiNotice}
+					onClose={onClearGeminiNotice}
+					showEmojis={showEmojis}
+					view={view}
+					variant={geminiNotice.variant}
 				/>
 			)}
 
