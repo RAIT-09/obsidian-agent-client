@@ -89,6 +89,16 @@ export function ErrorBanner({
 					)}
 				</div>
 			)}
+			{errorInfo.link && (
+				<a
+					className="agent-client-error-overlay-link"
+					href={errorInfo.link.url}
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					{errorInfo.link.text}
+				</a>
+			)}
 		</div>
 	);
 }

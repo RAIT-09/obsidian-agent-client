@@ -1,5 +1,9 @@
 # Gemini CLI Setup
 
+::: warning Gemini CLI is being discontinued
+Google is retiring account login for Gemini CLI (Pro / Ultra / free tiers) on **June 18, 2026**. Google states Gemini CLI stays accessible via a **paid** Gemini API key. See **[Gemini CLI Discontinuation & Migration](/announcements/gemini-cli-deprecation)**.
+:::
+
 Gemini CLI is Google's AI assistant. You can authenticate using your **Google account**, an **API key**, or **Vertex AI**.
 
 ## Install and Configure
@@ -40,6 +44,10 @@ Choose one of the following methods:
 
 If you have a Google account and prefer not to use an API key, you can log in directly.
 
+::: warning
+Account login is being discontinued for Pro / Ultra / free tiers on June 18, 2026. See [Gemini CLI Discontinuation & Migration](/announcements/gemini-cli-deprecation).
+:::
+
 1. Run Gemini CLI in your terminal and choose "Login with Google":
 
 ```bash
@@ -61,6 +69,10 @@ If you prefer to use an API key for authentication:
 1. Get your API key from [Google AI Studio](https://aistudio.google.com/apikey)
 2. Enter the API key in **Settings → Agent Client → Gemini CLI → API key**
 
+::: tip If the key isn't picked up
+If authentication still fails, set the key on the Gemini CLI side instead: run `gemini` in your terminal, type `/auth`, choose **Use Gemini API Key**, and paste your key (it's stored in your system keychain). Then leave the **API key field empty** in Agent Client.
+:::
+
 ### Option C: Vertex AI
 
 If you are using Vertex AI for enterprise workloads:
@@ -74,8 +86,8 @@ GOOGLE_GENAI_USE_VERTEXAI=true
 
 2. Leave the **API key field empty** (use Environment variables instead).
 
-::: tip
-Gemini CLI natively supports ACP, so no additional adapter is required.
+::: tip If it isn't picked up
+If authentication still fails, configure Vertex AI on the Gemini CLI side instead: run `gemini` in your terminal, type `/auth`, and choose **Vertex AI**.
 :::
 
 ## Verify Setup
