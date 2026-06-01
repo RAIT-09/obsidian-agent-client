@@ -28,6 +28,8 @@ export type AgentChatBlockConfig = {
 	 * global floatingButtonImage.
 	 */
 	image?: string;
+	/** Whether to show the resolved agent image above the embedded chat. */
+	showImage?: boolean;
 };
 
 export type AgentButtonBlockConfig = {
@@ -44,6 +46,8 @@ export type AgentButtonBlockConfig = {
 	autoSend?: boolean;
 	/** Hide the button after it is clicked (until the note is re-rendered). */
 	hideAfterClick?: boolean;
+	/** Whether to show the resolved agent image inside the button. */
+	showImage?: boolean;
 	/** Alignment of the rendered button block within the note. */
 	align?: "left" | "center" | "right";
 };
@@ -85,6 +89,14 @@ function asString(value: unknown): string | undefined {
 
 function asBoolean(value: unknown): boolean | undefined {
 	return typeof value === "boolean" ? value : undefined;
+}
+
+function showImageValue(obj: Record<string, unknown>): boolean | undefined {
+	const explicit = asBoolean(obj.showImage);
+	if (typeof explicit === "boolean") return explicit;
+	const hideImage = asBoolean(obj.hideImage);
+	if (typeof hideImage === "boolean") return !hideImage;
+	return obj.image === false ? false : undefined;
 }
 
 function dedent(source: string): string {
@@ -169,6 +181,7 @@ export function parseAgentBlock(source: string): AgentBlockParseResult {
 			persist: asBoolean(obj.persist) ?? false,
 			noteContext,
 			image: asString(obj.image),
+			showImage: showImageValue(obj),
 		};
 		return { ok: true, config };
 	}
@@ -223,6 +236,7 @@ export function parseAgentBlock(source: string): AgentBlockParseResult {
 		// Left undefined when unset so it can fall back to the referenced
 		// quick prompt's hideAfterClick setting at click time.
 		hideAfterClick: asBoolean(obj.hideAfterClick),
+		showImage: showImageValue(obj),
 		align: align ?? "left",
 	};
 	return { ok: true, config };

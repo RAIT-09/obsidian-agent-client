@@ -1,8 +1,14 @@
 import * as React from "react";
-const { useRef, useEffect } = React;
-import { setIcon, DropdownComponent } from "obsidian";
+const { useRef, useEffect, useMemo } = React;
+import { setIcon } from "obsidian";
 import { HeaderButton } from "./shared/IconButton";
 import type { AgentDisplayInfo } from "../services/session-helpers";
+import type AgentClientPlugin from "../plugin";
+import {
+	AgentAvatar,
+	getResolvedAgentAvatarSrc,
+} from "./shared/AgentAvatar";
+import { ImageSelect, type ImageSelectOption } from "./shared/ImageSelect";
 
 // ============================================================================
 // Props Types
@@ -15,6 +21,10 @@ export interface SidebarHeaderProps {
 	variant: "sidebar";
 	/** Display name of the active agent */
 	agentLabel: string;
+	/** Active agent ID */
+	agentId: string;
+	/** Plugin instance for resolving configured agent images */
+	plugin: AgentClientPlugin;
 	/** Whether a plugin update is available */
 	isUpdateAvailable: boolean;
 	/** Callback to create a new chat session */
@@ -34,6 +44,8 @@ export interface FloatingHeaderProps {
 	variant: "floating";
 	/** Display name of the active agent */
 	agentLabel: string;
+	/** Plugin instance for resolving configured agent images */
+	plugin: AgentClientPlugin;
 	/** Available agents for switching */
 	availableAgents: AgentDisplayInfo[];
 	/** Current agent ID */
@@ -90,6 +102,55 @@ function NavActionButton({
 	);
 }
 
+function AgentSelector({
+	agentLabel,
+	plugin,
+	availableAgents,
+	currentAgentId,
+	onAgentChange,
+}: {
+	agentLabel: string;
+	plugin: AgentClientPlugin;
+	availableAgents: AgentDisplayInfo[];
+	currentAgentId: string;
+	onAgentChange: (agentId: string) => void;
+}) {
+	const agentOptions = useMemo<ImageSelectOption[]>(
+		() =>
+			availableAgents.map((agent) => ({
+				value: agent.id,
+				label: agent.displayName,
+				imageSrc: getResolvedAgentAvatarSrc(plugin, agent.id),
+			})),
+		[availableAgents, plugin],
+	);
+
+	if (availableAgents.length > 1) {
+		return (
+			<div className="agent-client-agent-selector">
+				<ImageSelect
+					options={agentOptions}
+					value={currentAgentId}
+					onChange={onAgentChange}
+					className="agent-client-agent-image-select"
+					placeholder={agentLabel}
+				/>
+			</div>
+		);
+	}
+
+	return (
+		<span className="agent-client-agent-label">
+			<AgentAvatar
+				plugin={plugin}
+				agentId={currentAgentId}
+				className="agent-client-header-agent-avatar"
+			/>
+			{agentLabel}
+		</span>
+	);
+}
+
 // ============================================================================
 // Sidebar Header
 // ============================================================================
@@ -102,6 +163,8 @@ function NavActionButton({
  */
 function SidebarHeader({
 	agentLabel,
+	agentId,
+	plugin,
 	isUpdateAvailable,
 	onNewChat,
 	onExportChat,
@@ -112,6 +175,11 @@ function SidebarHeader({
 		<div className="nav-header agent-client-chat-view-header">
 			<div className="nav-buttons-container">
 				<span className="agent-client-chat-view-header-title">
+					<AgentAvatar
+						plugin={plugin}
+						agentId={agentId}
+						className="agent-client-header-agent-avatar"
+					/>
 					{agentLabel}
 				</span>
 				{isUpdateAvailable && (
@@ -161,6 +229,7 @@ function SidebarHeader({
  */
 function FloatingHeader({
 	agentLabel,
+	plugin,
 	availableAgents,
 	currentAgentId,
 	isUpdateAvailable,
@@ -169,85 +238,18 @@ function FloatingHeader({
 	onMinimize,
 	onClose,
 }: FloatingHeaderProps) {
-	// Refs for agent dropdown
-	const agentDropdownRef = useRef<HTMLDivElement>(null);
-	const agentDropdownInstance = useRef<DropdownComponent | null>(null);
-
-	// Stable ref for onAgentChange callback
-	const onAgentChangeRef = useRef(onAgentChange);
-	onAgentChangeRef.current = onAgentChange;
-
-	// Initialize agent dropdown
-	useEffect(() => {
-		const containerEl = agentDropdownRef.current;
-		if (!containerEl) return;
-
-		// Only show dropdown if there are multiple agents
-		if (availableAgents.length <= 1) {
-			if (agentDropdownInstance.current) {
-				containerEl.empty();
-				agentDropdownInstance.current = null;
-			}
-			return;
-		}
-
-		// Create dropdown if not exists
-		if (!agentDropdownInstance.current) {
-			const dropdown = new DropdownComponent(containerEl);
-			agentDropdownInstance.current = dropdown;
-
-			// Add options
-			for (const agent of availableAgents) {
-				dropdown.addOption(agent.id, agent.displayName);
-			}
-
-			// Set initial value
-			if (currentAgentId) {
-				dropdown.setValue(currentAgentId);
-			}
-
-			// Handle change
-			dropdown.onChange((value) => {
-				onAgentChangeRef.current?.(value);
-			});
-		}
-
-		// Cleanup on unmount or when availableAgents change
-		return () => {
-			if (agentDropdownInstance.current) {
-				containerEl.empty();
-				agentDropdownInstance.current = null;
-			}
-		};
-	}, [availableAgents]);
-
-	// Update dropdown value when currentAgentId changes
-	useEffect(() => {
-		if (agentDropdownInstance.current && currentAgentId) {
-			agentDropdownInstance.current.setValue(currentAgentId);
-		}
-	}, [currentAgentId]);
-
 	return (
 		<div
 			className={`agent-client-inline-header agent-client-inline-header-floating`}
 		>
 			<div className="agent-client-inline-header-main">
-				{availableAgents.length > 1 ? (
-					<div className="agent-client-agent-selector">
-						<div ref={agentDropdownRef} />
-						<span
-							className="agent-client-agent-selector-icon"
-							ref={(el) => {
-								if (el) setIcon(el, "chevron-down");
-							}}
-						/>
-					</div>
-				) : (
-					<span className="agent-client-agent-label">
-						{agentLabel}
-					</span>
-				)}
+				<AgentSelector
+					agentLabel={agentLabel}
+					plugin={plugin}
+					availableAgents={availableAgents}
+					currentAgentId={currentAgentId}
+					onAgentChange={onAgentChange}
+				/>
 			</div>
 			{isUpdateAvailable && (
 				<p className="agent-client-chat-view-header-update">

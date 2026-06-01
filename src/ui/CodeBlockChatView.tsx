@@ -62,6 +62,8 @@ function CodeBlockChatComponent({
 	);
 
 	const avatarSrc = useMemo(() => {
+		if (!plugin.settings.showAgentImagesInChatInterfaces) return null;
+		if (config.showImage === false) return null;
 		return (
 			resolveImageSrc(plugin, config.image) ??
 			resolveImageSrc(
@@ -70,7 +72,13 @@ function CodeBlockChatComponent({
 			) ??
 			resolveImageSrc(plugin, plugin.settings.floatingButtonImage)
 		);
-	}, [plugin, config.image, config.agent]);
+	}, [
+		plugin,
+		config.image,
+		config.agent,
+		config.showImage,
+		plugin.settings.showAgentImagesInChatInterfaces,
+	]);
 
 	const heightStyle = config.height
 		? ({ "--ac-embedded-max-height": config.height } as React.CSSProperties)

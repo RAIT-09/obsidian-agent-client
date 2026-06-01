@@ -134,6 +134,38 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		new Setting(containerEl)
+			.setName("Show recent chats in chat")
+			.setDesc(
+				"Show recent chat shortcuts above the message box on empty chats.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showRecentChatsInChat)
+					.onChange(async (value) => {
+						await this.plugin.settingsService.updateSettings({
+							showRecentChatsInChat: value,
+						});
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Show agent images")
+			.setDesc(
+				"Show configured agent avatar images in chat headers, selectors, embedded chats, buttons, and recent chat shortcuts.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(
+						this.plugin.settings.showAgentImagesInChatInterfaces,
+					)
+					.onChange(async (value) => {
+						await this.plugin.settingsService.updateSettings({
+							showAgentImagesInChatInterfaces: value,
+						});
+					}),
+			);
+
 		new Setting(containerEl).setName("Mentions").setHeading();
 
 		new Setting(containerEl)

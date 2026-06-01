@@ -41,6 +41,7 @@ import {
 	type SessionModeState,
 	type SessionModelState,
 	type SessionConfigOption,
+	type SessionInfo,
 } from "../types/session";
 import { checkAgentUpdate } from "../services/update-checker";
 import type { SessionStatus } from "../services/view-registry";
@@ -267,6 +268,18 @@ export function ChatPanel({
 		onClearMessages: agent.clearMessages,
 	});
 
+	useEffect(() => {
+		if (!settings.showRecentChatsInChat) return;
+		if (!isSessionReady || messages.length > 0) return;
+		void sessionHistory.fetchSessions(vaultPath);
+	}, [
+		settings.showRecentChatsInChat,
+		isSessionReady,
+		messages.length,
+		sessionHistory.fetchSessions,
+		vaultPath,
+	]);
+
 	// ============================================================
 	// Local State
 	// ============================================================
@@ -408,6 +421,27 @@ export function ChatPanel({
 		isSessionReady,
 		settings.debugMode,
 		setAgentCwd,
+	);
+
+	const recentChatSessions = useMemo<SessionInfo[]>(() => {
+		if (!settings.showRecentChatsInChat) return [];
+		if (messages.length > 0) return [];
+		return sessionHistory.sessions
+			.filter((item) => item.sessionId !== session.sessionId)
+			.slice(0, 5);
+	}, [
+		settings.showRecentChatsInChat,
+		messages.length,
+		sessionHistory.sessions,
+		session.sessionId,
+	]);
+
+	const handleRestoreRecentSession = useCallback(
+		async (sessionId: string, cwd: string) => {
+			setInputValue("");
+			await sessionHistory.restoreSession(sessionId, cwd);
+		},
+		[sessionHistory.restoreSession],
 	);
 
 	// ============================================================
@@ -1256,6 +1290,8 @@ export function ChatPanel({
 			<ChatHeader
 				variant="sidebar"
 				agentLabel={activeAgentLabel}
+				agentId={session.agentId}
+				plugin={plugin}
 				isUpdateAvailable={isUpdateAvailable}
 				onNewChat={() => void handleNewChatWithPersist()}
 				onExportChat={() => void handleExportChat()}
@@ -1266,6 +1302,7 @@ export function ChatPanel({
 			<ChatHeader
 				variant="floating"
 				agentLabel={activeAgentLabel}
+				plugin={plugin}
 				availableAgents={shouldShowAgentSelector ? availableAgents : []}
 				currentAgentId={session.agentId}
 				isUpdateAvailable={isUpdateAvailable}
@@ -1346,6 +1383,12 @@ export function ChatPanel({
 			geminiNotice={effectiveGeminiNotice}
 			onClearGeminiNotice={handleClearGeminiNotice}
 			messages={messages}
+			recentChatSessions={recentChatSessions}
+			onRestoreRecentSession={
+				sessionHistory.canRestore
+					? handleRestoreRecentSession
+					: undefined
+			}
 		/>
 	);
 

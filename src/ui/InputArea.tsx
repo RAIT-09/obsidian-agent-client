@@ -12,6 +12,7 @@ import type {
 	SessionModelState,
 	SessionUsage,
 	SessionConfigOption,
+	SessionInfo,
 } from "../types/session";
 import type { AttachedFile, ChatMessage } from "../types/chat";
 import type { UseSuggestionsReturn } from "../hooks/useSuggestions";
@@ -300,6 +301,10 @@ export interface InputAreaProps {
 	onClearGeminiNotice: () => void;
 	/** Messages array for input history navigation */
 	messages: ChatMessage[];
+	/** Recent chats to render as restore shortcuts on empty chats */
+	recentChatSessions?: SessionInfo[];
+	/** Restore a recent chat by session ID and cwd */
+	onRestoreRecentSession?: (sessionId: string, cwd: string) => Promise<void>;
 }
 
 /**
@@ -354,6 +359,8 @@ export function InputArea({
 	onClearGeminiNotice,
 	// Input history
 	messages,
+	recentChatSessions,
+	onRestoreRecentSession,
 }: InputAreaProps) {
 	const { mentions, commands: slashCommands } = suggestions;
 	const logger = getLogger();
@@ -773,6 +780,13 @@ export function InputArea({
 		],
 	);
 
+	const handleRestoreRecentChat = useCallback(
+		(session: SessionInfo) => {
+			void onRestoreRecentSession?.(session.sessionId, session.cwd);
+		},
+		[onRestoreRecentSession],
+	);
+
 	/**
 	 * Handle slash command selection from dropdown.
 	 */
@@ -1108,8 +1122,32 @@ export function InputArea({
 				/>
 			)}
 
-			{quickPrompts.length > 0 && (
+			{((settings.showRecentChatsInChat &&
+				recentChatSessions &&
+				recentChatSessions.length > 0) ||
+				quickPrompts.length > 0) && (
 				<div className="agent-client-quick-prompt-strip">
+					{settings.showRecentChatsInChat &&
+						recentChatSessions?.map((session) => (
+							<button
+								key={session.sessionId}
+								type="button"
+								className="agent-client-quick-prompt-chip agent-client-recent-chat-chip"
+								title={session.title ?? session.sessionId}
+								disabled={!onRestoreRecentSession}
+								onClick={() => handleRestoreRecentChat(session)}
+							>
+								<span
+									className="agent-client-quick-prompt-chip-icon"
+									ref={(el) => {
+										if (el) setIcon(el, "history");
+									}}
+								/>
+								<span className="agent-client-quick-prompt-chip-text">
+									{session.title ?? "Untitled session"}
+								</span>
+							</button>
+						))}
 					{quickPrompts.map((prompt) => (
 						<button
 							key={prompt.name}

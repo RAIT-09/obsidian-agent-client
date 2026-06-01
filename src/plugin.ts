@@ -146,6 +146,8 @@ export interface AgentClientPluginSettings {
 	// Input behavior
 	sendMessageShortcut: SendMessageShortcut;
 	showQuickPromptsInChat: boolean;
+	showRecentChatsInChat: boolean;
+	showAgentImagesInChatInterfaces: boolean;
 	quickPrompts: QuickPrompt[];
 	// View settings
 	chatViewLocation: ChatViewLocation;
@@ -225,6 +227,8 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	windowsWslDistribution: undefined,
 	sendMessageShortcut: "enter",
 	showQuickPromptsInChat: true,
+	showRecentChatsInChat: false,
+	showAgentImagesInChatInterfaces: true,
 	quickPrompts: [],
 	chatViewLocation: "right-tab",
 	displaySettings: {
@@ -329,6 +333,17 @@ export default class AgentClientPlugin extends Plugin {
 			name: "Open session manager",
 			callback: () => {
 				void this.activateSessionManager();
+			},
+		});
+
+		this.addCommand({
+			id: "open-new-side-chat-view",
+			name: "Open new side chat view",
+			callback: () => {
+				void this.openNewChatViewWithAgent(
+					this.settings.defaultAgentId,
+					"right-tab",
+				);
 			},
 		});
 
@@ -1368,6 +1383,14 @@ export default class AgentClientPlugin extends Plugin {
 			showQuickPromptsInChat: bool(
 				raw.showQuickPromptsInChat,
 				D.showQuickPromptsInChat,
+			),
+			showRecentChatsInChat: bool(
+				raw.showRecentChatsInChat,
+				D.showRecentChatsInChat,
+			),
+			showAgentImagesInChatInterfaces: bool(
+				raw.showAgentImagesInChatInterfaces,
+				D.showAgentImagesInChatInterfaces,
 			),
 			quickPrompts: (() => {
 				if (!Array.isArray(raw.quickPrompts)) return D.quickPrompts;

@@ -48,11 +48,18 @@ function AgentButtonBlockComponent({
 	}, [plugin, config.agent, quickPrompt?.agentId]);
 
 	const avatarSrc = useMemo(() => {
+		if (!plugin.settings.showAgentImagesInChatInterfaces) return null;
+		if (config.showImage === false) return null;
 		return resolveImageSrc(
 			plugin,
 			getAgentAvatarImage(plugin, resolvedAgentId),
 		);
-	}, [plugin, resolvedAgentId]);
+	}, [
+		plugin,
+		resolvedAgentId,
+		config.showImage,
+		plugin.settings.showAgentImagesInChatInterfaces,
+	]);
 
 	const handleClick = useCallback(async () => {
 		const promptText = config.prompt ?? quickPrompt?.prompt;
