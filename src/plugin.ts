@@ -6,8 +6,8 @@ import {
 	MarkdownRenderChild,
 	SuggestModal,
 	setIcon,
+	Menu,
 	type App,
-	type Menu,
 	type MenuItem,
 	type MarkdownPostProcessorContext,
 } from "obsidian";
@@ -869,7 +869,22 @@ export default class AgentClientPlugin extends Plugin {
 		const entries = this.getActiveChatMenuEntries();
 		if (entries.length === 0) return;
 
-		menu.addSeparator();
+		menu.addItem((item: MenuItem) => {
+			item.setTitle("Active chats")
+				.setIcon("messages-square")
+				.onClick((evt) => {
+					this.showActiveChatsMenu(evt, currentViewId);
+				});
+		});
+	}
+
+	private showActiveChatsMenu(
+		evt: MouseEvent | KeyboardEvent,
+		currentViewId?: string,
+	): void {
+		const entries = this.getActiveChatMenuEntries();
+		const menu = new Menu();
+
 		menu.addItem((item: MenuItem) => {
 			item.setTitle("Active chats").setIsLabel(true);
 		});
@@ -885,7 +900,15 @@ export default class AgentClientPlugin extends Plugin {
 			});
 		}
 
-		menu.addSeparator();
+		if (evt instanceof MouseEvent) {
+			menu.showAtMouseEvent(evt);
+			return;
+		}
+
+		menu.showAtPosition({
+			x: window.innerWidth / 2,
+			y: window.innerHeight / 2,
+		});
 	}
 
 	private getActiveChatMenuTitle(entry: ActiveChatMenuEntry): string {
