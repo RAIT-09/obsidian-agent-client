@@ -36,11 +36,15 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 8px;
 }
 
-/* ===== Loading Indicator ===== */
+/* ===== Loading Indicator =====
+   While the agent works, show pulsing dots + a shimmer-animated status
+   line so the panel feels alive instead of broken. The shimmer is a
+   moving gradient mask across the text. */
 .agent-client-loading-indicator {
 	display: flex;
 	align-items: center;
-	padding: 16px;
+	gap: 12px;
+	padding: 12px 0;
 	margin: 4px 0;
 }
 
@@ -49,14 +53,41 @@ If your plugin does not need CSS, delete this file.
 }
 
 .agent-client-loading-status {
-	color: var(--text-muted);
-	font-size: var(--font-ui-small);
+	font-size: 13px;
 	font-style: italic;
-	margin-left: 8px;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	min-width: 0;
+}
+
+/* Shimmer — moving highlight across the text. Falls back to a solid
+   muted color in browsers that don't support background-clip:text. */
+.agent-client-shimmer {
+	color: var(--text-muted);
+	background: linear-gradient(
+		90deg,
+		var(--text-muted) 0%,
+		var(--text-muted) 35%,
+		var(--text-normal) 50%,
+		var(--text-muted) 65%,
+		var(--text-muted) 100%
+	);
+	background-size: 200% 100%;
+	background-position: 100% 0;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: agent-client-shimmer 2.4s linear infinite;
+}
+
+@keyframes agent-client-shimmer {
+	0% {
+		background-position: 100% 0;
+	}
+	100% {
+		background-position: -100% 0;
+	}
 }
 
 /* ===== Scroll to Bottom Button ===== */
@@ -98,17 +129,18 @@ If your plugin does not need CSS, delete this file.
 
 .agent-client-loading-dots {
 	display: grid;
-	grid-template-columns: repeat(3, 4px);
-	grid-template-rows: repeat(3, 5px);
-	gap: 3px;
-	width: 18px;
-	height: 21px;
+	grid-template-columns: repeat(3, 6px);
+	grid-template-rows: repeat(3, 6px);
+	gap: 4px;
+	width: 26px;
+	height: 26px;
+	flex-shrink: 0;
 	will-change: transform;
 }
 
 .agent-client-loading-dot {
-	width: 4px;
-	height: 5px;
+	width: 6px;
+	height: 6px;
 	background-color: var(--background-modifier-border);
 	border-radius: 50%;
 	animation: dotPulse 1.2s ease-in-out infinite;

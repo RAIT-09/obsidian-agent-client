@@ -223,7 +223,9 @@ export function MessageList({
 				})}
 			</div>
 
-			{/* Loading indicator — outside virtualizer */}
+			{/* Loading indicator — outside virtualizer. While the agent is
+			    working, show a pulsing 9-dot grid + a shimmer-animated status
+			    line so the wait reads as "alive" instead of "frozen". */}
 			<div
 				className={`agent-client-loading-indicator ${!isSending ? "agent-client-hidden" : ""}`}
 			>
@@ -238,11 +240,11 @@ export function MessageList({
 					<div className="agent-client-loading-dot"></div>
 					<div className="agent-client-loading-dot"></div>
 				</div>
-				{hasActivePermission && (
-					<span className="agent-client-loading-status">
-						Waiting for permission...
-					</span>
-				)}
+				<span className="agent-client-loading-status agent-client-shimmer">
+					{hasActivePermission
+						? "Waiting for permission…"
+						: `${agentLabel} is thinking…`}
+				</span>
 			</div>
 
 			{/* Scroll to bottom button */}
