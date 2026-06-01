@@ -1,5 +1,5 @@
 import * as React from "react";
-const { useEffect, useMemo } = React;
+const { useEffect, useMemo, useRef } = React;
 import { createRoot, type Root } from "react-dom/client";
 
 import type AgentClientPlugin from "../plugin";
@@ -30,6 +30,7 @@ function CodeBlockChatComponent({
 	mountCtx,
 }: CodeBlockChatProps) {
 	const viewId = `code-block:${mountCtx.blockId}`;
+	const rootElRef = useRef<HTMLDivElement>(null);
 
 	const acpClient = useMemo(
 		() => plugin.getOrCreateAcpClient(viewId),
@@ -39,10 +40,14 @@ function CodeBlockChatComponent({
 	const vaultService = useMemo(() => new VaultService(plugin), [plugin]);
 
 	useEffect(() => {
+		const rootEl = rootElRef.current;
+		if (!rootEl) return;
+
 		const unregisterEmbeddedChat = plugin.registerEmbeddedChat({
 			viewId,
 			sourcePath: mountCtx.sourcePath,
 			lineStart: mountCtx.lineStart,
+			containerEl: rootEl,
 		});
 		return () => {
 			unregisterEmbeddedChat();
@@ -85,7 +90,11 @@ function CodeBlockChatComponent({
 		: undefined;
 
 	return (
-		<div className="agent-client-code-block-chat" style={heightStyle}>
+		<div
+			ref={rootElRef}
+			className="agent-client-code-block-chat"
+			style={heightStyle}
+		>
 			{avatarSrc && (
 				<div className="agent-client-code-block-chat-avatar-row">
 					<img

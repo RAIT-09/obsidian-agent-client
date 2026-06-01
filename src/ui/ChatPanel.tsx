@@ -530,6 +530,8 @@ export function ChatPanel({
 					});
 			});
 
+			plugin.addActiveChatsToMenu(menu, viewId);
+
 			menu.addItem((item: MenuItem) => {
 				item.setTitle("Restart agent")
 					.setIcon("refresh-cw")
@@ -582,6 +584,7 @@ export function ChatPanel({
 			agentCwd,
 			handleNewChatInDirectory,
 			handleOpenSettings,
+			viewId,
 		],
 	);
 
@@ -635,6 +638,8 @@ export function ChatPanel({
 				});
 			}
 
+			plugin.addActiveChatsToMenu(menu, viewId);
+
 			menu.addItem((item: MenuItem) => {
 				item.setTitle("Restart agent")
 					.setIcon("refresh-cw")
@@ -687,6 +692,7 @@ export function ChatPanel({
 			agentCwd,
 			handleNewChatInDirectory,
 			handleOpenSettings,
+			viewId,
 		],
 	);
 

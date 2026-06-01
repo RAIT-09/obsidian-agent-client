@@ -7,6 +7,8 @@ import {
 	SuggestModal,
 	setIcon,
 	type App,
+	type Menu,
+	type MenuItem,
 	type MarkdownPostProcessorContext,
 } from "obsidian";
 import * as semver from "semver";
@@ -103,6 +105,17 @@ export interface EmbeddedChatRegistration {
 	viewId: string;
 	sourcePath: string;
 	lineStart: number;
+	containerEl: HTMLElement;
+}
+
+type ActiveChatKind = "sidebar" | "floating" | "embedded";
+
+interface ActiveChatMenuEntry {
+	viewId: string;
+	type: ActiveChatKind;
+	label: string;
+	icon: string;
+	focus: () => void;
 }
 
 export interface AgentClientPluginSettings {
@@ -264,6 +277,8 @@ export default class AgentClientPlugin extends Plugin {
 	private floatingChatCounter = 0;
 	/** Embedded chat instances mounted from markdown code blocks. */
 	private embeddedChats = new Map<string, EmbeddedChatRegistration>();
+	private readonly activeChatsChangedEvent =
+		"agent-client:active-chats-changed";
 
 	async onload() {
 		await this.loadSettings();
@@ -764,12 +779,124 @@ export default class AgentClientPlugin extends Plugin {
 
 	registerEmbeddedChat(registration: EmbeddedChatRegistration): () => void {
 		this.embeddedChats.set(registration.viewId, registration);
+		this.notifyActiveChatsChanged();
 		return () => {
 			const current = this.embeddedChats.get(registration.viewId);
 			if (current === registration) {
 				this.embeddedChats.delete(registration.viewId);
+				this.notifyActiveChatsChanged();
 			}
 		};
+	}
+
+	notifyActiveChatsChanged(): void {
+		activeDocument.dispatchEvent(
+			new CustomEvent(this.activeChatsChangedEvent),
+		);
+	}
+
+	onActiveChatsChanged(callback: () => void): () => void {
+		activeDocument.addEventListener(this.activeChatsChangedEvent, callback);
+		return () => {
+			activeDocument.removeEventListener(
+				this.activeChatsChangedEvent,
+				callback,
+			);
+		};
+	}
+
+	hasVisibleChatSurfaces(): boolean {
+		const hasVisibleRegisteredView = this.viewRegistry
+			.getAll()
+			.some((view) => {
+				if (view instanceof FloatingViewContainer) {
+					return view.isExpanded();
+				}
+				return true;
+			});
+		return hasVisibleRegisteredView || this.embeddedChats.size > 0;
+	}
+
+	getActiveChatMenuEntries(): ActiveChatMenuEntry[] {
+		const entries: ActiveChatMenuEntry[] = [];
+
+		for (const view of this.viewRegistry.getAll()) {
+			const type = view.viewType;
+			entries.push({
+				viewId: view.viewId,
+				type,
+				label: view.getDisplayName(),
+				icon: type === "floating" ? "panel-top-open" : "panel-right",
+				focus: () => {
+					this.viewRegistry.setFocused(view.viewId);
+					view.focus();
+				},
+			});
+		}
+
+		for (const registration of this.embeddedChats.values()) {
+			const fileName =
+				registration.sourcePath.split(/[\\/]/).pop() ||
+				registration.sourcePath ||
+				"Current note";
+			entries.push({
+				viewId: registration.viewId,
+				type: "embedded",
+				label: `${fileName}:${registration.lineStart + 1}`,
+				icon: "file-text",
+				focus: () => {
+					registration.containerEl.scrollIntoView({
+						block: "center",
+						behavior: "smooth",
+					});
+					window.requestAnimationFrame(() => {
+						const textarea =
+							registration.containerEl.querySelector(
+								"textarea.agent-client-chat-input-textarea",
+							);
+						if (textarea instanceof HTMLTextAreaElement) {
+							textarea.focus();
+						}
+					});
+				},
+			});
+		}
+
+		return entries;
+	}
+
+	addActiveChatsToMenu(menu: Menu, currentViewId?: string): void {
+		const entries = this.getActiveChatMenuEntries();
+		if (entries.length === 0) return;
+
+		menu.addSeparator();
+		menu.addItem((item: MenuItem) => {
+			item.setTitle("Active chats").setIsLabel(true);
+		});
+
+		for (const entry of entries) {
+			menu.addItem((item: MenuItem) => {
+				item.setTitle(this.getActiveChatMenuTitle(entry))
+					.setIcon(entry.icon)
+					.setChecked(entry.viewId === currentViewId)
+					.onClick(() => {
+						entry.focus();
+					});
+			});
+		}
+
+		menu.addSeparator();
+	}
+
+	private getActiveChatMenuTitle(entry: ActiveChatMenuEntry): string {
+		switch (entry.type) {
+			case "floating":
+				return `Floating: ${entry.label}`;
+			case "sidebar":
+				return `Side chat: ${entry.label}`;
+			case "embedded":
+				return `Embedded: ${entry.label}`;
+		}
 	}
 
 	findNearestEmbeddedChat(
