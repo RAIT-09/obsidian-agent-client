@@ -108,7 +108,7 @@ export function useAgentMessages(
 	const [isSending, setIsSending] = useState(false);
 	const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
 
-	// Tool call index: toolCallId → message index for O(1) lookup
+	// Tool call index: toolCallId to message index for O(1) lookup
 	const toolCallIndexRef = useRef<Map<string, number>>(new Map());
 
 	// Ignore updates flag (used during session/load to skip history replay)
@@ -256,7 +256,11 @@ export function useAgentMessages(
 			// Wait for any in-flight send to settle (e.g. after cancel/stop)
 			// before starting a new one to avoid interleaved state updates.
 			if (sendPromiseRef.current) {
-				try { await sendPromiseRef.current; } catch { /* ignore */ }
+				try {
+					await sendPromiseRef.current;
+				} catch {
+					/* ignore */
+				}
 			}
 
 			const currentSessionId = session.sessionId;

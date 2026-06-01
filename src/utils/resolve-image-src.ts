@@ -31,6 +31,37 @@ export function resolveImageSrc(
 	return null;
 }
 
+/** Image file extensions recognized when classifying an icon reference. */
+const IMAGE_EXTENSION_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
+
+/**
+ * Classify an icon reference as either a Lucide icon id or an image reference.
+ *
+ * Heuristic: a value that looks like an http(s)/data URL, contains a path
+ * separator, or ends in a known image extension is treated as an image;
+ * otherwise it is treated as a Lucide icon id (a kebab-case slug like
+ * "sparkles" or "wand-2"). Returns null for empty/missing input.
+ */
+export function classifyIconRef(
+	value: string | undefined | null,
+):
+	| { kind: "image"; value: string }
+	| { kind: "lucide"; value: string }
+	| null {
+	if (!value) return null;
+	const trimmed = value.trim();
+	if (trimmed.length === 0) return null;
+
+	if (
+		/^(https?:|data:)/i.test(trimmed) ||
+		/[/\\]/.test(trimmed) ||
+		IMAGE_EXTENSION_RE.test(trimmed)
+	) {
+		return { kind: "image", value: trimmed };
+	}
+	return { kind: "lucide", value: trimmed };
+}
+
 export function getAgentAvatarImage(
 	plugin: AgentClientPlugin,
 	agentId: string | undefined,

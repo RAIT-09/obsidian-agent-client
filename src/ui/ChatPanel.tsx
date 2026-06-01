@@ -93,7 +93,7 @@ export interface ChatPanelProps {
 		sourcePath?: string;
 	};
 	onRegisterCallbacks?: (callbacks: ChatPanelCallbacks) => void;
-	/** Called when agent ID changes (sidebar only — persists in Obsidian state) */
+	/** Called when agent ID changes (sidebar only; persists in Obsidian state) */
 	onAgentIdChanged?: (agentId: string) => void;
 	/**
 	 * Called when the derived session title may have changed (sidebar only —
@@ -181,7 +181,7 @@ export function ChatPanel({
 		return process.cwd();
 	}, [plugin, workingDirectory]);
 
-	// Agent working directory — defaults to vault path.
+	// Agent working directory; defaults to vault path.
 	// Can be changed independently via "New chat in directory..." action.
 	const [agentCwd, setAgentCwd] = useState(vaultPath);
 
@@ -387,6 +387,17 @@ export function ChatPanel({
 			return handleSendMessage(content, attachments);
 		},
 		[handleSendMessage],
+	);
+
+	// Switch the view to a quick-prompt's assigned agent (fresh chat) and then
+	// auto-send the prompt once the new session is ready, reusing the same
+	// pending-auto-send drain as `agent-client:run-prompt`.
+	const handleSwitchAgentAndRun = useCallback(
+		async (nextAgentId: string, prompt: string) => {
+			await handleSwitchAgent(nextAgentId);
+			setPendingAutoSend(prompt);
+		},
+		[handleSwitchAgent],
 	);
 
 	const { handleOpenHistory } = useHistoryModal(
@@ -1319,6 +1330,7 @@ export function ChatPanel({
 			usage={session.usage}
 			supportsImages={session.promptCapabilities?.image ?? false}
 			agentId={session.agentId}
+			onSwitchAgentAndRun={handleSwitchAgentAndRun}
 			// Controlled component props (for broadcast commands)
 			inputValue={inputValue}
 			onInputChange={setInputValue}

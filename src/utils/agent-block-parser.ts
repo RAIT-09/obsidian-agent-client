@@ -34,12 +34,18 @@ export type AgentButtonBlockConfig = {
 	type: "button";
 	text: string;
 	/** Prompt sent to the opened chat. */
-	prompt: string;
+	prompt?: string;
+	/** Name of a saved quick prompt to resolve at click time. */
+	promptName?: string;
 	agent?: string;
 	/** Where to open the chat when clicked. */
 	viewType?: "right-pane" | "floating" | "editor-tab" | "embedded";
 	/** Send immediately on open. */
 	autoSend?: boolean;
+	/** Hide the button after it is clicked (until the note is re-rendered). */
+	hideAfterClick?: boolean;
+	/** Alignment of the rendered button block within the note. */
+	align?: "left" | "center" | "right";
 };
 
 export type AgentBlockConfig = AgentChatBlockConfig | AgentButtonBlockConfig;
@@ -56,6 +62,7 @@ const VALID_VIEW_TYPES = new Set<string>([
 	"embedded",
 ]);
 const VALID_NOTE_CONTEXTS = new Set<string>(["hosting"]);
+const VALID_ALIGNMENTS = new Set<string>(["left", "center", "right"]);
 
 function normalizeViewType(
 	value: string | undefined,
@@ -175,10 +182,11 @@ export function parseAgentBlock(source: string): AgentBlockParseResult {
 	}
 
 	const prompt = asString(obj.prompt);
-	if (!prompt) {
+	const promptName = asString(obj.promptName);
+	if (!prompt && !promptName) {
 		return {
 			ok: false,
-			error: 'Button block requires a non-empty "prompt" field.',
+			error: 'Button block requires a non-empty "prompt" or "promptName" field.',
 		};
 	}
 
@@ -191,13 +199,31 @@ export function parseAgentBlock(source: string): AgentBlockParseResult {
 		};
 	}
 
+	const rawAlign = asString(obj.align);
+	const align = rawAlign
+		? VALID_ALIGNMENTS.has(rawAlign)
+			? (rawAlign as AgentButtonBlockConfig["align"])
+			: undefined
+		: undefined;
+	if (rawAlign && !align) {
+		return {
+			ok: false,
+			error: `Unknown align: "${rawAlign}". Expected "left", "center", or "right".`,
+		};
+	}
+
 	const config: AgentButtonBlockConfig = {
 		type: "button",
 		text,
 		prompt,
+		promptName,
 		agent: asString(obj.agent),
 		viewType: viewType ?? "right-pane",
 		autoSend: asBoolean(obj.autoSend) ?? false,
+		// Left undefined when unset so it can fall back to the referenced
+		// quick prompt's hideAfterClick setting at click time.
+		hideAfterClick: asBoolean(obj.hideAfterClick),
+		align: align ?? "left",
 	};
 	return { ok: true, config };
 }
