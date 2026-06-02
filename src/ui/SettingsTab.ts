@@ -1707,6 +1707,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				"Lucide icon name (e.g. sparkles, wand-2) or an image URL / vault path. Leave blank for the default sparkles icon.",
 			)
 			.addText((text) => {
+				// eslint-disable-next-line obsidianmd/ui/sentence-case -- Lucide icon id, not UI prose
 				text.setPlaceholder("sparkles")
 					.setValue(prompt.icon ?? "")
 					.onChange(async (value) => {
