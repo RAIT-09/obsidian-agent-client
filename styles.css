@@ -899,6 +899,14 @@ If your plugin does not need CSS, delete this file.
 	white-space: nowrap;
 }
 
+.agent-client-suggested-prompt-chip {
+	border-color: var(--interactive-accent);
+}
+
+.agent-client-suggested-prompt-chip .agent-client-quick-prompt-chip-icon {
+	color: var(--interactive-accent);
+}
+
 .agent-client-quick-prompt-suggestion {
 	display: flex;
 	align-items: center;

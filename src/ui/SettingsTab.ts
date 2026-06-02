@@ -134,6 +134,21 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		new Setting(containerEl)
+			.setName("Suggest starter prompts")
+			.setDesc(
+				"When a new chat opens, ask the agent for a few starter prompts and show them as clickable chips. Costs one request per new chat, not per turn.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.suggestStarterPrompts)
+					.onChange(async (value) => {
+						await this.plugin.settingsService.updateSettings({
+							suggestStarterPrompts: value,
+						});
+					}),
+			);
+
 		new Setting(containerEl).setName("Mentions").setHeading();
 
 		new Setting(containerEl)

@@ -146,6 +146,11 @@ export interface AgentClientPluginSettings {
 	// Input behavior
 	sendMessageShortcut: SendMessageShortcut;
 	showQuickPromptsInChat: boolean;
+	/**
+	 * When a fresh chat opens, ask the agent for a few starter prompts and
+	 * render them as clickable chips. Costs one request per new chat.
+	 */
+	suggestStarterPrompts: boolean;
 	quickPrompts: QuickPrompt[];
 	// View settings
 	chatViewLocation: ChatViewLocation;
@@ -225,6 +230,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	windowsWslDistribution: undefined,
 	sendMessageShortcut: "enter",
 	showQuickPromptsInChat: true,
+	suggestStarterPrompts: false,
 	quickPrompts: [],
 	chatViewLocation: "right-tab",
 	displaySettings: {
@@ -1368,6 +1374,10 @@ export default class AgentClientPlugin extends Plugin {
 			showQuickPromptsInChat: bool(
 				raw.showQuickPromptsInChat,
 				D.showQuickPromptsInChat,
+			),
+			suggestStarterPrompts: bool(
+				raw.suggestStarterPrompts,
+				D.suggestStarterPrompts,
 			),
 			quickPrompts: (() => {
 				if (!Array.isArray(raw.quickPrompts)) return D.quickPrompts;

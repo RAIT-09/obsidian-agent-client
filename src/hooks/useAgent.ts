@@ -91,6 +91,8 @@ export interface UseAgentReturn {
 	setMessagesFromLocal: (localMessages: ChatMessage[]) => void;
 	clearError: () => void;
 	setIgnoreUpdates: (ignore: boolean) => void;
+	/** Ask the agent for starter prompts; returns parsed list. */
+	generateStarterPrompts: () => Promise<string[]>;
 	// Permission
 	activePermission: ActivePermission | null;
 	hasActivePermission: boolean;
@@ -209,6 +211,7 @@ export function useAgent(
 			setMessagesFromLocal: agentMessages.setMessagesFromLocal,
 			clearError: agentMessages.clearError,
 			setIgnoreUpdates: agentMessages.setIgnoreUpdates,
+			generateStarterPrompts: agentMessages.generateStarterPrompts,
 
 			// Permission
 			activePermission: agentMessages.activePermission,
@@ -240,6 +243,7 @@ export function useAgent(
 			agentMessages.setMessagesFromLocal,
 			agentMessages.clearError,
 			agentMessages.setIgnoreUpdates,
+			agentMessages.generateStarterPrompts,
 			agentMessages.activePermission,
 			agentMessages.hasActivePermission,
 			agentMessages.approvePermission,

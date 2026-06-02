@@ -300,6 +300,10 @@ export interface InputAreaProps {
 	onClearGeminiNotice: () => void;
 	/** Messages array for input history navigation */
 	messages: ChatMessage[];
+	/** Agent-suggested starter prompts to render as ephemeral chips */
+	suggestedPrompts?: string[];
+	/** Clear the current agent-suggested prompts (e.g. after one is used) */
+	onClearSuggestedPrompts?: () => void;
 }
 
 /**
@@ -354,6 +358,9 @@ export function InputArea({
 	onClearGeminiNotice,
 	// Input history
 	messages,
+	// Agent-suggested starter prompts
+	suggestedPrompts,
+	onClearSuggestedPrompts,
 }: InputAreaProps) {
 	const { mentions, commands: slashCommands } = suggestions;
 	const logger = getLogger();
@@ -773,6 +780,37 @@ export function InputArea({
 		],
 	);
 
+	const handleSelectSuggestedPrompt = useCallback(
+		(text: string) => {
+			void (async () => {
+				onClearSuggestedPrompts?.();
+				if (isSessionReady && !isSending && !isRestoringSession) {
+					onInputChange("");
+					await onSendMessage(text);
+					return;
+				}
+
+				onInputChange(text);
+				window.setTimeout(() => {
+					const textarea = textareaRef.current;
+					if (textarea) {
+						textarea.focus();
+						textarea.selectionStart = text.length;
+						textarea.selectionEnd = text.length;
+					}
+				}, 0);
+			})();
+		},
+		[
+			isRestoringSession,
+			isSending,
+			isSessionReady,
+			onClearSuggestedPrompts,
+			onInputChange,
+			onSendMessage,
+		],
+	);
+
 	/**
 	 * Handle slash command selection from dropdown.
 	 */
@@ -1108,8 +1146,28 @@ export function InputArea({
 				/>
 			)}
 
-			{quickPrompts.length > 0 && (
+			{((suggestedPrompts && suggestedPrompts.length > 0) ||
+				quickPrompts.length > 0) && (
 				<div className="agent-client-quick-prompt-strip">
+					{suggestedPrompts?.map((text, index) => (
+						<button
+							key={`suggested-${index}-${text}`}
+							type="button"
+							className="agent-client-quick-prompt-chip agent-client-suggested-prompt-chip"
+							title={text}
+							onClick={() => handleSelectSuggestedPrompt(text)}
+						>
+							<span
+								className="agent-client-quick-prompt-chip-icon"
+								ref={(el) => {
+									if (el) setIcon(el, "lightbulb");
+								}}
+							/>
+							<span className="agent-client-quick-prompt-chip-text">
+								{text}
+							</span>
+						</button>
+					))}
 					{quickPrompts.map((prompt) => (
 						<button
 							key={prompt.name}

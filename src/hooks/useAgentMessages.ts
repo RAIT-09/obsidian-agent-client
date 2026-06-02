@@ -32,6 +32,49 @@ import {
 } from "../services/message-state";
 
 // ============================================================================
+// Starter Prompt Suggestions
+// ============================================================================
+
+/** Maximum number of starter prompts to surface as chips. */
+const MAX_SUGGESTIONS = 4;
+
+/**
+ * Instruction sent once when a fresh chat opens. The reply is parsed into
+ * starter prompt chips and suppressed from the visible message list.
+ */
+const STARTER_PROMPT_INSTRUCTION = `Suggest up to ${MAX_SUGGESTIONS} concise prompts I could use to get started with you in this workspace. Respond with ONLY the prompts, one per line - no numbering, no bullets, no commentary, no surrounding quotes. Keep each prompt under 12 words.`;
+
+function parseStarterPrompts(text: string): string[] {
+	const out: string[] = [];
+	const seen = new Set<string>();
+	const instructionNeedles = [
+		"suggest up to",
+		"concise prompts",
+		"respond with only",
+		"no numbering",
+		"no bullets",
+		"keep each prompt",
+	];
+	for (const rawLine of text.split(/\r?\n/)) {
+		let line = rawLine.trim();
+		if (!line) continue;
+		line = line.replace(/^(?:[-*]\s+|\d+[.)]\s+)/, "").trim();
+		line = line.replace(/^["'`]+|["'`]+$/g, "").trim();
+		if (!line) continue;
+		const key = line.toLowerCase();
+		if (instructionNeedles.some((needle) => key.includes(needle))) {
+			continue;
+		}
+		if (line.length > 200) continue;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push(line);
+		if (out.length >= MAX_SUGGESTIONS) break;
+	}
+	return out;
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -87,6 +130,8 @@ export interface UseAgentMessagesReturn {
 
 	/** Enqueue a message-level update (used by useAgent for unified handler) */
 	enqueueUpdate: (update: SessionUpdate) => void;
+	/** Ask the agent for starter prompts; returns parsed list. */
+	generateStarterPrompts: () => Promise<string[]>;
 }
 
 // ============================================================================
@@ -123,6 +168,7 @@ export function useAgentMessages(
 	// Track the current send promise so a new sendMessage() can wait for
 	// the previous one to settle before starting (avoids interleaved sends).
 	const sendPromiseRef = useRef<Promise<void> | null>(null);
+	const isGeneratingStarterPromptsRef = useRef(false);
 
 	// ============================================================
 	// Streaming Update Batching
@@ -408,6 +454,55 @@ export function useAgentMessages(
 	);
 
 	// ============================================================
+	// Starter Prompt Suggestions
+	// ============================================================
+
+	const generateStarterPrompts = useCallback(async (): Promise<string[]> => {
+		const sessionId = session.sessionId;
+		if (!sessionId) return [];
+		if (isGeneratingStarterPromptsRef.current) return [];
+
+		if (sendPromiseRef.current) {
+			try {
+				await sendPromiseRef.current;
+			} catch {
+				/* ignore */
+			}
+		}
+
+		isGeneratingStarterPromptsRef.current = true;
+
+		let captured = "";
+		const unsubscribe = agentClient.onSessionUpdate((update) => {
+			if (
+				update.type === "agent_message_chunk" &&
+				update.sessionId === sessionId
+			) {
+				captured += update.text;
+			}
+		});
+		setIgnoreUpdates(true);
+
+		const genPromise = agentClient.sendPrompt(sessionId, [
+			{ type: "text", text: STARTER_PROMPT_INSTRUCTION },
+		]);
+		sendPromiseRef.current = genPromise;
+
+		try {
+			await genPromise;
+		} catch {
+			captured = "";
+		} finally {
+			sendPromiseRef.current = null;
+			unsubscribe();
+			setIgnoreUpdates(false);
+			isGeneratingStarterPromptsRef.current = false;
+		}
+
+		return parseStarterPrompts(captured);
+	}, [agentClient, session.sessionId, setIgnoreUpdates]);
+
+	// ============================================================
 	// Permission State & Operations
 	// ============================================================
 
@@ -480,5 +575,6 @@ export function useAgentMessages(
 		approveActivePermission,
 		rejectActivePermission,
 		enqueueUpdate,
+		generateStarterPrompts,
 	};
 }

@@ -229,6 +229,50 @@ export function ChatPanel({
 		pinnedActiveNote,
 	);
 
+	// ============================================================
+	// Agent-suggested Starter Prompts
+	// ============================================================
+	const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
+	const clearSuggestedPrompts = useCallback(
+		() => setSuggestedPrompts([]),
+		[],
+	);
+	const starterRequestedForSessionRef = useRef<string | null>(null);
+
+	useEffect(() => {
+		if (!settings.suggestStarterPrompts) return;
+		if (!isSessionReady || isSending || errorInfo) return;
+		if (messages.length > 0) return;
+		const sid = session.sessionId;
+		if (!sid) return;
+		if (starterRequestedForSessionRef.current === sid) return;
+		starterRequestedForSessionRef.current = sid;
+
+		let cancelled = false;
+		void agent.generateStarterPrompts().then((list) => {
+			if (!cancelled) setSuggestedPrompts(list);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		settings.suggestStarterPrompts,
+		isSessionReady,
+		isSending,
+		errorInfo,
+		messages.length,
+		session.sessionId,
+		agent.generateStarterPrompts,
+	]);
+
+	useEffect(() => {
+		if (messages.length > 0) setSuggestedPrompts([]);
+	}, [messages.length]);
+
+	useEffect(() => {
+		setSuggestedPrompts([]);
+	}, [session.sessionId]);
+
 	// Session history hook with callback for session load
 	const handleSessionLoad = useCallback(
 		(
@@ -1346,6 +1390,8 @@ export function ChatPanel({
 			geminiNotice={effectiveGeminiNotice}
 			onClearGeminiNotice={handleClearGeminiNotice}
 			messages={messages}
+			suggestedPrompts={suggestedPrompts}
+			onClearSuggestedPrompts={clearSuggestedPrompts}
 		/>
 	);
 
