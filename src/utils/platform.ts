@@ -307,13 +307,29 @@ export function wrapCommandForWsl(
 		pathPrefix = `export PATH="${escapePathForShell(wslPath)}:$PATH"; `;
 	}
 
-	const innerCommand = `${pathPrefix}cd ${escapeShellArgBash(wslCwd)} && ${command}${argsString}`;
-	wslArgs.push("sh", "-c", buildWslShellWrapper(innerCommand));
+    const commandIsAbsoluteWslPath = command.startsWith("/");
+    const commandHasShellSyntax = /[\s"'`$&|;<>(){}[\]*?!\\]/.test(command);
+    const canUseDirectExec =
+	    commandIsAbsoluteWslPath &&
+	    !commandHasShellSyntax &&
+	    !additionalPath;
 
-	return {
-		command: "C:\\Windows\\System32\\wsl.exe",
-		args: wslArgs,
-	};
+    if (canUseDirectExec) {
+	    wslArgs.push("--cd", wslCwd, "--exec", command, ...args);
+
+	    return {
+		    command: "C:\\Windows\\System32\\wsl.exe",
+		    args: wslArgs,
+	    };
+    }
+
+    const innerCommand = `${pathPrefix}cd ${escapeShellArgBash(wslCwd)} && ${command}${argsString}`;
+    wslArgs.push("sh", "-c", buildWslShellWrapper(innerCommand));
+
+    return {
+	    command: "C:\\Windows\\System32\\wsl.exe",
+	    args: wslArgs,
+    };
 }
 
 /**
