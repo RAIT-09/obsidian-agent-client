@@ -175,6 +175,7 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 						...permissionRequest,
 						selectedOptionId: selectedOptionId,
 					}}
+					showEmojis={showEmojis}
 					onApprovePermission={onApprovePermission}
 					onOptionSelected={setSelectedOptionId}
 				/>
