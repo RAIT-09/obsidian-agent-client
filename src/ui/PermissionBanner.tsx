@@ -2,11 +2,7 @@ import { getLogger } from "../utils/logger";
 import type { PermissionOption } from "../types/chat";
 import { LucideIcon } from "./shared/IconButton";
 
-/**
- * Maps permission option kind to its Lucide icon name.
- * Kind semantics are conveyed by icon shape + color (the button
- * background stays neutral for theme compatibility).
- */
+/** Kind semantics are conveyed by icon shape + color, not button background. */
 const KIND_ICONS: Record<PermissionOption["kind"], string> = {
 	allow_always: "check-check",
 	allow_once: "check",
