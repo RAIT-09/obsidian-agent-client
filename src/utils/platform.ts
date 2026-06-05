@@ -289,6 +289,10 @@ export function isSameDirectory(pathA: string, pathB: string): boolean {
  * $SHELL, and falls back to /bin/sh for non-POSIX shells (fish, elvish,
  * nushell, xonsh).
  *
+ * NOTE: agent and terminal launches now use buildWslArgvScript /
+ * buildWslTerminalScript (--exec + positional argv) instead. This helper is
+ * currently used only by paths.ts (resolveCommandPathInWsl, the `which` lookup).
+ *
  * IMPORTANT: wsl.exe pre-expands $VAR references using WSL environment
  * variables before passing them to the Linux shell. Intermediate variables
  * (e.g., s=$SHELL; exec $s) will NOT work because wsl.exe expands $s to
@@ -340,6 +344,34 @@ export function buildWslArgvScript(): string {
 		`case \${SHELL:-/bin/sh} in ` +
 		`*/fish|*/elvish|*/nushell|*/xonsh) exec /bin/sh -l -c '${coreEsc}' sh "$@";; ` +
 		`*) exec \${SHELL:-/bin/sh} -l -c '${coreEsc}' sh "$@";; ` +
+		`esac`
+	);
+}
+
+/**
+ * Build the constant launcher script for terminal commands in WSL.
+ *
+ * Used as: `wsl.exe [-d dist] --exec /bin/sh -c '<this>' sh '<commandLine>'`
+ * where the full shell command line is passed as a single positional ($1),
+ * NEVER baked into this string — so there is no nested-quoting fragility. The
+ * command line is then run under the user's login shell with `-c`, so it is
+ * parsed by the user's actual shell (e.g. bash): pipes, redirects, subshells and
+ * bash-specific syntax are preserved, with ~/.profile sourced. Falls back to
+ * /bin/sh for non-POSIX shells (fish, elvish, nushell, xonsh).
+ *
+ * This mirrors buildWslShellWrapper's effective behavior (`$SHELL -l -c
+ * <commandLine>`) but delivers the command line via an argv positional + `--exec`
+ * instead of a doubly-escaped nested string, which avoids quoting failures seen
+ * in some WSL environments (e.g. RHEL8).
+ *
+ * IMPORTANT (same caveat as buildWslArgvScript): reference `${SHELL:-/bin/sh}`
+ * directly; do not use intermediate variables.
+ */
+export function buildWslTerminalScript(): string {
+	return (
+		`case \${SHELL:-/bin/sh} in ` +
+		`*/fish|*/elvish|*/nushell|*/xonsh) exec /bin/sh -l -c "$1";; ` +
+		`*) exec \${SHELL:-/bin/sh} -l -c "$1";; ` +
 		`esac`
 	);
 }
@@ -416,9 +448,12 @@ export function wrapCommandForWsl(
 		};
 	}
 
-	// Terminal launch: the command may be a shell line (pipes, redirects, &&),
-	// so keep the shell-string wrapper and let the login shell parse it.
-	// Use login shell (-l) to inherit PATH from user's shell profile.
+	// Terminal launch: the command may be a shell line (pipes, redirects, &&,
+	// subshells, bash-isms), so it must be parsed by the user's shell. Build the
+	// same shell command line as before, but deliver it via --exec + a single
+	// positional (no nested escaped string) so it survives WSL quoting, and run
+	// it under the user's login shell ($SHELL -l -c "$1"). Behaviorally identical
+	// to the previous `$SHELL -l -c <innerCommand>`, just delivered robustly.
 	const escapedArgs = args.map(escapeShellArgBash).join(" ");
 	const argsString = escapedArgs.length > 0 ? ` ${escapedArgs}` : "";
 
@@ -431,7 +466,14 @@ export function wrapCommandForWsl(
 	}
 
 	const innerCommand = `${pathPrefix}cd ${escapeShellArgBash(wslCwd)} && ${command}${argsString}`;
-	wslArgs.push("sh", "-c", buildWslShellWrapper(innerCommand));
+	wslArgs.push(
+		"--exec",
+		"/bin/sh",
+		"-c",
+		buildWslTerminalScript(),
+		"sh",
+		innerCommand,
+	);
 
 	return {
 		command: "C:\\Windows\\System32\\wsl.exe",

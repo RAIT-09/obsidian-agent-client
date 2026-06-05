@@ -110,9 +110,13 @@ export class TerminalManager {
 			cwd: params.cwd,
 		});
 
-		// Spawn the process
+		// Spawn the process.
+		// In WSL mode the working directory is applied inside the launcher
+		// (cd '<wslCwd>'); the wsl.exe process must NOT receive a Linux path as
+		// its Windows cwd (CreateProcess would fail), so omit cwd there.
+		const useWsl = Platform.isWin && this.plugin.settings.windowsWslMode;
 		const spawnOptions: SpawnOptions = {
-			cwd: params.cwd || undefined,
+			cwd: useWsl ? undefined : params.cwd || undefined,
 			env,
 			stdio: ["pipe", "pipe", "pipe"],
 			shell: needsShell,

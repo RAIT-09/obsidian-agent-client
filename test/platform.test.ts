@@ -6,6 +6,7 @@ import {
 	escapeShellArgBash,
 	escapeShellArgWindows,
 	buildWslArgvScript,
+	buildWslTerminalScript,
 	wrapCommandForWsl,
 	prepareShellCommand,
 	buildWslEnv,
@@ -180,8 +181,8 @@ describe("wrapCommandForWsl — agent (useArgvExec)", () => {
 	});
 });
 
-describe("wrapCommandForWsl — terminal (shell string)", () => {
-	it("uses sh -c wrapper and lets the shell parse the command (pipes)", () => {
+describe("wrapCommandForWsl — terminal (shell string via hybrid)", () => {
+	it("uses --exec + login shell, command line as a single positional (pipes preserved)", () => {
 		const { command, args } = wrapCommandForWsl(
 			"ls -la | grep foo",
 			[],
@@ -191,14 +192,48 @@ describe("wrapCommandForWsl — terminal (shell string)", () => {
 			false,
 		);
 		expect(command).toBe(WSL_EXE);
-		expect(args).toContain("sh");
-		expect(args).toContain("-c");
-		const wrapper = args[args.indexOf("-c") + 1];
-		// login shell + profile sourcing preserved
-		expect(wrapper).toContain(". ~/.profile");
-		expect(wrapper).toContain(" -l ");
-		// command is left raw so the shell parses the pipe
-		expect(wrapper).toContain("ls -la | grep foo");
+		// header: --exec /bin/sh -c <launcher script>
+		expect(args.slice(0, 3)).toEqual(["--exec", "/bin/sh", "-c"]);
+		// launcher runs the command line under the user's login shell
+		const script = args[3];
+		expect(script).toContain(" -l ");
+		expect(script).toContain("${SHELL:-/bin/sh}");
+		expect(script).toContain('-c "$1"');
+		// positionals: sh <innerCommand> — the command line is ONE intact element
+		expect(args).toHaveLength(6);
+		expect(args[4]).toBe("sh");
+		const innerCommand = args[5];
+		expect(innerCommand).toContain("ls -la | grep foo"); // raw pipe preserved
+		expect(innerCommand).toContain("cd '/mnt/c/vault'");
+	});
+
+	it("includes the PATH export and cd in the command line when additionalPath is set", () => {
+		const { args } = wrapCommandForWsl(
+			"node x.js",
+			[],
+			"C:\\v",
+			undefined,
+			"C:\\node\\bin",
+			false,
+		);
+		const innerCommand = args[args.length - 1];
+		expect(innerCommand).toContain('export PATH="/mnt/c/node/bin:$PATH"');
+		expect(innerCommand).toContain("node x.js");
+	});
+});
+
+describe("buildWslTerminalScript", () => {
+	const s = buildWslTerminalScript();
+	it("runs the command line under the user's login shell via -c", () => {
+		expect(s).toContain(" -l ");
+		expect(s).toContain('-c "$1"');
+		expect(s).toContain("${SHELL:-/bin/sh}");
+	});
+	it("falls back to /bin/sh for non-POSIX shells", () => {
+		expect(s).toContain("*/fish");
+	});
+	it("is a pure constant (no baked-in user data)", () => {
+		expect(s).not.toContain("undefined");
 	});
 });
 
@@ -227,15 +262,17 @@ describe("prepareShellCommand", () => {
 		expect(r.args).toContain("--exec");
 	});
 
-	it("WSL terminal: wsl.exe via sh -c wrapper", () => {
+	it("WSL terminal: wsl.exe via --exec + login shell, command line as positional", () => {
 		Platform.isWin = true;
 		const r = prepareShellCommand("ls | grep x", [], "C:\\vault", {
 			wslMode: true,
 			alwaysEscape: false,
 		});
 		expect(r.command).toBe(WSL_EXE);
-		expect(r.args).toContain("sh");
-		expect(r.args).not.toContain("--exec");
+		expect(r.needsShell).toBe(false);
+		expect(r.args.slice(0, 3)).toEqual(["--exec", "/bin/sh", "-c"]);
+		// the command line (with the pipe) is the last positional, intact
+		expect(r.args[r.args.length - 1]).toContain("ls | grep x");
 	});
 
 	it("macOS: wraps in a login shell (-l -c)", () => {
