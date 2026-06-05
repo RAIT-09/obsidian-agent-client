@@ -210,9 +210,10 @@ export function buildWslEnv(
 		return baseEnv;
 	}
 
-	const existing = baseEnv.WSLENV
-		? baseEnv.WSLENV.split(":").filter((e) => e.length > 0)
-		: [];
+	const existing =
+		typeof baseEnv.WSLENV === "string"
+			? baseEnv.WSLENV.split(":").filter((e) => e.length > 0)
+			: [];
 	const existingNames = new Set(existing.map((e) => e.split("/")[0]));
 
 	const merged = [...existing];
@@ -334,11 +335,12 @@ export function buildWslShellWrapper(innerCommand: string): string {
  *   $1 = extra PATH dir ("" = none), $2 = working dir, $3 = command, $4.. = args
  */
 export function buildWslArgvScript(): string {
-	// Constant inner script: optional PATH prepend, cd into the working dir,
-	// then exec the command with its args as argv.
+	// Constant inner script: optional PATH prepend, cd into the working dir
+	// (fail fast like the terminal wrapper / pre-#304 launch, so the agent never
+	// runs in an unintended directory), then exec the command with its args.
 	const core =
 		'[ -n "$1" ] && export PATH="$1:$PATH"; shift; ' +
-		'cd "$1" 2>/dev/null; shift; exec "$@"';
+		'cd "$1" || exit 1; shift; exec "$@"';
 	const coreEsc = core.replace(/'/g, "'\\''");
 	// Source ~/.profile first (like buildWslShellWrapper): bash -l skips ~/.profile
 	// when ~/.bash_profile exists, yet linuxbrew/nvm/mise put their PATH there and

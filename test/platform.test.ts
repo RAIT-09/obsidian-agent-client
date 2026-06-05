@@ -91,6 +91,9 @@ describe("buildWslArgvScript", () => {
 	it("sources ~/.profile (bash -l skips it when ~/.bash_profile exists)", () => {
 		expect(script).toContain(". ~/.profile");
 	});
+	it("fails fast if cd to the working dir fails (no run in wrong dir)", () => {
+		expect(script).toContain('cd "$1" || exit');
+	});
 	it("does not bake in any command/args (pure constant)", () => {
 		// Sanity: the script must not contain a placeholder that implies
 		// string interpolation of user data.
@@ -342,6 +345,15 @@ describe("buildWslEnv", () => {
 		const base: NodeJS.ProcessEnv = { FOO: "bar" };
 		buildWslEnv(base, ["FOO"]);
 		expect(base.WSLENV).toBeUndefined();
+	});
+
+	it("does not throw when WSLENV is present but not a string (defensive)", () => {
+		const base = {
+			FOO: "bar",
+			WSLENV: 123 as unknown as string,
+		};
+		expect(() => buildWslEnv(base, ["FOO"])).not.toThrow();
+		expect(buildWslEnv(base, ["FOO"]).WSLENV).toBe("FOO/u");
 	});
 });
 
