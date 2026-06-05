@@ -13,7 +13,7 @@ export default defineConfig([
 		files: ["**/*.ts", "**/*.tsx"],
 		languageOptions: {
 			parser: tsparser,
-			parserOptions: { project: "./tsconfig.json" },
+			parserOptions: { project: "./tsconfig.eslint.json" },
 		},
 		rules: {
 			// Preserve existing rules

@@ -175,6 +175,59 @@ export function clearWindowsPathCache(): void {
 }
 
 /**
+ * Forward selected environment variables into WSL via WSLENV.
+ *
+ * WSL only imports Windows environment variables that are listed in WSLENV
+ * (Build 17063+). Values cross through the Windows process environment, not the
+ * command line, so secrets are not exposed in `ps`/argv. This makes env-based
+ * config (API keys from the plugin's key field, custom agent env, tool env)
+ * actually reach the agent in WSL mode, instead of relying on the user's
+ * ~/.profile.
+ *
+ * Defensive by design (this runs on every WSL launch): merges with any existing
+ * WSLENV without clobbering, skips empty values (so an empty key field never
+ * overrides a profile-set value with ""), skips invalid key names, and never
+ * throws.
+ *
+ * @param baseEnv - Base environment (not mutated)
+ * @param keysToForward - Names of env vars to make visible inside WSL
+ * @returns A new env object with WSLENV augmented, or baseEnv unchanged if nothing to add
+ */
+export function buildWslEnv(
+	baseEnv: NodeJS.ProcessEnv,
+	keysToForward: string[],
+): NodeJS.ProcessEnv {
+	// A valid WSLENV entry name is a normal env var name. Reject names containing
+	// ':' or '/' (the WSLENV separators / flag marker) to avoid corrupting the list.
+	const validName = /^[A-Za-z_][A-Za-z0-9_]*$/;
+	const toAdd = keysToForward.filter(
+		(k) =>
+			validName.test(k) &&
+			typeof baseEnv[k] === "string" &&
+			baseEnv[k] !== "",
+	);
+	if (toAdd.length === 0) {
+		return baseEnv;
+	}
+
+	const existing = baseEnv.WSLENV
+		? baseEnv.WSLENV.split(":").filter((e) => e.length > 0)
+		: [];
+	const existingNames = new Set(existing.map((e) => e.split("/")[0]));
+
+	const merged = [...existing];
+	for (const k of toAdd) {
+		if (!existingNames.has(k)) {
+			// "/u": share only when launching WSL from Win32 (our direction).
+			merged.push(`${k}/u`);
+			existingNames.add(k);
+		}
+	}
+
+	return { ...baseEnv, WSLENV: merged.join(":") };
+}
+
+/**
  * Convert Windows path to WSL path format.
  * Example: C:\Users\name\vault → /mnt/c/Users/name/vault
  *
@@ -256,8 +309,49 @@ export function buildWslShellWrapper(innerCommand: string): string {
 }
 
 /**
+ * Build the constant launcher script for argv-based WSL agent launch.
+ *
+ * Used as: `wsl.exe [-d dist] --exec /bin/sh -c '<this>' sh <pathDir> <cwd> <command> <args...>`
+ * where pathDir/cwd/command/args are passed as separate argv (positional params),
+ * NEVER baked into this string. As a result there is no nested-quoting fragility
+ * and no escaping of user data is required — the returned string is a pure constant.
+ *
+ * This combines the strengths of both prior approaches: it skips wsl's default
+ * shell layer (via `--exec`, fixing environments where the nested `sh -c "<baked
+ * string>"` construction fails), runs under the user's login shell (`$SHELL -l`,
+ * so ~/.profile and login files are sourced — unlike a bare `--exec <command>`
+ * which would drop the environment), and forwards command/args as clean argv.
+ * Falls back to /bin/sh for non-POSIX shells (fish, elvish, nushell, xonsh).
+ *
+ * IMPORTANT (same caveat as buildWslShellWrapper): reference `${SHELL:-/bin/sh}`
+ * directly; do not use intermediate variables.
+ *
+ * Positional params seen by the inner login shell:
+ *   $1 = extra PATH dir ("" = none), $2 = working dir, $3 = command, $4.. = args
+ */
+export function buildWslArgvScript(): string {
+	// Constant inner script: optional PATH prepend, cd into the working dir,
+	// then exec the command with its args as argv.
+	const core =
+		'[ -n "$1" ] && export PATH="$1:$PATH"; shift; ' +
+		'cd "$1" 2>/dev/null; shift; exec "$@"';
+	const coreEsc = core.replace(/'/g, "'\\''");
+	return (
+		`case \${SHELL:-/bin/sh} in ` +
+		`*/fish|*/elvish|*/nushell|*/xonsh) exec /bin/sh -l -c '${coreEsc}' sh "$@";; ` +
+		`*) exec \${SHELL:-/bin/sh} -l -c '${coreEsc}' sh "$@";; ` +
+		`esac`
+	);
+}
+
+/**
  * Wrap a command to run inside WSL using wsl.exe.
  * Generates wsl.exe command with proper arguments for executing commands in WSL environment.
+ *
+ * @param useArgvExec - When true (agent launch), use the hybrid argv launcher
+ *   (`--exec` + login shell + argv) so command/args need no escaping and the
+ *   environment is preserved. When false (terminal launch), use the shell-string
+ *   wrapper so the login shell parses pipes/redirects in the command.
  */
 export function wrapCommandForWsl(
 	command: string,
@@ -265,6 +359,7 @@ export function wrapCommandForWsl(
 	cwd: string,
 	distribution?: string,
 	additionalPath?: string,
+	useArgvExec = false,
 ): { command: string; args: string[] } {
 	// Validate working directory path
 	// Check for UNC paths (\\server\share) which are not supported by WSL
@@ -294,8 +389,36 @@ export function wrapCommandForWsl(
 		wslArgs.push("-d", distribution);
 	}
 
-	// Build command to execute inside WSL
-	// Use login shell (-l) to inherit PATH from user's shell profile
+	if (useArgvExec) {
+		// Agent launch: hybrid argv launcher.
+		// command/args/cwd/pathDir are passed as separate argv (positional params),
+		// so no shell quoting of user data is needed (fixes paths/args with spaces
+		// or special chars), `--exec` skips wsl's default shell layer (fixes envs
+		// where the nested `sh -c "<baked string>"` construction breaks), and the
+		// login shell inside still sources ~/.profile (preserves the environment).
+		const pathDir = additionalPath
+			? convertWindowsPathToWsl(additionalPath)
+			: "";
+		wslArgs.push(
+			"--exec",
+			"/bin/sh",
+			"-c",
+			buildWslArgvScript(),
+			"sh",
+			pathDir,
+			wslCwd,
+			command,
+			...args,
+		);
+		return {
+			command: "C:\\Windows\\System32\\wsl.exe",
+			args: wslArgs,
+		};
+	}
+
+	// Terminal launch: the command may be a shell line (pipes, redirects, &&),
+	// so keep the shell-string wrapper and let the login shell parse it.
+	// Use login shell (-l) to inherit PATH from user's shell profile.
 	const escapedArgs = args.map(escapeShellArgBash).join(" ");
 	const argsString = escapedArgs.length > 0 ? ` ${escapedArgs}` : "";
 
@@ -307,29 +430,13 @@ export function wrapCommandForWsl(
 		pathPrefix = `export PATH="${escapePathForShell(wslPath)}:$PATH"; `;
 	}
 
-    const commandIsAbsoluteWslPath = command.startsWith("/");
-    const commandHasShellSyntax = /[\s"'`$&|;<>(){}[\]*?!\\]/.test(command);
-    const canUseDirectExec =
-	    commandIsAbsoluteWslPath &&
-	    !commandHasShellSyntax &&
-	    !additionalPath;
+	const innerCommand = `${pathPrefix}cd ${escapeShellArgBash(wslCwd)} && ${command}${argsString}`;
+	wslArgs.push("sh", "-c", buildWslShellWrapper(innerCommand));
 
-    if (canUseDirectExec) {
-	    wslArgs.push("--cd", wslCwd, "--exec", command, ...args);
-
-	    return {
-		    command: "C:\\Windows\\System32\\wsl.exe",
-		    args: wslArgs,
-	    };
-    }
-
-    const innerCommand = `${pathPrefix}cd ${escapeShellArgBash(wslCwd)} && ${command}${argsString}`;
-    wslArgs.push("sh", "-c", buildWslShellWrapper(innerCommand));
-
-    return {
-	    command: "C:\\Windows\\System32\\wsl.exe",
-	    args: wslArgs,
-    };
+	return {
+		command: "C:\\Windows\\System32\\wsl.exe",
+		args: wslArgs,
+	};
 }
 
 /**
@@ -390,12 +497,16 @@ export function prepareShellCommand(
 
 	// WSL mode (Windows only)
 	if (Platform.isWin && options.wslMode) {
+		// Agent launch (alwaysEscape: true) uses the hybrid argv launcher;
+		// terminal launch (alwaysEscape: false) uses the shell-string wrapper
+		// so pipes/redirects in the command are parsed by the shell.
 		const wrapped = wrapCommandForWsl(
 			command,
 			args,
 			cwd,
 			options.wslDistribution,
 			options.nodeDir,
+			alwaysEscape,
 		);
 		return {
 			command: wrapped.command,

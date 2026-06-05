@@ -3,7 +3,11 @@ import type AgentClientPlugin from "../plugin";
 import { getLogger, Logger } from "../utils/logger";
 import { Platform } from "obsidian";
 import { resolveNodeDirectory } from "../utils/paths";
-import { getEnhancedWindowsEnv, prepareShellCommand } from "../utils/platform";
+import {
+	getEnhancedWindowsEnv,
+	prepareShellCommand,
+	buildWslEnv,
+} from "../utils/platform";
 
 /**
  * Parameters for creating a terminal process.
@@ -68,6 +72,15 @@ export class TerminalManager {
 			for (const envVar of params.env) {
 				env[envVar.name] = envVar.value;
 			}
+		}
+
+		// In WSL mode, forward the tool-provided env vars into WSL via WSLENV
+		// (Windows env is otherwise not visible to the Linux process).
+		if (Platform.isWin && this.plugin.settings.windowsWslMode && params.env) {
+			env = buildWslEnv(
+				env,
+				params.env.map((e) => e.name),
+			);
 		}
 
 		// Handle command parsing

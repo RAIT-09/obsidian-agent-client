@@ -6,6 +6,8 @@
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"test": "vitest run",
+		"test:watch": "vitest",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.css\"",
 		"format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"*.css\"",
@@ -33,7 +35,8 @@
 		"tslib": "2.4.0",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.0.0",
-		"vitepress": "^1.6.4"
+		"vitepress": "^1.6.4",
+		"vitest": "^4.1.8"
 	},
 	"dependencies": {
 		"@agentclientprotocol/sdk": "^0.14.1",

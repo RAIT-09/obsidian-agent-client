@@ -143,6 +143,11 @@ If you sync your vault (e.g., via Nextcloud, Syncthing, or iCloud) across machin
 - Enable **Settings → Agent Client → Windows Subsystem for Linux → Enable WSL mode**
 - Optionally specify your distribution in **WSL distribution**
 
+**Using a Node version manager (nvm/fnm) inside WSL:**
+- These tools usually add `node` to `PATH` only in **interactive** shells (e.g. from `~/.bashrc`), so the agent — launched non-interactively — may not see your nvm-managed `node` and can fall back to an old system `node` (or none).
+- Fix: set **Node.js path** to the absolute path of your nvm `node` directory, e.g. `/home/<user>/.nvm/versions/node/<version>/bin`. The plugin then injects it into `PATH` for the agent.
+- API keys: in WSL mode you can enter them directly in the agent's API key field — the plugin forwards them into WSL automatically (no need to put them in `~/.profile`).
+
 ### Agent works in Terminal but not in Obsidian
 
 The PATH environment may differ between Terminal and Obsidian.
