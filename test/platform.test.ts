@@ -88,6 +88,9 @@ describe("buildWslArgvScript", () => {
 		expect(script).toContain("${SHELL:-/bin/sh}");
 		expect(script).toContain("*/fish");
 	});
+	it("sources ~/.profile (bash -l skips it when ~/.bash_profile exists)", () => {
+		expect(script).toContain(". ~/.profile");
+	});
 	it("does not bake in any command/args (pure constant)", () => {
 		// Sanity: the script must not contain a placeholder that implies
 		// string interpolation of user data.
@@ -110,6 +113,9 @@ describe("wrapCommandForWsl — agent (useArgvExec)", () => {
 		expect(args.slice(0, 3)).toEqual(["--exec", "/bin/sh", "-c"]);
 		// launcher keeps a login shell so the environment is preserved
 		expect(args[3]).toContain(" -l ");
+		// and sources ~/.profile (regression guard: bash -l skips it when
+		// ~/.bash_profile exists; linuxbrew/nvm/mise/bare-commands need it)
+		expect(args[3]).toContain(". ~/.profile");
 		// positionals: sh <pathDir> <cwd> <command> <args...> — ORDER matters
 		// ("" pathDir must be present so $1..$N line up with the script)
 		expect(args.slice(4)).toEqual([
@@ -199,6 +205,8 @@ describe("wrapCommandForWsl — terminal (shell string via hybrid)", () => {
 		expect(script).toContain(" -l ");
 		expect(script).toContain("${SHELL:-/bin/sh}");
 		expect(script).toContain('-c "$1"');
+		expect(script).toContain(". ~/.profile"); // regression guard
+
 		// positionals: sh <innerCommand> — the command line is ONE intact element
 		expect(args).toHaveLength(6);
 		expect(args[4]).toBe("sh");
@@ -231,6 +239,9 @@ describe("buildWslTerminalScript", () => {
 	});
 	it("falls back to /bin/sh for non-POSIX shells", () => {
 		expect(s).toContain("*/fish");
+	});
+	it("sources ~/.profile (bash -l skips it when ~/.bash_profile exists)", () => {
+		expect(s).toContain(". ~/.profile");
 	});
 	it("is a pure constant (no baked-in user data)", () => {
 		expect(s).not.toContain("undefined");

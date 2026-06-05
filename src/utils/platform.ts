@@ -340,7 +340,11 @@ export function buildWslArgvScript(): string {
 		'[ -n "$1" ] && export PATH="$1:$PATH"; shift; ' +
 		'cd "$1" 2>/dev/null; shift; exec "$@"';
 	const coreEsc = core.replace(/'/g, "'\\''");
+	// Source ~/.profile first (like buildWslShellWrapper): bash -l skips ~/.profile
+	// when ~/.bash_profile exists, yet linuxbrew/nvm/mise put their PATH there and
+	// bare command names resolve via that PATH.
 	return (
+		`. ~/.profile 2>/dev/null; ` +
 		`case \${SHELL:-/bin/sh} in ` +
 		`*/fish|*/elvish|*/nushell|*/xonsh) exec /bin/sh -l -c '${coreEsc}' sh "$@";; ` +
 		`*) exec \${SHELL:-/bin/sh} -l -c '${coreEsc}' sh "$@";; ` +
@@ -368,7 +372,11 @@ export function buildWslArgvScript(): string {
  * directly; do not use intermediate variables.
  */
 export function buildWslTerminalScript(): string {
+	// Source ~/.profile first (like buildWslShellWrapper): bash -l skips ~/.profile
+	// when ~/.bash_profile exists, yet linuxbrew/nvm/mise put their PATH there and
+	// bare command names resolve via that PATH.
 	return (
+		`. ~/.profile 2>/dev/null; ` +
 		`case \${SHELL:-/bin/sh} in ` +
 		`*/fish|*/elvish|*/nushell|*/xonsh) exec /bin/sh -l -c "$1";; ` +
 		`*) exec \${SHELL:-/bin/sh} -l -c "$1";; ` +
