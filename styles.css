@@ -413,82 +413,85 @@ If your plugin does not need CSS, delete this file.
 	font-weight: bold;
 }
 
-/* Permission Request */
+/* ===== Permission Request (vertical option list) ===== */
+/* Mirrors .agent-client-tool-call-diff: full-bleed block inside the
+   tool call with a 1px border container. Kind colors live on the icon,
+   not the button background (theme compatibility). */
 .agent-client-message-permission-request {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	justify-content: flex-end;
-	padding: 6px 0;
-	margin-top: 4px;
+	flex-direction: column;
+	margin-top: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	overflow: hidden;
 }
 
-/* ===== Permission Request Buttons ===== */
-.agent-client-permission-option {
-	padding: 8px 16px !important;
-	border: 1px solid var(--background-modifier-border) !important;
-	border-radius: 6px !important;
-	background-color: var(--background-primary) !important;
-	color: var(--text-normal) !important;
+.agent-client-message-permission-request .agent-client-permission-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 12px;
+	border: none;
+	border-radius: 0;
+	background-color: var(--background-primary);
+	box-shadow: none;
+	color: var(--text-normal);
 	cursor: pointer;
 	font-size: 13px;
 	font-weight: 500;
-	transition: all 0.2s ease;
-	min-width: 80px;
-	text-align: center;
-	opacity: 1;
+	text-align: left;
 }
 
-.agent-client-permission-option.agent-client-selected {
-	background-color: var(--interactive-accent) !important;
-	color: white !important;
-	font-weight: 600;
+.agent-client-message-permission-request
+	.agent-client-permission-option
+	+ .agent-client-permission-option {
+	border-top: 1px solid var(--background-modifier-border);
 }
 
-.agent-client-permission-option.agent-client-disabled {
-	background-color: var(--background-modifier-border) !important;
-	color: var(--text-muted) !important;
-	cursor: not-allowed !important;
+.agent-client-message-permission-request .agent-client-permission-option:hover {
+	background-color: var(--background-modifier-hover);
 }
 
-.agent-client-permission-option.agent-client-disabled:not(
-		.agent-client-selected
-	) {
-	opacity: 0.5;
+.agent-client-message-permission-request
+	.agent-client-permission-option:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
 }
 
-/* Special kinds */
-.agent-client-permission-option.agent-client-permission-kind-allow_always:not(
-		.agent-client-selected
-	):not(.agent-client-disabled) {
-	background-color: var(--color-green) !important;
-	color: white !important;
-	border-color: var(--color-green) !important;
+.agent-client-permission-option-icon {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
 }
 
-.agent-client-permission-option.agent-client-permission-kind-reject_once:not(
-		.agent-client-selected
-	):not(.agent-client-disabled) {
-	background-color: var(--color-red) !important;
-	color: white !important;
-	border-color: var(--color-red) !important;
+.agent-client-permission-option-icon svg {
+	width: 14px;
+	height: 14px;
 }
 
-.agent-client-permission-option.agent-client-permission-kind-allow_once:not(
-		.agent-client-selected
-	):not(.agent-client-disabled) {
-	background-color: var(--color-orange) !important;
-	color: white !important;
-	border-color: var(--color-orange) !important;
+.agent-client-permission-option-label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-/* Normal option button hover (no kind specified) */
-.agent-client-permission-option:not(
-		.agent-client-permission-kind-allow_always
-	):not(.agent-client-permission-kind-reject_once):not(
-		.agent-client-permission-kind-allow_once
-	):not(.agent-client-disabled):not(.agent-client-selected):hover {
-	background-color: var(--background-modifier-hover) !important;
+/* Kind colors (icon only) */
+.agent-client-permission-kind-allow_always
+	.agent-client-permission-option-icon {
+	color: var(--color-green);
+}
+
+.agent-client-permission-kind-allow_once .agent-client-permission-option-icon {
+	color: var(--color-orange);
+}
+
+.agent-client-permission-kind-reject_once .agent-client-permission-option-icon,
+.agent-client-permission-kind-reject_always
+	.agent-client-permission-option-icon {
+	color: var(--color-red);
 }
 
 /* ===== Chat View Components ===== */
