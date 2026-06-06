@@ -6,10 +6,12 @@ import {
 	Platform,
 	Menu,
 	setIcon,
+	TFile,
 	type MenuItem,
 } from "obsidian";
 
 import type { AttachedFile, ChatInputState } from "../types/chat";
+import type { NoteMetadata } from "../services/vault-service";
 import { isSameDirectory } from "../utils/platform";
 import { computeSessionTitle } from "../services/session-helpers";
 import { useHistoryModal } from "../hooks/useHistoryModal";
@@ -79,13 +81,19 @@ export interface ChatPanelCallbacks {
 // ============================================================================
 
 export interface ChatPanelProps {
-	variant: "sidebar" | "floating";
+	variant: "sidebar" | "floating" | "embedded";
 	viewId: string;
 	workingDirectory?: string;
 	initialAgentId?: string;
-	config?: { agent?: string; model?: string };
+	config?: {
+		agent?: string;
+		model?: string;
+		persist?: boolean;
+		noteContext?: "hosting";
+		sourcePath?: string;
+	};
 	onRegisterCallbacks?: (callbacks: ChatPanelCallbacks) => void;
-	/** Called when agent ID changes (sidebar only — persists in Obsidian state) */
+	/** Called when agent ID changes (sidebar only; persists in Obsidian state) */
 	onAgentIdChanged?: (agentId: string) => void;
 	/**
 	 * Called when the derived session title may have changed (sidebar only —
@@ -173,7 +181,7 @@ export function ChatPanel({
 		return process.cwd();
 	}, [plugin, workingDirectory]);
 
-	// Agent working directory — defaults to vault path.
+	// Agent working directory; defaults to vault path.
 	// Can be changed independently via "New chat in directory..." action.
 	const [agentCwd, setAgentCwd] = useState(vaultPath);
 
@@ -198,12 +206,72 @@ export function ChatPanel({
 		errorInfo,
 	} = agent;
 
+	const pinnedActiveNote = useMemo<NoteMetadata | null>(() => {
+		if (config?.noteContext !== "hosting" || !config.sourcePath) {
+			return null;
+		}
+		const file = plugin.app.vault.getAbstractFileByPath(config.sourcePath);
+		if (!(file instanceof TFile)) return null;
+		return {
+			path: file.path,
+			name: file.basename,
+			extension: file.extension,
+			created: file.stat.ctime,
+			modified: file.stat.mtime,
+		};
+	}, [plugin, config?.noteContext, config?.sourcePath]);
+
 	const suggestions = useSuggestions(
 		vaultService,
 		plugin,
 		session.availableCommands || EMPTY_COMMANDS,
 		settings.autoMentionActiveNote,
+		pinnedActiveNote,
 	);
+
+	// ============================================================
+	// Agent-suggested Starter Prompts
+	// ============================================================
+	const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
+	const clearSuggestedPrompts = useCallback(
+		() => setSuggestedPrompts([]),
+		[],
+	);
+	const starterRequestedForSessionRef = useRef<string | null>(null);
+
+	useEffect(() => {
+		if (!settings.suggestStarterPrompts) return;
+		if (!isSessionReady || isSending || errorInfo) return;
+		if (messages.length > 0) return;
+		const sid = session.sessionId;
+		if (!sid) return;
+		if (starterRequestedForSessionRef.current === sid) return;
+		starterRequestedForSessionRef.current = sid;
+
+		let cancelled = false;
+		void agent.generateStarterPrompts().then((list) => {
+			if (!cancelled) setSuggestedPrompts(list);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		settings.suggestStarterPrompts,
+		isSessionReady,
+		isSending,
+		errorInfo,
+		messages.length,
+		session.sessionId,
+		agent.generateStarterPrompts,
+	]);
+
+	useEffect(() => {
+		if (messages.length > 0) setSuggestedPrompts([]);
+	}, [messages.length]);
+
+	useEffect(() => {
+		setSuggestedPrompts([]);
+	}, [session.sessionId]);
 
 	// Session history hook with callback for session load
 	const handleSessionLoad = useCallback(
@@ -252,6 +320,10 @@ export function ChatPanel({
 	const [inputValue, setInputValue] = useState("");
 	const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 
+	// Pending auto-send queued by `agent-client:run-prompt` (drained when ready)
+	const [pendingAutoSend, setPendingAutoSend] = useState<string | null>(null);
+	const persistRestoreAttemptedRef = useRef(false);
+
 	// ============================================================
 	// Refs
 	// ============================================================
@@ -299,6 +371,7 @@ export function ChatPanel({
 		messages,
 		settings,
 		vaultPath,
+		config?.persist ? config.sourcePath : undefined,
 	);
 
 	const {
@@ -358,6 +431,17 @@ export function ChatPanel({
 			return handleSendMessage(content, attachments);
 		},
 		[handleSendMessage],
+	);
+
+	// Switch the view to a quick-prompt's assigned agent (fresh chat) and then
+	// auto-send the prompt once the new session is ready, reusing the same
+	// pending-auto-send drain as `agent-client:run-prompt`.
+	const handleSwitchAgentAndRun = useCallback(
+		async (nextAgentId: string, prompt: string) => {
+			await handleSwitchAgent(nextAgentId);
+			setPendingAutoSend(prompt);
+		},
+		[handleSwitchAgent],
 	);
 
 	const { handleOpenHistory } = useHistoryModal(
@@ -636,14 +720,14 @@ export function ChatPanel({
 		// Floating: create a shim with listener tracking
 		return {
 			app: plugin.app,
-			registerDomEvent: ((
+			registerDomEvent: (
 				target: Window | Document | HTMLElement,
 				type: string,
 				callback: EventListenerOrEventListenerObject,
 			) => {
 				target.addEventListener(type, callback);
 				registeredListenersRef.current.push({ target, type, callback });
-			}),
+			},
 		};
 	}, [viewHostProp, plugin.app]);
 
@@ -669,6 +753,35 @@ export function ChatPanel({
 		logger.log("[Debug] Starting connection setup via useSession...");
 		void agent.createSession(config?.agent || initialAgentId);
 	}, [agent.createSession, config?.agent, initialAgentId]);
+
+	useEffect(() => {
+		if (variant !== "embedded") return;
+		if (!config?.persist || !config.sourcePath) return;
+		if (!isSessionReady || !session.sessionId || !session.agentId) return;
+		if (!sessionHistory.canRestore) return;
+		if (persistRestoreAttemptedRef.current) return;
+		persistRestoreAttemptedRef.current = true;
+
+		const savedSession = plugin.settingsService
+			.getSavedSessions(session.agentId, agentCwd)
+			.find((item) => item.sourcePath === config.sourcePath);
+		if (!savedSession || savedSession.sessionId === session.sessionId) {
+			return;
+		}
+
+		void sessionHistory.restoreSession(savedSession.sessionId, agentCwd);
+	}, [
+		variant,
+		config?.persist,
+		config?.sourcePath,
+		isSessionReady,
+		session.sessionId,
+		session.agentId,
+		sessionHistory.canRestore,
+		sessionHistory.restoreSession,
+		plugin.settingsService,
+		agentCwd,
+	]);
 
 	// Apply configured model when session is ready
 	useEffect(() => {
@@ -793,7 +906,10 @@ export function ChatPanel({
 			);
 
 			// System notification on response completion
-			if (settings.enableSystemNotifications && !activeDocument.hasFocus()) {
+			if (
+				settings.enableSystemNotifications &&
+				!activeDocument.hasFocus()
+			) {
 				new Notification("Agent Client", {
 					body: `${activeAgentLabel} has completed the response.`,
 				});
@@ -990,6 +1106,27 @@ export function ChatPanel({
 				if (targetViewId && targetViewId !== viewId) return;
 				void handleExportChatRef.current();
 			}),
+
+			// Run prompt injected by quick-action button or code block.
+			// `targetViewId` filter: null/empty matches any view (used when the
+			// caller created the leaf via openNewChatViewWithAgent and cannot
+			// know the new viewId synchronously).
+			ws.on(
+				"agent-client:run-prompt",
+				(
+					targetViewId: string | null,
+					prompt: string,
+					autoSend?: boolean,
+				) => {
+					if (targetViewId && targetViewId !== viewId) return;
+					if (typeof prompt !== "string" || prompt.length === 0)
+						return;
+					setInputValue(prompt);
+					if (autoSend) {
+						setPendingAutoSend(prompt);
+					}
+				},
+			),
 		];
 
 		return () => {
@@ -1003,6 +1140,27 @@ export function ChatPanel({
 		viewId,
 		variant,
 		suggestions.mentions.toggleAutoMention,
+	]);
+
+	// ============================================================
+	// Effects - Drain pending auto-send when session becomes ready
+	// ============================================================
+	useEffect(() => {
+		if (!pendingAutoSend) return;
+		if (!isSessionReady) return;
+		if (isSending) return;
+		if (sessionHistory.loading) return;
+
+		const prompt = pendingAutoSend;
+		setPendingAutoSend(null);
+		setInputValue("");
+		void handleSendMessage(prompt);
+	}, [
+		pendingAutoSend,
+		isSessionReady,
+		isSending,
+		sessionHistory.loading,
+		handleSendMessage,
 	]);
 
 	// ============================================================
@@ -1135,6 +1293,8 @@ export function ChatPanel({
 				} as React.CSSProperties)
 			: undefined;
 
+	const shouldShowAgentSelector = variant !== "embedded" || !config?.agent;
+
 	const headerElement =
 		variant === "sidebar" ? (
 			<ChatHeader
@@ -1150,7 +1310,7 @@ export function ChatPanel({
 			<ChatHeader
 				variant="floating"
 				agentLabel={activeAgentLabel}
-				availableAgents={availableAgents}
+				availableAgents={shouldShowAgentSelector ? availableAgents : []}
 				currentAgentId={session.agentId}
 				isUpdateAvailable={isUpdateAvailable}
 				onAgentChange={(agentId) => void handleSwitchAgent(agentId)}
@@ -1214,6 +1374,7 @@ export function ChatPanel({
 			usage={session.usage}
 			supportsImages={session.promptCapabilities?.image ?? false}
 			agentId={session.agentId}
+			onSwitchAgentAndRun={handleSwitchAgentAndRun}
 			// Controlled component props (for broadcast commands)
 			inputValue={inputValue}
 			onInputChange={setInputValue}
@@ -1229,6 +1390,8 @@ export function ChatPanel({
 			geminiNotice={effectiveGeminiNotice}
 			onClearGeminiNotice={handleClearGeminiNotice}
 			messages={messages}
+			suggestedPrompts={suggestedPrompts}
+			onClearSuggestedPrompts={clearSuggestedPrompts}
 		/>
 	);
 
@@ -1251,6 +1414,25 @@ export function ChatPanel({
 					{inputAreaElement}
 				</div>
 			</>
+		);
+	}
+
+	if (variant === "embedded") {
+		return (
+			<div
+				ref={containerRef}
+				className="agent-client-chat-view-container agent-client-embedded-chat-panel"
+				style={chatFontSizeStyle}
+			>
+				<div className="agent-client-embedded-header">
+					{headerElement}
+				</div>
+				{cwdBanner}
+				<div className="agent-client-embedded-messages-container">
+					{messageListElement}
+				</div>
+				{inputAreaElement}
+			</div>
 		);
 	}
 
