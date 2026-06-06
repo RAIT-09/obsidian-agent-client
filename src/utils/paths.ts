@@ -1,5 +1,7 @@
 import { execFile } from "child_process";
 import { Platform } from "obsidian";
+import { existsSync } from "fs";
+import { join } from "path";
 import { buildWslShellWrapper, getLoginShell } from "./platform";
 
 /**
@@ -7,6 +9,29 @@ import { buildWslShellWrapper, getLoginShell } from "./platform";
  */
 export function isAbsolutePath(path: string): boolean {
 	return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
+}
+
+/**
+ * Fallback path resolution for when `which` returns nothing.
+ * On macOS, GUI-launched apps (Finder/Dock) inherit a reduced PATH that
+ * excludes Homebrew's bin directory (/opt/homebrew/bin on Apple Silicon),
+ * so `which` can fail even when the command is installed. Checks common
+ * install directories directly to cover that case.
+ *
+ * @param command - Command name (e.g. "node", "codex-acp")
+ * @returns Absolute path string, or null if not found in known directories
+ */
+function findInKnownPaths(command: string): string | null {
+	const dirs = Platform.isMacOS
+		? ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
+		: ["/usr/local/bin", "/usr/bin", "/bin"];
+
+	for (const dir of dirs) {
+		const candidate = join(dir, command);
+		if (existsSync(candidate)) return candidate;
+	}
+
+	return null;
 }
 
 /**
@@ -50,11 +75,15 @@ export function resolveCommandPath(command: string): Promise<string | null> {
 				{ timeout: 5000 },
 				(err, stdout) => {
 					if (err) {
-						resolve(null);
+						resolve(findInKnownPaths(trimmed));
 						return;
 					}
 					const resolved = stdout.split("\n")[0].trim();
-					resolve(resolved.length > 0 ? resolved : null);
+					resolve(
+						resolved.length > 0
+							? resolved
+							: findInKnownPaths(trimmed),
+					);
 				},
 			);
 		}
