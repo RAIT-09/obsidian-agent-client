@@ -3,6 +3,7 @@ const { useRef, useState, useEffect, useCallback, useMemo } = React;
 import { setIcon, Notice } from "obsidian";
 
 import type AgentClientPlugin from "../plugin";
+import type { QuickPrompt } from "../plugin";
 import type { IChatViewHost } from "./view-host";
 import type { NoteMetadata } from "../services/vault-service";
 import type {
@@ -11,6 +12,7 @@ import type {
 	SessionModelState,
 	SessionUsage,
 	SessionConfigOption,
+	SessionInfo,
 } from "../types/session";
 import type { AttachedFile, ChatMessage } from "../types/chat";
 import type { UseSuggestionsReturn } from "../hooks/useSuggestions";
@@ -19,6 +21,7 @@ import { ErrorBanner } from "./ErrorBanner";
 import { AttachmentStrip } from "./shared/AttachmentStrip";
 import { InputToolbar } from "./InputToolbar";
 import { getLogger } from "../utils/logger";
+import { classifyIconRef, resolveImageSrc } from "../utils/resolve-image-src";
 import type { ErrorInfo } from "../types/errors";
 import type { AgentUpdateNotification } from "../services/update-checker";
 import { useSettings } from "../hooks/useSettings";
@@ -175,6 +178,49 @@ function useInputHistory(
 }
 
 // ============================================================================
+// Quick Prompt Chip Icon
+// ============================================================================
+
+/**
+ * Renders a quick-prompt chip icon: an <img> when the configured icon is an
+ * image reference, otherwise a Lucide icon. Falls back to "sparkles" when the
+ * icon is unset or an image reference cannot be resolved.
+ */
+function QuickPromptChipIcon({
+	plugin,
+	icon,
+}: {
+	plugin: AgentClientPlugin;
+	icon?: string;
+}) {
+	const classified = useMemo(() => classifyIconRef(icon), [icon]);
+
+	if (classified?.kind === "image") {
+		const src = resolveImageSrc(plugin, classified.value);
+		if (src) {
+			return (
+				<img
+					src={src}
+					alt=""
+					className="agent-client-quick-prompt-chip-image"
+				/>
+			);
+		}
+	}
+
+	const lucideName =
+		classified?.kind === "lucide" ? classified.value : "sparkles";
+	return (
+		<span
+			className="agent-client-quick-prompt-chip-icon"
+			ref={(el) => {
+				if (el) setIcon(el, lucideName);
+			}}
+		/>
+	);
+}
+
+// ============================================================================
 // InputArea Component
 // ============================================================================
 
@@ -226,6 +272,12 @@ export interface InputAreaProps {
 	supportsImages?: boolean;
 	/** Current agent ID (used to clear images on agent switch) */
 	agentId: string;
+	/**
+	 * Switch the view to `agentId` (starting a fresh chat on that agent) and
+	 * then auto-send `prompt` once the new session is ready. Used by quick
+	 * prompts that carry an assigned agent so clicking the chip honors it.
+	 */
+	onSwitchAgentAndRun?: (agentId: string, prompt: string) => Promise<void>;
 	// Controlled component props (for broadcast commands)
 	/** Current input text value */
 	inputValue: string;
@@ -249,6 +301,10 @@ export interface InputAreaProps {
 	onClearGeminiNotice: () => void;
 	/** Messages array for input history navigation */
 	messages: ChatMessage[];
+	/** Recent chats to render as restore shortcuts on empty chats */
+	recentChatSessions?: SessionInfo[];
+	/** Restore a recent chat by session ID and cwd */
+	onRestoreRecentSession?: (sessionId: string, cwd: string) => Promise<void>;
 }
 
 /**
@@ -286,6 +342,7 @@ export function InputArea({
 	usage,
 	supportsImages = false,
 	agentId,
+	onSwitchAgentAndRun,
 	// Controlled component props
 	inputValue,
 	onInputChange,
@@ -302,15 +359,34 @@ export function InputArea({
 	onClearGeminiNotice,
 	// Input history
 	messages,
+	recentChatSessions,
+	onRestoreRecentSession,
 }: InputAreaProps) {
 	const { mentions, commands: slashCommands } = suggestions;
 	const logger = getLogger();
 	const settings = useSettings(plugin);
 	const showEmojis = plugin.settings.displaySettings.showEmojis;
+	// Quick-prompt chips dismissed by clicking (when hideAfterClick is set).
+	// View-local and non-persistent: cleared on remount / chat reopen.
+	const [dismissedQuickPrompts, setDismissedQuickPrompts] = useState<
+		Set<string>
+	>(() => new Set());
+	const quickPrompts = useMemo(() => {
+		if (!settings.showQuickPromptsInChat) return [];
+		return plugin
+			.getQuickPrompts()
+			.filter((prompt) => !dismissedQuickPrompts.has(prompt.name));
+	}, [
+		plugin,
+		settings.showQuickPromptsInChat,
+		settings.quickPrompts,
+		dismissedQuickPrompts,
+	]);
 
 	// Unofficial Obsidian API (see src/types/obsidian-internals.d.ts)
 	const obsidianSpellcheck =
-		(plugin.app.vault.getConfig("spellcheck") as boolean | undefined) ?? true;
+		(plugin.app.vault.getConfig("spellcheck") as boolean | undefined) ??
+		true;
 
 	// Local state (hint and command are still local - not needed for broadcast)
 	const [hintText, setHintText] = useState<string | null>(null);
@@ -646,6 +722,71 @@ export function InputArea({
 		[mentions, inputValue, setTextAndFocus],
 	);
 
+	const handleSelectQuickPrompt = useCallback(
+		(prompt: QuickPrompt) => {
+			void (async () => {
+				if (prompt.hideAfterClick) {
+					setDismissedQuickPrompts((prev) => {
+						const next = new Set(prev);
+						next.add(prompt.name);
+						return next;
+					});
+				}
+				await plugin.incrementQuickPromptUsage(prompt.name);
+
+				// If the prompt is assigned to a different (valid) agent, switch
+				// the view to that agent first and let it auto-send once the
+				// fresh session is ready. Mirrors the code-block/command path.
+				const targetAgentId =
+					prompt.agentId &&
+					prompt.agentId !== agentId &&
+					plugin
+						.getAvailableAgents()
+						.some((a) => a.id === prompt.agentId)
+						? prompt.agentId
+						: null;
+				if (targetAgentId && onSwitchAgentAndRun) {
+					onInputChange("");
+					await onSwitchAgentAndRun(targetAgentId, prompt.prompt);
+					return;
+				}
+
+				if (isSessionReady && !isSending && !isRestoringSession) {
+					onInputChange("");
+					await onSendMessage(prompt.prompt);
+					return;
+				}
+
+				onInputChange(prompt.prompt);
+				window.setTimeout(() => {
+					const textarea = textareaRef.current;
+					if (textarea) {
+						textarea.focus();
+						textarea.selectionStart = prompt.prompt.length;
+						textarea.selectionEnd = prompt.prompt.length;
+					}
+				}, 0);
+			})();
+		},
+		[
+			agentId,
+			isRestoringSession,
+			isSending,
+			isSessionReady,
+			onInputChange,
+			onSendMessage,
+			onSwitchAgentAndRun,
+			plugin,
+		],
+	);
+
+	const handleRestoreRecentChat = useCallback(
+		(session: SessionInfo) => {
+			void onRestoreRecentSession?.(session.sessionId, session.cwd);
+		},
+		[onRestoreRecentSession],
+	);
+
 	/**
 	 * Handle slash command selection from dropdown.
 	 */
@@ -979,6 +1120,52 @@ export function InputArea({
 					view={view}
 					variant={geminiNotice.variant}
 				/>
+			)}
+
+			{((settings.showRecentChatsInChat &&
+				recentChatSessions &&
+				recentChatSessions.length > 0) ||
+				quickPrompts.length > 0) && (
+				<div className="agent-client-quick-prompt-strip">
+					{settings.showRecentChatsInChat &&
+						recentChatSessions?.map((session) => (
+							<button
+								key={session.sessionId}
+								type="button"
+								className="agent-client-quick-prompt-chip agent-client-recent-chat-chip"
+								title={session.title ?? session.sessionId}
+								disabled={!onRestoreRecentSession}
+								onClick={() => handleRestoreRecentChat(session)}
+							>
+								<span
+									className="agent-client-quick-prompt-chip-icon"
+									ref={(el) => {
+										if (el) setIcon(el, "history");
+									}}
+								/>
+								<span className="agent-client-quick-prompt-chip-text">
+									{session.title ?? "Untitled session"}
+								</span>
+							</button>
+						))}
+					{quickPrompts.map((prompt) => (
+						<button
+							key={prompt.name}
+							type="button"
+							className="agent-client-quick-prompt-chip"
+							title={prompt.prompt}
+							onClick={() => handleSelectQuickPrompt(prompt)}
+						>
+							<QuickPromptChipIcon
+								plugin={plugin}
+								icon={prompt.icon}
+							/>
+							<span className="agent-client-quick-prompt-chip-text">
+								{prompt.name}
+							</span>
+						</button>
+					))}
+				</div>
 			)}
 
 			{/* Mention Dropdown */}

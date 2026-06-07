@@ -3,9 +3,17 @@ import {
 	WorkspaceLeaf,
 	Notice,
 	requestUrl,
+	MarkdownRenderChild,
+	SuggestModal,
+	setIcon,
+	type App,
+	type MarkdownPostProcessorContext,
 } from "obsidian";
 import * as semver from "semver";
 import { ChatView, VIEW_TYPE_CHAT } from "./ui/ChatView";
+import { mountCodeBlockChat } from "./ui/CodeBlockChatView";
+import { mountAgentButtonBlock } from "./ui/AgentButtonBlock";
+import { parseAgentBlock } from "./utils/agent-block-parser";
 import {
 	SessionManagerView,
 	VIEW_TYPE_SESSION_MANAGER,
@@ -44,10 +52,30 @@ import {
 	CustomAgentSettings,
 } from "./types/agent";
 import type { SavedSessionInfo } from "./types/session";
+import { classifyIconRef, resolveImageSrc } from "./utils/resolve-image-src";
 import { initializeLogger, getLogger } from "./utils/logger";
 
 // Re-export for backward compatibility
 export type { AgentEnvVar, CustomAgentSettings };
+
+export interface QuickPrompt {
+	name: string;
+	prompt: string;
+	agentId?: string;
+	usageCount: number;
+	/**
+	 * Icon shown on the quick-prompt chip. Either a Lucide icon id
+	 * (e.g. "sparkles", "wand-2") or an image reference (http(s)/data URL
+	 * or vault-relative path). Falls back to "sparkles" when unset.
+	 */
+	icon?: string;
+	/**
+	 * When true, the quick-prompt chip hides itself after it is clicked,
+	 * for the lifetime of the current chat view. Reopening the chat
+	 * restores it. Non-persistent and non-destructive.
+	 */
+	hideAfterClick?: boolean;
+}
 
 /**
  * Send message shortcut configuration.
@@ -62,12 +90,20 @@ export type SendMessageShortcut = "enter" | "cmd-enter";
  * - 'right-split': Open in right pane with vertical split
  * - 'editor-tab': Open in editor area as tabs
  * - 'editor-split': Open in editor area with right split
+ * - 'floating': Open as a floating chat window
  */
 export type ChatViewLocation =
 	| "right-tab"
 	| "right-split"
 	| "editor-tab"
-	| "editor-split";
+	| "editor-split"
+	| "floating";
+
+export interface EmbeddedChatRegistration {
+	viewId: string;
+	sourcePath: string;
+	lineStart: number;
+}
 
 export interface AgentClientPluginSettings {
 	gemini: GeminiAgentSettings;
@@ -109,6 +145,10 @@ export interface AgentClientPluginSettings {
 	windowsWslDistribution?: string;
 	// Input behavior
 	sendMessageShortcut: SendMessageShortcut;
+	showQuickPromptsInChat: boolean;
+	showRecentChatsInChat: boolean;
+	showAgentImagesInChatInterfaces: boolean;
+	quickPrompts: QuickPrompt[];
 	// View settings
 	chatViewLocation: ChatViewLocation;
 	// Display settings
@@ -186,6 +226,10 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	windowsWslMode: false,
 	windowsWslDistribution: undefined,
 	sendMessageShortcut: "enter",
+	showQuickPromptsInChat: true,
+	showRecentChatsInChat: false,
+	showAgentImagesInChatInterfaces: true,
+	quickPrompts: [],
 	chatViewLocation: "right-tab",
 	displaySettings: {
 		autoCollapseDiffs: false,
@@ -218,6 +262,8 @@ export default class AgentClientPlugin extends Plugin {
 	private floatingButton: FloatingButtonContainer | null = null;
 	/** Counter for generating unique floating chat instance IDs */
 	private floatingChatCounter = 0;
+	/** Embedded chat instances mounted from markdown code blocks. */
+	private embeddedChats = new Map<string, EmbeddedChatRegistration>();
 
 	async onload() {
 		await this.loadSettings();
@@ -290,6 +336,29 @@ export default class AgentClientPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "open-new-side-chat-view",
+			name: "Open new side chat view",
+			callback: () => {
+				void this.openNewChatViewWithAgent(
+					this.settings.defaultAgentId,
+					"right-tab",
+				);
+			},
+		});
+
+		this.addCommand({
+			id: "run-quick-prompt",
+			name: "Run quick prompt",
+			checkCallback: (checking) => {
+				if (this.settings.quickPrompts.length === 0) return false;
+				if (checking) return true;
+				new QuickPromptSuggestModal(this.app, this, (prompt) => {
+					void this.runQuickPrompt(prompt);
+				}).open();
+			},
+		});
+
 		// Register agent-specific commands
 		this.registerAgentCommands();
 		this.registerPermissionCommands();
@@ -355,6 +424,14 @@ export default class AgentClientPlugin extends Plugin {
 		});
 
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
+
+		this.registerMarkdownCodeBlockProcessor(
+			"agent-client",
+			(source, el, ctx) => this.renderAgentBlock(source, el, ctx),
+		);
+		this.registerMarkdownCodeBlockProcessor("agent", (source, el, ctx) =>
+			this.renderAgentBlock(source, el, ctx),
+		);
 
 		// Mount floating button (always present; visibility controlled by settings inside component)
 		this.floatingButton = new FloatingButtonContainer(this);
@@ -469,6 +546,16 @@ export default class AgentClientPlugin extends Plugin {
 	async activateView() {
 		const { workspace } = this.app;
 
+		if (this.settings.chatViewLocation === "floating") {
+			const instances = this.getFloatingChatInstances();
+			if (instances.length === 0) {
+				this.openNewFloatingChat(true);
+			} else {
+				this.expandFloatingChat(instances[instances.length - 1]);
+			}
+			return;
+		}
+
 		let leaf: WorkspaceLeaf | null = null;
 		const leaves = workspace.getLeavesOfType(VIEW_TYPE_CHAT);
 
@@ -560,11 +647,15 @@ export default class AgentClientPlugin extends Plugin {
 	 * Create a new leaf for ChatView based on the configured location setting.
 	 * @param isAdditional - true when opening additional views (e.g., Open New View)
 	 */
-	private createNewChatLeaf(isAdditional: boolean): WorkspaceLeaf | null {
+	private createNewChatLeaf(
+		isAdditional: boolean,
+		location: ChatViewLocation = this.settings.chatViewLocation,
+	): WorkspaceLeaf | null {
 		const { workspace } = this.app;
-		const location = this.settings.chatViewLocation;
 
 		switch (location) {
+			case "floating":
+				return null;
 			case "right-tab":
 				if (isAdditional) {
 					return this.createSidebarTab("right");
@@ -616,11 +707,20 @@ export default class AgentClientPlugin extends Plugin {
 	 * Open a new chat view with a specific agent.
 	 * Always creates a new view (doesn't reuse existing).
 	 */
-	async openNewChatViewWithAgent(agentId: string): Promise<void> {
-		const leaf = this.createNewChatLeaf(true);
+	async openNewChatViewWithAgent(
+		agentId: string,
+		location: ChatViewLocation = this.settings.chatViewLocation,
+	): Promise<string | null> {
+		if (location === "floating") {
+			const counterBefore = this.floatingChatCounter;
+			this.openNewFloatingChat(true);
+			return `floating-chat-${counterBefore}`;
+		}
+
+		const leaf = this.createNewChatLeaf(true, location);
 		if (!leaf) {
 			getLogger().warn("[AgentClient] Failed to create new leaf");
-			return;
+			return null;
 		}
 
 		await leaf.setViewState({
@@ -630,6 +730,8 @@ export default class AgentClientPlugin extends Plugin {
 		});
 
 		await this.app.workspace.revealLeaf(leaf);
+		const view = leaf.view as ChatView | null;
+		const viewId = view?.viewId ?? null;
 
 		// Focus textarea after revealing the leaf
 		const viewContainerEl = leaf.view?.containerEl;
@@ -643,6 +745,7 @@ export default class AgentClientPlugin extends Plugin {
 				}
 			}, 0);
 		}
+		return viewId;
 	}
 
 	/**
@@ -657,6 +760,35 @@ export default class AgentClientPlugin extends Plugin {
 		// FloatingViewContainer will create viewId as "floating-chat-{instanceId}"
 		const instanceId = String(this.floatingChatCounter++);
 		createFloatingChat(this, instanceId, initialExpanded, initialPosition);
+	}
+
+	registerEmbeddedChat(registration: EmbeddedChatRegistration): () => void {
+		this.embeddedChats.set(registration.viewId, registration);
+		return () => {
+			const current = this.embeddedChats.get(registration.viewId);
+			if (current === registration) {
+				this.embeddedChats.delete(registration.viewId);
+			}
+		};
+	}
+
+	findNearestEmbeddedChat(
+		sourcePath: string,
+		lineStart: number,
+	): string | null {
+		let nearest: EmbeddedChatRegistration | null = null;
+		let nearestDistance = Number.POSITIVE_INFINITY;
+
+		for (const registration of this.embeddedChats.values()) {
+			if (registration.sourcePath !== sourcePath) continue;
+			const distance = Math.abs(registration.lineStart - lineStart);
+			if (distance < nearestDistance) {
+				nearest = registration;
+				nearestDistance = distance;
+			}
+		}
+
+		return nearest?.viewId ?? null;
 	}
 
 	/**
@@ -686,6 +818,170 @@ export default class AgentClientPlugin extends Plugin {
 		const view = this.viewRegistry.get(viewId);
 		if (view) {
 			view.expand();
+		}
+	}
+
+	/**
+	 * Render an `agent-client` code block. Dispatches to embedded chat or
+	 * quick-action button based on the parsed `type` field.
+	 */
+	private renderAgentBlock(
+		source: string,
+		el: HTMLElement,
+		ctx: MarkdownPostProcessorContext,
+	): void {
+		const child = new MarkdownRenderChild(el);
+		const parsed = parseAgentBlock(source);
+
+		if (!parsed.ok) {
+			const errorEl = el.createDiv({
+				cls: "agent-client-code-block-error",
+			});
+			errorEl.createSpan({
+				cls: "agent-client-code-block-error-label",
+				text: "agent-client block error: ",
+			});
+			errorEl.createSpan({ text: parsed.error });
+			const sourceEl = errorEl.createEl("pre", {
+				cls: "agent-client-code-block-error-source",
+			});
+			sourceEl.setText(source);
+			ctx.addChild(child);
+			return;
+		}
+
+		const sectionInfo = ctx.getSectionInfo(el);
+		const sourcePath = ctx.sourcePath || "";
+		const lineStart = sectionInfo?.lineStart ?? 0;
+		const blockId = `${sourcePath || "untitled"}:${lineStart}`;
+
+		if (parsed.config.type === "chat") {
+			const root = mountCodeBlockChat(this, el, parsed.config, {
+				sourcePath,
+				blockId,
+				lineStart,
+			});
+			child.onunload = () => root.unmount();
+		} else {
+			const root = mountAgentButtonBlock(this, el, parsed.config, {
+				sourcePath,
+				lineStart,
+			});
+			child.onunload = () => root.unmount();
+		}
+		ctx.addChild(child);
+	}
+
+	/**
+	 * Open a chat view and inject a prompt into it. Used by quick-action
+	 * buttons (embedded code blocks, command palette entries, etc.).
+	 *
+	 * Fires `agent-client:run-prompt` shortly after the open call so the
+	 * target ChatPanel can populate its input box, optionally auto-sending
+	 * once the session is ready.
+	 */
+	async runPromptInChat(options: {
+		agentId: string;
+		prompt: string;
+		autoSend: boolean;
+		viewType: "right-pane" | "floating" | "editor-tab" | "embedded";
+		sourcePath?: string;
+		lineStart?: number;
+	}): Promise<void> {
+		const { agentId, prompt, autoSend, viewType, sourcePath, lineStart } =
+			options;
+		let targetViewId: string | null = null;
+
+		if (viewType === "embedded") {
+			targetViewId =
+				sourcePath && typeof lineStart === "number"
+					? this.findNearestEmbeddedChat(sourcePath, lineStart)
+					: null;
+			if (!targetViewId) {
+				new Notice("No embedded chat block found in this note.");
+				return;
+			}
+		} else if (viewType === "floating") {
+			const counterBefore = this.floatingChatCounter;
+			this.openNewFloatingChat(true);
+			targetViewId = `floating-chat-${counterBefore}`;
+		} else if (viewType === "editor-tab") {
+			targetViewId = await this.openNewChatViewWithAgent(
+				agentId,
+				"editor-tab",
+			);
+		} else {
+			targetViewId = await this.openNewChatViewWithAgent(
+				agentId,
+				"right-tab",
+			);
+		}
+
+		if (!targetViewId) return;
+
+		this.dispatchPromptToChat(targetViewId, prompt, autoSend);
+	}
+
+	private dispatchPromptToChat(
+		targetViewId: string,
+		prompt: string,
+		autoSend: boolean,
+	): void {
+		// Defer slightly so the React root has mounted and registered its
+		// `agent-client:run-prompt` listener.
+		window.setTimeout(() => {
+			this.app.workspace.trigger(
+				"agent-client:run-prompt",
+				targetViewId,
+				prompt,
+				autoSend,
+			);
+		}, 100);
+	}
+
+	getQuickPrompts(): QuickPrompt[] {
+		return this.settings.quickPrompts
+			.filter((prompt) => prompt.name.trim() && prompt.prompt.trim())
+			.sort((a, b) => {
+				if (b.usageCount !== a.usageCount) {
+					return b.usageCount - a.usageCount;
+				}
+				return a.name.localeCompare(b.name);
+			});
+	}
+
+	findQuickPrompt(name: string | undefined): QuickPrompt | null {
+		const key = name?.trim();
+		if (!key) return null;
+		const exact = this.settings.quickPrompts.find((p) => p.name === key);
+		if (exact) return exact;
+		const lower = key.toLowerCase();
+		return (
+			this.settings.quickPrompts.find(
+				(p) => p.name.toLowerCase() === lower,
+			) ?? null
+		);
+	}
+
+	async incrementQuickPromptUsage(name: string): Promise<void> {
+		const next = this.settings.quickPrompts.map((prompt) =>
+			prompt.name === name
+				? { ...prompt, usageCount: prompt.usageCount + 1 }
+				: prompt,
+		);
+		await this.settingsService.updateSettings({ quickPrompts: next });
+	}
+
+	async runQuickPrompt(prompt: QuickPrompt): Promise<void> {
+		const agentId =
+			prompt.agentId &&
+			this.collectAvailableAgentIds().includes(prompt.agentId)
+				? prompt.agentId
+				: this.settings.defaultAgentId;
+		await this.incrementQuickPromptUsage(prompt.name);
+		const targetViewId = await this.openNewChatViewWithAgent(agentId);
+		if (targetViewId) {
+			this.dispatchPromptToChat(targetViewId, prompt.prompt, false);
 		}
 	}
 
@@ -938,6 +1234,12 @@ export default class AgentClientPlugin extends Plugin {
 				? rawDefaultId
 				: availableAgentIds[0] || D.claude.id;
 
+		const pickAvatarImage = (value: unknown): string | undefined => {
+			if (typeof value !== "string") return undefined;
+			const trimmed = value.trim();
+			return trimmed.length > 0 ? trimmed : undefined;
+		};
+
 		this.settings = {
 			claude: {
 				id: D.claude.id, // Fixed — never from raw
@@ -959,6 +1261,7 @@ export default class AgentClientPlugin extends Plugin {
 					D.claude.command,
 				args: sanitizeArgs(rc.args),
 				env: normalizeEnvVars(rc.env),
+				avatarImage: pickAvatarImage(rc.avatarImage),
 			},
 			codex: {
 				id: D.codex.id,
@@ -976,6 +1279,7 @@ export default class AgentClientPlugin extends Plugin {
 				command: str(rk.command, "") || D.codex.command,
 				args: sanitizeArgs(rk.args),
 				env: normalizeEnvVars(rk.env),
+				avatarImage: pickAvatarImage(rk.avatarImage),
 			},
 			gemini: {
 				id: D.gemini.id,
@@ -1000,6 +1304,7 @@ export default class AgentClientPlugin extends Plugin {
 						? sanitizeArgs(rg.args)
 						: D.gemini.args,
 				env: normalizeEnvVars(rg.env),
+				avatarImage: pickAvatarImage(rg.avatarImage),
 			},
 			customAgents,
 			defaultAgentId,
@@ -1075,9 +1380,57 @@ export default class AgentClientPlugin extends Plugin {
 				["enter", "cmd-enter"],
 				D.sendMessageShortcut,
 			),
+			showQuickPromptsInChat: bool(
+				raw.showQuickPromptsInChat,
+				D.showQuickPromptsInChat,
+			),
+			showRecentChatsInChat: bool(
+				raw.showRecentChatsInChat,
+				D.showRecentChatsInChat,
+			),
+			showAgentImagesInChatInterfaces: bool(
+				raw.showAgentImagesInChatInterfaces,
+				D.showAgentImagesInChatInterfaces,
+			),
+			quickPrompts: (() => {
+				if (!Array.isArray(raw.quickPrompts)) return D.quickPrompts;
+				const seen = new Set<string>();
+				const prompts: QuickPrompt[] = [];
+				for (const entry of raw.quickPrompts) {
+					const item = obj(entry);
+					if (!item) continue;
+					const name = str(item.name, "").trim();
+					const prompt = str(item.prompt, "").trim();
+					if (!name || !prompt || seen.has(name)) continue;
+					seen.add(name);
+					const agentId = str(item.agentId, "").trim();
+					prompts.push({
+						name,
+						prompt,
+						agentId:
+							agentId.length > 0 &&
+							availableAgentIds.includes(agentId)
+								? agentId
+								: undefined,
+						usageCount: num(item.usageCount, 0, 0),
+						icon: str(item.icon, "").trim() || undefined,
+						hideAfterClick:
+							typeof item.hideAfterClick === "boolean"
+								? item.hideAfterClick
+								: undefined,
+					});
+				}
+				return prompts;
+			})(),
 			chatViewLocation: enumVal(
 				raw.chatViewLocation,
-				["right-tab", "right-split", "editor-tab", "editor-split"],
+				[
+					"right-tab",
+					"right-split",
+					"editor-tab",
+					"editor-split",
+					"floating",
+				],
 				D.chatViewLocation,
 			),
 			displaySettings: {
@@ -1314,5 +1667,81 @@ export default class AgentClientPlugin extends Plugin {
 			}
 		}
 		return Array.from(ids);
+	}
+}
+
+class QuickPromptSuggestModal extends SuggestModal<QuickPrompt> {
+	constructor(
+		app: App,
+		private plugin: AgentClientPlugin,
+		private onChoose: (prompt: QuickPrompt) => void,
+	) {
+		super(app);
+		this.setPlaceholder("Choose a quick prompt");
+	}
+
+	getSuggestions(query: string): QuickPrompt[] {
+		const needle = query.trim().toLowerCase();
+		const prompts = this.plugin.getQuickPrompts();
+		if (!needle) return prompts;
+		return prompts.filter((prompt) => {
+			return (
+				prompt.name.toLowerCase().includes(needle) ||
+				prompt.prompt.toLowerCase().includes(needle)
+			);
+		});
+	}
+
+	renderSuggestion(prompt: QuickPrompt, el: HTMLElement): void {
+		const row = el.createDiv({
+			cls: "agent-client-quick-prompt-suggestion",
+		});
+		this.renderPromptIcon(row, prompt);
+
+		const text = row.createDiv({
+			cls: "agent-client-quick-prompt-suggestion-text",
+		});
+		text.createDiv({
+			cls: "agent-client-quick-prompt-suggestion-name",
+			text: prompt.name,
+		});
+		text.createDiv({
+			cls: "agent-client-quick-prompt-suggestion-preview",
+			text:
+				prompt.prompt.length > 80
+					? prompt.prompt.slice(0, 80) + "\u2026"
+					: prompt.prompt,
+		});
+	}
+
+	/**
+	 * Render the prompt icon (Lucide id or image) into the row, mirroring the
+	 * chat-input chip. Falls back to "sparkles" when unset or unresolvable.
+	 */
+	private renderPromptIcon(parent: HTMLElement, prompt: QuickPrompt): void {
+		const classified = classifyIconRef(prompt.icon);
+
+		if (classified?.kind === "image") {
+			const src = resolveImageSrc(this.plugin, classified.value);
+			if (src) {
+				parent.createEl("img", {
+					cls: "agent-client-quick-prompt-suggestion-image",
+					attr: { src, alt: "" },
+				});
+				return;
+			}
+		}
+
+		const iconEl = parent.createSpan({
+			cls: "agent-client-quick-prompt-suggestion-icon",
+		});
+		setIcon(
+			iconEl,
+			classified?.kind === "lucide" ? classified.value : "sparkles",
+		);
+	}
+
+	onChooseSuggestion(prompt: QuickPrompt): void {
+		this.onChoose(prompt);
 	}
 }
