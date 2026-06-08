@@ -91,6 +91,7 @@ export function useSuggestions(
 	plugin: AgentClientPlugin,
 	availableCommands: SlashCommand[],
 	autoMentionDefault: boolean,
+	pinnedActiveNote?: NoteMetadata | null,
 ): UseSuggestionsReturn {
 	// ============================================================
 	// Mention State
@@ -103,7 +104,9 @@ export function useSuggestions(
 	const [mentionContext, setMentionContext] = useState<MentionContext | null>(
 		null,
 	);
-	const [activeNote, setActiveNote] = useState<NoteMetadata | null>(null);
+	const [activeNote, setActiveNote] = useState<NoteMetadata | null>(
+		pinnedActiveNote ?? null,
+	);
 	const [isAutoMentionDisabled, setIsAutoMentionDisabled] = useState(
 		!autoMentionDefault,
 	);
@@ -206,9 +209,13 @@ export function useSuggestions(
 	}, []);
 
 	const updateActiveNote = useCallback(async () => {
+		if (pinnedActiveNote) {
+			setActiveNote(pinnedActiveNote);
+			return;
+		}
 		const note = await vaultAccess.getActiveNote();
 		setActiveNote(note);
-	}, [vaultAccess]);
+	}, [vaultAccess, pinnedActiveNote]);
 
 	// ============================================================
 	// Command Callbacks
