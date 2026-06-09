@@ -84,6 +84,16 @@ export interface CodexAgentSettings extends BaseAgentSettings {
 }
 
 /**
+ * Configuration for Mistral Vibe agent.
+ *
+ * Extends base settings with Mistral-specific requirements.
+ */
+export interface MistralVibeAgentSettings extends BaseAgentSettings {
+	/** Mistral API key (MISTRAL_API_KEY) */
+	apiKey: string;
+}
+
+/**
  * Configuration for custom ACP-compatible agents.
  *
  * Uses only the base settings, allowing users to configure
