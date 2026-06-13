@@ -1,6 +1,7 @@
 import { execFile } from "child_process";
 import { Platform } from "obsidian";
-import { existsSync } from "fs";
+import { access, stat } from "fs/promises";
+import { constants } from "fs";
 import { join } from "path";
 import { buildWslShellWrapper, getLoginShell } from "./platform";
 
@@ -12,23 +13,41 @@ export function isAbsolutePath(path: string): boolean {
 }
 
 /**
- * Fallback path resolution for when `which` returns nothing.
- * On macOS, GUI-launched apps (Finder/Dock) inherit a reduced PATH that
- * excludes Homebrew's bin directory (/opt/homebrew/bin on Apple Silicon),
- * so `which` can fail even when the command is installed. Checks common
- * install directories directly to cover that case.
+ * Best-effort fallback for when `which` returns nothing — e.g. macOS GUI-launched
+ * apps (Finder/Dock) inherit a reduced PATH that excludes /opt/homebrew/bin, so
+ * `which` can fail even when the command is installed. Probes common install
+ * directories directly (PATH-independent), returning only an executable regular
+ * file so the result matches what `which` would have returned.
  *
- * @param command - Command name (e.g. "node", "codex-acp")
- * @returns Absolute path string, or null if not found in known directories
+ * Best-effort and intentionally narrow: version-manager installs
+ * (nvm/fnm/asdf/volta) and ~/.local/bin live in per-version directories a static
+ * list cannot enumerate and are out of scope — those users get an honest
+ * "Not found". (Windows solves the same reduced-PATH problem authoritatively via
+ * the registry; see getFullWindowsPath in platform.ts. macOS has no such
+ * side-channel, so this static last-resort list is a deliberate trade-off.)
+ *
+ * @param command - Bare command name (e.g. "node", "codex-acp")
+ * @returns Absolute path to an executable file, or null if not found
  */
-function findInKnownPaths(command: string): string | null {
+async function findInKnownPaths(command: string): Promise<string | null> {
+	// Only resolve bare names within the listed dirs; never let a separator
+	// escape via join() (defensive — current callers pass hardcoded names).
+	if (command.includes("/") || command.includes("\\")) return null;
+
 	const dirs = Platform.isMacOS
 		? ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
 		: ["/usr/local/bin", "/usr/bin", "/bin"];
 
 	for (const dir of dirs) {
 		const candidate = join(dir, command);
-		if (existsSync(candidate)) return candidate;
+		try {
+			const st = await stat(candidate); // follows symlinks
+			if (!st.isFile()) continue; // reject directories/sockets
+			await access(candidate, constants.X_OK); // must be executable
+			return candidate;
+		} catch {
+			// missing / not a runnable file / dangling symlink → keep scanning
+		}
 	}
 
 	return null;
@@ -75,15 +94,15 @@ export function resolveCommandPath(command: string): Promise<string | null> {
 				{ timeout: 5000 },
 				(err, stdout) => {
 					if (err) {
-						resolve(findInKnownPaths(trimmed));
+						findInKnownPaths(trimmed).then(resolve, () => resolve(null));
 						return;
 					}
 					const resolved = stdout.split("\n")[0].trim();
-					resolve(
-						resolved.length > 0
-							? resolved
-							: findInKnownPaths(trimmed),
-					);
+					if (resolved.length > 0) {
+						resolve(resolved);
+					} else {
+						findInKnownPaths(trimmed).then(resolve, () => resolve(null));
+					}
 				},
 			);
 		}
@@ -124,6 +143,11 @@ export function resolveCommandPathInWsl(
 			{ timeout: 5000 },
 			(err, stdout) => {
 				if (err) {
+					// No known-paths fallback here on purpose: a host-side
+					// existsSync would check the Windows filesystem, not the
+					// Linux FS inside WSL. The wrapper already runs a login
+					// shell (-l, sources ~/.profile), so the reduced-PATH
+					// problem is milder here than on a GUI-launched macOS app.
 					resolve(null);
 					return;
 				}
