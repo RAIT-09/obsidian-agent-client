@@ -1,7 +1,7 @@
 # Agent Client Plugin - LLM Developer Guide
 
 ## Overview
-Obsidian plugin for AI agent interaction (Claude Code, Codex, Gemini CLI, custom agents) via ACP.
+Obsidian plugin for AI agent interaction (Claude Code, Codex, Gemini CLI, Mistral Vibe, custom agents) via ACP.
 
 **Tech**: React 19, TypeScript, Obsidian API, Agent Client Protocol (ACP)
 
@@ -12,7 +12,7 @@ src/
 ├── types/                       # Type definitions (no logic, no dependencies)
 │   ├── chat.ts                  # ChatMessage, MessageContent, PromptContent, AttachedFile, ActivePermission
 │   ├── session.ts               # ChatSession, SessionUpdate (12-type union), SessionInfo, Capabilities
-│   ├── agent.ts                 # AgentConfig, agent settings (Claude/Codex/Gemini/Custom)
+│   ├── agent.ts                 # AgentConfig, agent settings (Claude/Codex/Gemini/Mistral Vibe/Custom)
 │   └── errors.ts                # AcpError, ProcessError, ErrorInfo
 ├── acp/                         # ACP protocol (SDK dependency confined here)
 │   ├── acp-client.ts            # Process lifecycle, UI-facing API (AcpClient class)
@@ -323,6 +323,7 @@ interface ISettingsAccess {
 - Claude Code: `@agentclientprotocol/claude-agent-acp` (ANTHROPIC_API_KEY)
 - Codex: `@zed-industries/codex-acp` (OPENAI_API_KEY)
 - Gemini CLI: `@google/gemini-cli` (GEMINI_API_KEY)
+- Mistral Vibe: `mistral-vibe` (MISTRAL_API_KEY)
 - Custom: Any ACP-compatible agent
 
 ---
