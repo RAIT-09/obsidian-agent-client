@@ -93,10 +93,12 @@ export interface CodexAgentSettings extends BaseAgentSettings {
  * Configuration for Mistral Vibe agent.
  *
  * Extends base settings with Mistral-specific requirements.
+ * The API key (MISTRAL_API_KEY) is stored in Obsidian's secret storage
+ * and referenced by ID. Empty string means no API key is configured.
  */
 export interface MistralVibeAgentSettings extends BaseAgentSettings {
-	/** Mistral API key (MISTRAL_API_KEY) */
-	apiKey: string;
+	/** Secret storage ID containing the Mistral API key (MISTRAL_API_KEY) */
+	apiKeySecretId: string;
 }
 
 /**

@@ -172,9 +172,9 @@ export function buildAgentConfigWithApiKey(
 		const mistralSettings = agentSettings as MistralVibeAgentSettings;
 		return {
 			...baseConfig,
-			env: {
-				...baseConfig.env,
-				MISTRAL_API_KEY: mistralSettings.apiKey,
+			apiKey: {
+				secretId: mistralSettings.apiKeySecretId,
+				envVarName: "MISTRAL_API_KEY",
 			},
 		};
 	}

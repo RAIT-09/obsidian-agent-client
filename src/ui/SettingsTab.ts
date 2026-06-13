@@ -1235,17 +1235,20 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(sectionEl)
 			.setName("API key")
 			.setDesc(
-				"Mistral API key. Required if not logging in with a Mistral account. (Stored as plain text)",
+				"Mistral API key. Required if not logging in with a Mistral account. Select from Obsidian's Keychain or create a new secret.",
 			)
-			.addText((text) => {
-				text.setPlaceholder("Enter your Mistral API key")
-					.setValue(mistralVibe.apiKey)
+			.addComponent((el) =>
+				new SecretComponent(this.app, el)
+					.setValue(mistralVibe.apiKeySecretId)
 					.onChange(async (value) => {
-						this.plugin.settings.mistralVibe.apiKey = value.trim();
-						await this.plugin.saveSettings();
-					});
-				text.inputEl.type = "password";
-			});
+						await this.plugin.settingsService.updateSettings({
+							mistralVibe: {
+								...this.plugin.settings.mistralVibe,
+								apiKeySecretId: value,
+							},
+						});
+					}),
+			);
 
 		const vibePathSetting = new Setting(sectionEl)
 			.setName("Path")

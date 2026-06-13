@@ -164,7 +164,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	mistralVibe: {
 		id: "mistral-vibe",
 		displayName: "Mistral Vibe",
-		apiKey: "",
+		apiKeySecretId: "",
 		command: "vibe-acp",
 		args: [],
 		env: [],
@@ -1022,7 +1022,16 @@ export default class AgentClientPlugin extends Plugin {
 			mistralVibe: {
 				id: D.mistralVibe.id,
 				displayName: str(rmv.displayName, D.mistralVibe.displayName),
-				apiKey: str(rmv.apiKey, D.mistralVibe.apiKey),
+				apiKeySecretId: this.migrateLegacyApiKey(
+					"mistral-api-key",
+					"agent-client-mistral-api-key",
+					str(rmv.apiKeySecretId, D.mistralVibe.apiKeySecretId),
+					str(rmv.apiKey, ""),
+					"Mistral Vibe",
+					() => {
+						migratedSecrets = true;
+					},
+				),
 				command: str(rmv.command, "") || D.mistralVibe.command,
 				args: sanitizeArgs(rmv.args),
 				env: normalizeEnvVars(rmv.env),
