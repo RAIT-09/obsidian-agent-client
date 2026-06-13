@@ -93,15 +93,20 @@ export function resolveCommandPath(command: string): Promise<string | null> {
 				["-l", "-c", `which '${escaped}'`],
 				{ timeout: 5000 },
 				(err, stdout) => {
+					const fallback = () => {
+						findInKnownPaths(trimmed).then(resolve, () =>
+							resolve(null),
+						);
+					};
 					if (err) {
-						findInKnownPaths(trimmed).then(resolve, () => resolve(null));
+						fallback();
 						return;
 					}
 					const resolved = stdout.split("\n")[0].trim();
 					if (resolved.length > 0) {
 						resolve(resolved);
 					} else {
-						findInKnownPaths(trimmed).then(resolve, () => resolve(null));
+						fallback();
 					}
 				},
 			);
