@@ -11,6 +11,7 @@ Agent Client supports multiple AI agents. Choose one to start:
 | **[Claude Code](/agent-setup/claude-code)** | Anthropic | via [ACP adapter](https://github.com/agentclientprotocol/claude-agent-acp) |
 | **[Codex](/agent-setup/codex)** | OpenAI | via [Zed's adapter](https://github.com/zed-industries/codex-acp) |
 | **[Gemini CLI](/agent-setup/gemini-cli)** | Google | with `--experimental-acp` option |
+| **[Mistral Vibe](/agent-setup/mistral-vibe)** | Mistral AI | with built-in ACP support (`vibe-acp`) |
 | **[Custom](/agent-setup/custom-agents)** | Various | [Any ACP-compatible agent](https://agentclientprotocol.com/overview/agents) (e.g., OpenCode, Qwen Code, Kiro) |
 
 ## Step 2: Install and Configure the Agent
@@ -20,6 +21,7 @@ Follow the setup guide for your chosen agent:
 - [Claude Code Setup](/agent-setup/claude-code)
 - [Codex Setup](/agent-setup/codex)
 - [Gemini CLI Setup](/agent-setup/gemini-cli)
+- [Mistral Vibe Setup](/agent-setup/mistral-vibe)
 - [Custom Agents](/agent-setup/custom-agents)
 
 Each guide covers installation, path configuration, and authentication.

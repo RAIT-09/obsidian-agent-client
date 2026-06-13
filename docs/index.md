@@ -51,6 +51,7 @@ Agent Client is an Obsidian plugin that brings AI coding agents directly into yo
 | **[Claude Code](https://github.com/anthropics/claude-code)** | Anthropic | via [ACP adapter](https://github.com/agentclientprotocol/claude-agent-acp) |
 | **[Codex](https://github.com/openai/codex)** | OpenAI | via [Zed’s adapter](https://github.com/zed-industries/codex-acp) |
 | **[Gemini CLI](https://github.com/google-gemini/gemini-cli)** | Google | with `--experimental-acp` option |
+| **[Mistral Vibe](https://github.com/mistralai/mistral-vibe)** | Mistral AI | with built-in ACP support (`vibe-acp`) |
 | **Custom** | Various | [Any ACP-compatible agent](https://agentclientprotocol.com/overview/agents) (e.g., OpenCode, Qwen Code, Kiro) |
 
 ### Key Features

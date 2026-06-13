@@ -264,6 +264,12 @@ export function ChatPanel({
 				plugin.settings.gemini.displayName || plugin.settings.gemini.id
 			);
 		}
+		if (activeId === plugin.settings.mistralVibe.id) {
+			return (
+				plugin.settings.mistralVibe.displayName ||
+				plugin.settings.mistralVibe.id
+			);
+		}
 		const custom = plugin.settings.customAgents.find(
 			(agent) => agent.id === activeId,
 		);

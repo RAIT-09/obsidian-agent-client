@@ -147,7 +147,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		env: [],
 	},
 	mistralVibe: {
-		id: "vibe-acp",
+		id: "mistral-vibe",
 		displayName: "Mistral Vibe",
 		apiKey: "",
 		command: "vibe-acp",
