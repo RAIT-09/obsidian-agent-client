@@ -111,6 +111,7 @@ export class FloatingViewContainer implements IChatViewContainer {
 				}}
 				onExpandedChange={(expanded) => {
 					this.isExpandedState = expanded;
+					this.plugin.notifyActiveChatsChanged();
 				}}
 				onContainerRef={(el) => {
 					this.containerRefEl = el;
@@ -120,6 +121,7 @@ export class FloatingViewContainer implements IChatViewContainer {
 
 		// Register with plugin's view registry
 		this.plugin.viewRegistry.register(this);
+		this.plugin.notifyActiveChatsChanged();
 	}
 
 	/**
@@ -127,6 +129,7 @@ export class FloatingViewContainer implements IChatViewContainer {
 	 */
 	unmount(): void {
 		this.plugin.viewRegistry.unregister(this.viewId);
+		this.plugin.notifyActiveChatsChanged();
 
 		if (this.root) {
 			this.root.unmount();
@@ -196,6 +199,10 @@ export class FloatingViewContainer implements IChatViewContainer {
 			this.isExpandedState = true;
 			this.setExpanded?.(true);
 		}
+	}
+
+	isExpanded(): boolean {
+		return this.isExpandedState;
 	}
 
 	collapse(): void {

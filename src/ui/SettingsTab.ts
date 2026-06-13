@@ -5,12 +5,14 @@ import {
 	DropdownComponent,
 	Platform,
 	SecretComponent,
+	Notice,
 } from "obsidian";
 import type AgentClientPlugin from "../plugin";
 import type {
 	CustomAgentSettings,
 	AgentEnvVar,
 	ChatViewLocation,
+	QuickPrompt,
 } from "../plugin";
 import { resolveCommandPath, resolveCommandPathInWsl } from "../utils/paths";
 import {
@@ -117,6 +119,53 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// Mentions
 		// ─────────────────────────────────────────────────────────────────────
 
+		new Setting(containerEl)
+			.setName("Show quick prompts in chat")
+			.setDesc(
+				"Show saved quick prompts above the message box in sidebar, floating, and embedded chats.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showQuickPromptsInChat)
+					.onChange(async (value) => {
+						await this.plugin.settingsService.updateSettings({
+							showQuickPromptsInChat: value,
+						});
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Show recent chats in chat")
+			.setDesc(
+				"Show recent chat shortcuts above the message box on empty chats.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showRecentChatsInChat)
+					.onChange(async (value) => {
+						await this.plugin.settingsService.updateSettings({
+							showRecentChatsInChat: value,
+						});
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Show agent images")
+			.setDesc(
+				"Show configured agent avatar images in chat headers, selectors, embedded chats, buttons, and recent chat shortcuts.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(
+						this.plugin.settings.showAgentImagesInChatInterfaces,
+					)
+					.onChange(async (value) => {
+						await this.plugin.settingsService.updateSettings({
+							showAgentImagesInChatInterfaces: value,
+						});
+					}),
+			);
+
 		new Setting(containerEl).setName("Mentions").setHeading();
 
 		new Setting(containerEl)
@@ -202,6 +251,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.addOption("right-split", "Right pane (split)")
 					.addOption("editor-tab", "Editor area (tabs)")
 					.addOption("editor-split", "Editor area (split)")
+					.addOption("floating", "Floating chat")
 					.setValue(this.plugin.settings.chatViewLocation)
 					.onChange(async (value) => {
 						await this.plugin.settingsService.updateSettings({
@@ -433,6 +483,12 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		// ─────────────────────────────────────────────────────────────────────
 		// Permissions
 		// ─────────────────────────────────────────────────────────────────────
+
+		new Setting(containerEl).setName("Quick prompts").setHeading();
+		new Setting(containerEl).setDesc(
+			"Saved prompts can be shown in chat views, run from the command palette, or referenced from `agent-client` button blocks with `promptName:`.",
+		);
+		this.renderQuickPrompts(containerEl);
 
 		new Setting(containerEl).setName("Permissions").setHeading();
 
@@ -1027,6 +1083,11 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					});
 				text.inputEl.rows = 3;
 			});
+
+		this.renderAvatarSetting(sectionEl, gemini.avatarImage, async (v) => {
+			this.plugin.settings.gemini.avatarImage = v;
+			await this.plugin.saveSettings();
+		});
 	}
 
 	private renderClaudeSettings(sectionEl: HTMLElement) {
@@ -1122,6 +1183,11 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					});
 				text.inputEl.rows = 3;
 			});
+
+		this.renderAvatarSetting(sectionEl, claude.avatarImage, async (v) => {
+			this.plugin.settings.claude.avatarImage = v;
+			await this.plugin.saveSettings();
+		});
 	}
 
 	private renderCodexSettings(sectionEl: HTMLElement) {
@@ -1217,6 +1283,11 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					});
 				text.inputEl.rows = 3;
 			});
+
+		this.renderAvatarSetting(sectionEl, codex.avatarImage, async (v) => {
+			this.plugin.settings.codex.avatarImage = v;
+			await this.plugin.saveSettings();
+		});
 	}
 
 	private renderCustomAgents(containerEl: HTMLElement) {
@@ -1363,6 +1434,11 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					});
 				text.inputEl.rows = 3;
 			});
+
+		this.renderAvatarSetting(blockEl, agent.avatarImage, async (v) => {
+			this.plugin.settings.customAgents[index].avatarImage = v;
+			await this.plugin.saveSettings();
+		});
 	}
 
 	/**
@@ -1538,5 +1614,211 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		}
 
 		return normalizeEnvVars(envVars);
+	}
+
+	private renderQuickPrompts(containerEl: HTMLElement): void {
+		const prompts = this.plugin.settings.quickPrompts;
+		if (prompts.length === 0) {
+			containerEl.createEl("p", {
+				cls: "setting-item-description",
+				text: "No quick prompts saved yet.",
+			});
+		} else {
+			prompts.forEach((prompt, index) => {
+				this.renderQuickPrompt(containerEl, prompt, index);
+			});
+		}
+
+		new Setting(containerEl).addButton((button) => {
+			button
+				.setButtonText("Add quick prompt")
+				.setCta()
+				.onClick(async () => {
+					const next = [
+						...this.plugin.settings.quickPrompts,
+						{
+							name: this.generateQuickPromptName(),
+							prompt: "",
+							usageCount: 0,
+						},
+					];
+					await this.plugin.settingsService.updateSettings({
+						quickPrompts: next,
+					});
+					this.display();
+				});
+		});
+	}
+
+	private renderQuickPrompt(
+		containerEl: HTMLElement,
+		prompt: QuickPrompt,
+		index: number,
+	): void {
+		const blockEl = containerEl.createDiv({
+			cls: "agent-client-quick-prompt-setting",
+		});
+
+		const nameSetting = new Setting(blockEl)
+			.setName("Name")
+			.setDesc("Use this value in button blocks as `promptName:`.")
+			.addText((text) => {
+				text.setPlaceholder("Summarize note")
+					.setValue(prompt.name)
+					.onChange(async (value) => {
+						const name = value.trim();
+						if (!name) return;
+						const duplicate =
+							this.plugin.settings.quickPrompts.some(
+								(item, itemIndex) =>
+									itemIndex !== index && item.name === name,
+							);
+						if (duplicate) {
+							new Notice(
+								`[Agent Client] A quick prompt named "${name}" already exists.`,
+							);
+							text.setValue(prompt.name);
+							return;
+						}
+						const next = [...this.plugin.settings.quickPrompts];
+						next[index] = { ...next[index], name };
+						await this.plugin.settingsService.updateSettings({
+							quickPrompts: next,
+						});
+					});
+			});
+
+		nameSetting.addExtraButton((button) => {
+			button
+				.setIcon("trash")
+				.setTooltip("Delete quick prompt")
+				.onClick(async () => {
+					const next = [...this.plugin.settings.quickPrompts];
+					next.splice(index, 1);
+					await this.plugin.settingsService.updateSettings({
+						quickPrompts: next,
+					});
+					this.display();
+				});
+		});
+
+		new Setting(blockEl)
+			.setName("Prompt")
+			.setDesc("The text inserted into chat or sent by a button block.")
+			.addTextArea((text) => {
+				text.setPlaceholder("Summarize the active note in 3 bullets.")
+					.setValue(prompt.prompt)
+					.onChange(async (value) => {
+						const next = [...this.plugin.settings.quickPrompts];
+						next[index] = { ...next[index], prompt: value };
+						await this.plugin.settingsService.updateSettings({
+							quickPrompts: next,
+						});
+					});
+				text.inputEl.rows = 4;
+			});
+
+		new Setting(blockEl)
+			.setName("Icon")
+			.setDesc(
+				"Lucide icon name (e.g. sparkles, wand-2) or an image URL / vault path. Leave blank for the default sparkles icon.",
+			)
+			.addText((text) => {
+				// eslint-disable-next-line obsidianmd/ui/sentence-case -- Lucide icon id, not UI prose
+				text.setPlaceholder("sparkles")
+					.setValue(prompt.icon ?? "")
+					.onChange(async (value) => {
+						const icon = value.trim();
+						const next = [...this.plugin.settings.quickPrompts];
+						next[index] = {
+							...next[index],
+							icon: icon.length > 0 ? icon : undefined,
+						};
+						await this.plugin.settingsService.updateSettings({
+							quickPrompts: next,
+						});
+					});
+			});
+
+		new Setting(blockEl)
+			.setName("Default agent")
+			.setDesc("Used when a button block does not specify `agent:`.")
+			.addDropdown((dropdown) => {
+				dropdown.addOption("", "(plugin default)");
+				for (const agent of this.plugin.getAvailableAgents()) {
+					dropdown.addOption(agent.id, agent.displayName);
+				}
+				dropdown
+					.setValue(prompt.agentId ?? "")
+					.onChange(async (value) => {
+						const next = [...this.plugin.settings.quickPrompts];
+						next[index] = {
+							...next[index],
+							agentId: value.length > 0 ? value : undefined,
+						};
+						await this.plugin.settingsService.updateSettings({
+							quickPrompts: next,
+						});
+					});
+			});
+		new Setting(blockEl)
+			.setName("Hide after click")
+			.setDesc(
+				"Hide this chip once it is used, for the current chat view. Reopening the chat restores it.",
+			)
+			.addToggle((toggle) => {
+				toggle
+					.setValue(prompt.hideAfterClick ?? false)
+					.onChange(async (value) => {
+						const next = [...this.plugin.settings.quickPrompts];
+						next[index] = {
+							...next[index],
+							hideAfterClick: value || undefined,
+						};
+						await this.plugin.settingsService.updateSettings({
+							quickPrompts: next,
+						});
+					});
+			});
+	}
+
+	private generateQuickPromptName(): string {
+		const base = "New prompt";
+		const existing = new Set(
+			this.plugin.settings.quickPrompts.map((prompt) => prompt.name),
+		);
+		if (!existing.has(base)) return base;
+		let counter = 2;
+		let candidate = `${base} ${counter}`;
+		while (existing.has(candidate)) {
+			counter += 1;
+			candidate = `${base} ${counter}`;
+		}
+		return candidate;
+	}
+
+	/**
+	 * Shared avatar field rendered at the bottom of every agent section.
+	 */
+	private renderAvatarSetting(
+		sectionEl: HTMLElement,
+		currentValue: string | undefined,
+		onChange: (value: string | undefined) => Promise<void>,
+	): void {
+		new Setting(sectionEl)
+			.setName("Avatar image")
+			.setDesc(
+				"URL or vault path to an image. Used by embedded `agent-client` chat blocks and quick-action buttons.",
+			)
+			.addText((text) => {
+				text.setPlaceholder("https://example.com/avatar.png")
+					.setValue(currentValue ?? "")
+					.onChange(async (value) => {
+						const trimmed = value.trim();
+						await onChange(
+							trimmed.length > 0 ? trimmed : undefined,
+						);
+					});
+			});
 	}
 }

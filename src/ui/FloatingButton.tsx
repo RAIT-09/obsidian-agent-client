@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { setIcon } from "obsidian";
 import type AgentClientPlugin from "../plugin";
 import { useSettings } from "../hooks/useSettings";
+
 function clampPosition(
 	x: number,
 	y: number,
@@ -63,13 +64,11 @@ interface FloatingButtonProps {
 
 function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 	const settings = useSettings(plugin);
+	const [hasVisibleChatSurfaces, setHasVisibleChatSurfaces] = useState(() =>
+		plugin.hasVisibleChatSurfaces(),
+	);
 
-	const [showInstanceMenu, setShowInstanceMenu] = useState(false);
-	const instanceMenuRef = useRef<HTMLDivElement>(null);
-
-	// Button / menu size constants
 	const BUTTON_SIZE = 48;
-	const MENU_MIN_WIDTH = 220;
 
 	// Dragging state
 	const [position, setPosition] = useState<{ x: number; y: number } | null>(
@@ -103,33 +102,6 @@ function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 			plugin.app.vault.adapter as VaultAdapterWithResourcePath
 		).getResourcePath?.(img);
 	}, [settings.floatingButtonImage, plugin.app.vault.adapter]);
-
-	// Build display labels with duplicate numbering
-	const allInstances = plugin.getFloatingChatInstances();
-
-	const instanceLabels = useMemo(() => {
-		const views = plugin.viewRegistry.getByType("floating");
-		const entries = views.map((v) => ({
-			viewId: v.viewId,
-			label: v.getDisplayName(),
-		}));
-		const countMap = new Map<string, number>();
-		for (const e of entries) {
-			countMap.set(e.label, (countMap.get(e.label) ?? 0) + 1);
-		}
-		const indexMap = new Map<string, number>();
-		return entries.map((e) => {
-			if ((countMap.get(e.label) ?? 0) > 1) {
-				const idx = (indexMap.get(e.label) ?? 0) + 1;
-				indexMap.set(e.label, idx);
-				return {
-					viewId: e.viewId,
-					label: idx === 1 ? e.label : `${e.label} ${idx}`,
-				};
-			}
-			return e;
-		});
-	}, [plugin.viewRegistry, allInstances]);
 
 	// ============================================================
 	// Dragging Logic
@@ -210,43 +182,34 @@ function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 		return () => window.clearTimeout(timer);
 	}, [position, plugin, settings.floatingButtonPosition]);
 
+	useEffect(() => {
+		const updateActiveChatState = () => {
+			setHasVisibleChatSurfaces(plugin.hasVisibleChatSurfaces());
+		};
+
+		updateActiveChatState();
+		return plugin.onActiveChatsChanged(updateActiveChatState);
+	}, [plugin]);
+
 	// Button click handler
 	const handleButtonClick = useCallback(() => {
 		if (wasDragged.current) return;
 		const instances = plugin.getFloatingChatInstances();
 		if (instances.length === 0) {
-			// No instances, create one and expand
 			plugin.openNewFloatingChat(true);
-		} else if (instances.length === 1) {
-			// Single instance, just expand
-			plugin.expandFloatingChat(instances[0]);
-		} else {
-			// Multiple instances, show menu
-			setShowInstanceMenu(true);
+			return;
 		}
+
+		const focused = plugin.viewRegistry.getFocused();
+		if (focused?.viewType === "floating") {
+			plugin.expandFloatingChat(focused.viewId);
+			return;
+		}
+
+		plugin.expandFloatingChat(instances[instances.length - 1]);
 	}, [plugin]);
 
-	// Close instance menu on outside click
-	useEffect(() => {
-		if (!showInstanceMenu) return;
-
-		const handleClickOutside = (event: MouseEvent) => {
-			if (
-				instanceMenuRef.current &&
-				!instanceMenuRef.current.contains(event.target as Node)
-			) {
-				setShowInstanceMenu(false);
-			}
-		};
-
-		const doc = activeDocument;
-		doc.addEventListener("mousedown", handleClickOutside);
-		return () => {
-			doc.removeEventListener("mousedown", handleClickOutside);
-		};
-	}, [showInstanceMenu]);
-
-	if (!settings.enableFloatingChat) return null;
+	if (!settings.enableFloatingChat || hasVisibleChatSurfaces) return null;
 
 	const buttonClassName = [
 		"agent-client-floating-button",
@@ -257,95 +220,31 @@ function FloatingButtonComponent({ plugin }: FloatingButtonProps) {
 		.join(" ");
 
 	return (
-		<>
-			<div
-				className={buttonClassName}
-				onMouseDown={handleMouseDown}
-				onMouseUp={handleButtonClick}
-				style={
-					position
-						? {
-								left: position.x,
-								top: position.y,
-								right: "auto",
-								bottom: "auto",
-							}
-						: undefined
-				}
-			>
-				{floatingButtonImageSrc ? (
-					<img src={floatingButtonImageSrc} alt="Open chat" />
-				) : (
-					<div
-						className="agent-client-floating-button-fallback"
-						ref={(el) => {
-							if (el) setIcon(el, "bot-message-square");
-						}}
-					/>
-				)}
-			</div>
-			{showInstanceMenu && (
+		<div
+			className={buttonClassName}
+			onMouseDown={handleMouseDown}
+			onMouseUp={handleButtonClick}
+			style={
+				position
+					? {
+							left: position.x,
+							top: position.y,
+							right: "auto",
+							bottom: "auto",
+						}
+					: undefined
+			}
+		>
+			{floatingButtonImageSrc ? (
+				<img src={floatingButtonImageSrc} alt="Open chat" />
+			) : (
 				<div
-					ref={instanceMenuRef}
-					className="agent-client-floating-instance-menu"
-					style={
-						position
-							? {
-									bottom:
-										window.innerHeight - position.y + 10,
-									...(position.x + MENU_MIN_WIDTH >
-									window.innerWidth
-										? {
-												right:
-													window.innerWidth -
-													(position.x + BUTTON_SIZE),
-												left: "auto",
-												top: "auto",
-											}
-										: {
-												left: position.x,
-												right: "auto",
-												top: "auto",
-											}),
-								}
-							: undefined
-					}
-				>
-					<div className="agent-client-floating-instance-menu-header">
-						Select session to open
-					</div>
-					{instanceLabels.map(({ viewId: id, label }) => (
-						<div
-							key={id}
-							className="agent-client-floating-instance-menu-item"
-							onClick={() => {
-								plugin.expandFloatingChat(id);
-								plugin.viewRegistry.setFocused(id);
-								setShowInstanceMenu(false);
-							}}
-						>
-							<span className="agent-client-floating-instance-menu-label">
-								{label}
-							</span>
-							{instanceLabels.length > 1 && (
-								<button
-									className="agent-client-floating-instance-menu-close"
-									onClick={(e) => {
-										e.stopPropagation();
-										plugin.closeFloatingChat(id);
-										if (instanceLabels.length <= 2) {
-											setShowInstanceMenu(false);
-										}
-									}}
-									title="Close session"
-								>
-									×
-								</button>
-							)}
-						</div>
-					))}
-				</div>
+					className="agent-client-floating-button-fallback"
+					ref={(el) => {
+						if (el) setIcon(el, "bot-message-square");
+					}}
+				/>
 			)}
-		</>
+		</div>
 	);
 }

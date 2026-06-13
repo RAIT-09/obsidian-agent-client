@@ -353,6 +353,7 @@ export class ChatView extends ItemView implements IChatViewContainer {
 
 		// Register with plugin's view registry
 		this.plugin.viewRegistry.register(this);
+		this.plugin.notifyActiveChatsChanged();
 
 		return Promise.resolve();
 	}
@@ -362,6 +363,7 @@ export class ChatView extends ItemView implements IChatViewContainer {
 
 		// Unregister from plugin's view registry
 		this.plugin.viewRegistry.unregister(this.viewId);
+		this.plugin.notifyActiveChatsChanged();
 
 		// Cleanup is handled by React useEffect cleanup in ChatPanel
 		// which performs auto-export and closeSession
