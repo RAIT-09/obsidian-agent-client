@@ -1,10 +1,48 @@
 import * as React from "react";
+import { useRef, useEffect } from "react";
 import { setIcon } from "obsidian";
 import type { AttachedFile } from "../../types/chat";
 
 interface AttachmentStripProps {
 	files: AttachedFile[];
 	onRemove: (id: string) => void;
+}
+
+/** Remove button with a stable ref so setIcon runs once on mount. */
+function RemoveButton({
+	fileId,
+	onRemove,
+}: {
+	fileId: string;
+	onRemove: (id: string) => void;
+}) {
+	const ref = useRef<HTMLButtonElement>(null);
+	useEffect(() => {
+		if (ref.current) setIcon(ref.current, "x");
+	}, []);
+	return (
+		<button
+			ref={ref}
+			className="agent-client-attachment-preview-remove"
+			onClick={() => onRemove(fileId)}
+			title="Remove attachment"
+			type="button"
+		/>
+	);
+}
+
+/** File icon with a stable ref so setIcon runs once on mount. */
+function FileIcon() {
+	const ref = useRef<HTMLSpanElement>(null);
+	useEffect(() => {
+		if (ref.current) setIcon(ref.current, "file");
+	}, []);
+	return (
+		<span
+			ref={ref}
+			className="agent-client-attachment-preview-file-icon"
+		/>
+	);
 }
 
 /**
@@ -30,26 +68,13 @@ export function AttachmentStrip({ files, onRemove }: AttachmentStripProps) {
 						/>
 					) : (
 						<div className="agent-client-attachment-preview-file">
-							<span
-								className="agent-client-attachment-preview-file-icon"
-								ref={(el) => {
-									if (el) setIcon(el, "file");
-								}}
-							/>
+							<FileIcon />
 							<span className="agent-client-attachment-preview-file-name">
 								{file.name ?? "file"}
 							</span>
 						</div>
 					)}
-					<button
-						className="agent-client-attachment-preview-remove"
-						onClick={() => onRemove(file.id)}
-						title="Remove attachment"
-						type="button"
-						ref={(el) => {
-							if (el) setIcon(el, "x");
-						}}
-					/>
+					<RemoveButton fileId={file.id} onRemove={onRemove} />
 				</div>
 			))}
 		</div>

@@ -112,12 +112,10 @@ export class PermissionManager {
 
 		const normalizedOptions: PermissionOption[] = params.options.map(
 			(option) => {
-				const normalizedKind =
-					option.kind === "reject_always"
-						? "reject_once"
-						: option.kind;
-				const kind: PermissionOption["kind"] = normalizedKind
-					? normalizedKind
+				// Use the agent-provided kind as-is. Only infer from the
+				// option name when a non-conforming agent omits kind.
+				const kind: PermissionOption["kind"] = option.kind
+					? option.kind
 					: option.name.toLowerCase().includes("allow")
 						? "allow_once"
 						: "reject_once";

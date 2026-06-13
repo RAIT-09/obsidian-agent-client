@@ -7,6 +7,113 @@ If your plugin does not need CSS, delete this file.
 
 */
 
+/* ===== Session Manager ===== */
+
+.agent-client-session-manager {
+	padding: 4px 0;
+}
+
+.agent-client-session-manager-empty {
+	padding: 16px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	text-align: center;
+}
+
+.agent-client-session-manager .tree-item-self {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding-inline-start: 12px;
+}
+
+.agent-client-session-item-more {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	opacity: 0;
+	cursor: pointer;
+	color: var(--text-muted);
+	margin-left: auto;
+	/* Reset <button> browser defaults so the icon matches the prior <div> */
+	background: none;
+	border: none;
+	padding: 0;
+	font: inherit;
+}
+
+.agent-client-session-manager .tree-item-self:hover .agent-client-session-item-more {
+	opacity: 1;
+}
+
+.agent-client-session-item-more:hover {
+	color: var(--text-normal);
+}
+
+.agent-client-session-item-more svg {
+	width: 14px;
+	height: 14px;
+}
+
+.agent-client-session-item-text {
+	min-width: 0;
+	flex: 1;
+}
+
+.agent-client-session-item-title {
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-semibold);
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.agent-client-session-item-agent {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.agent-client-session-status-icon {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+}
+
+.agent-client-session-status-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.agent-client-session-status-ready svg {
+	color: var(--text-muted);
+}
+
+.agent-client-session-status-busy svg {
+	color: var(--text-accent);
+	animation: agent-client-spin 1.5s linear infinite;
+}
+
+.agent-client-session-status-permission svg {
+	color: var(--color-yellow);
+}
+
+.agent-client-session-status-error svg {
+	color: var(--color-red);
+}
+
+.agent-client-session-status-disconnected svg {
+	color: var(--text-faint);
+}
+
+@keyframes agent-client-spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
 /* ===== Settings Tab Documentation Link ===== */
 .agent-client-doc-link {
 	padding: 12px 16px;
@@ -306,82 +413,85 @@ If your plugin does not need CSS, delete this file.
 	font-weight: bold;
 }
 
-/* Permission Request */
+/* ===== Permission Request (vertical option list) ===== */
+/* Mirrors .agent-client-tool-call-diff: full-bleed block inside the
+   tool call with a 1px border container. Kind colors live on the icon,
+   not the button background (theme compatibility). */
 .agent-client-message-permission-request {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	justify-content: flex-end;
-	padding: 6px 0;
-	margin-top: 4px;
+	flex-direction: column;
+	margin-top: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	overflow: hidden;
 }
 
-/* ===== Permission Request Buttons ===== */
-.agent-client-permission-option {
-	padding: 8px 16px !important;
-	border: 1px solid var(--background-modifier-border) !important;
-	border-radius: 6px !important;
-	background-color: var(--background-primary) !important;
-	color: var(--text-normal) !important;
+.agent-client-message-permission-request .agent-client-permission-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 12px;
+	border: none;
+	border-radius: 0;
+	background-color: var(--background-primary);
+	box-shadow: none;
+	color: var(--text-normal);
 	cursor: pointer;
 	font-size: 13px;
 	font-weight: 500;
-	transition: all 0.2s ease;
-	min-width: 80px;
-	text-align: center;
-	opacity: 1;
+	text-align: left;
 }
 
-.agent-client-permission-option.agent-client-selected {
-	background-color: var(--interactive-accent) !important;
-	color: white !important;
-	font-weight: 600;
+.agent-client-message-permission-request
+	.agent-client-permission-option
+	+ .agent-client-permission-option {
+	border-top: 1px solid var(--background-modifier-border);
 }
 
-.agent-client-permission-option.agent-client-disabled {
-	background-color: var(--background-modifier-border) !important;
-	color: var(--text-muted) !important;
-	cursor: not-allowed !important;
+.agent-client-message-permission-request .agent-client-permission-option:hover {
+	background-color: var(--background-modifier-hover);
 }
 
-.agent-client-permission-option.agent-client-disabled:not(
-		.agent-client-selected
-	) {
-	opacity: 0.5;
+.agent-client-message-permission-request
+	.agent-client-permission-option:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
 }
 
-/* Special kinds */
-.agent-client-permission-option.agent-client-permission-kind-allow_always:not(
-		.agent-client-selected
-	):not(.agent-client-disabled) {
-	background-color: var(--color-green) !important;
-	color: white !important;
-	border-color: var(--color-green) !important;
+.agent-client-permission-option-icon {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
 }
 
-.agent-client-permission-option.agent-client-permission-kind-reject_once:not(
-		.agent-client-selected
-	):not(.agent-client-disabled) {
-	background-color: var(--color-red) !important;
-	color: white !important;
-	border-color: var(--color-red) !important;
+.agent-client-permission-option-icon svg {
+	width: 14px;
+	height: 14px;
 }
 
-.agent-client-permission-option.agent-client-permission-kind-allow_once:not(
-		.agent-client-selected
-	):not(.agent-client-disabled) {
-	background-color: var(--color-orange) !important;
-	color: white !important;
-	border-color: var(--color-orange) !important;
+.agent-client-permission-option-label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-/* Normal option button hover (no kind specified) */
-.agent-client-permission-option:not(
-		.agent-client-permission-kind-allow_always
-	):not(.agent-client-permission-kind-reject_once):not(
-		.agent-client-permission-kind-allow_once
-	):not(.agent-client-disabled):not(.agent-client-selected):hover {
-	background-color: var(--background-modifier-hover) !important;
+/* Kind colors (icon only) */
+.agent-client-permission-kind-allow_always
+	.agent-client-permission-option-icon {
+	color: var(--color-green);
+}
+
+.agent-client-permission-kind-allow_once .agent-client-permission-option-icon {
+	color: var(--color-orange);
+}
+
+.agent-client-permission-kind-reject_once .agent-client-permission-option-icon,
+.agent-client-permission-kind-reject_always
+	.agent-client-permission-option-icon {
+	color: var(--color-red);
 }
 
 /* ===== Chat View Components ===== */
@@ -392,6 +502,11 @@ If your plugin does not need CSS, delete this file.
 	padding-left: 0;
 	padding-right: 0;
 	overflow: hidden;
+}
+
+/* Hide stale inner view-header title (updateHeader() doesn't refresh it); visibility:hidden preserves flex layout. */
+.workspace-leaf-content[data-type="agent-client-chat-view"] > .view-header .view-header-title-container {
+	visibility: hidden;
 }
 
 /* Main container */
@@ -852,12 +967,18 @@ If your plugin does not need CSS, delete this file.
 	min-width: 0;
 }
 
-/* Mode Selector */
-.agent-client-mode-selector {
+/* Toolbar dropdown — opens an Obsidian Menu on click. */
+
+.agent-client-toolbar-dropdown {
 	display: inline-flex;
 	align-items: center;
-	padding: 0 4px;
-	border-radius: 4px;
+	padding: 0 4px !important;
+	margin: 0 !important;
+	border: none !important;
+	border-radius: 4px !important;
+	background: transparent !important;
+	background-color: transparent !important;
+	box-shadow: none !important;
 	cursor: pointer;
 	transition: background-color 0.1s ease;
 	height: 20px;
@@ -867,183 +988,50 @@ If your plugin does not need CSS, delete this file.
 	overflow: hidden;
 }
 
-.agent-client-mode-selector:hover {
-	background-color: var(--background-modifier-hover);
+.agent-client-toolbar-dropdown:hover {
+	background-color: var(--background-modifier-hover) !important;
 }
 
-.agent-client-mode-selector-icon {
+.agent-client-toolbar-dropdown:focus {
+	background: transparent !important;
+	box-shadow: none !important;
+	outline: none;
+}
+
+.agent-client-toolbar-dropdown-label-area {
+	display: grid;
+	max-width: 100px;
+	overflow: hidden;
+}
+
+.agent-client-toolbar-dropdown-label-area > * {
+	grid-area: 1 / 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-align: left;
+	font-size: 11px;
+}
+
+.agent-client-toolbar-dropdown-sizer {
+	visibility: hidden;
+}
+
+.agent-client-toolbar-dropdown-label {
+	color: var(--text-faint);
+}
+
+.agent-client-toolbar-dropdown-chevron {
 	display: flex;
 	align-items: center;
 	pointer-events: none;
 	color: var(--text-faint);
 	margin-left: 2px;
-	order: 2;
 }
 
-.agent-client-mode-selector-icon svg {
+.agent-client-toolbar-dropdown-chevron svg {
 	width: 12px;
 	height: 12px;
-}
-
-.agent-client-mode-selector select.dropdown {
-	padding: 0 !important;
-	margin: 0 !important;
-	border: none !important;
-	border-radius: 0 !important;
-	background: none !important;
-	background-color: transparent !important;
-	background-image: none !important;
-	box-shadow: none !important;
-	color: var(--text-faint) !important;
-	font-size: 11px !important;
-	cursor: pointer !important;
-	outline: none !important;
-	appearance: none !important;
-	-webkit-appearance: none !important;
-	-moz-appearance: none !important;
-	order: 1;
-	max-width: 100px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.agent-client-mode-selector select.dropdown:hover,
-.agent-client-mode-selector select.dropdown:focus {
-	color: var(--text-faint) !important;
-	background-color: transparent !important;
-	box-shadow: none !important;
-}
-
-/* Model Selector (experimental) */
-.agent-client-model-selector {
-	display: inline-flex;
-	align-items: center;
-	padding: 0 4px;
-	border-radius: 4px;
-	cursor: pointer;
-	transition: background-color 0.1s ease;
-	height: 20px;
-	max-width: 120px;
-	min-width: 0;
-	flex-shrink: 1;
-	overflow: hidden;
-}
-
-.agent-client-model-selector:hover {
-	background-color: var(--background-modifier-hover);
-}
-
-.agent-client-model-selector-icon {
-	display: flex;
-	align-items: center;
-	pointer-events: none;
-	color: var(--text-faint);
-	margin-left: 2px;
-	order: 2;
-}
-
-.agent-client-model-selector-icon svg {
-	width: 12px;
-	height: 12px;
-}
-
-.agent-client-model-selector select.dropdown {
-	padding: 0 !important;
-	margin: 0 !important;
-	border: none !important;
-	border-radius: 0 !important;
-	background: none !important;
-	background-color: transparent !important;
-	background-image: none !important;
-	box-shadow: none !important;
-	color: var(--text-faint) !important;
-	font-size: 11px !important;
-	cursor: pointer !important;
-	outline: none !important;
-	appearance: none !important;
-	-webkit-appearance: none !important;
-	-moz-appearance: none !important;
-	order: 1;
-	max-width: 100px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.agent-client-model-selector select.dropdown:hover,
-.agent-client-model-selector select.dropdown:focus {
-	color: var(--text-faint) !important;
-	background-color: transparent !important;
-	box-shadow: none !important;
-}
-
-/* Config option selector (configOptions API - supersedes mode/model selectors) */
-
-.agent-client-config-options-container {
-	display: contents;
-}
-
-.agent-client-config-selector {
-	display: inline-flex;
-	align-items: center;
-	padding: 0 4px;
-	border-radius: 4px;
-	cursor: pointer;
-	transition: background-color 0.1s ease;
-	height: 20px;
-	max-width: 120px;
-	min-width: 0;
-	flex-shrink: 1;
-	overflow: hidden;
-}
-
-.agent-client-config-selector:hover {
-	background-color: var(--background-modifier-hover);
-}
-
-.agent-client-config-selector-icon {
-	display: flex;
-	align-items: center;
-	pointer-events: none;
-	color: var(--text-faint);
-	margin-left: 2px;
-	order: 2;
-}
-
-.agent-client-config-selector-icon svg {
-	width: 12px;
-	height: 12px;
-}
-
-.agent-client-config-selector select.dropdown {
-	padding: 0 !important;
-	margin: 0 !important;
-	border: none !important;
-	border-radius: 0 !important;
-	background: none !important;
-	background-color: transparent !important;
-	background-image: none !important;
-	box-shadow: none !important;
-	color: var(--text-faint) !important;
-	font-size: 11px !important;
-	cursor: pointer !important;
-	outline: none !important;
-	appearance: none !important;
-	-webkit-appearance: none !important;
-	-moz-appearance: none !important;
-	order: 1;
-	max-width: 100px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.agent-client-config-selector select.dropdown:hover,
-.agent-client-config-selector select.dropdown:focus {
-	color: var(--text-faint) !important;
-	background-color: transparent !important;
-	box-shadow: none !important;
 }
 
 /* Context Usage Indicator */

@@ -7,6 +7,10 @@ import {
 import * as semver from "semver";
 import { ChatView, VIEW_TYPE_CHAT } from "./ui/ChatView";
 import {
+	SessionManagerView,
+	VIEW_TYPE_SESSION_MANAGER,
+} from "./ui/SessionManagerView";
+import {
 	createFloatingChat,
 	FloatingViewContainer,
 } from "./ui/FloatingChatView";
@@ -41,7 +45,7 @@ import {
 	CustomAgentSettings,
 } from "./types/agent";
 import type { SavedSessionInfo } from "./types/session";
-import { initializeLogger } from "./utils/logger";
+import { initializeLogger, getLogger } from "./utils/logger";
 
 // Re-export for backward compatibility
 export type { AgentEnvVar, MistralVibeAgentSettings, CustomAgentSettings };
@@ -78,6 +82,17 @@ export interface AgentClientPluginSettings {
 	autoMentionActiveNote: boolean;
 	/** Show OS system notifications on response completion and permission requests */
 	enableSystemNotifications: boolean;
+	/** Prompt injection settings for Obsidian-flavored Markdown guidance */
+	promptInjection: {
+		/** Master toggle for prompt injection */
+		enabled: boolean;
+		/** Inject LaTeX math formatting instructions ($...$ and $$...$$) */
+		latex: boolean;
+		/** Instruct agents to use [[Note Name]] wikilink syntax */
+		wikiLinks: boolean;
+		/** Instruct agents to leave a blank line before Markdown tables */
+		tables: boolean;
+	};
 	debugMode: boolean;
 	nodePath: string;
 	exportSettings: {
@@ -125,7 +140,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	claude: {
 		id: "claude-code-acp",
 		displayName: "Claude Code",
-		apiKey: "",
+		apiKeySecretId: "",
 		command: "claude-agent-acp",
 		args: [],
 		env: [],
@@ -133,7 +148,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	codex: {
 		id: "codex-acp",
 		displayName: "Codex",
-		apiKey: "",
+		apiKeySecretId: "",
 		command: "codex-acp",
 		args: [],
 		env: [],
@@ -141,7 +156,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	gemini: {
 		id: "gemini-cli",
 		displayName: "Gemini CLI",
-		apiKey: "",
+		apiKeySecretId: "",
 		command: "gemini",
 		args: ["--experimental-acp"],
 		env: [],
@@ -159,6 +174,12 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	autoAllowPermissions: false,
 	autoMentionActiveNote: true,
 	enableSystemNotifications: true,
+	promptInjection: {
+		enabled: true,
+		latex: true,
+		wikiLinks: true,
+		tables: true,
+	},
 	debugMode: false,
 	nodePath: "",
 	exportSettings: {
@@ -216,7 +237,17 @@ export default class AgentClientPlugin extends Plugin {
 		// Initialize settings store
 		this.settingsService = createSettingsService(this.settings, this);
 
+		// Detach stale leaves from a previous plugin instance to prevent
+		// "Attempting to register an existing view type" when Obsidian's
+		// hot-reload races onunload/onload (e.g. rapid toggle or npm run dev).
+		this.app.workspace.detachLeavesOfType(VIEW_TYPE_CHAT);
 		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
+
+		this.app.workspace.detachLeavesOfType(VIEW_TYPE_SESSION_MANAGER);
+		this.registerView(
+			VIEW_TYPE_SESSION_MANAGER,
+			(leaf) => new SessionManagerView(leaf, this),
+		);
 
 		const ribbonIconEl = this.addRibbonIcon(
 			"bot-message-square",
@@ -258,6 +289,14 @@ export default class AgentClientPlugin extends Plugin {
 				void this.openNewChatViewWithAgent(
 					this.settings.defaultAgentId,
 				);
+			},
+		});
+
+		this.addCommand({
+			id: "open-session-manager",
+			name: "Open session manager",
+			callback: () => {
+				void this.activateSessionManager();
 			},
 		});
 
@@ -343,7 +382,7 @@ export default class AgentClientPlugin extends Plugin {
 				// Fire and forget - don't block Obsidian from quitting
 				for (const [viewId, client] of this._acpClients) {
 					client.disconnect().catch((error) => {
-						console.warn(
+						getLogger().warn(
 							`[AgentClient] Quit cleanup error for view ${viewId}:`,
 							error,
 						);
@@ -390,6 +429,16 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	/**
+	 * Update auto-allow permission setting on all live AcpClient instances.
+	 * Called when the setting changes at runtime.
+	 */
+	updateAllAutoAllow(autoAllow: boolean): void {
+		for (const client of this._acpClients.values()) {
+			client.updateAutoAllow(autoAllow);
+		}
+	}
+
+	/**
 	 * Remove and disconnect the AcpClient for a specific view.
 	 * Called when a ChatView is closed.
 	 */
@@ -399,7 +448,7 @@ export default class AgentClientPlugin extends Plugin {
 			try {
 				await client.disconnect();
 			} catch (error) {
-				console.warn(
+				getLogger().warn(
 					`[AgentClient] Failed to disconnect client for view ${viewId}:`,
 					error,
 				);
@@ -458,6 +507,34 @@ export default class AgentClientPlugin extends Plugin {
 			await workspace.revealLeaf(leaf);
 			this.focusTextarea(leaf);
 		}
+	}
+
+	async activateSessionManager(): Promise<void> {
+		const { workspace } = this.app;
+
+		const leaves = workspace.getLeavesOfType(VIEW_TYPE_SESSION_MANAGER);
+		if (leaves.length > 0) {
+			await workspace.revealLeaf(leaves[0]);
+			return;
+		}
+
+		const leaf = workspace.getLeftLeaf(false);
+		if (leaf) {
+			await leaf.setViewState({
+				type: VIEW_TYPE_SESSION_MANAGER,
+				active: true,
+			});
+			await workspace.revealLeaf(leaf);
+		}
+	}
+
+	/**
+	 * Close a specific chat view (sidebar or floating).
+	 * Dispatch is via IChatViewContainer.closeContainer(); plugin does not
+	 * need to know the concrete container class.
+	 */
+	closeView(viewId: string): void {
+		this.viewRegistry.get(viewId)?.closeContainer();
 	}
 
 	/**
@@ -552,7 +629,7 @@ export default class AgentClientPlugin extends Plugin {
 	async openNewChatViewWithAgent(agentId: string): Promise<void> {
 		const leaf = this.createNewChatLeaf(true);
 		if (!leaf) {
-			console.warn("[AgentClient] Failed to create new leaf");
+			getLogger().warn("[AgentClient] Failed to create new leaf");
 			return;
 		}
 
@@ -845,6 +922,7 @@ export default class AgentClientPlugin extends Plugin {
 	async loadSettings() {
 		const raw = ((await this.loadData()) ?? {}) as Record<string, unknown>;
 		const D = DEFAULT_SETTINGS;
+		let migratedSecrets = false;
 
 		// Extract agent sub-objects
 		const rc = obj(raw.claude) ?? {};
@@ -882,7 +960,16 @@ export default class AgentClientPlugin extends Plugin {
 			claude: {
 				id: D.claude.id, // Fixed — never from raw
 				displayName: str(rc.displayName, D.claude.displayName),
-				apiKey: str(rc.apiKey, D.claude.apiKey),
+				apiKeySecretId: this.migrateLegacyApiKey(
+					"claude-api-key",
+					"agent-client-claude-api-key",
+					str(rc.apiKeySecretId, D.claude.apiKeySecretId),
+					str(rc.apiKey, ""),
+					"Claude",
+					() => {
+						migratedSecrets = true;
+					},
+				),
 				// Migration: claude.command ← claudeCodeAcpCommandPath (old name)
 				command:
 					str(rc.command, "") ||
@@ -894,7 +981,16 @@ export default class AgentClientPlugin extends Plugin {
 			codex: {
 				id: D.codex.id,
 				displayName: str(rk.displayName, D.codex.displayName),
-				apiKey: str(rk.apiKey, D.codex.apiKey),
+				apiKeySecretId: this.migrateLegacyApiKey(
+					"openai-api-key",
+					"agent-client-openai-api-key",
+					str(rk.apiKeySecretId, D.codex.apiKeySecretId),
+					str(rk.apiKey, ""),
+					"Codex",
+					() => {
+						migratedSecrets = true;
+					},
+				),
 				command: str(rk.command, "") || D.codex.command,
 				args: sanitizeArgs(rk.args),
 				env: normalizeEnvVars(rk.env),
@@ -902,7 +998,16 @@ export default class AgentClientPlugin extends Plugin {
 			gemini: {
 				id: D.gemini.id,
 				displayName: str(rg.displayName, D.gemini.displayName),
-				apiKey: str(rg.apiKey, D.gemini.apiKey),
+				apiKeySecretId: this.migrateLegacyApiKey(
+					"gemini-api-key",
+					"agent-client-gemini-api-key",
+					str(rg.apiKeySecretId, D.gemini.apiKeySecretId),
+					str(rg.apiKey, ""),
+					"Gemini",
+					() => {
+						migratedSecrets = true;
+					},
+				),
 				// Migration: gemini.command ← geminiCommandPath (old name)
 				command:
 					str(rg.command, "") ||
@@ -936,6 +1041,15 @@ export default class AgentClientPlugin extends Plugin {
 				raw.enableSystemNotifications,
 				D.enableSystemNotifications,
 			),
+			promptInjection: (() => {
+				const rp = obj(raw.promptInjection) ?? {};
+				return {
+					enabled: bool(rp.enabled, D.promptInjection.enabled),
+					latex: bool(rp.latex, D.promptInjection.latex),
+				wikiLinks: bool(rp.wikiLinks, D.promptInjection.wikiLinks),
+					tables: bool(rp.tables, D.promptInjection.tables),
+				};
+			})(),
 			debugMode: bool(raw.debugMode, D.debugMode),
 			nodePath: str(raw.nodePath, D.nodePath),
 			exportSettings: {
@@ -1042,6 +1156,10 @@ export default class AgentClientPlugin extends Plugin {
 		};
 
 		this.ensureDefaultAgentId();
+
+		if (migratedSecrets) {
+			await this.saveSettings();
+		}
 	}
 
 	async saveSettings() {
@@ -1050,6 +1168,80 @@ export default class AgentClientPlugin extends Plugin {
 
 	async saveSettingsAndNotify(nextSettings: AgentClientPluginSettings) {
 		await this.settingsService.updateSettings(nextSettings);
+	}
+
+	/**
+	 * Migrate legacy plaintext apiKey (v0.10.x) to secretStorage.
+	 *
+	 * Returns the secretId to use for this agent.
+	 *
+	 * Behavior:
+	 * - If apiKeySecretId is already set, return it as-is. If a legacy
+	 *   plaintext apiKey still lingers in data.json (orphaned from prior
+	 *   experimental state), trigger onMigrate to schedule a save that
+	 *   cleans it up.
+	 * - If legacy apiKey is empty, return empty string (no migration needed).
+	 * - Otherwise, migrate to secretStorage:
+	 *   - Use defaultSecretId (e.g. "claude-api-key") for cross-plugin sharing.
+	 *   - On collision (defaultSecretId exists with a different value, e.g.
+	 *     from another plugin), fall back to fallbackSecretId
+	 *     (e.g. "agent-client-claude-api-key") to preserve the user's key
+	 *     and notify them.
+	 *
+	 * This method is for upgrading from v0.10.x or experimental builds and
+	 * can be removed in a future major version once we're confident no
+	 * users have legacy plaintext apiKey fields in data.json.
+	 */
+	private migrateLegacyApiKey(
+		defaultSecretId: string,
+		fallbackSecretId: string,
+		currentSecretId: string,
+		legacyApiKey: string,
+		agentLabel: string,
+		onMigrate: () => void,
+	): string {
+		const trimmed = legacyApiKey.trim();
+
+		// Already migrated
+		if (currentSecretId.length > 0) {
+			// Clean up orphaned plaintext apiKey if still in data.json
+			if (trimmed.length > 0) {
+				onMigrate();
+			}
+			return currentSecretId;
+		}
+
+		if (trimmed.length === 0) {
+			return "";
+		}
+
+		const existing = this.app.secretStorage.getSecret(defaultSecretId);
+
+		if (existing === null) {
+			// No collision — create the secret with the preferred ID
+			this.app.secretStorage.setSecret(defaultSecretId, trimmed);
+			new Notice(
+				`[Agent Client] Your ${agentLabel} API key has been migrated to Obsidian's Keychain as "${defaultSecretId}".`,
+			);
+			onMigrate();
+			return defaultSecretId;
+		}
+
+		if (existing === trimmed) {
+			// Idempotent re-migration (same value already stored)
+			onMigrate();
+			return defaultSecretId;
+		}
+
+		// Collision: defaultSecretId exists with a different value (likely
+		// another plugin). Fall back to a plugin-prefixed ID to preserve
+		// the user's key without overwriting other plugins' secrets.
+		this.app.secretStorage.setSecret(fallbackSecretId, trimmed);
+		new Notice(
+			`[Agent Client] "${defaultSecretId}" was already in use. Your ${agentLabel} API key was migrated to "${fallbackSecretId}". You can rename it in Obsidian's Keychain settings.`,
+		);
+		onMigrate();
+		return fallbackSecretId;
 	}
 
 	/**

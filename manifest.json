@@ -1,8 +1,8 @@
 {
 	"id": "agent-client",
 	"name": "Agent Client",
-	"version": "0.10.6",
-	"minAppVersion": "1.7.2",
+	"version": "0.11.0-preview.1",
+	"minAppVersion": "1.11.4",
 	"description": "Chat with AI agents via the Agent Client Protocol directly from your vault.",
 	"author": "RAIT-09",
 	"authorUrl": "https://github.com/RAIT-09",

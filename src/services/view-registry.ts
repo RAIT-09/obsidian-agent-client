@@ -29,6 +29,28 @@ import { getLogger } from "../utils/logger";
 export type ChatViewType = "sidebar" | "floating";
 
 /**
+ * Simplified session status for display in session lists.
+ * Derived from session state, permission state, and sending state.
+ */
+export type SessionStatus =
+	| "ready"
+	| "busy"
+	| "permission"
+	| "error"
+	| "disconnected";
+
+/**
+ * Reactive snapshot of the view registry for `useSyncExternalStore`.
+ * Includes both the view list and the focused view ID so that consumers
+ * (e.g. SessionManagerView) can derive UI state from a single source —
+ * mirrors SettingsService's whole-state snapshot pattern.
+ */
+export interface ViewRegistrySnapshot {
+	views: IChatViewContainer[];
+	focusedId: string | null;
+}
+
+/**
  * Interface that all chat view containers must implement.
  * Enables the plugin to manage views uniformly regardless of their implementation.
  */
@@ -137,6 +159,42 @@ export interface IChatViewContainer {
 	cancelOperation(): Promise<void>;
 
 	// ============================================================
+	// Session Info
+	// ============================================================
+
+	/**
+	 * Get the current session status for display in session lists.
+	 * Combines session state and permission status into a simplified status.
+	 */
+	getSessionStatus(): SessionStatus;
+
+	/**
+	 * Get the session title for display in session lists.
+	 * Returns "New session" before the first message, then the first user message (truncated).
+	 */
+	getSessionTitle(): string;
+
+	/**
+	 * Get the current ACP session ID.
+	 * Returns null if no session has been created yet.
+	 */
+	getSessionId(): string | null;
+
+	/**
+	 * Close this view permanently.
+	 * - Sidebar (`ChatView`): detaches the workspace leaf
+	 * - Floating (`FloatingViewContainer`): unmounts the React root
+	 * Implementations are responsible for triggering proper cleanup
+	 * (onClose / unmount), which transitively unregisters from the registry.
+	 *
+	 * NOTE: Named `closeContainer` (not `close`) to avoid colliding with
+	 * Obsidian's internal `View.close()` — invoked by `leaf.detach()` during
+	 * cleanup. Overriding it caused infinite recursion in ChatView, since
+	 * our impl calls `leaf.detach()` which calls `view.close()` again.
+	 */
+	closeContainer(): void;
+
+	// ============================================================
 	// Container Access
 	// ============================================================
 
@@ -151,6 +209,8 @@ export class ChatViewRegistry {
 	private views = new Map<string, IChatViewContainer>();
 	private focusedViewId: string | null = null;
 	private logger = getLogger();
+	private changeListeners = new Set<() => void>();
+	private snapshotCache: ViewRegistrySnapshot | null = null;
 
 	// ============================================================
 	// Registration
@@ -166,9 +226,13 @@ export class ChatViewRegistry {
 		);
 		this.views.set(view.viewId, view);
 
-		// First view becomes focused by default
+		// First view becomes focused by default. setFocused() already calls
+		// notifyChange(), so only emit an explicit notify on subsequent
+		// registrations to keep this method's contract at "exactly one notify".
 		if (this.views.size === 1) {
 			this.setFocused(view.viewId);
+		} else {
+			this.notifyChange();
 		}
 	}
 
@@ -192,6 +256,7 @@ export class ChatViewRegistry {
 				this.views.get(this.focusedViewId)?.onActivate();
 			}
 		}
+		this.notifyChange();
 	}
 
 	/**
@@ -206,6 +271,8 @@ export class ChatViewRegistry {
 		}
 		this.views.clear();
 		this.focusedViewId = null;
+		this.changeListeners.clear();
+		this.snapshotCache = null;
 	}
 
 	// ============================================================
@@ -244,6 +311,7 @@ export class ChatViewRegistry {
 		this.focusedViewId = viewId;
 		this.views.get(viewId)?.onActivate();
 		this.logger.log(`[ChatViewRegistry] Focus changed to: ${viewId}`);
+		this.notifyChange();
 	}
 
 	/**
@@ -342,4 +410,44 @@ export class ChatViewRegistry {
 	get size(): number {
 		return this.views.size;
 	}
+
+	// ============================================================
+	// Change Notification (for Session Manager)
+	// ============================================================
+
+	/**
+	 * Subscribe to registry changes (view register/unregister, focus change, state change).
+	 * Pattern: same as SettingsService.subscribe (for useSyncExternalStore).
+	 */
+	subscribe = (listener: () => void): (() => void) => {
+		this.changeListeners.add(listener);
+		return () => this.changeListeners.delete(listener);
+	};
+
+	/**
+	 * Notify all subscribers that something changed.
+	 * Called from: register, unregister, setFocused, and externally by ChatPanel on state change.
+	 */
+	notifyChange(): void {
+		this.snapshotCache = null;
+		for (const listener of this.changeListeners) {
+			listener();
+		}
+	}
+
+	/**
+	 * Get a stable snapshot of the registry for useSyncExternalStore.
+	 * Returns the same object reference until notifyChange() invalidates it.
+	 * Includes both views and focusedId so consumers derive UI state from
+	 * a single source (mirrors SettingsService's whole-state snapshot pattern).
+	 */
+	getSnapshot = (): ViewRegistrySnapshot => {
+		if (!this.snapshotCache) {
+			this.snapshotCache = {
+				views: Array.from(this.views.values()),
+				focusedId: this.focusedViewId,
+			};
+		}
+		return this.snapshotCache;
+	};
 }

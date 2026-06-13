@@ -13,6 +13,7 @@
  */
 
 import type { AcpClient } from "../acp/acp-client";
+import { getLogger } from "../utils/logger";
 import type {
 	IVaultAccess,
 	NoteMetadata,
@@ -75,6 +76,16 @@ export interface PreparePromptInput {
 
 	/** Maximum characters for selection (default: 10000) */
 	maxSelectionLength?: number;
+
+	/** Whether this is the first message in the session */
+	isFirstMessage?: boolean;
+
+	/** Prompt injection settings (undefined = disabled) */
+	promptInjection?: {
+		latex?: boolean;
+		wikiLinks?: boolean;
+		tables?: boolean;
+	};
 }
 
 /**
@@ -144,6 +155,12 @@ export interface SendPromptResult {
 
 const DEFAULT_MAX_NOTE_LENGTH = 10000; // Default maximum characters per note
 const DEFAULT_MAX_SELECTION_LENGTH = 10000; // Default maximum characters for selection
+const LATEX_MATH_INSTRUCTION =
+	"This client uses Obsidian Flavored Markdown. For math, use $...$ for inline and $$...$$ for display (not \\(...\\) or \\[...\\]).";
+const WIKI_LINK_INSTRUCTION =
+	"When referencing notes in this vault, use [[Note Name]] wikilink syntax so they become clickable links.";
+const TABLE_INSTRUCTION =
+	"Always leave a blank line before Markdown tables; without it Obsidian renders them as plain text.";
 
 // ============================================================================
 // Shared Helper Functions
@@ -196,7 +213,7 @@ async function processNote(
 			originalLength: content.length,
 		};
 	} catch (error) {
-		console.error(`Failed to read note ${file.path}:`, error);
+		getLogger().error(`Failed to read note ${file.path}:`, error);
 		return null;
 	}
 }
@@ -232,7 +249,7 @@ async function readSelection(
 			originalLength: fullText.length,
 		};
 	} catch (error) {
-		console.error(`Failed to read selection from ${notePath}:`, error);
+		getLogger().error(`Failed to read selection from ${notePath}:`, error);
 		return null;
 	}
 }
@@ -240,16 +257,76 @@ async function readSelection(
 /**
  * Build auto-mention prefix string for session/load recovery.
  * Format: "@[[note name]]:from-to\n" or "@[[note name]]\n"
+ *
+ * Returns empty string when the user message starts with "/" to avoid
+ * corrupting ACP slash-command recognition at the text-block level.
+ * Agents detect slash commands by matching "/" at character 0 of a
+ * text ContentBlock's text field; the prefix would push "/" off char 0.
+ * The resource-block channel (autoMentionBlocks) still carries the
+ * note context for slash-command turns — see the ACP spec at
+ * https://agentclientprotocol.com/protocol/slash-commands which allows
+ * resource blocks alongside slash-command text blocks.
  */
 function buildAutoMentionPrefix(
 	activeNote: NoteMetadata | null | undefined,
 	isDisabled: boolean | undefined,
+	message: string,
 ): string {
 	if (!activeNote || isDisabled) return "";
+	if (message.startsWith("/")) return "";
 	if (activeNote.selection) {
 		return `@[[${activeNote.name}]]:${activeNote.selection.from.line + 1}-${activeNote.selection.to.line + 1}\n`;
 	}
 	return `@[[${activeNote.name}]]\n`;
+}
+
+/**
+ * Build system prompt instruction strings for Obsidian-flavored Markdown.
+ * Returns an array of instruction strings to inject.
+ * Empty array if not first message or no instructions enabled.
+ */
+function buildSystemInstructions(input: PreparePromptInput): string[] {
+	if (!input.isFirstMessage) return [];
+	if (!input.promptInjection) return [];
+
+	const instructions: string[] = [];
+
+	if (input.promptInjection.wikiLinks) {
+		instructions.push(WIKI_LINK_INSTRUCTION);
+	}
+
+	if (input.promptInjection.tables) {
+		instructions.push(TABLE_INSTRUCTION);
+	}
+
+	if (input.promptInjection.latex) {
+		instructions.push(LATEX_MATH_INSTRUCTION);
+	}
+
+	return instructions;
+}
+
+function buildAgentMessageText(
+	message: string,
+	autoMentionPrefix: string,
+	contextBlocks?: string[],
+): string {
+	const userMessage = autoMentionPrefix + message;
+
+	// Skip context blocks on slash-command turns to avoid colliding with
+	// the ACP command-detection rule (agents detect '/' at the start of
+	// a text ContentBlock). This is the fallback path for agents that
+	// don't support embeddedContext resource blocks; agents with
+	// embeddedContext receive note context through the separate resource
+	// ContentBlock path in preparePrompt, which stays spec-compliant
+	// alongside slash commands.
+	const isSlashCommand = message.startsWith("/");
+	const includeContext = !isSlashCommand && contextBlocks && contextBlocks.length > 0;
+
+	return [
+		...(includeContext ? [contextBlocks.join("\n")] : []),
+		...(userMessage ? [userMessage] : []),
+	].join("\n\n");
 }
 
 /**
@@ -267,6 +344,14 @@ function buildDisplayContent(input: PreparePromptInput): PromptContent[] {
 
 /**
  * Build auto-mention context metadata for UI.
+ *
+ * Returns metadata describing the auto-mentioned note for display as a
+ * UI badge. The caller is responsible for deciding whether the badge
+ * should reflect what was actually sent: agents that support
+ * embeddedContext receive the auto-mention as a Resource block even on
+ * slash-command turns (badge applies), while the text-context fallback
+ * path drops the note context on slash commands (badge should be
+ * skipped at the call site).
  */
 function buildAutoMentionContext(
 	activeNote: NoteMetadata | null | undefined,
@@ -380,7 +465,12 @@ async function preparePromptWithEmbeddedContext(
 		});
 	}
 
-	// Build auto-mention Resource block
+	// Build auto-mention Resource block. Sent on slash-command turns too
+	// because Resource blocks are separate ContentBlocks — they don't
+	// interfere with ACP's "/" at char 0 detection on the user-message
+	// text block. Only buildAutoMentionPrefix needs the slash guard.
+	// See https://agentclientprotocol.com/protocol/slash-commands which
+	// allows resource blocks alongside slash-command text blocks.
 	const autoMentionBlocks: PromptContent[] = [];
 	if (input.activeNote && !input.isAutoMentionDisabled) {
 		const autoMentionResource = await buildAutoMentionResource(
@@ -396,9 +486,18 @@ async function preparePromptWithEmbeddedContext(
 	const autoMentionPrefix = buildAutoMentionPrefix(
 		input.activeNote,
 		input.isAutoMentionDisabled,
+		input.message,
 	);
 
+	// Build system prompt instructions (first message only)
+	const systemInstructions = buildSystemInstructions(input);
+	const systemBlocks: PromptContent[] = systemInstructions.map((text) => ({
+		type: "text" as const,
+		text,
+	}));
+
 	const agentContent: PromptContent[] = [
+		...systemBlocks,
 		...resourceBlocks,
 		...autoMentionBlocks,
 		...(input.message || autoMentionPrefix
@@ -472,19 +571,25 @@ async function preparePromptWithTextContext(
 		contextBlocks.push(autoMentionContextBlock);
 	}
 
+	// Build system prompt instructions (first message only)
+	const systemInstructions = buildSystemInstructions(input);
+	for (const instruction of systemInstructions) {
+		contextBlocks.push(
+			`<obsidian_system_instruction>\n${instruction}\n</obsidian_system_instruction>`,
+		);
+	}
+
 	const autoMentionPrefix = buildAutoMentionPrefix(
 		input.activeNote,
 		input.isAutoMentionDisabled,
+		input.message,
 	);
 
-	// Build agent message text (context blocks + auto-mention prefix + original message)
-	const agentMessageText =
-		contextBlocks.length > 0
-			? contextBlocks.join("\n") +
-				"\n\n" +
-				autoMentionPrefix +
-				input.message
-			: autoMentionPrefix + input.message;
+	const agentMessageText = buildAgentMessageText(
+		input.message,
+		autoMentionPrefix,
+		contextBlocks,
+	);
 
 	const agentContent: PromptContent[] = [
 		...(agentMessageText
@@ -497,10 +602,17 @@ async function preparePromptWithTextContext(
 	return {
 		displayContent: buildDisplayContent(input),
 		agentContent,
-		autoMentionContext: buildAutoMentionContext(
-			input.activeNote,
-			input.isAutoMentionDisabled,
-		),
+		// Skip the badge on slash-command turns because the text-context
+		// block was also dropped (see buildAgentMessageText). Keeping the
+		// badge state consistent with what was actually sent to the agent
+		// avoids a misleading "context attached" indicator on a turn that
+		// shipped no context.
+		autoMentionContext: input.message.startsWith("/")
+			? undefined
+			: buildAutoMentionContext(
+					input.activeNote,
+					input.isAutoMentionDisabled,
+				),
 	};
 }
 

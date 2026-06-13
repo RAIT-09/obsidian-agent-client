@@ -11,8 +11,10 @@ import type {
 	CodexAgentSettings,
 	MistralVibeAgentSettings,
 } from "../types/agent";
-import type { ChatSession } from "../types/session";
+import type { ChatSession, SavedSessionInfo } from "../types/session";
+import type { ChatMessage } from "../types/chat";
 import { toAgentConfig } from "./settings-normalizer";
+import { truncateTitle } from "../utils/text";
 import type { AgentUpdateNotification } from "./update-checker";
 
 // ============================================================================
@@ -120,7 +122,13 @@ export function findAgentSettings(
 }
 
 /**
- * Build AgentConfig with API key injection for known agents.
+ * Build AgentConfig with API key injection intent for known agents.
+ *
+ * For built-in agents, attaches an `apiKey` intent (secretId + envVarName)
+ * to the config. AcpClient.initialize() resolves the secret value from
+ * Obsidian's secret storage just before spawn.
+ *
+ * Custom agents pass through unchanged (they manage env vars directly).
  */
 export function buildAgentConfigWithApiKey(
 	settings: AgentClientPluginSettings,
@@ -130,14 +138,13 @@ export function buildAgentConfigWithApiKey(
 ) {
 	const baseConfig = toAgentConfig(agentSettings, workingDirectory);
 
-	// Add API keys to environment for Claude, Codex, and Gemini
 	if (agentId === settings.claude.id) {
 		const claudeSettings = agentSettings as ClaudeAgentSettings;
 		return {
 			...baseConfig,
-			env: {
-				...baseConfig.env,
-				ANTHROPIC_API_KEY: claudeSettings.apiKey,
+			apiKey: {
+				secretId: claudeSettings.apiKeySecretId,
+				envVarName: "ANTHROPIC_API_KEY",
 			},
 		};
 	}
@@ -145,9 +152,9 @@ export function buildAgentConfigWithApiKey(
 		const codexSettings = agentSettings as CodexAgentSettings;
 		return {
 			...baseConfig,
-			env: {
-				...baseConfig.env,
-				OPENAI_API_KEY: codexSettings.apiKey,
+			apiKey: {
+				secretId: codexSettings.apiKeySecretId,
+				envVarName: "OPENAI_API_KEY",
 			},
 		};
 	}
@@ -155,9 +162,9 @@ export function buildAgentConfigWithApiKey(
 		const geminiSettings = agentSettings as GeminiAgentSettings;
 		return {
 			...baseConfig,
-			env: {
-				...baseConfig.env,
-				GEMINI_API_KEY: geminiSettings.apiKey,
+			apiKey: {
+				secretId: geminiSettings.apiKeySecretId,
+				envVarName: "GEMINI_API_KEY",
 			},
 		};
 	}
@@ -172,7 +179,7 @@ export function buildAgentConfigWithApiKey(
 		};
 	}
 
-	// Custom agents - no API key injection
+	// Custom agents — no API key injection
 	return baseConfig;
 }
 
@@ -201,6 +208,32 @@ export function createInitialSession(
 		lastActivityAt: new Date(),
 		workingDirectory,
 	};
+}
+
+// ============================================================================
+// Session Title Derivation
+// ============================================================================
+
+/** Derive the session display title (saved title > first user message > "New session"). */
+export function computeSessionTitle(
+	sessionId: string | null,
+	savedSessions: SavedSessionInfo[],
+	messages: ChatMessage[],
+): string {
+	if (sessionId) {
+		const saved = savedSessions.find((s) => s.sessionId === sessionId);
+		if (saved?.title) return saved.title;
+	}
+	const firstUserMessage = messages.find((m) => m.role === "user");
+	if (firstUserMessage) {
+		const textContent = firstUserMessage.content.find(
+			(c) => c.type === "text" || c.type === "text_with_context",
+		);
+		if (textContent && "text" in textContent) {
+			return truncateTitle(textContent.text);
+		}
+	}
+	return "New session";
 }
 
 // ============================================================================

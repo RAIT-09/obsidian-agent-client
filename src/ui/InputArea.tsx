@@ -362,6 +362,7 @@ export function InputArea({
 	const removeFile = useCallback(
 		(id: string) => {
 			onAttachedFilesChange(attachedFiles.filter((f) => f.id !== id));
+			textareaRef.current?.focus();
 		},
 		[attachedFiles, onAttachedFilesChange],
 	);
@@ -406,7 +407,7 @@ export function InputArea({
 						mimeType: file.type,
 					});
 				} catch (error) {
-					console.error("Failed to convert image:", error);
+					getLogger().error("Failed to convert image:", error);
 					new Notice("[Agent Client] Failed to attach image");
 				}
 			}
@@ -1011,7 +1012,7 @@ export function InputArea({
 				onDrop={(e) => void handleDrop(e)}
 			>
 				{/* Auto-mention Badge */}
-				{autoMentionEnabled && mentions.activeNote && (
+				{mentions.activeNote && (
 					<button
 						className="agent-client-auto-mention-inline"
 						onClick={() =>
@@ -1062,7 +1063,7 @@ export function InputArea({
 						onKeyDown={handleKeyDown}
 						onPaste={(e) => void handlePaste(e)}
 						placeholder={placeholder}
-						className={`agent-client-chat-input-textarea ${autoMentionEnabled && mentions.activeNote ? "has-auto-mention" : ""}`}
+						className={`agent-client-chat-input-textarea ${mentions.activeNote ? "has-auto-mention" : ""}`}
 						rows={1}
 						spellCheck={obsidianSpellcheck}
 					/>

@@ -178,15 +178,14 @@ export function useChatActions(
 			}
 
 			await agent.sendMessage(content, {
-				activeNote: settings.autoMentionActiveNote
-					? suggestions.mentions.activeNote
-					: null,
+				activeNote: suggestions.mentions.activeNote,
 				vaultBasePath: vaultPath,
 				isAutoMentionDisabled:
 					suggestions.mentions.isAutoMentionDisabled,
 				images: images.length > 0 ? images : undefined,
 				resourceLinks:
 					resourceLinks.length > 0 ? resourceLinks : undefined,
+				isFirstMessage,
 			});
 
 			// Save session metadata locally on first message
@@ -207,7 +206,6 @@ export function useChatActions(
 			session.sessionId,
 			sessionHistory.saveSessionLocally,
 			logger,
-			settings.autoMentionActiveNote,
 			suggestions.mentions.activeNote,
 			suggestions.mentions.isAutoMentionDisabled,
 			shouldConvertToWsl,

@@ -1,5 +1,14 @@
 import { getLogger } from "../utils/logger";
 import type { PermissionOption } from "../types/chat";
+import { LucideIcon } from "./shared/IconButton";
+
+/** Kind semantics are conveyed by icon shape + color, not button background. */
+const KIND_ICONS: Record<PermissionOption["kind"], string> = {
+	allow_always: "check-check",
+	allow_once: "check",
+	reject_once: "x",
+	reject_always: "ban",
+};
 
 interface PermissionBannerProps {
 	permissionRequest: {
@@ -9,6 +18,8 @@ interface PermissionBannerProps {
 		isCancelled?: boolean;
 		isActive?: boolean;
 	};
+	/** Whether to show kind icons (follows displaySettings.showEmojis) */
+	showEmojis: boolean;
 	/** Callback to approve a permission request */
 	onApprovePermission?: (
 		requestId: string,
@@ -19,6 +30,7 @@ interface PermissionBannerProps {
 
 export function PermissionBanner({
 	permissionRequest,
+	showEmojis,
 	onApprovePermission,
 	onOptionSelected,
 }: PermissionBannerProps) {
@@ -35,7 +47,8 @@ export function PermissionBanner({
 			{permissionRequest.options.map((option) => (
 				<button
 					key={option.optionId}
-					className={`agent-client-permission-option ${option.kind ? `agent-client-permission-kind-${option.kind}` : ""}`}
+					className={`agent-client-permission-option agent-client-permission-kind-${option.kind}`}
+					title={option.name}
 					onClick={() => {
 						if (onOptionSelected) {
 							onOptionSelected(option.optionId);
@@ -53,7 +66,15 @@ export function PermissionBanner({
 						}
 					}}
 				>
-					{option.name}
+					{showEmojis && (
+						<LucideIcon
+							name={KIND_ICONS[option.kind]}
+							className="agent-client-permission-option-icon"
+						/>
+					)}
+					<span className="agent-client-permission-option-label">
+						{option.name}
+					</span>
 				</button>
 			))}
 		</div>

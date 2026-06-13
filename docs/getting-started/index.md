@@ -37,6 +37,14 @@ To try pre-release versions before they are published to Community Plugins:
 
 ## Prerequisites
 
+### Obsidian Version
+
+Agent Client requires **Obsidian 1.11.4 or later**. The plugin uses Obsidian's Keychain (introduced in 1.11.4) to store agent API keys securely.
+
+::: tip
+Check your version under **Settings → General → Version**. If you are on an older version, update Obsidian from the [official installer](https://obsidian.md/download) or your package manager.
+:::
+
 ### Node.js
 
 ::: tip Not always required

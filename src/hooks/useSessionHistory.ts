@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import type { AcpClient } from "../acp/acp-client";
 import type { ISettingsAccess } from "../services/settings-service";
 import type {
@@ -13,6 +13,7 @@ import type {
 } from "../types/session";
 import type { ChatMessage } from "../types/chat";
 import { extractErrorMessage } from "../utils/error-utils";
+import { truncateTitle } from "../utils/text";
 
 // ============================================================================
 // Session Capability Helpers (from session-capability-utils.ts)
@@ -299,6 +300,38 @@ export function useSessionHistory(
 	// Cache reference (not state to avoid re-renders)
 	const cacheRef = useRef<SessionCache | null>(null);
 	const currentCwdRef = useRef<string | undefined>(undefined);
+
+	// External rename detection: when `savedSessions` changes (e.g. via Session
+	// Manager's Rename), re-merge titles into the currently displayed list
+	// without re-fetching from the agent. Subscribe to settings directly (rather
+	// than via useSettings) so we don't re-render on unrelated settings slices
+	// (windowsWslMode, fontSize, etc.). Reference comparison is sufficient
+	// because SessionStorage always writes a fresh `savedSessions` array.
+	const lastSavedSessionsRef = useRef<SavedSessionInfo[] | null>(null);
+
+	useEffect(() => {
+		return settingsAccess.subscribe(() => {
+			const next = settingsAccess.getSnapshot().savedSessions ?? [];
+			if (next === lastSavedSessionsRef.current) return;
+			lastSavedSessionsRef.current = next;
+
+			const localSessions = settingsAccess.getSavedSessions(
+				session.agentId,
+			);
+			setSessions((prev) => {
+				if (prev.length === 0) return prev;
+				const merged = mergeWithLocalTitles(prev, localSessions);
+				// Skip render if no title actually changed
+				const unchanged =
+					merged.length === prev.length &&
+					merged.every((s, i) => s.title === prev[i].title);
+				return unchanged ? prev : merged;
+			});
+			setLocalSessionIds(
+				new Set(localSessions.map((s) => s.sessionId)),
+			);
+		});
+	}, [settingsAccess, session.agentId]);
 
 	/**
 	 * Check if cache is valid.
@@ -626,15 +659,9 @@ export function useSessionHistory(
 					);
 					const originalTitle = originalSession?.title ?? "Session";
 
-					// Truncate title to 50 characters
-					const maxTitleLength = 50;
+					// Keep "Fork: " prefix intact; truncate only the base.
 					const prefix = "Fork: ";
-					const maxBaseLength = maxTitleLength - prefix.length;
-					const truncatedTitle =
-						originalTitle.length > maxBaseLength
-							? originalTitle.substring(0, maxBaseLength) + "..."
-							: originalTitle;
-					const newTitle = `${prefix}${truncatedTitle}`;
+					const newTitle = `${prefix}${truncateTitle(originalTitle, 50 - prefix.length)}`;
 
 					const now = new Date().toISOString();
 
@@ -710,7 +737,6 @@ export function useSessionHistory(
 	 */
 	const updateSessionTitle = useCallback(
 		async (sessionId: string, newTitle: string, sessionCwd: string) => {
-			// Read current title for potential rollback
 			const savedSessions = settingsAccess.getSavedSessions();
 			const existing = savedSessions.find(
 				(s) => s.sessionId === sessionId,
@@ -725,28 +751,14 @@ export function useSessionHistory(
 			);
 
 			try {
-				if (existing) {
-					await settingsAccess.saveSession({
-						...existing,
-						title: newTitle,
-						updatedAt: new Date().toISOString(),
-					});
-				} else {
-					// Session exists only on agent side — create local entry
-					// Use sessionCwd (from SessionInfo) instead of hook's cwd
-					await settingsAccess.saveSession({
-						sessionId,
-						agentId: session.agentId,
-						cwd: sessionCwd,
-						title: newTitle,
-						createdAt: new Date().toISOString(),
-						updatedAt: new Date().toISOString(),
-					});
-				}
-
+				await settingsAccess.updateSessionTitle(
+					sessionId,
+					newTitle,
+					{ agentId: session.agentId, cwd: sessionCwd },
+				);
 				invalidateCache();
 			} catch (err) {
-				// Rollback optimistic update
+				// Rollback
 				setSessions((prev) =>
 					prev.map((s) =>
 						s.sessionId === sessionId
@@ -770,10 +782,7 @@ export function useSessionHistory(
 		async (sessionId: string, messageContent: string) => {
 			if (!session.agentId) return;
 
-			const title =
-				messageContent.length > 50
-					? messageContent.substring(0, 50) + "..."
-					: messageContent;
+			const title = truncateTitle(messageContent);
 
 			await settingsAccess.saveSession({
 				sessionId,
@@ -791,6 +800,10 @@ export function useSessionHistory(
 	 * Save session messages locally.
 	 * Called when a turn ends (agent response complete).
 	 * Fire-and-forget (does not block UI).
+	 *
+	 * Also bumps the session's `updatedAt` metadata so that
+	 * `getSavedSessions()` (sorted by updatedAt desc) reflects actual
+	 * activity rather than just session-creation time (#257).
 	 */
 	const saveSessionMessages = useCallback(
 		(
@@ -799,12 +812,20 @@ export function useSessionHistory(
 		) => {
 			if (!session.agentId || messages.length === 0) return;
 
-			// Fire-and-forget
+			// Persist message content (fire-and-forget)
 			void settingsAccess.saveSessionMessages(
 				sessionId,
 				session.agentId,
 				messages,
 			);
+
+			// Bump updatedAt on session metadata so "last used" ordering
+			// reflects real activity. `updateSession` is a no-op if the entry
+			// hasn't landed yet — saveSessionLocally will create it on the
+			// first-message path.
+			void settingsAccess.updateSession(sessionId, {
+				updatedAt: new Date().toISOString(),
+			});
 		},
 		[session.agentId, settingsAccess],
 	);

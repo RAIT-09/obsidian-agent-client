@@ -8,6 +8,7 @@
 
 import type { AgentClientPluginSettings } from "../plugin";
 import type AgentClientPlugin from "../plugin";
+import { updateDebugMode } from "../utils/logger";
 import type { ChatMessage } from "../types/chat";
 import type { SavedSessionInfo } from "../types/session";
 import { SessionStorage } from "./session-storage";
@@ -91,6 +92,25 @@ export interface ISettingsAccess {
 	 * @returns Promise that resolves when session is deleted
 	 */
 	deleteSession(sessionId: string): Promise<void>;
+
+	/**
+	 * Update the title of a saved session.
+	 * If createIfMissing is provided and session doesn't exist, creates a new entry.
+	 */
+	updateSessionTitle(
+		sessionId: string,
+		newTitle: string,
+		createIfMissing?: { agentId: string; cwd: string },
+	): Promise<void>;
+
+	/**
+	 * Update fields of an existing saved session.
+	 * Silently no-op if the session does not exist.
+	 */
+	updateSession(
+		sessionId: string,
+		patch: Partial<Omit<SavedSessionInfo, "sessionId" | "createdAt">>,
+	): Promise<void>;
 
 	// ============================================================
 	// Session Message History Methods
@@ -200,6 +220,9 @@ export class SettingsService implements ISettingsAccess {
 		// Sync with plugin.settings (required for saveSettings to persist correctly)
 		this.plugin.settings = next;
 
+		// Keep logger in sync with debug mode toggle
+		updateDebugMode(next.debugMode);
+
 		// Notify all subscribers
 		for (const listener of this.listeners) {
 			listener();
@@ -251,6 +274,25 @@ export class SettingsService implements ISettingsAccess {
 
 	async deleteSession(sessionId: string): Promise<void> {
 		return this.sessionStorage.deleteSession(sessionId);
+	}
+
+	async updateSessionTitle(
+		sessionId: string,
+		newTitle: string,
+		createIfMissing?: { agentId: string; cwd: string },
+	): Promise<void> {
+		return this.sessionStorage.updateSessionTitle(
+			sessionId,
+			newTitle,
+			createIfMissing,
+		);
+	}
+
+	async updateSession(
+		sessionId: string,
+		patch: Partial<Omit<SavedSessionInfo, "sessionId" | "createdAt">>,
+	): Promise<void> {
+		return this.sessionStorage.updateSession(sessionId, patch);
 	}
 
 	async saveSessionMessages(

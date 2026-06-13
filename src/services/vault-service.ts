@@ -371,11 +371,7 @@ export class VaultService implements IVaultAccess {
 		const { editor, file } = view;
 		const filePath = file.path;
 
-		if (
-			this.lastSelectionKey &&
-			!this.lastSelectionKey.startsWith(`${filePath}:`)
-		) {
-			// Clear previous file selection when switching files
+		if (!this.lastSelectionKey.startsWith(`${filePath}:`)) {
 			this.handleSelectionChange(filePath, null);
 		}
 
@@ -418,7 +414,7 @@ export class VaultService implements IVaultAccess {
 			// 1. Obsidian changes its internal implementation
 			// 2. A future Obsidian version removes the 'cm' property
 			// 3. The editor is in a different mode (e.g., legacy editor)
-			console.warn(
+			getLogger().debug(
 				"[VaultService] CodeMirror 6 API not available. " +
 					"Selection change tracking will not work. " +
 					"This may be due to an Obsidian version change.",
@@ -498,7 +494,7 @@ export class VaultService implements IVaultAccess {
 			try {
 				listener();
 			} catch (error) {
-				console.error("[VaultService] Selection listener error", error);
+				getLogger().error("[VaultService] Selection listener error", error);
 			}
 		}
 	}
