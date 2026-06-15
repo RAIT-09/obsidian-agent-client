@@ -3,7 +3,11 @@ import type AgentClientPlugin from "../plugin";
 import { getLogger, Logger } from "../utils/logger";
 import { Platform } from "obsidian";
 import { resolveNodeDirectory } from "../utils/paths";
-import { getEnhancedWindowsEnv, prepareShellCommand } from "../utils/platform";
+import {
+	getEnhancedWindowsEnv,
+	prepareShellCommand,
+	buildWslEnv,
+} from "../utils/platform";
 
 /**
  * Parameters for creating a terminal process.
@@ -70,6 +74,15 @@ export class TerminalManager {
 			}
 		}
 
+		// In WSL mode, forward the tool-provided env vars into WSL via WSLENV
+		// (Windows env is otherwise not visible to the Linux process).
+		if (Platform.isWin && this.plugin.settings.windowsWslMode && params.env) {
+			env = buildWslEnv(
+				env,
+				params.env.map((e) => e.name),
+			);
+		}
+
 		// Handle command parsing
 		let command = params.command;
 		let args = params.args || [];
@@ -97,9 +110,13 @@ export class TerminalManager {
 			cwd: params.cwd,
 		});
 
-		// Spawn the process
+		// Spawn the process.
+		// In WSL mode the working directory is applied inside the launcher
+		// (cd '<wslCwd>'); the wsl.exe process must NOT receive a Linux path as
+		// its Windows cwd (CreateProcess would fail), so omit cwd there.
+		const useWsl = Platform.isWin && this.plugin.settings.windowsWslMode;
 		const spawnOptions: SpawnOptions = {
-			cwd: params.cwd || undefined,
+			cwd: useWsl ? undefined : params.cwd || undefined,
 			env,
 			stdio: ["pipe", "pipe", "pipe"],
 			shell: needsShell,

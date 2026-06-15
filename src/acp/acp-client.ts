@@ -21,6 +21,7 @@ import {
 	convertWindowsPathToWsl,
 	getEnhancedWindowsEnv,
 	prepareShellCommand,
+	buildWslEnv,
 } from "../utils/platform";
 import { resolveNodeDirectory } from "../utils/paths";
 import {
@@ -164,6 +165,14 @@ export class AcpClient {
 		// which causes executables like python, node, etc. to not be found.
 		if (Platform.isWin && !this.plugin.settings.windowsWslMode) {
 			baseEnv = getEnhancedWindowsEnv(baseEnv);
+		}
+
+		// In WSL mode, forward the configured env vars (API keys, custom agent
+		// env) into WSL via WSLENV. Windows env vars are otherwise not visible to
+		// the Linux agent process, so without this the plugin's API key field has
+		// no effect in WSL mode (the user would have to put keys in ~/.profile).
+		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+			baseEnv = buildWslEnv(baseEnv, Object.keys(config.env || {}));
 		}
 
 		// Add Node.js directory to PATH only when nodePath is an explicit absolute path.
