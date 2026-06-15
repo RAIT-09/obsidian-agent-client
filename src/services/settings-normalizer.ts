@@ -128,6 +128,12 @@ export const normalizeCustomAgent = (
 		agent.displayName.trim().length > 0
 			? agent.displayName.trim()
 			: rawId;
+	const rawAvatar =
+		agent &&
+		typeof agent.avatarImage === "string" &&
+		agent.avatarImage.trim().length > 0
+			? agent.avatarImage.trim()
+			: undefined;
 	return {
 		id: rawId,
 		displayName: rawDisplayName,
@@ -139,6 +145,7 @@ export const normalizeCustomAgent = (
 				: "",
 		args: sanitizeArgs(agent?.args),
 		env: normalizeEnvVars(agent?.env),
+		avatarImage: rawAvatar,
 	};
 };
 

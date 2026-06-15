@@ -593,6 +593,8 @@ export interface SavedSessionInfo {
 	cwd: string;
 	/** Human-readable session title (first 50 chars of first user message) */
 	title?: string;
+	/** Note path that owns a persistent embedded chat session. */
+	sourcePath?: string;
 	/** ISO 8601 timestamp of session creation */
 	createdAt: string;
 	/** ISO 8601 timestamp of last activity */
