@@ -15,6 +15,8 @@ export interface SidebarHeaderProps {
 	variant: "sidebar";
 	/** Display name of the active agent */
 	agentLabel: string;
+	/** Effective model confirmed by the latest assistant response */
+	modelLabel?: string;
 	/** Whether a plugin update is available */
 	isUpdateAvailable: boolean;
 	/** Callback to create a new chat session */
@@ -34,6 +36,8 @@ export interface FloatingHeaderProps {
 	variant: "floating";
 	/** Display name of the active agent */
 	agentLabel: string;
+	/** Effective model confirmed by the latest assistant response */
+	modelLabel?: string;
 	/** Available agents for switching */
 	availableAgents: AgentDisplayInfo[];
 	/** Current agent ID */
@@ -102,6 +106,7 @@ function NavActionButton({
  */
 function SidebarHeader({
 	agentLabel,
+	modelLabel,
 	isUpdateAvailable,
 	onNewChat,
 	onExportChat,
@@ -114,6 +119,11 @@ function SidebarHeader({
 				<span className="agent-client-chat-view-header-title">
 					{agentLabel}
 				</span>
+				{modelLabel && (
+					<span className="agent-client-header-model-label">
+						{modelLabel}
+					</span>
+				)}
 				{isUpdateAvailable && (
 					<span className="agent-client-chat-view-header-update">
 						Plugin update available!
@@ -161,6 +171,7 @@ function SidebarHeader({
  */
 function FloatingHeader({
 	agentLabel,
+	modelLabel,
 	availableAgents,
 	currentAgentId,
 	isUpdateAvailable,
@@ -246,6 +257,11 @@ function FloatingHeader({
 				) : (
 					<span className="agent-client-agent-label">
 						{agentLabel}
+					</span>
+				)}
+				{modelLabel && (
+					<span className="agent-client-header-model-label">
+						{modelLabel}
 					</span>
 				)}
 			</div>

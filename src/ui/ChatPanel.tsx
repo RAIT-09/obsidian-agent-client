@@ -278,6 +278,8 @@ export function ChatPanel({
 		return custom?.displayName || custom?.id || activeId;
 	}, [session.agentId, plugin.settings]);
 
+	const headerModelLabel = session.confirmedModelId;
+
 	const availableAgents = useMemo(() => {
 		return plugin.getAvailableAgents();
 	}, [plugin]);
@@ -1179,6 +1181,7 @@ export function ChatPanel({
 			<ChatHeader
 				variant="sidebar"
 				agentLabel={activeAgentLabel}
+				modelLabel={headerModelLabel}
 				isUpdateAvailable={isUpdateAvailable}
 				onNewChat={() => void handleNewChatWithPersist()}
 				onExportChat={() => void handleExportChat()}
@@ -1189,6 +1192,7 @@ export function ChatPanel({
 			<ChatHeader
 				variant="floating"
 				agentLabel={activeAgentLabel}
+				modelLabel={headerModelLabel}
 				availableAgents={availableAgents}
 				currentAgentId={session.agentId}
 				isUpdateAvailable={isUpdateAvailable}

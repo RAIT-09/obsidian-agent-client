@@ -536,6 +536,16 @@ If your plugin does not need CSS, delete this file.
 	white-space: nowrap;
 }
 
+.agent-client-header-model-label {
+	flex: 0 1 auto;
+	max-width: 45%;
+	color: var(--text-muted);
+	font-size: 11px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .agent-client-chat-view-header-update {
 	flex: 0 1 auto;
 	padding: 2px 8px;
@@ -567,6 +577,8 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	align-items: center;
 	gap: 8px;
+	min-width: 0;
+	flex: 1 1 auto;
 }
 
 .agent-client-inline-header-actions {

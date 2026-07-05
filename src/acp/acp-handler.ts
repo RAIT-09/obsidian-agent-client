@@ -6,6 +6,15 @@ import type { PermissionManager } from "./permission-handler";
 import type { TerminalManager } from "./terminal-handler";
 import type { Logger } from "../utils/logger";
 
+export function getModelIdFromMeta(
+	meta: { [key: string]: unknown } | null | undefined,
+): string | undefined {
+	const modelId = meta?.modelId;
+	if (typeof modelId !== "string") return undefined;
+	const trimmed = modelId.trim();
+	return trimmed.length > 0 ? trimmed : undefined;
+}
+
 /**
  * Handles incoming ACP protocol events from the agent.
  *
@@ -75,6 +84,15 @@ export class AcpHandler {
 
 		switch (update.sessionUpdate) {
 			case "agent_message_chunk":
+				if (update.content.type === "text") {
+					this.emitSessionUpdate({
+						type: "agent_message_chunk",
+						sessionId,
+						text: update.content.text,
+						modelId: getModelIdFromMeta(update._meta),
+					});
+				}
+				break;
 			case "agent_thought_chunk":
 			case "user_message_chunk":
 				if (update.content.type === "text") {
@@ -98,8 +116,7 @@ export class AcpHandler {
 					content: AcpTypeConverter.toToolCallContent(update.content),
 					locations: update.locations ?? undefined,
 					rawInput: update.rawInput as
-						| { [k: string]: unknown }
-						| undefined,
+						{ [k: string]: unknown } | undefined,
 				});
 				break;
 

@@ -188,6 +188,12 @@ export interface ChatSession {
 	configOptions?: SessionConfigOption[];
 
 	/**
+	 * Last model identifier confirmed by an assistant response.
+	 * Some agents expose the effective model only on response chunk metadata.
+	 */
+	confirmedModelId?: string;
+
+	/**
 	 * Context window usage and cost information.
 	 * Updated dynamically via ACP's `usage_update` notification.
 	 * Agent sends this after each prompt response and on session load/resume.
@@ -270,6 +276,7 @@ interface SessionUpdateBase {
 export interface AgentMessageChunk extends SessionUpdateBase {
 	type: "agent_message_chunk";
 	text: string;
+	modelId?: string;
 }
 
 /**

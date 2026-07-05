@@ -136,7 +136,23 @@ export function useAgentSession(
 					setSession((prev) => ({
 						...prev,
 						configOptions: update.configOptions,
+						confirmedModelId: update.configOptions.some(
+							(option) => option.category === "model",
+						)
+							? undefined
+							: prev.confirmedModelId,
 					}));
+					break;
+				case "agent_message_chunk":
+					if (!update.modelId) break;
+					setSession((prev) =>
+						prev.confirmedModelId === update.modelId
+							? prev
+							: {
+									...prev,
+									confirmedModelId: update.modelId,
+								},
+					);
 					break;
 				case "usage_update":
 					setSession((prev) => ({
@@ -182,6 +198,7 @@ export function useAgentSession(
 				availableCommands: undefined,
 				modes: undefined,
 				configOptions: undefined,
+				confirmedModelId: undefined,
 				usage: undefined,
 				promptCapabilities: prev.promptCapabilities,
 				agentCapabilities: prev.agentCapabilities,
@@ -318,6 +335,7 @@ export function useAgentSession(
 			...prev,
 			sessionId: null,
 			state: "disconnected",
+			confirmedModelId: undefined,
 		}));
 	}, [agentClient]);
 
@@ -399,6 +417,7 @@ export function useAgentSession(
 				state: "ready",
 				modes: finalModes ?? prev.modes,
 				configOptions: finalConfigOptions ?? prev.configOptions,
+				confirmedModelId: undefined,
 				lastActivityAt: new Date(),
 			}));
 		},
@@ -459,6 +478,9 @@ export function useAgentSession(
 			}
 
 			const previousConfigOptions = s.configOptions;
+			const isModelConfig = previousConfigOptions?.some(
+				(opt) => opt.id === configId && opt.category === "model",
+			);
 
 			setSession((prev) => {
 				if (!prev.configOptions) return prev;
@@ -469,6 +491,9 @@ export function useAgentSession(
 							? { ...opt, currentValue: value }
 							: opt,
 					),
+					confirmedModelId: isModelConfig
+						? undefined
+						: prev.confirmedModelId,
 				};
 			});
 
