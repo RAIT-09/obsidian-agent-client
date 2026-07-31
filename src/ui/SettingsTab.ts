@@ -106,9 +106,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.sendMessageShortcut)
 					.onChange(async (value) => {
 						await this.plugin.settingsService.updateSettings({
-							sendMessageShortcut: value as
-								| "enter"
-								| "cmd-enter",
+							sendMessageShortcut: value as "enter" | "cmd-enter",
 						});
 					}),
 			);
@@ -601,6 +599,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		this.renderClaudeSettings(containerEl);
 		this.renderCodexSettings(containerEl);
 		this.renderGeminiSettings(containerEl);
+		this.renderMiniMaxSettings(containerEl);
 
 		new Setting(containerEl).setName("Custom agents").setHeading();
 
@@ -918,6 +917,11 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				this.plugin.settings.gemini.displayName ||
 					this.plugin.settings.gemini.id,
 			),
+			toOption(
+				this.plugin.settings.minimax.id,
+				this.plugin.settings.minimax.displayName ||
+					this.plugin.settings.minimax.id,
+			),
 		];
 		for (const agent of this.plugin.settings.customAgents) {
 			if (agent.id && agent.id.length > 0) {
@@ -1116,6 +1120,101 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						await this.plugin.settingsService.updateSettings({
 							claude: {
 								...this.plugin.settings.claude,
+								env: this.parseEnv(value),
+							},
+						});
+					});
+				text.inputEl.rows = 3;
+			});
+	}
+
+	private renderMiniMaxSettings(sectionEl: HTMLElement) {
+		const minimax = this.plugin.settings.minimax;
+
+		new Setting(sectionEl)
+			.setName(minimax.displayName || "MiniMax")
+			.setHeading();
+
+		new Setting(sectionEl)
+			.setName("API key")
+			.setDesc(
+				"MiniMax API key. Select from Obsidian's Keychain or create a new secret.",
+			)
+			.addComponent((el) =>
+				new SecretComponent(this.app, el)
+					.setValue(minimax.apiKeySecretId)
+					.onChange(async (value) => {
+						await this.plugin.settingsService.updateSettings({
+							minimax: {
+								...this.plugin.settings.minimax,
+								apiKeySecretId: value,
+							},
+						});
+					}),
+			);
+
+		const minimaxPathSetting = new Setting(sectionEl)
+			.setName("Path")
+			.setDesc(
+				'Command name or path to claude-agent-acp. Use just "claude-agent-acp" to let the login shell resolve it, or enter an absolute path.',
+			)
+			.addText((text) => {
+				text.setPlaceholder("claude-agent-acp")
+					.setValue(minimax.command)
+					.onChange(async (value) => {
+						await this.plugin.settingsService.updateSettings({
+							minimax: {
+								...this.plugin.settings.minimax,
+								command: value.trim(),
+							},
+						});
+					});
+			});
+		this.addAutoDetectButton(
+			minimaxPathSetting,
+			"claude-agent-acp",
+			async (path) => {
+				await this.plugin.settingsService.updateSettings({
+					minimax: {
+						...this.plugin.settings.minimax,
+						command: path,
+					},
+				});
+			},
+		);
+		this.addInstallHint(sectionEl, "@agentclientprotocol/claude-agent-acp");
+
+		new Setting(sectionEl)
+			.setName("Arguments")
+			.setDesc(
+				"Enter one argument per line. Leave empty to run without arguments.",
+			)
+			.addTextArea((text) => {
+				text.setPlaceholder("")
+					.setValue(this.formatArgs(minimax.args))
+					.onChange(async (value) => {
+						await this.plugin.settingsService.updateSettings({
+							minimax: {
+								...this.plugin.settings.minimax,
+								args: this.parseArgs(value),
+							},
+						});
+					});
+				text.inputEl.rows = 3;
+			});
+
+		new Setting(sectionEl)
+			.setName("Environment variables")
+			.setDesc(
+				"Defaults to the global MiniMax endpoint and MiniMax-M3. For China access, set ANTHROPIC_BASE_URL to https://api.minimaxi.com/anthropic.",
+			)
+			.addTextArea((text) => {
+				text.setPlaceholder("KEY=VALUE")
+					.setValue(this.formatEnv(minimax.env))
+					.onChange(async (value) => {
+						await this.plugin.settingsService.updateSettings({
+							minimax: {
+								...this.plugin.settings.minimax,
 								env: this.parseEnv(value),
 							},
 						});

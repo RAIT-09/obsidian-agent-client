@@ -1,9 +1,4 @@
-import {
-	Plugin,
-	WorkspaceLeaf,
-	Notice,
-	requestUrl,
-} from "obsidian";
+import { Plugin, WorkspaceLeaf, Notice, requestUrl } from "obsidian";
 import * as semver from "semver";
 import { ChatView, VIEW_TYPE_CHAT } from "./ui/ChatView";
 import {
@@ -41,6 +36,7 @@ import {
 	AgentEnvVar,
 	GeminiAgentSettings,
 	ClaudeAgentSettings,
+	MiniMaxAgentSettings,
 	CodexAgentSettings,
 	CustomAgentSettings,
 } from "./types/agent";
@@ -48,7 +44,7 @@ import type { SavedSessionInfo } from "./types/session";
 import { initializeLogger, getLogger } from "./utils/logger";
 
 // Re-export for backward compatibility
-export type { AgentEnvVar, CustomAgentSettings };
+export type { AgentEnvVar, MiniMaxAgentSettings, CustomAgentSettings };
 
 /**
  * Send message shortcut configuration.
@@ -73,6 +69,7 @@ export type ChatViewLocation =
 export interface AgentClientPluginSettings {
 	gemini: GeminiAgentSettings;
 	claude: ClaudeAgentSettings;
+	minimax: MiniMaxAgentSettings;
 	codex: CodexAgentSettings;
 	customAgents: CustomAgentSettings[];
 	/** Default agent ID for new views (renamed from activeAgentId for multi-session) */
@@ -145,6 +142,20 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		command: "claude-agent-acp",
 		args: [],
 		env: [],
+	},
+	minimax: {
+		id: "minimax",
+		displayName: "MiniMax",
+		apiKeySecretId: "",
+		command: "claude-agent-acp",
+		args: [],
+		env: [
+			{
+				key: "ANTHROPIC_BASE_URL",
+				value: "https://api.minimax.io/anthropic",
+			},
+			{ key: "ANTHROPIC_MODEL", value: "MiniMax-M3" },
+		],
 	},
 	codex: {
 		id: "codex-acp",
@@ -707,7 +718,7 @@ export default class AgentClientPlugin extends Plugin {
 	}
 
 	/**
-	 * Get all available agents (claude, codex, gemini, custom)
+	 * Get all available agents.
 	 */
 	getAvailableAgents(): Array<{ id: string; displayName: string }> {
 		return [
@@ -725,6 +736,12 @@ export default class AgentClientPlugin extends Plugin {
 				id: this.settings.gemini.id,
 				displayName:
 					this.settings.gemini.displayName || this.settings.gemini.id,
+			},
+			{
+				id: this.settings.minimax.id,
+				displayName:
+					this.settings.minimax.displayName ||
+					this.settings.minimax.id,
 			},
 			...this.settings.customAgents.map((agent) => ({
 				id: agent.id,
@@ -929,6 +946,7 @@ export default class AgentClientPlugin extends Plugin {
 		const rc = obj(raw.claude) ?? {};
 		const rk = obj(raw.codex) ?? {};
 		const rg = obj(raw.gemini) ?? {};
+		const rm = obj(raw.minimax) ?? {};
 		const re = obj(raw.exportSettings) ?? {};
 		const rd = obj(raw.displaySettings) ?? {};
 
@@ -946,6 +964,7 @@ export default class AgentClientPlugin extends Plugin {
 			D.claude.id,
 			D.codex.id,
 			D.gemini.id,
+			D.minimax.id,
 			...customAgents.map((a) => a.id),
 		];
 		const rawDefaultId =
@@ -1018,6 +1037,26 @@ export default class AgentClientPlugin extends Plugin {
 						: D.gemini.args,
 				env: normalizeEnvVars(rg.env),
 			},
+			minimax: {
+				id: D.minimax.id,
+				displayName: str(rm.displayName, D.minimax.displayName),
+				apiKeySecretId: this.migrateLegacyApiKey(
+					"minimax-api-key",
+					"agent-client-minimax-api-key",
+					str(rm.apiKeySecretId, D.minimax.apiKeySecretId),
+					str(rm.apiKey, ""),
+					"MiniMax",
+					() => {
+						migratedSecrets = true;
+					},
+				),
+				command: str(rm.command, "") || D.minimax.command,
+				args: sanitizeArgs(rm.args),
+				env:
+					"env" in rm
+						? normalizeEnvVars(rm.env)
+						: D.minimax.env.map((entry) => ({ ...entry })),
+			},
 			customAgents,
 			defaultAgentId,
 			autoAllowPermissions: bool(
@@ -1037,7 +1076,7 @@ export default class AgentClientPlugin extends Plugin {
 				return {
 					enabled: bool(rp.enabled, D.promptInjection.enabled),
 					latex: bool(rp.latex, D.promptInjection.latex),
-				wikiLinks: bool(rp.wikiLinks, D.promptInjection.wikiLinks),
+					wikiLinks: bool(rp.wikiLinks, D.promptInjection.wikiLinks),
 					tables: bool(rp.tables, D.promptInjection.tables),
 				};
 			})(),
@@ -1326,6 +1365,7 @@ export default class AgentClientPlugin extends Plugin {
 		ids.add(this.settings.claude.id);
 		ids.add(this.settings.codex.id);
 		ids.add(this.settings.gemini.id);
+		ids.add(this.settings.minimax.id);
 		for (const agent of this.settings.customAgents) {
 			if (agent.id && agent.id.length > 0) {
 				ids.add(agent.id);

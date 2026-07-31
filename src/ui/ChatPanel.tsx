@@ -272,6 +272,12 @@ export function ChatPanel({
 				plugin.settings.gemini.displayName || plugin.settings.gemini.id
 			);
 		}
+		if (activeId === plugin.settings.minimax.id) {
+			return (
+				plugin.settings.minimax.displayName ||
+				plugin.settings.minimax.id
+			);
+		}
 		const custom = plugin.settings.customAgents.find(
 			(agent) => agent.id === activeId,
 		);

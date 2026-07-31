@@ -78,6 +78,17 @@ export interface ClaudeAgentSettings extends BaseAgentSettings {
 }
 
 /**
+ * Configuration for the MiniMax agent profile.
+ *
+ * The API key is stored in Obsidian's secret storage and referenced by ID.
+ * Empty string means no API key is configured.
+ */
+export interface MiniMaxAgentSettings extends BaseAgentSettings {
+	/** Secret storage ID containing the MiniMax API key */
+	apiKeySecretId: string;
+}
+
+/**
  * Configuration for Codex CLI agent.
  *
  * Extends base settings with Codex-specific requirements.

@@ -7,6 +7,7 @@ import type { AgentClientPluginSettings } from "../plugin";
 import type {
 	BaseAgentSettings,
 	ClaudeAgentSettings,
+	MiniMaxAgentSettings,
 	GeminiAgentSettings,
 	CodexAgentSettings,
 } from "../types/agent";
@@ -61,6 +62,10 @@ export function getAvailableAgentsFromSettings(
 			id: settings.gemini.id,
 			displayName: settings.gemini.displayName || settings.gemini.id,
 		},
+		{
+			id: settings.minimax.id,
+			displayName: settings.minimax.displayName || settings.minimax.id,
+		},
 		...settings.customAgents.map((agent) => ({
 			id: agent.id,
 			displayName: agent.displayName || agent.id,
@@ -104,6 +109,9 @@ export function findAgentSettings(
 	}
 	if (agentId === settings.gemini.id) {
 		return settings.gemini;
+	}
+	if (agentId === settings.minimax.id) {
+		return settings.minimax;
 	}
 	// Search in custom agents
 	const customAgent = settings.customAgents.find(
@@ -156,6 +164,16 @@ export function buildAgentConfigWithApiKey(
 			apiKey: {
 				secretId: geminiSettings.apiKeySecretId,
 				envVarName: "GEMINI_API_KEY",
+			},
+		};
+	}
+	if (agentId === settings.minimax.id) {
+		const minimaxSettings = agentSettings as MiniMaxAgentSettings;
+		return {
+			...baseConfig,
+			apiKey: {
+				secretId: minimaxSettings.apiKeySecretId,
+				envVarName: "ANTHROPIC_API_KEY",
 			},
 		};
 	}
