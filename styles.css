@@ -1587,6 +1587,20 @@ If your plugin does not need CSS, delete this file.
 	border: 1px solid var(--background-modifier-border);
 	background-color: var(--background-primary);
 	overflow: hidden;
+	padding: 4px;
+	box-shadow: none;
+	color: inherit;
+}
+
+.agent-client-attachment-preview-file:disabled {
+	opacity: 1;
+	cursor: default;
+}
+
+.agent-client-attachment-preview-file-labels {
+	display: flex;
+	flex-direction: column;
+	max-width: 100%;
 }
 
 .agent-client-attachment-preview-file-icon {
@@ -1602,6 +1616,16 @@ If your plugin does not need CSS, delete this file.
 	font-size: 9px;
 	color: var(--text-muted);
 	text-align: center;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 0 4px;
+}
+
+.agent-client-attachment-preview-file-path {
+	font-size: 8px;
+	color: var(--text-faint);
 	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;

@@ -243,6 +243,9 @@ export interface AttachedFile {
 	/** Absolute file path (only for kind === "file") */
 	path?: string;
 
+	/** Canonical vault-relative path for files dragged from Obsidian. */
+	vaultPath?: string;
+
 	/** File size in bytes (only for kind === "file", for display + resource_link) */
 	size?: number;
 }
