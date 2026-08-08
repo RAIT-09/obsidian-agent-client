@@ -23,6 +23,13 @@ export type ToolCallMessageContent = Extract<
 	MessageContent,
 	{ type: "tool_call" }
 >;
+export type ToolCallMessageUpdate = Omit<
+	Partial<ToolCallMessageContent>,
+	"type" | "toolCallId"
+> & {
+	type: "tool_call";
+	toolCallId: string;
+};
 
 // ============================================================================
 // Tool Call Merge
@@ -34,23 +41,10 @@ export type ToolCallMessageContent = Extract<
  */
 export function mergeToolCallContent(
 	existing: ToolCallMessageContent,
-	update: ToolCallMessageContent,
+	update: ToolCallMessageUpdate,
 ): ToolCallMessageContent {
-	// Merge content arrays
-	let mergedContent = existing.content || [];
-	if (update.content !== undefined) {
-		const newContent = update.content || [];
-
-		// If new content contains diff, replace all old diffs
-		const hasDiff = newContent.some((item) => item.type === "diff");
-		if (hasDiff) {
-			mergedContent = mergedContent.filter(
-				(item) => item.type !== "diff",
-			);
-		}
-
-		mergedContent = [...mergedContent, ...newContent];
-	}
+	const mergedContent =
+		update.content !== undefined ? update.content : existing.content;
 
 	return {
 		...existing,
@@ -68,6 +62,10 @@ export function mergeToolCallContent(
 			Object.keys(update.rawInput).length > 0
 				? update.rawInput
 				: existing.rawInput,
+		rawOutput:
+			update.rawOutput !== undefined
+				? update.rawOutput
+				: existing.rawOutput,
 		permissionRequest:
 			update.permissionRequest !== undefined
 				? update.permissionRequest
@@ -190,7 +188,7 @@ export function applyUpdateUserMessage(
  */
 export function applyUpsertToolCall(
 	prev: ChatMessage[],
-	content: ToolCallMessageContent,
+	content: ToolCallMessageUpdate,
 	toolCallIndex: Map<string, number>,
 ): ChatMessage[] {
 	// O(1) lookup via index
@@ -253,7 +251,12 @@ export function applyUpsertToolCall(
 		{
 			id: crypto.randomUUID(),
 			role: "assistant" as const,
-			content: [content],
+			content: [
+				{
+					...content,
+					status: content.status ?? "pending",
+				},
+			],
 			timestamp: new Date(),
 		},
 	];
@@ -302,6 +305,22 @@ export function applySingleUpdate(
 				text: update.text,
 			});
 		case "tool_call":
+			return applyUpsertToolCall(
+				prev,
+				{
+					type: "tool_call",
+					toolCallId: update.toolCallId,
+					title: update.title,
+					status: update.status,
+					kind: update.kind,
+					content: update.content,
+					locations: update.locations,
+					rawInput: update.rawInput,
+					rawOutput: update.rawOutput,
+					permissionRequest: update.permissionRequest,
+				},
+				toolCallIndex,
+			);
 		case "tool_call_update":
 			return applyUpsertToolCall(
 				prev,
@@ -309,11 +328,12 @@ export function applySingleUpdate(
 					type: "tool_call",
 					toolCallId: update.toolCallId,
 					title: update.title,
-					status: update.status || "pending",
+					status: update.status,
 					kind: update.kind,
 					content: update.content,
 					locations: update.locations,
 					rawInput: update.rawInput,
+					rawOutput: update.rawOutput,
 					permissionRequest: update.permissionRequest,
 				},
 				toolCallIndex,

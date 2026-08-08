@@ -1534,6 +1534,68 @@ If your plugin does not need CSS, delete this file.
 	word-break: break-word;
 }
 
+.agent-client-tool-result-text,
+.agent-client-tool-result-resource-embedded pre,
+.agent-client-tool-result-raw pre {
+	max-height: 320px;
+	margin: 6px 0 0;
+	padding: 8px;
+	overflow: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	font-family: var(--font-monospace);
+	font-size: 0.9em;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.agent-client-tool-result-image {
+	display: block;
+	max-width: 100%;
+	max-height: 384px;
+	margin-top: 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	object-fit: contain;
+}
+
+.agent-client-tool-result-audio {
+	width: min(100%, 448px);
+	margin-top: 6px;
+}
+
+.agent-client-tool-result-resource {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+	max-width: 100%;
+	margin-top: 6px;
+	padding: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	color: var(--text-normal);
+	text-decoration: none;
+	overflow-wrap: anywhere;
+}
+
+.agent-client-tool-result-resource small,
+.agent-client-tool-result-resource-embedded p {
+	color: var(--text-muted);
+}
+
+.agent-client-tool-result-resource-embedded,
+.agent-client-tool-result-raw {
+	margin-top: 6px;
+}
+
+.agent-client-tool-result-resource-embedded summary,
+.agent-client-tool-result-raw summary {
+	cursor: pointer;
+	overflow-wrap: anywhere;
+}
+
 /* ===== Attachment Preview Strip ===== */
 .agent-client-attachment-preview-strip {
 	display: flex;
