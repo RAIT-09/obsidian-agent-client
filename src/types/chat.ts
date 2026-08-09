@@ -147,6 +147,14 @@ export interface ActivePermission {
 	toolCallId: string;
 	/** Available permission options */
 	options: PermissionOption[];
+	/** Tool call title, shown as the dialog heading */
+	title?: string | null;
+	/** Tool kind, for the dialog's icon */
+	kind?: ToolKind;
+	/** What the agent is about to do — the dialog's review surface */
+	content?: ToolCallContent[];
+	/** Raw tool input; carries the command for `execute` calls */
+	rawInput?: { [k: string]: unknown };
 }
 
 /**

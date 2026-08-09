@@ -374,6 +374,52 @@ If your plugin does not need CSS, delete this file.
 	text-overflow: ellipsis;
 }
 
+.agent-client-message-tool-call-header-toggle {
+	cursor: pointer;
+}
+
+.agent-client-message-tool-call-expand-icon {
+	flex-shrink: 0;
+}
+
+.agent-client-message-tool-call-expand-icon svg {
+	width: 14px;
+	height: 14px;
+	color: var(--text-muted);
+}
+
+/* Images stay visible while the body is collapsed. */
+.agent-client-tool-result-images-strip {
+	display: flex;
+	gap: 8px;
+	padding: 4px 0 0;
+	overflow-x: auto;
+	scrollbar-width: thin;
+}
+
+.agent-client-tool-result-images-strip::-webkit-scrollbar {
+	height: 4px;
+}
+
+.agent-client-tool-result-images-strip::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.agent-client-tool-result-images-strip::-webkit-scrollbar-thumb {
+	background-color: var(--background-modifier-border);
+	border-radius: 2px;
+}
+
+.agent-client-tool-result-image-thumbnail {
+	flex-shrink: 0;
+	width: 120px;
+	height: 120px;
+	object-fit: cover;
+	object-position: center;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+}
+
 .agent-client-message-tool-call-status-icon {
 	flex-shrink: 0;
 }

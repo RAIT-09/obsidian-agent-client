@@ -7,6 +7,7 @@ import type AgentClientPlugin from "../plugin";
 import { MarkdownRenderer } from "./shared/MarkdownRenderer";
 import { TerminalBlock } from "./TerminalBlock";
 import { ToolCallBlock } from "./ToolCallBlock";
+import { isPermissionPending } from "../services/message-state";
 import { LucideIcon } from "./shared/IconButton";
 
 // ---------------------------------------------------------------------------
@@ -154,11 +155,10 @@ interface ContentBlockProps {
 	plugin: AgentClientPlugin;
 	messageRole?: "user" | "assistant";
 	terminalClient?: AcpClient;
-	/** Callback to approve a permission request */
-	onApprovePermission?: (
-		requestId: string,
-		optionId: string,
-	) => Promise<void>;
+	/** Tool call ids whose bodies are expanded */
+	expandedToolCalls?: ReadonlySet<string>;
+	/** Toggle a tool call body */
+	onToggleToolCall?: (toolCallId: string) => void;
 }
 
 function ContentBlock({
@@ -166,7 +166,8 @@ function ContentBlock({
 	plugin,
 	messageRole,
 	terminalClient,
-	onApprovePermission,
+	expandedToolCalls,
+	onToggleToolCall,
 }: ContentBlockProps) {
 	switch (content.type) {
 		case "text":
@@ -191,12 +192,19 @@ function ContentBlock({
 			return <CollapsibleThought text={content.text} plugin={plugin} />;
 
 		case "tool_call":
+			// A tool call awaiting a decision is reviewed in the dialog above
+			// the input, and joins the transcript once the user decides.
+			// Keyed on "undecided", not on isActive: a queued request arrives
+			// with isActive false, so keying on isActive would show it, hide
+			// it again when its turn came, then show it once more.
+			if (isPermissionPending(content.permissionRequest)) return null;
 			return (
 				<ToolCallBlock
 					content={content}
 					plugin={plugin}
 					terminalClient={terminalClient}
-					onApprovePermission={onApprovePermission}
+					isExpanded={expandedToolCalls?.has(content.toolCallId)}
+					onToggleExpanded={onToggleToolCall}
 				/>
 			);
 
@@ -287,11 +295,10 @@ export interface MessageBubbleProps {
 	message: ChatMessage;
 	plugin: AgentClientPlugin;
 	terminalClient?: AcpClient;
-	/** Callback to approve a permission request */
-	onApprovePermission?: (
-		requestId: string,
-		optionId: string,
-	) => Promise<void>;
+	/** Tool call ids whose bodies are expanded */
+	expandedToolCalls?: ReadonlySet<string>;
+	/** Toggle a tool call body */
+	onToggleToolCall?: (toolCallId: string) => void;
 }
 
 /**
@@ -385,7 +392,8 @@ export const MessageBubble = React.memo(function MessageBubble({
 	message,
 	plugin,
 	terminalClient,
-	onApprovePermission,
+	expandedToolCalls,
+	onToggleToolCall,
 }: MessageBubbleProps) {
 	const groups = groupContent(message.content);
 
@@ -408,7 +416,8 @@ export const MessageBubble = React.memo(function MessageBubble({
 									plugin={plugin}
 									messageRole={message.role}
 									terminalClient={terminalClient}
-									onApprovePermission={onApprovePermission}
+									expandedToolCalls={expandedToolCalls}
+									onToggleToolCall={onToggleToolCall}
 								/>
 							))}
 						</div>
@@ -422,7 +431,8 @@ export const MessageBubble = React.memo(function MessageBubble({
 								plugin={plugin}
 								messageRole={message.role}
 								terminalClient={terminalClient}
-								onApprovePermission={onApprovePermission}
+								expandedToolCalls={expandedToolCalls}
+								onToggleToolCall={onToggleToolCall}
 							/>
 						</div>
 					);

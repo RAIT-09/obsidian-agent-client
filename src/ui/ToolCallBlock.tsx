@@ -1,10 +1,9 @@
 import * as React from "react";
-const { useState, useMemo } = React;
+const { useMemo } = React;
 import { FileSystemAdapter } from "obsidian";
 import type { MessageContent } from "../types/chat";
 import type { AcpClient } from "../acp/acp-client";
 import type AgentClientPlugin from "../plugin";
-import { PermissionBanner } from "./PermissionBanner";
 import { LucideIcon } from "./shared/IconButton";
 import { toRelativePath } from "../utils/paths";
 import { ToolCallContentView } from "./ToolCallContentView";
@@ -14,41 +13,42 @@ interface ToolCallBlockProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
 	plugin: AgentClientPlugin;
 	terminalClient?: AcpClient;
-	/** Callback to approve a permission request */
-	onApprovePermission?: (
-		requestId: string,
-		optionId: string,
-	) => Promise<void>;
+	/** Whether this tool call's body is expanded */
+	isExpanded?: boolean;
+	/** Toggle the body. Owned above the virtualized list so the state
+	 *  survives scrolling the row out of view. */
+	onToggleExpanded?: (toolCallId: string) => void;
 }
 
 export const ToolCallBlock = React.memo(function ToolCallBlock({
 	content,
 	plugin,
 	terminalClient,
-	onApprovePermission,
+	isExpanded = false,
+	onToggleExpanded,
 }: ToolCallBlockProps) {
 	const {
+		toolCallId,
 		kind,
 		title,
 		status,
-		permissionRequest,
 		locations,
 		rawInput,
 		rawOutput,
 		content: toolContent,
 	} = content;
 
-	// Local state for selected option (for immediate UI feedback)
-	const [selectedOptionId, setSelectedOptionId] = useState<
-		string | undefined
-	>(permissionRequest?.selectedOptionId);
-
-	// Update selectedOptionId when permissionRequest changes
-	React.useEffect(() => {
-		if (permissionRequest?.selectedOptionId !== selectedOptionId) {
-			setSelectedOptionId(permissionRequest?.selectedOptionId);
-		}
-	}, [permissionRequest?.selectedOptionId]);
+	// Images render beside the collapsed row, so they stay visible without
+	// expanding; everything else lives in the collapsible body.
+	const images = useMemo(
+		() =>
+			(toolContent ?? []).flatMap((item) =>
+				item.type === "content" && item.content.type === "image"
+					? [item.content]
+					: [],
+			),
+		[toolContent],
+	);
 
 	// Get vault path for relative path display
 	const vaultPath = useMemo(() => {
@@ -90,8 +90,11 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 
 	return (
 		<div className="agent-client-message-tool-call">
-			{/* Header */}
-			<div className="agent-client-message-tool-call-header">
+			{/* Header — the whole row toggles, like CollapsibleThought */}
+			<div
+				className="agent-client-message-tool-call-header agent-client-message-tool-call-header-toggle"
+				onClick={() => onToggleExpanded?.(toolCallId)}
+			>
 				<div className="agent-client-message-tool-call-title">
 					{showEmojis && (
 						<LucideIcon
@@ -108,6 +111,10 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 							className={`agent-client-message-tool-call-status-icon agent-client-status-${status}`}
 						/>
 					)}
+					<LucideIcon
+						name={isExpanded ? "chevron-down" : "chevron-right"}
+						className="agent-client-message-tool-call-expand-icon"
+					/>
 				</div>
 				{kind === "execute" &&
 					rawInput &&
@@ -136,26 +143,37 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 				)}
 			</div>
 
-			{/* Tool call content (diffs, terminal output, etc.) */}
-			<ToolCallContentView
-				content={toolContent}
-				rawOutput={rawOutput}
-				plugin={plugin}
-				terminalClient={terminalClient}
-			/>
-
-			{/* Permission request section */}
-			{permissionRequest && (
-				<PermissionBanner
-					permissionRequest={{
-						...permissionRequest,
-						selectedOptionId: selectedOptionId,
-					}}
-					showEmojis={showEmojis}
-					onApprovePermission={onApprovePermission}
-					onOptionSelected={setSelectedOptionId}
-				/>
+			{/* Images sit outside the collapsible body: a result you want to
+			    see at a glance, not detail you open. */}
+			{images.length > 0 && (
+				<div className="agent-client-tool-result-images-strip">
+					{images.map((image, index) => (
+						<img
+							key={index}
+							className="agent-client-tool-result-image-thumbnail"
+							src={`data:${image.mimeType};base64,${image.data}`}
+							alt="Tool result"
+						/>
+					))}
+				</div>
 			)}
+
+			{/* Collapsible body. Hidden with CSS rather than unmounted so an
+			    embedded TerminalBlock keeps polling: the client drops a
+			    released terminal 30s later, and a remount after that would
+			    find nothing left to show. */}
+			<div
+				className="agent-client-message-tool-call-body"
+				hidden={!isExpanded}
+			>
+				<ToolCallContentView
+					content={toolContent}
+					rawOutput={rawOutput}
+					plugin={plugin}
+					terminalClient={terminalClient}
+					omitImages
+				/>
+			</div>
 		</div>
 	);
 });

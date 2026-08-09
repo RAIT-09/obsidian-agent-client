@@ -335,6 +335,23 @@ export const ChatPanel = React.memo(function ChatPanel({
 	const [inputValue, setInputValue] = useState("");
 	const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 
+	// Which tool calls are expanded. Held here rather than inside the rows
+	// because the virtualized list unmounts anything scrolled out of view.
+	const [expandedToolCalls, setExpandedToolCalls] = useState<Set<string>>(
+		() => new Set(),
+	);
+	const toggleToolCall = useCallback((toolCallId: string) => {
+		setExpandedToolCalls((prev) => {
+			const next = new Set(prev);
+			if (!next.delete(toolCallId)) next.add(toolCallId);
+			return next;
+		});
+	}, []);
+	// Start every session collapsed; ids are only meaningful within one.
+	useEffect(() => {
+		setExpandedToolCalls(new Set());
+	}, [session.sessionId]);
+
 	// Pending auto-send queued by the pending-prompt handler (drained when ready)
 	const [pendingAutoSend, setPendingAutoSend] = useState<string | null>(null);
 	const persistRestoreAttemptedRef = useRef(false);
@@ -1464,7 +1481,8 @@ export const ChatPanel = React.memo(function ChatPanel({
 			plugin={plugin}
 			view={viewHost}
 			terminalClient={terminalClientRef.current}
-			onApprovePermission={agent.approvePermission}
+			expandedToolCalls={expandedToolCalls}
+			onToggleToolCall={toggleToolCall}
 			hasActivePermission={agent.hasActivePermission}
 		/>
 	);
