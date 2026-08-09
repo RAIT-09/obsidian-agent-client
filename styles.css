@@ -526,6 +526,57 @@ If your plugin does not need CSS, delete this file.
 	overflow: hidden;
 }
 
+/* ===== Permission dialog (above the input) ===== */
+.agent-client-permission-dialog {
+	margin-bottom: 8px;
+	padding: 8px;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	font-size: 0.85em;
+}
+
+.agent-client-permission-dialog-header {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-weight: bold;
+}
+
+.agent-client-permission-dialog-icon svg {
+	width: 14px;
+	height: 14px;
+	color: var(--text-muted);
+}
+
+.agent-client-permission-dialog-title {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* How many requests are waiting behind this one. */
+.agent-client-permission-dialog-queue {
+	flex-shrink: 0;
+	padding: 0 6px;
+	border-radius: 8px;
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
+	font-weight: normal;
+}
+
+/* The review surface: what is about to run, or about to change. */
+.agent-client-permission-dialog-review {
+	max-height: 40vh;
+	overflow: auto;
+}
+
+.agent-client-permission-dialog-review:empty {
+	display: none;
+}
+
 .agent-client-message-permission-request .agent-client-permission-option {
 	display: flex;
 	align-items: center;

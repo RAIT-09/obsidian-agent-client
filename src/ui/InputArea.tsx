@@ -11,10 +11,15 @@ import type {
 	SessionUsage,
 	SessionConfigOption,
 } from "../types/session";
-import type { AttachedFile, ChatMessage } from "../types/chat";
+import type {
+	ActivePermission,
+	AttachedFile,
+	ChatMessage,
+} from "../types/chat";
 import type { UseSuggestionsReturn } from "../hooks/useSuggestions";
 import { SuggestionPopup } from "./SuggestionPopup";
 import { ErrorBanner } from "./ErrorBanner";
+import { PermissionDialog } from "./PermissionDialog";
 import { AttachmentStrip } from "./shared/AttachmentStrip";
 import { InputToolbar } from "./InputToolbar";
 import { getLogger } from "../utils/logger";
@@ -188,6 +193,15 @@ export interface InputAreaProps {
 	agentLabel: string;
 	/** Available slash commands */
 	availableCommands: SlashCommand[];
+	/** Permission awaiting the user's decision, reviewed above the input */
+	activePermission?: ActivePermission | null;
+	/** Requests queued behind the active one */
+	queuedPermissionCount?: number;
+	/** Callback to answer a permission request */
+	onApprovePermission?: (
+		requestId: string,
+		optionId: string,
+	) => Promise<void>;
 	/** Whether auto-mention setting is enabled */
 	autoMentionEnabled: boolean;
 	/** Message to restore (e.g., after cancellation) */
@@ -264,6 +278,9 @@ export function InputArea({
 	isRestoringSession,
 	agentLabel,
 	availableCommands,
+	activePermission,
+	queuedPermissionCount = 0,
+	onApprovePermission,
 	autoMentionEnabled,
 	restoredMessage,
 	suggestions,
@@ -972,6 +989,19 @@ export function InputArea({
 					showEmojis={showEmojis}
 					view={view}
 					variant={geminiNotice.variant}
+				/>
+			)}
+
+			{/* Permission review — below the banners, above the input, so the
+			    buttons are always in reach (they used to live inside the
+			    virtualized transcript, where scrolling could hide them). */}
+			{activePermission && (
+				<PermissionDialog
+					permission={activePermission}
+					queuedCount={queuedPermissionCount}
+					plugin={plugin}
+					showEmojis={showEmojis}
+					onApprovePermission={onApprovePermission}
 				/>
 			)}
 

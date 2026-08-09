@@ -17,6 +17,7 @@ import {
 	computeSessionTitle,
 	getDefaultAgentId,
 } from "../services/session-helpers";
+import { countPendingPermissions } from "../services/message-state";
 import { useHistoryModal } from "../hooks/useHistoryModal";
 import { useChatActions } from "../hooks/useChatActions";
 import { ChangeDirectoryModal } from "./ChangeDirectoryModal";
@@ -351,6 +352,12 @@ export const ChatPanel = React.memo(function ChatPanel({
 	useEffect(() => {
 		setExpandedToolCalls(new Set());
 	}, [session.sessionId]);
+
+	// Requests waiting behind the active one, for the dialog's queue badge.
+	const queuedPermissionCount = useMemo(
+		() => Math.max(0, countPendingPermissions(messages) - 1),
+		[messages],
+	);
 
 	// Pending auto-send queued by the pending-prompt handler (drained when ready)
 	const [pendingAutoSend, setPendingAutoSend] = useState<string | null>(null);
@@ -1494,6 +1501,9 @@ export const ChatPanel = React.memo(function ChatPanel({
 			isRestoringSession={sessionHistory.loading}
 			agentLabel={activeAgentLabel}
 			availableCommands={session.availableCommands || []}
+			activePermission={agent.activePermission}
+			queuedPermissionCount={queuedPermissionCount}
+			onApprovePermission={agent.approvePermission}
 			autoMentionEnabled={settings.autoMentionActiveNote}
 			restoredMessage={restoredMessage}
 			suggestions={suggestions}
