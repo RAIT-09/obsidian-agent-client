@@ -116,31 +116,6 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 						className="agent-client-message-tool-call-expand-icon"
 					/>
 				</div>
-				{kind === "execute" &&
-					rawInput &&
-					typeof rawInput.command === "string" && (
-						<div className="agent-client-message-tool-call-command">
-							<code>
-								{rawInput.command}
-								{Array.isArray(rawInput.args) &&
-									rawInput.args.length > 0 &&
-									` ${(rawInput.args as string[]).join(" ")}`}
-							</code>
-						</div>
-					)}
-				{locations && locations.length > 0 && (
-					<div className="agent-client-message-tool-call-locations">
-						{locations.map((loc, idx) => (
-							<span
-								key={idx}
-								className="agent-client-message-tool-call-location"
-							>
-								{toRelativePath(loc.path, vaultPath)}
-								{loc.line != null && `:${loc.line}`}
-							</span>
-						))}
-					</div>
-				)}
 			</div>
 
 			{/* Images sit outside the collapsible body: a result you want to
@@ -166,6 +141,33 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 				className="agent-client-message-tool-call-body"
 				hidden={!isExpanded}
 			>
+				{/* Detail that used to sit in the header. It moved here so the
+				    collapsed row stays a single line. */}
+				{kind === "execute" &&
+					rawInput &&
+					typeof rawInput.command === "string" && (
+						<div className="agent-client-message-tool-call-command">
+							<code>
+								{rawInput.command}
+								{Array.isArray(rawInput.args) &&
+									rawInput.args.length > 0 &&
+									` ${(rawInput.args as string[]).join(" ")}`}
+							</code>
+						</div>
+					)}
+				{locations && locations.length > 0 && (
+					<div className="agent-client-message-tool-call-locations">
+						{locations.map((loc, idx) => (
+							<span
+								key={idx}
+								className="agent-client-message-tool-call-location"
+							>
+								{toRelativePath(loc.path, vaultPath)}
+								{loc.line != null && `:${loc.line}`}
+							</span>
+						))}
+					</div>
+				)}
 				<ToolCallContentView
 					content={toolContent}
 					rawOutput={rawOutput}
