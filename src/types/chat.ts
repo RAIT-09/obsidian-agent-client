@@ -44,9 +44,58 @@ export type ToolKind =
 
 /**
  * Content that can be included in a tool call result.
- * Currently supports diffs and terminal output.
+ * Supports ACP standard content blocks, diffs, and terminal output.
  */
-export type ToolCallContent = DiffContent | TerminalContent;
+export type ToolCallContent =
+	| StandardToolCallContent
+	| DiffContent
+	| TerminalContent;
+
+/** A displayable ACP content block returned by a tool. */
+export type ToolResultContentBlock =
+	| {
+			type: "text";
+			text: string;
+	  }
+	| {
+			type: "image";
+			data: string;
+			mimeType: string;
+			uri?: string;
+	  }
+	| {
+			type: "audio";
+			data: string;
+			mimeType: string;
+	  }
+	| {
+			type: "resource_link";
+			uri: string;
+			name: string;
+			title?: string;
+			description?: string;
+			mimeType?: string;
+			size?: number;
+	  }
+	| {
+			type: "resource";
+			resource:
+				| {
+						uri: string;
+						mimeType?: string;
+						text: string;
+				  }
+				| {
+						uri: string;
+						mimeType?: string;
+						blob: string;
+				  };
+	  };
+
+export interface StandardToolCallContent {
+	type: "content";
+	content: ToolResultContentBlock;
+}
 
 /**
  * Represents a file modification with before/after content.
@@ -121,7 +170,7 @@ export interface ToolCallInfo {
 	content?: ToolCallContent[] | null;
 	locations?: ToolCallLocation[] | null;
 	rawInput?: { [k: string]: unknown }; // Tool's input parameters
-	rawOutput?: { [k: string]: unknown }; // Tool's output data
+	rawOutput?: unknown; // Tool's output data
 }
 
 // ============================================================================
@@ -197,7 +246,7 @@ export type MessageContent =
 			content?: ToolCallContent[];
 			locations?: ToolCallLocation[];
 			rawInput?: { [k: string]: unknown };
-			rawOutput?: { [k: string]: unknown };
+			rawOutput?: unknown;
 			permissionRequest?: {
 				requestId: string;
 				options: PermissionOption[];

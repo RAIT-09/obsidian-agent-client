@@ -297,12 +297,13 @@ export interface UserMessageChunk extends SessionUpdateBase {
 export interface ToolCall extends SessionUpdateBase {
 	type: "tool_call";
 	toolCallId: string;
-	title?: string;
+	title?: string | null;
 	status: ToolCallStatus;
 	kind?: ToolKind;
 	content?: ToolCallContent[];
 	locations?: ToolCallLocation[];
 	rawInput?: { [k: string]: unknown };
+	rawOutput?: unknown;
 	permissionRequest?: {
 		requestId: string;
 		options: PermissionOption[];
@@ -320,12 +321,13 @@ export interface ToolCall extends SessionUpdateBase {
 export interface ToolCallUpdate extends SessionUpdateBase {
 	type: "tool_call_update";
 	toolCallId: string;
-	title?: string;
+	title?: string | null;
 	status?: ToolCallStatus;
 	kind?: ToolKind;
 	content?: ToolCallContent[];
 	locations?: ToolCallLocation[];
 	rawInput?: { [k: string]: unknown };
+	rawOutput?: unknown;
 	permissionRequest?: {
 		requestId: string;
 		options: PermissionOption[];

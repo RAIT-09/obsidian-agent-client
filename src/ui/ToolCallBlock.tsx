@@ -9,6 +9,7 @@ import { PermissionBanner } from "./PermissionBanner";
 import { LucideIcon } from "./shared/IconButton";
 import { toRelativePath } from "../utils/paths";
 import * as Diff from "diff";
+import { ToolResultContent } from "./ToolResultContent";
 // import { MarkdownRenderer } from "./shared/MarkdownRenderer";
 
 interface ToolCallBlockProps {
@@ -35,6 +36,7 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 		permissionRequest,
 		locations,
 		rawInput,
+		rawOutput,
 		content: toolContent,
 	} = content;
 
@@ -139,6 +141,14 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 			{/* Tool call content (diffs, terminal output, etc.) */}
 			{toolContent &&
 				toolContent.map((item, index) => {
+					if (item.type === "content") {
+						return (
+							<ToolResultContent
+								key={index}
+								content={item.content}
+							/>
+						);
+					}
 					if (item.type === "terminal") {
 						return (
 							<TerminalBlock
@@ -167,6 +177,18 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 					}
 					return null;
 				})}
+
+			{rawOutput !== undefined &&
+				(!toolContent || toolContent.length === 0) && (
+					<details className="agent-client-tool-result-raw">
+						<summary>Raw output</summary>
+						<pre>
+							{typeof rawOutput === "string"
+								? rawOutput
+								: JSON.stringify(rawOutput, null, 2)}
+						</pre>
+					</details>
+				)}
 
 			{/* Permission request section */}
 			{permissionRequest && (
