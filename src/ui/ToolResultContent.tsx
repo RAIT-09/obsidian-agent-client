@@ -33,6 +33,12 @@ export function ToolResultContent({ content }: ToolResultContentProps) {
 			);
 		case "resource_link":
 			return (
+				// The URI comes from the agent. `target="_blank"` is what routes
+				// the click through Obsidian's external-link handling, which
+				// confirms unknown schemes with the user and leaves
+				// `javascript:`/`data:` URIs inert; without it the href would
+				// navigate in place. Keep it even if a refactor suggests
+				// otherwise.
 				<a
 					className="agent-client-tool-result-resource"
 					href={content.uri}
