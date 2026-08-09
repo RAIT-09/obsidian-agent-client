@@ -158,21 +158,6 @@ export interface PlanEntry {
 	priority: "high" | "medium" | "low";
 }
 
-/**
- * Tool call information for permission requests.
- * Contains details about the operation being requested for user approval.
- */
-export interface ToolCallInfo {
-	toolCallId: string;
-	title?: string | null;
-	status?: ToolCallStatus | null;
-	kind?: ToolKind | null;
-	content?: ToolCallContent[] | null;
-	locations?: ToolCallLocation[] | null;
-	rawInput?: { [k: string]: unknown }; // Tool's input parameters
-	rawOutput?: unknown; // Tool's output data
-}
-
 // ============================================================================
 // Chat Message
 // ============================================================================
@@ -200,7 +185,6 @@ export interface ChatMessage {
  * - resource_link: Reference to a file the agent can access (URI only)
  * - tool_call: Agent's tool execution with results
  * - plan: Agent's task breakdown
- * - permission_request: Request for user approval
  * - terminal: Reference to a terminal session
  */
 export type MessageContent =
@@ -258,14 +242,6 @@ export type MessageContent =
 	| {
 			type: "plan";
 			entries: PlanEntry[];
-	  }
-	| {
-			type: "permission_request";
-			toolCall: ToolCallInfo;
-			options: PermissionOption[];
-			selectedOptionId?: string;
-			isCancelled?: boolean;
-			isActive?: boolean;
 	  }
 	| {
 			type: "terminal";
