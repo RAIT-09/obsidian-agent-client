@@ -366,7 +366,7 @@ type PermissionRequestState = NonNullable<
  */
 export function isPermissionPending(
 	permissionRequest: PermissionRequestState | undefined,
-): boolean {
+): permissionRequest is PermissionRequestState {
 	if (!permissionRequest) return false;
 	return (
 		permissionRequest.selectedOptionId === undefined &&
