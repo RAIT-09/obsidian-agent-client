@@ -32,14 +32,6 @@ interface AcpSessionResponse {
  */
 export class AcpTypeConverter {
 	/**
-	 * Convert ACP ToolCallContent to domain ToolCallContent.
-	 *
-	 * Preserves standard ACP content blocks as well as diffs and terminals.
-	 *
-	 * @param acpContent - Tool call content from ACP protocol
-	 * @returns Domain model tool call content, or undefined if input is null/empty
-	 */
-	/**
 	 * Convert ACP AvailableCommand[] to domain SlashCommand[].
 	 */
 	static toSlashCommands(
@@ -52,6 +44,18 @@ export class AcpTypeConverter {
 		}));
 	}
 
+	/**
+	 * Convert ACP ToolCallContent to domain ToolCallContent.
+	 *
+	 * Preserves standard ACP content blocks as well as diffs and terminals.
+	 * The three-state return mirrors ACP's update semantics:
+	 * - omitted (`undefined`) → `undefined`: the collection is unchanged
+	 * - `null` or `[]` → `[]`: the collection is explicitly cleared
+	 * - a populated array → the converted collection, replacing the previous one
+	 *
+	 * @param acpContent - Tool call content from ACP protocol
+	 * @returns Converted content, or undefined when the input was omitted
+	 */
 	static toToolCallContent(
 		acpContent: acp.ToolCallContent[] | undefined | null,
 	): ToolCallContent[] | undefined {
