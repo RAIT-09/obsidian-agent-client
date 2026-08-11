@@ -1379,6 +1379,10 @@ If your plugin does not need CSS, delete this file.
 	position: relative;
 	padding: 0 16px;
 	width: 100%;
+	/* Floor for every message. Assistant messages end with a block that
+	   already carries this much, so it collapses away there; it only shows
+	   up for messages whose last block has no bottom margin of its own. */
+	margin-bottom: 12px;
 	/* Prevent long strings from overflowing */
 	overflow-wrap: break-word;
 	word-wrap: break-word;
@@ -1391,6 +1395,13 @@ If your plugin does not need CSS, delete this file.
 	width: auto;
 	margin-left: 8px;
 	margin-right: 8px;
+	/* A user message is a turn boundary, so it gets more air than the
+	   12px rhythm between blocks. The top is smaller because the preceding
+	   block already contributes its own bottom margin; the bottom carries
+	   the whole gap on its own (the bubble's border stops the inner text
+	   margins from collapsing out). */
+	margin-top: 12px;
+	margin-bottom: 24px;
 	background-color: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 8px;
