@@ -744,10 +744,6 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* Virtual item spacing (replaces flex gap: 2px) */
-.agent-client-virtual-item {
-	padding-bottom: 2px;
-}
-
 /* Allow horizontal scroll for wide tables within messages */
 .agent-client-chat-view-messages table {
 	display: block;
@@ -1271,7 +1267,6 @@ If your plugin does not need CSS, delete this file.
 	word-wrap: break-word;
 	word-break: break-word;
 	max-width: 100%;
-	margin-top: 8px;
 	margin-bottom: 12px;
 }
 
@@ -1384,7 +1379,6 @@ If your plugin does not need CSS, delete this file.
 	position: relative;
 	padding: 0 16px;
 	width: 100%;
-	margin: 4px 0;
 	/* Prevent long strings from overflowing */
 	overflow-wrap: break-word;
 	word-wrap: break-word;
