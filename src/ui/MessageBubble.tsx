@@ -7,7 +7,6 @@ import type AgentClientPlugin from "../plugin";
 import { MarkdownRenderer } from "./shared/MarkdownRenderer";
 import { TerminalBlock } from "./TerminalBlock";
 import { ToolCallBlock } from "./ToolCallBlock";
-import { isPermissionPending } from "../services/message-state";
 import { LucideIcon } from "./shared/IconButton";
 
 // ---------------------------------------------------------------------------
@@ -192,12 +191,11 @@ function ContentBlock({
 			return <CollapsibleThought text={content.text} plugin={plugin} />;
 
 		case "tool_call":
-			// A tool call awaiting a decision is reviewed in the dialog above
-			// the input, and joins the transcript once the user decides.
-			// Keyed on "undecided", not on isActive: a queued request arrives
-			// with isActive false, so keying on isActive would show it, hide
-			// it again when its turn came, then show it once more.
-			if (isPermissionPending(content.permissionRequest)) return null;
+			// Shown even while a permission is pending. Agents announce the
+			// tool call before asking (agent-side etiquette so the client has
+			// context), so hiding it until the answer made the row appear and
+			// then vanish. The dialog above the input is the place to decide;
+			// this row is the transcript.
 			return (
 				<ToolCallBlock
 					content={content}
