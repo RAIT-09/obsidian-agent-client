@@ -633,6 +633,14 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* Messages container */
+.agent-client-message-list-shell {
+	position: relative;
+	display: flex;
+	flex: 1;
+	min-height: 0;
+	container-type: inline-size;
+}
+
 .agent-client-chat-view-messages {
 	flex: 1;
 	padding: 16px 8px;
@@ -641,6 +649,174 @@ If your plugin does not need CSS, delete this file.
 	font-size: var(--ac-chat-font-size);
 	min-height: 0;
 	position: relative;
+}
+
+/* Conversation turn navigator */
+.agent-client-turn-navigator {
+	position: absolute;
+	z-index: 20;
+	top: 50%;
+	inset-inline-start: 9px;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: center;
+	width: 11px;
+	max-height: min(50%, 320px);
+	padding: 6px 0;
+	gap: 8px;
+	transform: translateY(-50%);
+	overscroll-behavior: none;
+	pointer-events: none;
+	transition:
+		width 140ms ease,
+		gap 140ms ease,
+		padding 140ms ease;
+}
+
+.agent-client-turn-navigator.agent-client-is-interacting {
+	width: 36px;
+	padding: 8px 0;
+	gap: 0;
+	pointer-events: auto;
+}
+
+.agent-client-turn-navigator-item {
+	position: relative;
+	display: block !important;
+	flex: 0 0 2px;
+	width: 11px;
+	min-width: 0;
+	height: 2px;
+	min-height: 2px !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	border: none !important;
+	border-radius: 0;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	cursor: pointer;
+	pointer-events: auto;
+	transition:
+		width 140ms ease,
+		height 140ms ease;
+}
+
+.agent-client-turn-navigator.agent-client-is-interacting
+	.agent-client-turn-navigator-item {
+	flex: 0 0 12px;
+	width: 36px;
+	height: 12px;
+	min-height: 12px !important;
+}
+
+.agent-client-turn-navigator-line {
+	display: block;
+	width: 11px;
+	height: 2px;
+	border-radius: 2px;
+	background-color: var(--text-normal);
+	opacity: 0.2;
+	transition:
+		width 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+		height 160ms ease,
+		opacity 160ms ease;
+	pointer-events: none;
+}
+
+.agent-client-turn-navigator-item.agent-client-is-active
+	.agent-client-turn-navigator-line {
+	opacity: 0.62;
+}
+
+.agent-client-turn-navigator
+	.agent-client-turn-navigator-item:hover
+	.agent-client-turn-navigator-line,
+.agent-client-turn-navigator
+	.agent-client-turn-navigator-item:focus-visible
+	.agent-client-turn-navigator-line {
+	width: 27px;
+	height: 3px;
+	opacity: 1;
+}
+
+.agent-client-turn-navigator.agent-client-is-interacting
+	.agent-client-turn-navigator-line {
+	width: 20px;
+	opacity: 0.4;
+}
+
+.agent-client-turn-navigator.agent-client-is-interacting
+	.agent-client-turn-navigator-item:hover
+	.agent-client-turn-navigator-line,
+.agent-client-turn-navigator.agent-client-is-interacting
+	.agent-client-turn-navigator-item:focus-visible
+	.agent-client-turn-navigator-line {
+	width: 32px;
+	opacity: 1;
+}
+
+.agent-client-turn-navigator-preview {
+	pointer-events: none;
+	position: absolute;
+	z-index: 2;
+	top: 50%;
+	inset-inline-start: 44px;
+	display: block;
+	width: min(360px, calc(100cqw - 92px));
+	padding: 13px 15px 14px;
+	visibility: hidden;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 14px;
+	background-color: var(--background-primary);
+	box-shadow: var(--shadow-s);
+	color: var(--text-normal);
+	font-size: 0.9em;
+	line-height: 1.5;
+	text-align: start;
+	opacity: 0;
+	transform: translate(6px, -50%);
+	transition:
+		opacity 100ms ease,
+		transform 140ms ease,
+		visibility 0s linear 140ms;
+}
+
+.agent-client-turn-navigator-question,
+.agent-client-turn-navigator-response {
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	white-space: normal;
+	word-break: break-word;
+}
+
+.agent-client-turn-navigator-question {
+	-webkit-line-clamp: 2;
+	font-weight: var(--font-semibold);
+}
+
+.agent-client-turn-navigator-response {
+	margin-top: 0.4em;
+	-webkit-line-clamp: 3;
+	color: var(--text-muted);
+}
+
+.agent-client-turn-navigator-item:hover .agent-client-turn-navigator-preview,
+.agent-client-turn-navigator-item:focus-visible
+	.agent-client-turn-navigator-preview {
+	visibility: visible;
+	opacity: 1;
+	transform: translate(0, -50%);
+	transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.agent-client-turn-navigator-line,
+	.agent-client-turn-navigator-preview {
+		transition: none;
+	}
 }
 
 /* Virtual item spacing (replaces flex gap: 2px) */
