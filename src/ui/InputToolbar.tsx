@@ -179,7 +179,7 @@ export function InputToolbar({
 				"agent-client-icon-inactive",
 			);
 
-			if (isSending) {
+			if (isSending && !hasContent) {
 				svg.classList.add("agent-client-icon-sending");
 			} else {
 				svg.classList.add(
@@ -194,14 +194,15 @@ export function InputToolbar({
 
 	useEffect(() => {
 		if (sendButtonRef.current) {
-			const iconName = isSending ? "square" : "send-horizontal";
+			const iconName =
+				isSending && !hasContent ? "square" : "send-horizontal";
 			setIcon(sendButtonRef.current, iconName);
 			const svg = sendButtonRef.current.querySelector("svg");
 			if (svg) {
 				updateIconColor(svg);
 			}
 		}
-	}, [isSending, updateIconColor]);
+	}, [hasContent, isSending, updateIconColor]);
 
 	useEffect(() => {
 		if (sendButtonRef.current) {
@@ -326,14 +327,24 @@ export function InputToolbar({
 			{/* Send/Stop Button */}
 			<button
 				ref={sendButtonRef}
+				type="button"
 				onClick={onSendOrStop}
 				disabled={isButtonDisabled}
-				className={`agent-client-chat-send-button ${isSending ? "sending" : ""} ${isButtonDisabled ? "agent-client-disabled" : ""}`}
+				className={`agent-client-chat-send-button ${isSending && !hasContent ? "sending" : ""} ${isButtonDisabled ? "agent-client-disabled" : ""}`}
+				aria-label={
+					isSending
+						? hasContent
+							? "Queue message"
+							: "Stop generation"
+						: "Send message"
+				}
 				title={
 					!isSessionReady
 						? "Connecting..."
 						: isSending
-							? "Stop generation"
+							? hasContent
+								? "Queue message"
+								: "Stop generation"
 							: "Send message"
 				}
 			></button>

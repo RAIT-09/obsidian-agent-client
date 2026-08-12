@@ -296,6 +296,14 @@ export interface AttachedFile {
 	size?: number;
 }
 
+/** A prompt waiting for the current agent turn to finish. */
+export interface QueuedPrompt {
+	id: string;
+	content: string;
+	attachments: AttachedFile[];
+	createdAt: Date;
+}
+
 /**
  * ChatInput component state that can be shared between views.
  * Used for broadcast-prompt command.
