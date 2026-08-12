@@ -667,7 +667,7 @@ If your plugin does not need CSS, delete this file.
 	gap: 8px;
 	transform: translateY(-50%);
 	overscroll-behavior: none;
-	pointer-events: none;
+	pointer-events: auto;
 	transition:
 		width 140ms ease,
 		gap 140ms ease,

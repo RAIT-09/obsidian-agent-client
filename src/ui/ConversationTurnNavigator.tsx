@@ -17,6 +17,7 @@ export const ConversationTurnNavigator = React.memo(
 	}: ConversationTurnNavigatorProps) {
 		const [isInteracting, setIsInteracting] = React.useState(false);
 		const collapseTimerRef = React.useRef<number | null>(null);
+		const previewIdPrefix = React.useId();
 
 		const activate = React.useCallback(() => {
 			if (collapseTimerRef.current !== null) {
@@ -56,40 +57,45 @@ export const ConversationTurnNavigator = React.memo(
 						scheduleCollapse();
 					}
 				}}
+				onWheel={(event) => {
+					event.preventDefault();
+					onWheel(event.deltaY);
+				}}
 			>
-				{items.map((item, index) => (
-					<button
-						key={item.id}
-						type="button"
-						className={`agent-client-turn-navigator-item ${index === activeIndex ? "agent-client-is-active" : ""}`}
-						aria-current={
-							index === activeIndex ? "step" : undefined
-						}
-						aria-label={`Go to turn ${index + 1}: ${item.question}`}
-						onClick={() => onNavigate(item, index)}
-						onMouseEnter={activate}
-						onWheel={(event) => {
-							event.preventDefault();
-							onWheel(event.deltaY);
-						}}
-					>
-						<span
-							className="agent-client-turn-navigator-line"
-							aria-hidden="true"
-						/>
-						<span
-							className="agent-client-turn-navigator-preview"
-							role="tooltip"
+				{items.map((item, index) => {
+					const previewId = `${previewIdPrefix}-turn-${index}`;
+					return (
+						<button
+							key={item.id}
+							type="button"
+							className={`agent-client-turn-navigator-item ${index === activeIndex ? "agent-client-is-active" : ""}`}
+							aria-current={
+								index === activeIndex ? "step" : undefined
+							}
+							aria-label={`Go to turn ${index + 1}: ${item.question}`}
+							aria-describedby={previewId}
+							onClick={() => onNavigate(item, index)}
+							onMouseEnter={activate}
 						>
-							<span className="agent-client-turn-navigator-question">
-								{item.question}
+							<span
+								className="agent-client-turn-navigator-line"
+								aria-hidden="true"
+							/>
+							<span
+								id={previewId}
+								className="agent-client-turn-navigator-preview"
+								role="tooltip"
+							>
+								<span className="agent-client-turn-navigator-question">
+									{item.question}
+								</span>
+								<span className="agent-client-turn-navigator-response">
+									{item.response}
+								</span>
 							</span>
-							<span className="agent-client-turn-navigator-response">
-								{item.response}
-							</span>
-						</span>
-					</button>
-				))}
+						</button>
+					);
+				})}
 			</nav>
 		);
 	},
