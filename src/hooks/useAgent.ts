@@ -26,7 +26,12 @@ export type { AgentDisplayInfo } from "../services/session-helpers";
 // Types
 // ============================================================================
 
-import type { ChatMessage, ActivePermission } from "../types/chat";
+import type {
+	ChatMessage,
+	ActivePermission,
+	AttachedFile,
+	QueuedPrompt,
+} from "../types/chat";
 import type {
 	ChatSession,
 	SessionModeState,
@@ -46,6 +51,8 @@ export interface UseAgentReturn {
 	messages: ChatMessage[];
 	isSending: boolean;
 	lastUserMessage: string | null;
+	queuedPrompts: QueuedPrompt[];
+	isQueuePaused: boolean;
 
 	// Combined error
 	errorInfo: ErrorInfo | null;
@@ -89,6 +96,14 @@ export interface UseAgentReturn {
 	setMessagesFromLocal: (localMessages: ChatMessage[]) => void;
 	clearError: () => void;
 	setIgnoreUpdates: (ignore: boolean) => void;
+	updateQueuedPrompt: (
+		id: string,
+		content: string,
+		attachments: AttachedFile[],
+	) => void;
+	removeQueuedPrompt: (id: string) => void;
+	resumeQueue: () => void;
+	pauseQueue: () => void;
 	// Permission
 	activePermission: ActivePermission | null;
 	hasActivePermission: boolean;
@@ -182,6 +197,8 @@ export function useAgent(
 			messages: agentMessages.messages,
 			isSending: agentMessages.isSending,
 			lastUserMessage: agentMessages.lastUserMessage,
+			queuedPrompts: agentMessages.queuedPrompts,
+			isQueuePaused: agentMessages.isQueuePaused,
 
 			// Combined error
 			errorInfo,
@@ -206,6 +223,10 @@ export function useAgent(
 			setMessagesFromLocal: agentMessages.setMessagesFromLocal,
 			clearError: agentMessages.clearError,
 			setIgnoreUpdates: agentMessages.setIgnoreUpdates,
+			updateQueuedPrompt: agentMessages.updateQueuedPrompt,
+			removeQueuedPrompt: agentMessages.removeQueuedPrompt,
+			resumeQueue: agentMessages.resumeQueue,
+			pauseQueue: agentMessages.pauseQueue,
 
 			// Permission
 			activePermission: agentMessages.activePermission,
@@ -220,6 +241,8 @@ export function useAgent(
 			agentMessages.messages,
 			agentMessages.isSending,
 			agentMessages.lastUserMessage,
+			agentMessages.queuedPrompts,
+			agentMessages.isQueuePaused,
 			errorInfo,
 			agentSession.createSession,
 			agentSession.restartSession,
@@ -236,6 +259,10 @@ export function useAgent(
 			agentMessages.setMessagesFromLocal,
 			agentMessages.clearError,
 			agentMessages.setIgnoreUpdates,
+			agentMessages.updateQueuedPrompt,
+			agentMessages.removeQueuedPrompt,
+			agentMessages.resumeQueue,
+			agentMessages.pauseQueue,
 			agentMessages.activePermission,
 			agentMessages.hasActivePermission,
 			agentMessages.approvePermission,

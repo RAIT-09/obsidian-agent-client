@@ -11,12 +11,13 @@ import type {
 	SessionUsage,
 	SessionConfigOption,
 } from "../types/session";
-import type { AttachedFile, ChatMessage } from "../types/chat";
+import type { AttachedFile, ChatMessage, QueuedPrompt } from "../types/chat";
 import type { UseSuggestionsReturn } from "../hooks/useSuggestions";
 import { SuggestionPopup } from "./SuggestionPopup";
 import { ErrorBanner } from "./ErrorBanner";
 import { AttachmentStrip } from "./shared/AttachmentStrip";
 import { InputToolbar } from "./InputToolbar";
+import { QueuedPromptList } from "./QueuedPromptList";
 import { getLogger } from "../utils/logger";
 import type { ErrorInfo } from "../types/errors";
 import type { AgentUpdateNotification } from "../services/update-checker";
@@ -244,6 +245,16 @@ export interface InputAreaProps {
 	onClearGeminiNotice: () => void;
 	/** Messages array for input history navigation */
 	messages: ChatMessage[];
+	queuedPrompts: QueuedPrompt[];
+	isQueuePaused: boolean;
+	onUpdateQueuedPrompt: (
+		id: string,
+		content: string,
+		attachments: AttachedFile[],
+	) => void;
+	onRemoveQueuedPrompt: (id: string) => void;
+	onResumeQueue: () => void;
+	onPauseQueue: () => void;
 }
 
 /**
@@ -295,6 +306,12 @@ export function InputArea({
 	onClearGeminiNotice,
 	// Input history
 	messages,
+	queuedPrompts,
+	isQueuePaused,
+	onUpdateQueuedPrompt,
+	onRemoveQueuedPrompt,
+	onResumeQueue,
+	onPauseQueue,
 }: InputAreaProps) {
 	const { mentions, commands: slashCommands } = suggestions;
 	const logger = getLogger();
@@ -719,7 +736,9 @@ export function InputArea({
 	 * Handle sending or stopping based on current state.
 	 */
 	const handleSendOrStop = useCallback(async () => {
-		if (isSending) {
+		const hasContent =
+			inputValue.trim().length > 0 || attachedFiles.length > 0;
+		if (isSending && !hasContent) {
 			await onStopGeneration();
 			return;
 		}
@@ -858,7 +877,10 @@ export function InputArea({
 
 				if (shouldSend) {
 					e.preventDefault();
-					if (!isButtonDisabled && !isSending) {
+					const hasContent =
+						inputValue.trim().length > 0 ||
+						attachedFiles.length > 0;
+					if (hasContent && isSessionReady && !isRestoringSession) {
 						void handleSendOrStop();
 					}
 				}
@@ -868,8 +890,10 @@ export function InputArea({
 		[
 			handleDropdownKeyPress,
 			handleHistoryKeyDown,
-			isSending,
-			isButtonDisabled,
+			inputValue,
+			attachedFiles,
+			isSessionReady,
+			isRestoringSession,
 			handleSendOrStop,
 			settings.sendMessageShortcut,
 		],
@@ -974,6 +998,15 @@ export function InputArea({
 					variant={geminiNotice.variant}
 				/>
 			)}
+
+			<QueuedPromptList
+				prompts={queuedPrompts}
+				isPaused={isQueuePaused}
+				onUpdate={onUpdateQueuedPrompt}
+				onRemove={onRemoveQueuedPrompt}
+				onResume={onResumeQueue}
+				onPause={onPauseQueue}
+			/>
 
 			{/* Mention Dropdown */}
 			{mentions.isOpen && (
