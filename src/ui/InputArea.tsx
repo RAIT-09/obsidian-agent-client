@@ -877,7 +877,10 @@ export function InputArea({
 
 				if (shouldSend) {
 					e.preventDefault();
-					if (!isButtonDisabled) {
+					const hasContent =
+						inputValue.trim().length > 0 ||
+						attachedFiles.length > 0;
+					if (hasContent && isSessionReady && !isRestoringSession) {
 						void handleSendOrStop();
 					}
 				}
@@ -887,7 +890,10 @@ export function InputArea({
 		[
 			handleDropdownKeyPress,
 			handleHistoryKeyDown,
-			isButtonDisabled,
+			inputValue,
+			attachedFiles,
+			isSessionReady,
+			isRestoringSession,
 			handleSendOrStop,
 			settings.sendMessageShortcut,
 		],

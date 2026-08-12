@@ -202,10 +202,10 @@ export function useAgentMessages(
 			const previousAttachments = job.prompt.attachments;
 			const retainedIds = new Set(attachments.map((file) => file.id));
 			const previousImages = previousAttachments.filter(
-				(file) => file.kind === "image",
+				(file) => file.kind === "image" && Boolean(file.data),
 			);
 			const previousResources = previousAttachments.filter(
-				(file) => file.kind === "file",
+				(file) => file.kind === "file" && Boolean(file.path),
 			);
 
 			job.prompt = {
@@ -326,8 +326,9 @@ export function useAgentMessages(
 			});
 		}
 
+		pauseQueue();
 		setSending(false);
-	}, [setSending]);
+	}, [pauseQueue, setSending]);
 
 	const clearMessages = useCallback((): void => {
 		setMessages([]);

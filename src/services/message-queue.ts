@@ -1,5 +1,6 @@
 import type { AttachedFile, QueuedPrompt } from "../types/chat";
 
+/** Create an isolated queued-prompt snapshot for later dispatch. */
 export function createQueuedPrompt(
 	content: string,
 	attachments: AttachedFile[] = [],
@@ -14,6 +15,7 @@ export function createQueuedPrompt(
 	};
 }
 
+/** Update a queued prompt without mutating or reordering the source queue. */
 export function updateQueuedPromptItem(
 	queue: QueuedPrompt[],
 	id: string,
@@ -30,6 +32,7 @@ export function updateQueuedPromptItem(
 	);
 }
 
+/** Remove a queued prompt by id while preserving the order of all others. */
 export function removeQueuedPromptItem(
 	queue: QueuedPrompt[],
 	id: string,

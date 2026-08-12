@@ -31,11 +31,20 @@ export const QueuedPromptList = React.memo(function QueuedPromptList({
 		[],
 	);
 	const [resumeAfterEdit, setResumeAfterEdit] = useState(false);
+	const canSave = draft.trim().length > 0 || draftAttachments.length > 0;
 	const finishEditing = useCallback(() => {
 		setEditingId(null);
 		if (resumeAfterEdit) onResume();
 		setResumeAfterEdit(false);
 	}, [onResume, resumeAfterEdit]);
+	const saveEditing = useCallback(
+		(id: string) => {
+			if (!canSave) return;
+			onUpdate(id, draft.trim(), draftAttachments);
+			finishEditing();
+		},
+		[canSave, draft, draftAttachments, finishEditing, onUpdate],
+	);
 
 	useEffect(() => {
 		if (editingId && !prompts.some((prompt) => prompt.id === editingId)) {
@@ -86,6 +95,21 @@ export const QueuedPromptList = React.memo(function QueuedPromptList({
 											onChange={(event) =>
 												setDraft(event.target.value)
 											}
+											onKeyDown={(event) => {
+												if (event.key === "Escape") {
+													event.preventDefault();
+													finishEditing();
+													return;
+												}
+												if (
+													event.key === "Enter" &&
+													(event.metaKey ||
+														event.ctrlKey)
+												) {
+													event.preventDefault();
+													saveEditing(prompt.id);
+												}
+											}}
 											rows={2}
 											aria-label="Edit queued message"
 											autoFocus
@@ -104,19 +128,10 @@ export const QueuedPromptList = React.memo(function QueuedPromptList({
 										<div className="agent-client-queued-prompt-edit-actions">
 											<button
 												type="button"
-												onClick={() => {
-													onUpdate(
-														prompt.id,
-														draft.trim(),
-														draftAttachments,
-													);
-													finishEditing();
-												}}
-												disabled={
-													!draft.trim() &&
-													draftAttachments.length ===
-														0
+												onClick={() =>
+													saveEditing(prompt.id)
 												}
+												disabled={!canSave}
 											>
 												Save
 											</button>

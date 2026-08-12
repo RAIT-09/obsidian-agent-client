@@ -947,7 +947,7 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-normal);
 	font-size: var(--font-ui-small);
 	line-height: 1.35;
-	word-break: break-word;
+	overflow-wrap: anywhere;
 }
 
 .agent-client-queued-prompt-attachment-count {

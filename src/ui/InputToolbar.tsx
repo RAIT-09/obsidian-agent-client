@@ -332,11 +332,13 @@ export function InputToolbar({
 				disabled={isButtonDisabled}
 				className={`agent-client-chat-send-button ${isSending && !hasContent ? "sending" : ""} ${isButtonDisabled ? "agent-client-disabled" : ""}`}
 				aria-label={
-					isSending
-						? hasContent
-							? "Queue message"
-							: "Stop generation"
-						: "Send message"
+					!isSessionReady
+						? "Connecting"
+						: isSending
+							? hasContent
+								? "Queue message"
+								: "Stop generation"
+							: "Send message"
 				}
 				title={
 					!isSessionReady
