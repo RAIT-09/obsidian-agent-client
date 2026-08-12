@@ -287,7 +287,12 @@ export function MessageList({
 
 	return (
 		<div className="agent-client-message-list-shell">
-			<div ref={containerRef} className="agent-client-chat-view-messages">
+			<div
+				ref={containerRef}
+				className={`agent-client-chat-view-messages ${
+					showTurnNavigator ? "agent-client-has-turn-navigator" : ""
+				}`}
+			>
 				{/* Virtualized message list */}
 				<div
 					className="agent-client-virtual-list-inner"

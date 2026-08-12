@@ -651,6 +651,10 @@ If your plugin does not need CSS, delete this file.
 	position: relative;
 }
 
+.agent-client-chat-view-messages.agent-client-has-turn-navigator {
+	padding-inline-start: 48px;
+}
+
 /* Conversation turn navigator */
 .agent-client-turn-navigator {
 	position: absolute;
