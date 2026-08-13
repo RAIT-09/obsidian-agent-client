@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	createQueuedPrompt,
 	removeQueuedPromptItem,
+	takeNextQueueItemForSession,
 	updateQueuedPromptItem,
 } from "../src/services/message-queue";
 import type { AttachedFile } from "../src/types/chat";
@@ -15,6 +16,21 @@ const attachment: AttachedFile = {
 };
 
 describe("message queue transforms", () => {
+	it("never takes queued work from another session", () => {
+		const queue = [
+			{ sessionId: "session-a", value: "from-a" },
+			{ sessionId: "session-b", value: "from-b" },
+		];
+
+		const result = takeNextQueueItemForSession(queue, "session-b");
+
+		expect(result.item).toEqual({
+			sessionId: "session-b",
+			value: "from-b",
+		});
+		expect(result.remaining).toEqual([]);
+	});
+
 	it("creates an isolated prompt with the supplied fields", () => {
 		const attachments = [attachment];
 		const prompt = createQueuedPrompt(

@@ -6,7 +6,8 @@
  */
 
 import * as React from "react";
-const { useState, useCallback, useMemo, useRef, useEffect } = React;
+const { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } =
+	React;
 
 import type {
 	ChatMessage,
@@ -36,6 +37,7 @@ import {
 import {
 	createQueuedPrompt,
 	removeQueuedPromptItem,
+	takeNextQueueItemForSession,
 	updateQueuedPromptItem,
 } from "../services/message-queue";
 
@@ -133,6 +135,7 @@ export function useAgentMessages(
 	const isSendingRef = useRef(false);
 	const dispatchInProgressRef = useRef(false);
 	type QueuedPromptJob = {
+		sessionId: string;
 		prompt: QueuedPrompt;
 		options: SendMessageOptions;
 	};
@@ -574,6 +577,7 @@ export function useAgentMessages(
 			) {
 				const prompt = createQueuedPrompt(content, options.attachments);
 				queuedPromptJobsRef.current.push({
+					sessionId: session.sessionId,
 					prompt,
 					options: { ...options, isFirstMessage: false },
 				});
@@ -585,6 +589,10 @@ export function useAgentMessages(
 		},
 		[dispatchMessage, session.sessionId, setErrorInfo],
 	);
+
+	useLayoutEffect(() => {
+		clearQueue();
+	}, [clearQueue, session.sessionId]);
 
 	useEffect(() => {
 		if (
@@ -598,11 +606,13 @@ export function useAgentMessages(
 			return;
 		}
 
-		const job = queuedPromptJobsRef.current.shift();
-		if (!job) return;
-		setQueuedPrompts((queue) =>
-			removeQueuedPromptItem(queue, job.prompt.id),
+		const { item: job, remaining } = takeNextQueueItemForSession(
+			queuedPromptJobsRef.current,
+			session.sessionId,
 		);
+		queuedPromptJobsRef.current = remaining;
+		setQueuedPrompts(remaining.map((queuedJob) => queuedJob.prompt));
+		if (!job) return;
 		void dispatchMessage(job.prompt.content, job.options);
 	}, [
 		dispatchMessage,
