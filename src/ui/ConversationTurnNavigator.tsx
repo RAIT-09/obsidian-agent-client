@@ -72,11 +72,13 @@ export const ConversationTurnNavigator = React.memo(
 							aria-current={
 								index === activeIndex ? "step" : undefined
 							}
-							aria-label={`Go to turn ${index + 1}: ${item.question}`}
 							aria-describedby={previewId}
 							onClick={() => onNavigate(item, index)}
 							onMouseEnter={activate}
 						>
+							<span className="agent-client-turn-navigator-label">
+								Go to turn {index + 1}: {item.question}
+							</span>
 							<span
 								className="agent-client-turn-navigator-line"
 								aria-hidden="true"
