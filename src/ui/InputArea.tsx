@@ -22,6 +22,7 @@ import type { ErrorInfo } from "../types/errors";
 import type { AgentUpdateNotification } from "../services/update-checker";
 import { useSettings } from "../hooks/useSettings";
 import {
+	deduplicateAttachments,
 	extractVaultPathsFromInternalDrag,
 	extractVaultPathsFromObsidianUris,
 } from "../utils/vault-drag";
@@ -351,25 +352,7 @@ export function InputArea({
 		(newFiles: AttachedFile[]) => {
 			if (newFiles.length === 0) return;
 			const currentFiles = attachedFilesRef.current;
-			const existingKeys = new Set(
-				currentFiles.map((file) =>
-					file.vaultPath
-						? `vault:${file.vaultPath}`
-						: file.path
-							? `path:${file.path}`
-							: `id:${file.id}`,
-				),
-			);
-			const deduplicated = newFiles.filter((file) => {
-				const key = file.vaultPath
-					? `vault:${file.vaultPath}`
-					: file.path
-						? `path:${file.path}`
-						: `id:${file.id}`;
-				if (existingKeys.has(key)) return false;
-				existingKeys.add(key);
-				return true;
-			});
+			const deduplicated = deduplicateAttachments(currentFiles, newFiles);
 			if (deduplicated.length < newFiles.length) {
 				new Notice("[Agent Client] Duplicate attachments were skipped");
 			}

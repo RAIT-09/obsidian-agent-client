@@ -1,5 +1,7 @@
 /** Pure helpers for resolving Obsidian file-explorer drag payloads. */
 
+import type { AttachedFile } from "../types/chat";
+
 interface PathLike {
 	path: string;
 }
@@ -18,6 +20,27 @@ function uniquePaths(paths: string[]): string[] {
 	return [...new Set(paths.map((path) => path.replace(/^\/+/, "")))].filter(
 		Boolean,
 	);
+}
+
+function attachmentIdentityKeys(file: AttachedFile): string[] {
+	const keys: string[] = [];
+	if (file.vaultPath) keys.push(`vault:${file.vaultPath}`);
+	if (file.path) keys.push(`path:${file.path}`);
+	return keys.length > 0 ? keys : [`id:${file.id}`];
+}
+
+/** Remove candidate attachments matching any stable identity already present. */
+export function deduplicateAttachments(
+	existing: AttachedFile[],
+	candidates: AttachedFile[],
+): AttachedFile[] {
+	const existingKeys = new Set(existing.flatMap(attachmentIdentityKeys));
+	return candidates.filter((file) => {
+		const keys = attachmentIdentityKeys(file);
+		if (keys.some((key) => existingKeys.has(key))) return false;
+		keys.forEach((key) => existingKeys.add(key));
+		return true;
+	});
 }
 
 /** Extract vault-relative paths from Obsidian's current internal drag item. */

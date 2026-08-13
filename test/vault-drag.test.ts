@@ -1,8 +1,42 @@
 import { describe, expect, it } from "vitest";
 import {
+	deduplicateAttachments,
 	extractVaultPathsFromInternalDrag,
 	extractVaultPathsFromObsidianUris,
 } from "../src/utils/vault-drag";
+import type { AttachedFile } from "../src/types/chat";
+
+describe("deduplicateAttachments", () => {
+	it("matches a vault attachment against an existing absolute path", () => {
+		const path = "/vault/Notes/Project.md";
+		const external: AttachedFile = {
+			id: "external",
+			kind: "file",
+			mimeType: "text/markdown",
+			path,
+		};
+		const vault: AttachedFile = {
+			...external,
+			id: "vault",
+			vaultPath: "Notes/Project.md",
+		};
+
+		expect(deduplicateAttachments([external], [vault])).toEqual([]);
+	});
+
+	it("deduplicates candidates added in the same batch", () => {
+		const file: AttachedFile = {
+			id: "one",
+			kind: "file",
+			mimeType: "text/plain",
+			path: "/vault/file.txt",
+		};
+
+		expect(
+			deduplicateAttachments([], [file, { ...file, id: "two" }]),
+		).toEqual([file]);
+	});
+});
 
 describe("extractVaultPathsFromInternalDrag", () => {
 	it("extracts a single Obsidian file drag", () => {
