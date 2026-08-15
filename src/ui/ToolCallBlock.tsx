@@ -41,6 +41,23 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 		onToggleExpanded?.(toolCallId);
 	}, [onToggleExpanded, toolCallId]);
 
+	// A drag-select over the title also fires a click; don't yank the body
+	// away. ownerDocument: the row's document, not the focused window's.
+	const handleClick = useCallback(
+		(event: React.MouseEvent<HTMLDivElement>) => {
+			const selection = event.currentTarget.ownerDocument.getSelection();
+			if (
+				selection &&
+				!selection.isCollapsed &&
+				event.currentTarget.contains(selection.anchorNode)
+			) {
+				return;
+			}
+			handleToggle();
+		},
+		[handleToggle],
+	);
+
 	const handleKeyDown = useCallback(
 		(event: React.KeyboardEvent<HTMLDivElement>) => {
 			if (event.key !== "Enter" && event.key !== " ") return;
@@ -109,7 +126,7 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 				role="button"
 				tabIndex={0}
 				aria-expanded={isExpanded}
-				onClick={handleToggle}
+				onClick={handleClick}
 				onKeyDown={handleKeyDown}
 			>
 				<div className="agent-client-message-tool-call-title">
