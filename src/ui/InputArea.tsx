@@ -992,9 +992,8 @@ export function InputArea({
 				/>
 			)}
 
-			{/* Permission review — below the banners, above the input, so the
-			    buttons are always in reach (they used to live inside the
-			    virtualized transcript, where scrolling could hide them). */}
+			{/* Overlay above the input; the banners share this rectangle and
+			    paint on top (z 30 vs 20) because they are dismissible. */}
 			{activePermission && (
 				<PermissionDialog
 					permission={activePermission}

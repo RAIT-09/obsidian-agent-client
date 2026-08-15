@@ -537,9 +537,37 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* ===== Permission dialog (above the input) ===== */
+
+/* Two selectors: the floating variant has no chat-view-container. With no
+   matching container, cqh silently falls back to the viewport. */
+.agent-client-chat-view-container,
+.agent-client-floating-window {
+	container-type: size;
+	/* Header + input area + gap, measured on device; transient badges make
+	   the header taller, so this is a ceiling estimate. */
+	--ac-permission-dialog-reserve: 240px;
+}
+
+/* Overlay like the error overlay below: bottom:100% grows upward, so a
+   short panel clips the title — never the DOM-last button row. */
 .agent-client-permission-dialog {
+	position: absolute;
+	bottom: 100%;
+	left: 8px;
+	right: 8px;
+	/* Front = easiest to dismiss; the dialog has no dismiss affordance. 20 is
+	   a floor: .agent-client-scroll-to-bottom (z 10) shares this context. */
+	z-index: 20;
 	margin-bottom: 8px;
 	padding: 8px;
+	/* Never below what the fixed rows need — the shortfall then clips the
+	   title at the panel top instead of the buttons. */
+	max-height: max(
+		calc(100cqh - var(--ac-permission-dialog-reserve, 240px)),
+		220px
+	);
+	display: flex;
+	flex-direction: column;
 	background-color: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 4px;
@@ -551,6 +579,10 @@ If your plugin does not need CSS, delete this file.
 	align-items: center;
 	gap: 4px;
 	font-weight: bold;
+	flex-shrink: 0;
+	/* The gap lives on the rigid row: a margin inside the scroll box would
+	   scroll away with the content. */
+	margin-bottom: 8px;
 }
 
 .agent-client-permission-dialog-icon svg {
@@ -577,14 +609,60 @@ If your plugin does not need CSS, delete this file.
 	font-weight: normal;
 }
 
-/* The review surface: what is about to run, or about to change. */
+/* The review surface — the one flexible row: it takes the leftover height
+   and scrolls internally. min-height: 0 is load-bearing for the cap. */
 .agent-client-permission-dialog-review {
-	max-height: 40vh;
-	overflow: auto;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	/* Reaching the end of the review must not scroll the host note. */
+	overscroll-behavior: contain;
+	/* A flex column so the diff below can opt into shrinking. */
+	display: flex;
+	flex-direction: column;
 }
 
 .agent-client-permission-dialog-review:empty {
 	display: none;
+}
+
+/* Edge gaps belong to the rigid rows; an edge margin here would exist at
+   rest and vanish once scrolled. Gaps BETWEEN items rightly scroll. */
+.agent-client-permission-dialog-review > :first-child {
+	margin-top: 0;
+}
+
+.agent-client-permission-dialog-review > :last-child {
+	margin-bottom: 0;
+}
+
+/* A diff scrolls within its own frame (the corners stay put); non-diff
+   overflow falls back to the review's own scrollbar. Dialog-scoped only. */
+.agent-client-permission-dialog-review > * {
+	flex-shrink: 0;
+}
+
+.agent-client-permission-dialog-review > .agent-client-tool-call-diff {
+	flex-shrink: 1;
+	/* A floor, not 0: rigid siblings would otherwise squeeze the diff to
+	   nothing in a mixed review. */
+	min-height: 120px;
+	display: flex;
+	flex-direction: column;
+}
+
+.agent-client-permission-dialog-review
+	> .agent-client-tool-call-diff
+	> .agent-client-tool-call-diff-content {
+	flex: 1 1 auto;
+	min-height: 0;
+	/* overflow: auto comes from the base rule */
+}
+
+/* Rigid row in the dialog's flex column; only the review gives.
+   (margin-top: 8px comes from the base rule above.) */
+.agent-client-permission-dialog > .agent-client-message-permission-request {
+	flex-shrink: 0;
 }
 
 .agent-client-message-permission-request .agent-client-permission-option {
@@ -822,7 +900,9 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--background-secondary);
 	border: 1px solid var(--color-red);
 	border-radius: 8px;
-	z-index: 10;
+	/* Above the permission dialog (20): the banner is dismissible, the
+	   dialog can only be answered. */
+	z-index: 30;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
