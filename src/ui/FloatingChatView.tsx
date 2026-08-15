@@ -84,7 +84,9 @@ export class FloatingViewContainer implements IChatViewContainer {
 		this.plugin = plugin;
 		// viewId format: "floating-chat-{instanceId}" to match adapter key
 		this.viewId = `floating-chat-${instanceId}`;
-		this.containerEl = activeDocument.body.createDiv({
+		// Main-window document, not activeDocument: creation may run while the
+		// Settings window (its own window since Obsidian 1.13) holds focus.
+		this.containerEl = plugin.app.workspace.containerEl.doc.body.createDiv({
 			cls: "agent-client-floating-view-root",
 		});
 	}

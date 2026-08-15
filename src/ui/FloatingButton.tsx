@@ -34,7 +34,9 @@ export class FloatingButtonContainer {
 	private containerEl: HTMLElement;
 
 	constructor(private plugin: AgentClientPlugin) {
-		this.containerEl = activeDocument.body.createDiv({
+		// Main-window document, not activeDocument: since Obsidian 1.13 the
+		// Settings dialog is its own window and may hold focus during (re)load.
+		this.containerEl = plugin.app.workspace.containerEl.doc.body.createDiv({
 			cls: "agent-client-floating-button-root",
 		});
 	}
