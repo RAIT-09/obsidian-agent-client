@@ -5,7 +5,7 @@ import { PermissionBanner } from "./PermissionBanner";
 import { ToolCallContentView } from "./ToolCallContentView";
 import { LucideIcon } from "./shared/IconButton";
 
-const { useState, useEffect } = React;
+const { useState, useEffect, useMemo } = React;
 
 interface PermissionDialogProps {
 	permission: ActivePermission;
@@ -62,6 +62,18 @@ export function PermissionDialog({
 		? (permission.rawInput.args as string[]).join(" ")
 		: "";
 
+	// Same thumbnail strip as the transcript rows: images everywhere are
+	// 120px thumbs, full-size at 384px would dominate a mixed review.
+	const images = useMemo(
+		() =>
+			(permission.content ?? []).flatMap((item) =>
+				item.type === "content" && item.content.type === "image"
+					? [item.content]
+					: [],
+			),
+		[permission.content],
+	);
+
 	return (
 		<div className="agent-client-permission-dialog">
 			<div className="agent-client-permission-dialog-header">
@@ -93,10 +105,23 @@ export function PermissionDialog({
 						</code>
 					</div>
 				)}
+				{images.length > 0 && (
+					<div className="agent-client-tool-result-images-strip">
+						{images.map((image, index) => (
+							<img
+								key={index}
+								className="agent-client-tool-result-image-thumbnail"
+								src={`data:${image.mimeType};base64,${image.data}`}
+								alt="Tool result"
+							/>
+						))}
+					</div>
+				)}
 				<ToolCallContentView
 					content={permission.content}
 					plugin={plugin}
 					terminalClient={null}
+					omitImages
 				/>
 			</div>
 
