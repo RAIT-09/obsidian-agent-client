@@ -17,6 +17,7 @@ import {
 	computeSessionTitle,
 	getDefaultAgentId,
 } from "../services/session-helpers";
+import { countPendingPermissions } from "../services/message-state";
 import { useHistoryModal } from "../hooks/useHistoryModal";
 import { useChatActions } from "../hooks/useChatActions";
 import { ChangeDirectoryModal } from "./ChangeDirectoryModal";
@@ -334,6 +335,29 @@ export const ChatPanel = React.memo(function ChatPanel({
 	// Input state (for broadcast commands)
 	const [inputValue, setInputValue] = useState("");
 	const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+
+	// Which tool calls are expanded. Held here rather than inside the rows
+	// because the virtualized list unmounts anything scrolled out of view.
+	const [expandedToolCalls, setExpandedToolCalls] = useState<Set<string>>(
+		() => new Set(),
+	);
+	const toggleToolCall = useCallback((toolCallId: string) => {
+		setExpandedToolCalls((prev) => {
+			const next = new Set(prev);
+			if (!next.delete(toolCallId)) next.add(toolCallId);
+			return next;
+		});
+	}, []);
+	// Start every session collapsed; ids are only meaningful within one.
+	useEffect(() => {
+		setExpandedToolCalls(new Set());
+	}, [session.sessionId]);
+
+	// Requests waiting behind the active one, for the dialog's queue badge.
+	const queuedPermissionCount = useMemo(
+		() => Math.max(0, countPendingPermissions(messages) - 1),
+		[messages],
+	);
 
 	// Pending auto-send queued by the pending-prompt handler (drained when ready)
 	const [pendingAutoSend, setPendingAutoSend] = useState<string | null>(null);
@@ -1464,7 +1488,8 @@ export const ChatPanel = React.memo(function ChatPanel({
 			plugin={plugin}
 			view={viewHost}
 			terminalClient={terminalClientRef.current}
-			onApprovePermission={agent.approvePermission}
+			expandedToolCalls={expandedToolCalls}
+			onToggleToolCall={toggleToolCall}
 			hasActivePermission={agent.hasActivePermission}
 		/>
 	);
@@ -1476,6 +1501,9 @@ export const ChatPanel = React.memo(function ChatPanel({
 			isRestoringSession={sessionHistory.loading}
 			agentLabel={activeAgentLabel}
 			availableCommands={session.availableCommands || []}
+			activePermission={agent.activePermission}
+			queuedPermissionCount={queuedPermissionCount}
+			onApprovePermission={agent.approvePermission}
 			autoMentionEnabled={settings.autoMentionActiveNote}
 			restoredMessage={restoredMessage}
 			suggestions={suggestions}

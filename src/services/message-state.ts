@@ -352,8 +352,50 @@ export function applySingleUpdate(
 // Permission Helper Functions
 // ============================================================================
 
+/** The permission state carried on a tool call content item. */
+type PermissionRequestState = NonNullable<
+	Extract<MessageContent, { type: "tool_call" }>["permissionRequest"]
+>;
+
+/**
+ * Whether a permission request is still awaiting the user's decision.
+ *
+ * Note this is NOT `isActive`: only the queue head is active, so a queued
+ * request is undecided while `isActive` is false. This does not affect what
+ * the transcript renders — tool calls stay visible throughout. It feeds the
+ * dialog's queue badge and settles ghosts left in a stored transcript.
+ */
+export function isPermissionPending(
+	permissionRequest: PermissionRequestState | undefined,
+): permissionRequest is PermissionRequestState {
+	if (!permissionRequest) return false;
+	return (
+		permissionRequest.selectedOptionId === undefined &&
+		permissionRequest.isCancelled !== true
+	);
+}
+
+/** How many permission requests are still undecided, active one included. */
+export function countPendingPermissions(messages: ChatMessage[]): number {
+	let count = 0;
+	for (const message of messages) {
+		for (const content of message.content) {
+			if (
+				content.type === "tool_call" &&
+				isPermissionPending(content.permissionRequest)
+			) {
+				count++;
+			}
+		}
+	}
+	return count;
+}
+
 /**
  * Find the active permission request from messages.
+ *
+ * Carries the tool call's own details so the dialog can show what the agent
+ * is about to do without reaching back into the message list.
  */
 export function findActivePermission(
 	messages: ChatMessage[],
@@ -367,6 +409,10 @@ export function findActivePermission(
 						requestId: permission.requestId,
 						toolCallId: content.toolCallId,
 						options: permission.options,
+						title: content.title,
+						kind: content.kind,
+						content: content.content,
+						rawInput: content.rawInput,
 					};
 				}
 			}

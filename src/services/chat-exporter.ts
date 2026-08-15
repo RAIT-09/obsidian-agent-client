@@ -312,9 +312,6 @@ session_id: ${sessionId}${tagsLine}
 			case "plan":
 				return this.convertPlanToMarkdown(content);
 
-			case "permission_request":
-				return this.convertPermissionRequestToMarkdown(content);
-
 			case "resource_link":
 				return `[${content.name}](${content.uri})\n\n`;
 
@@ -447,13 +444,6 @@ session_id: ${sessionId}${tagsLine}
 		}
 		md += `\n`;
 		return md;
-	}
-
-	private convertPermissionRequestToMarkdown(
-		content: Extract<MessageContent, { type: "permission_request" }>,
-	): string {
-		const status = content.isCancelled ? "Cancelled" : "Requested";
-		return `### ⚠️ Permission: ${content.toolCall.title || "Unknown"} (${status})\n\n`;
 	}
 
 	/**

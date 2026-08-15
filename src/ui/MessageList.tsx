@@ -36,11 +36,10 @@ export interface MessageListProps {
 	view: IChatViewHost;
 	/** Terminal client for output polling */
 	terminalClient?: AcpClient;
-	/** Callback to approve a permission request */
-	onApprovePermission?: (
-		requestId: string,
-		optionId: string,
-	) => Promise<void>;
+	/** Tool call ids whose bodies are expanded */
+	expandedToolCalls: ReadonlySet<string>;
+	/** Toggle a tool call body */
+	onToggleToolCall: (toolCallId: string) => void;
 	/** Whether a permission request is currently pending */
 	hasActivePermission: boolean;
 }
@@ -66,7 +65,8 @@ export function MessageList({
 	plugin,
 	view,
 	terminalClient,
-	onApprovePermission,
+	expandedToolCalls,
+	onToggleToolCall,
 	hasActivePermission,
 }: MessageListProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -272,7 +272,8 @@ export function MessageList({
 								message={message}
 								plugin={plugin}
 								terminalClient={terminalClient}
-								onApprovePermission={onApprovePermission}
+								expandedToolCalls={expandedToolCalls}
+								onToggleToolCall={onToggleToolCall}
 							/>
 						</div>
 					);

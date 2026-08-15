@@ -154,11 +154,10 @@ interface ContentBlockProps {
 	plugin: AgentClientPlugin;
 	messageRole?: "user" | "assistant";
 	terminalClient?: AcpClient;
-	/** Callback to approve a permission request */
-	onApprovePermission?: (
-		requestId: string,
-		optionId: string,
-	) => Promise<void>;
+	/** Tool call ids whose bodies are expanded */
+	expandedToolCalls?: ReadonlySet<string>;
+	/** Toggle a tool call body */
+	onToggleToolCall?: (toolCallId: string) => void;
 }
 
 function ContentBlock({
@@ -166,7 +165,8 @@ function ContentBlock({
 	plugin,
 	messageRole,
 	terminalClient,
-	onApprovePermission,
+	expandedToolCalls,
+	onToggleToolCall,
 }: ContentBlockProps) {
 	switch (content.type) {
 		case "text":
@@ -191,12 +191,15 @@ function ContentBlock({
 			return <CollapsibleThought text={content.text} plugin={plugin} />;
 
 		case "tool_call":
+			// Shown even while a permission is pending — the dialog above the
+			// input is the place to decide; this row is the transcript.
 			return (
 				<ToolCallBlock
 					content={content}
 					plugin={plugin}
 					terminalClient={terminalClient}
-					onApprovePermission={onApprovePermission}
+					isExpanded={expandedToolCalls?.has(content.toolCallId)}
+					onToggleExpanded={onToggleToolCall}
 				/>
 			);
 
@@ -287,11 +290,10 @@ export interface MessageBubbleProps {
 	message: ChatMessage;
 	plugin: AgentClientPlugin;
 	terminalClient?: AcpClient;
-	/** Callback to approve a permission request */
-	onApprovePermission?: (
-		requestId: string,
-		optionId: string,
-	) => Promise<void>;
+	/** Tool call ids whose bodies are expanded */
+	expandedToolCalls?: ReadonlySet<string>;
+	/** Toggle a tool call body */
+	onToggleToolCall?: (toolCallId: string) => void;
 }
 
 /**
@@ -385,7 +387,8 @@ export const MessageBubble = React.memo(function MessageBubble({
 	message,
 	plugin,
 	terminalClient,
-	onApprovePermission,
+	expandedToolCalls,
+	onToggleToolCall,
 }: MessageBubbleProps) {
 	const groups = groupContent(message.content);
 
@@ -408,7 +411,8 @@ export const MessageBubble = React.memo(function MessageBubble({
 									plugin={plugin}
 									messageRole={message.role}
 									terminalClient={terminalClient}
-									onApprovePermission={onApprovePermission}
+									expandedToolCalls={expandedToolCalls}
+									onToggleToolCall={onToggleToolCall}
 								/>
 							))}
 						</div>
@@ -422,7 +426,8 @@ export const MessageBubble = React.memo(function MessageBubble({
 								plugin={plugin}
 								messageRole={message.role}
 								terminalClient={terminalClient}
-								onApprovePermission={onApprovePermission}
+								expandedToolCalls={expandedToolCalls}
+								onToggleToolCall={onToggleToolCall}
 							/>
 						</div>
 					);
