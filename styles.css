@@ -574,6 +574,15 @@ If your plugin does not need CSS, delete this file.
 	font-size: 0.85em;
 }
 
+/* A short panel cannot fit the dialog's fixed rows above the input, so the
+   dialog re-anchors onto the input area — dead during a permission anyway. */
+@container (max-height: 400px) {
+	.agent-client-permission-dialog {
+		bottom: 0;
+		max-height: calc(100cqh - 24px);
+	}
+}
+
 .agent-client-permission-dialog-header {
 	display: flex;
 	align-items: center;
