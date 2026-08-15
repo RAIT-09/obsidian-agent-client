@@ -594,8 +594,8 @@ describe("SessionStorage — stored permissions are settled on load", () => {
 			await storage.loadSessionMessages("s1"),
 		);
 
-		// Cancelled, not merely inactive: an undecided request keeps its tool
-		// call hidden from the transcript.
+		// Cancelled, not merely inactive: an undecided request would inflate
+		// the dialog's queue badge on the next real request.
 		expect(permission?.isActive).toBe(false);
 		expect(permission?.isCancelled).toBe(true);
 	});

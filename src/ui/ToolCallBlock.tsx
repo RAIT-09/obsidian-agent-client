@@ -118,8 +118,7 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 				</div>
 			</div>
 
-			{/* Images sit outside the collapsible body: a result you want to
-			    see at a glance, not detail you open. */}
+			{/* Outside the collapsible body: results worth seeing at a glance. */}
 			{images.length > 0 && (
 				<div className="agent-client-tool-result-images-strip">
 					{images.map((image, index) => (
@@ -133,10 +132,8 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 				</div>
 			)}
 
-			{/* Collapsible body. Hidden with CSS rather than unmounted so an
-			    embedded TerminalBlock keeps polling: the client drops a
-			    released terminal 30s later, and a remount after that would
-			    find nothing left to show. */}
+			{/* Hidden with CSS, not unmounted: a TerminalBlock must keep polling
+			    (released terminals are dropped 30s later). */}
 			<div
 				className="agent-client-message-tool-call-body"
 				hidden={!isExpanded}

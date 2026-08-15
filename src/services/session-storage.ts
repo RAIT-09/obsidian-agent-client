@@ -95,10 +95,11 @@ function evictLeastRecentlyUsed(
  *
  * A permission belongs to a live agent process, so anything still undecided
  * on disk died with that process — normally `cancelAll()` records that on
- * disconnect, but a crash leaves the flags as they were. Marking them
- * cancelled (rather than merely inactive) matters: an undecided request keeps
- * its tool call out of the transcript, so leaving one behind would hide that
- * call forever.
+ * disconnect, but a crash leaves the flags as they were. Both writes carry
+ * their own weight: clearing `isActive` stops `findActivePermission` from
+ * raising a dialog for an agent that is gone, and setting `isCancelled`
+ * stops `countPendingPermissions` from counting the ghost, which would
+ * otherwise inflate the queue badge on the next real request.
  */
 function settleStoredPermissions(messages: ChatMessage[]): void {
 	for (const message of messages) {

@@ -361,8 +361,9 @@ type PermissionRequestState = NonNullable<
  * Whether a permission request is still awaiting the user's decision.
  *
  * Note this is NOT `isActive`: only the queue head is active, so a queued
- * request is undecided while `isActive` is false. Anything undecided is kept
- * out of the transcript and reviewed in the dialog above the input instead.
+ * request is undecided while `isActive` is false. This does not affect what
+ * the transcript renders — tool calls stay visible throughout. It feeds the
+ * dialog's queue badge and settles ghosts left in a stored transcript.
  */
 export function isPermissionPending(
 	permissionRequest: PermissionRequestState | undefined,

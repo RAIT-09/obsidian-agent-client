@@ -517,9 +517,8 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* ===== Permission Request (vertical option list) ===== */
-/* Mirrors .agent-client-tool-call-diff: full-bleed block inside the
-   tool call with a 1px border container. Kind colors live on the icon,
-   not the button background (theme compatibility). */
+/* PermissionDialog's option list (sole consumer; the message- prefix is a
+   relic of its transcript days). Kind colors live on the icon. */
 .agent-client-message-permission-request {
 	display: flex;
 	flex-direction: column;
@@ -1379,9 +1378,8 @@ If your plugin does not need CSS, delete this file.
 	position: relative;
 	padding: 0 16px;
 	width: 100%;
-	/* Floor for every message. Assistant messages end with a block that
-	   already carries this much, so it collapses away there; it only shows
-	   up for messages whose last block has no bottom margin of its own. */
+	/* Floor for every message; collapses away when the last block carries
+	   its own bottom margin. */
 	margin-bottom: 12px;
 	/* Prevent long strings from overflowing */
 	overflow-wrap: break-word;

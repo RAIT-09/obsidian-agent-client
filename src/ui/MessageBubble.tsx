@@ -191,11 +191,8 @@ function ContentBlock({
 			return <CollapsibleThought text={content.text} plugin={plugin} />;
 
 		case "tool_call":
-			// Shown even while a permission is pending. Agents announce the
-			// tool call before asking (agent-side etiquette so the client has
-			// context), so hiding it until the answer made the row appear and
-			// then vanish. The dialog above the input is the place to decide;
-			// this row is the transcript.
+			// Shown even while a permission is pending — the dialog above the
+			// input is the place to decide; this row is the transcript.
 			return (
 				<ToolCallBlock
 					content={content}

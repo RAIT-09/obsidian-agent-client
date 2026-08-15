@@ -34,8 +34,8 @@ const KIND_ICONS: Record<string, string> = {
 /**
  * Permission request shown above the input, where the buttons are always in
  * reach. It doubles as the review surface: the command about to run or the
- * edit about to be made is rendered here, and the tool call only joins the
- * transcript once the user decides.
+ * edit about to be made is rendered here. The tool call itself stays in the
+ * transcript throughout — this dialog is the place to decide, not the record.
  */
 export function PermissionDialog({
 	permission,
