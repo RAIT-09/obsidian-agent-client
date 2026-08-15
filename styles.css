@@ -380,6 +380,14 @@ If your plugin does not need CSS, delete this file.
 	cursor: pointer;
 }
 
+/* :focus-visible only — keyboard reveals the ring, mouse clicks never do.
+   Outline follows .agent-client-permission-option:focus-visible. */
+.agent-client-message-tool-call-header-toggle:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+	border-radius: 4px;
+}
+
 .agent-client-message-tool-call-expand-icon {
 	flex-shrink: 0;
 	opacity: 0.7;

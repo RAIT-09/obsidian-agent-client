@@ -1,5 +1,5 @@
 import * as React from "react";
-const { useMemo } = React;
+const { useMemo, useCallback } = React;
 import { FileSystemAdapter } from "obsidian";
 import type { MessageContent } from "../types/chat";
 import type { AcpClient } from "../acp/acp-client";
@@ -7,7 +7,6 @@ import type AgentClientPlugin from "../plugin";
 import { LucideIcon } from "./shared/IconButton";
 import { toRelativePath } from "../utils/paths";
 import { ToolCallContentView } from "./ToolCallContentView";
-// import { MarkdownRenderer } from "./shared/MarkdownRenderer";
 
 interface ToolCallBlockProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
@@ -37,6 +36,20 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 		rawOutput,
 		content: toolContent,
 	} = content;
+
+	const handleToggle = useCallback(() => {
+		onToggleExpanded?.(toolCallId);
+	}, [onToggleExpanded, toolCallId]);
+
+	const handleKeyDown = useCallback(
+		(event: React.KeyboardEvent<HTMLDivElement>) => {
+			if (event.key !== "Enter" && event.key !== " ") return;
+			// Space would scroll the transcript otherwise.
+			event.preventDefault();
+			handleToggle();
+		},
+		[handleToggle],
+	);
 
 	// Images render beside the collapsed row, so they stay visible without
 	// expanding; everything else lives in the collapsible body.
@@ -90,10 +103,14 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 
 	return (
 		<div className="agent-client-message-tool-call">
-			{/* Header — the whole row toggles, like CollapsibleThought */}
+			{/* The whole row is the toggle, pointer and keyboard alike. */}
 			<div
 				className="agent-client-message-tool-call-header agent-client-message-tool-call-header-toggle"
-				onClick={() => onToggleExpanded?.(toolCallId)}
+				role="button"
+				tabIndex={0}
+				aria-expanded={isExpanded}
+				onClick={handleToggle}
+				onKeyDown={handleKeyDown}
 			>
 				<div className="agent-client-message-tool-call-title">
 					{showEmojis && (
