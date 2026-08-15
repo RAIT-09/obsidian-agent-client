@@ -203,45 +203,9 @@ function ContentBlock({
 				/>
 			);
 
-		case "plan": {
-			const showEmojis = plugin.settings.displaySettings.showEmojis;
-			return (
-				<div className="agent-client-message-plan">
-					<div className="agent-client-message-plan-title">
-						{showEmojis && (
-							<LucideIcon
-								name="list-checks"
-								className="agent-client-message-plan-label-icon"
-							/>
-						)}
-						Plan
-					</div>
-					{content.entries.map((entry, idx) => (
-						<div
-							key={idx}
-							className={`agent-client-message-plan-entry agent-client-plan-status-${entry.status}`}
-						>
-							{showEmojis && (
-								<span
-									className={`agent-client-message-plan-entry-icon agent-client-status-${entry.status}`}
-								>
-									<LucideIcon
-										name={
-											entry.status === "completed"
-												? "check"
-												: entry.status === "in_progress"
-													? "loader"
-													: "circle"
-										}
-									/>
-								</span>
-							)}{" "}
-							{entry.content}
-						</div>
-					))}
-				</div>
-			);
-		}
+		case "plan":
+			// Rendered as the strip under the header, not in the transcript.
+			return null;
 
 		case "terminal":
 			return (
@@ -390,6 +354,15 @@ export const MessageBubble = React.memo(function MessageBubble({
 	expandedToolCalls,
 	onToggleToolCall,
 }: MessageBubbleProps) {
+	// A plan-only message (plan followed by a tool call) would render as an
+	// empty shell — the strip under the header owns plan display.
+	if (
+		message.content.length > 0 &&
+		message.content.every((content) => content.type === "plan")
+	) {
+		return null;
+	}
+
 	const groups = groupContent(message.content);
 
 	return (

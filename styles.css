@@ -325,19 +325,12 @@ If your plugin does not need CSS, delete this file.
 .agent-client-message-tool-call-icon svg,
 .agent-client-collapsible-thought-label-icon svg,
 .agent-client-terminal-renderer-label-icon svg,
-.agent-client-error-overlay-suggestion-icon svg,
-.agent-client-message-plan-label-icon svg {
+.agent-client-error-overlay-suggestion-icon svg {
 	width: 14px;
 	height: 14px;
 	vertical-align: -2px;
 	margin-right: 4px;
 	color: var(--text-muted);
-}
-
-.agent-client-message-plan-entry-icon svg {
-	width: 12px;
-	height: 12px;
-	vertical-align: -2px;
 }
 
 /* ===== Message Content Components ===== */
@@ -467,61 +460,6 @@ If your plugin does not need CSS, delete this file.
 .agent-client-message-tool-call-command code {
 	font-family: var(--font-monospace);
 	font-size: 0.9em;
-}
-
-/* Plan */
-.agent-client-message-plan {
-	padding: 8px;
-	margin: 4px 0;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
-	font-size: 12px;
-	user-select: text;
-	overflow-wrap: break-word;
-	word-wrap: break-word;
-	word-break: break-word;
-	max-width: 100%;
-}
-
-.agent-client-message-plan-title {
-	font-weight: bold;
-	margin-bottom: 4px;
-	user-select: text;
-	overflow-wrap: break-word;
-	word-wrap: break-word;
-	word-break: break-word;
-}
-
-.agent-client-message-plan-entry {
-	margin: 2px 0;
-	padding: 2px 4px;
-	border-left: 2px solid var(--text-muted);
-	user-select: text;
-	overflow-wrap: break-word;
-	word-wrap: break-word;
-	word-break: break-word;
-}
-
-.agent-client-message-plan-entry-icon.agent-client-status-completed {
-	user-select: text;
-}
-
-.agent-client-message-plan-entry-icon.agent-client-status-in_progress {
-	user-select: text;
-}
-
-.agent-client-message-plan-entry-icon.agent-client-status-pending {
-	user-select: text;
-}
-
-/* Plan entry status text styles (for emoji-off mode) */
-.agent-client-message-plan-entry.agent-client-plan-status-completed {
-	text-decoration: line-through;
-	color: var(--text-muted);
-}
-
-.agent-client-message-plan-entry.agent-client-plan-status-in_progress {
-	font-weight: bold;
 }
 
 /* ===== Permission Request (vertical option list) ===== */
@@ -2308,6 +2246,131 @@ If your plugin does not need CSS, delete this file.
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+/* ===== Plan strip (ambient, under the header) ===== */
+/* The row is in flow; the expanded list is an overlay dropdown, so
+   toggling never resizes the message area. */
+.agent-client-plan-strip {
+	position: relative;
+	padding: 0 12px 6px;
+	font-size: var(--font-ui-smaller);
+	user-select: text;
+}
+
+.agent-client-plan-strip-summary {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	white-space: nowrap;
+	color: var(--text-muted);
+}
+
+.agent-client-plan-strip-summary:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+	border-radius: 4px;
+}
+
+.agent-client-plan-strip-icon,
+.agent-client-plan-strip-chevron {
+	flex-shrink: 0;
+}
+
+.agent-client-plan-strip-icon svg,
+.agent-client-plan-strip-chevron svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* auto margin, not a flex-1 text column: the chevron stays pinned right
+   even when no current entry is shown (all-completed). */
+.agent-client-plan-strip-chevron {
+	margin-left: auto;
+	opacity: 0.7;
+}
+
+.agent-client-plan-strip-count {
+	flex-shrink: 0;
+	font-weight: 600;
+}
+
+.agent-client-plan-strip-current {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Header-extension band over the transcript. 15 sits above the
+   scroll-to-bottom button (10) and below the permission dialog (20). */
+/* No margin-top: any gap lets the transcript show through above the band. */
+.agent-client-plan-strip-entries {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	z-index: 15;
+	padding: 2px 12px 6px;
+	max-height: 200px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	background-color: var(--background-primary);
+	border-bottom: 1px solid var(--background-modifier-border);
+	color: var(--text-normal);
+}
+
+/* Match the surface the band extends: side docks paint
+   --background-secondary on their leaves. */
+.mod-sidedock .agent-client-plan-strip-entries {
+	background-color: var(--background-secondary);
+}
+
+/* ...except the embedded panel, which paints its own primary surface
+   wherever the host note lives. Order matters: same specificity. */
+.agent-client-embedded-chat-panel .agent-client-plan-strip-entries {
+	background-color: var(--background-primary);
+}
+
+/* Icon column + text column; the icon stays centered on the row's
+   full height however far the text wraps. */
+.agent-client-plan-strip-entry {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 2px 0;
+	padding: 2px 4px;
+	border-left: 2px solid var(--text-muted);
+}
+
+.agent-client-plan-strip-entry-icon {
+	flex-shrink: 0;
+	display: flex;
+}
+
+.agent-client-plan-strip-entry-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.agent-client-plan-strip-entry-text {
+	min-width: 0;
+	overflow-wrap: break-word;
+}
+
+.agent-client-plan-strip-entry.agent-client-plan-status-completed {
+	color: var(--text-muted);
+}
+
+/* On the span, not the flex container: decoration does not reliably
+   propagate into flex items. */
+.agent-client-plan-strip-entry.agent-client-plan-status-completed
+	.agent-client-plan-strip-entry-text {
+	text-decoration: line-through;
+}
+
+.agent-client-plan-strip-entry.agent-client-plan-status-in_progress {
+	font-weight: bold;
 }
 
 .agent-client-change-dir-buttons {

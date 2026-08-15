@@ -17,7 +17,12 @@ import {
 	computeSessionTitle,
 	getDefaultAgentId,
 } from "../services/session-helpers";
-import { countPendingPermissions } from "../services/message-state";
+import {
+	countPendingPermissions,
+	findLatestPlan,
+	summarizePlan,
+} from "../services/message-state";
+import { PlanStrip } from "./PlanStrip";
 import { useHistoryModal } from "../hooks/useHistoryModal";
 import { useChatActions } from "../hooks/useChatActions";
 import { ChangeDirectoryModal } from "./ChangeDirectoryModal";
@@ -159,7 +164,10 @@ function selectChatPanelSettings(s: AgentClientPluginSettings) {
 		// fields here).
 		presetAgents: s.presetAgents,
 		customAgents: s.customAgents,
-		displaySettings: { fontSize: s.displaySettings.fontSize },
+		displaySettings: {
+			fontSize: s.displaySettings.fontSize,
+			showEmojis: s.displaySettings.showEmojis,
+		},
 	};
 }
 
@@ -181,7 +189,8 @@ function chatPanelSettingsEqual(
 		// reference compare detects agent changes (and only those).
 		a.presetAgents === b.presetAgents &&
 		a.customAgents === b.customAgents &&
-		a.displaySettings.fontSize === b.displaySettings.fontSize
+		a.displaySettings.fontSize === b.displaySettings.fontSize &&
+		a.displaySettings.showEmojis === b.displaySettings.showEmojis
 	);
 }
 
@@ -348,9 +357,22 @@ export const ChatPanel = React.memo(function ChatPanel({
 			return next;
 		});
 	}, []);
+	// Plan strip: collapsed by default, derived from the transcript.
+	const [planExpanded, setPlanExpanded] = useState(false);
+	const togglePlan = useCallback(() => setPlanExpanded((v) => !v), []);
+	const planEntries = useMemo(() => findLatestPlan(messages), [messages]);
+	const planSummary = useMemo(
+		() =>
+			planEntries && planEntries.length > 0
+				? summarizePlan(planEntries)
+				: null,
+		[planEntries],
+	);
+
 	// Start every session collapsed; ids are only meaningful within one.
 	useEffect(() => {
 		setExpandedToolCalls(new Set());
+		setPlanExpanded(false);
 	}, [session.sessionId]);
 
 	// Requests waiting behind the active one, for the dialog's queue badge.
@@ -1478,6 +1500,17 @@ export const ChatPanel = React.memo(function ChatPanel({
 			</div>
 		) : null;
 
+	const planStrip =
+		planEntries && planEntries.length > 0 && planSummary ? (
+			<PlanStrip
+				entries={planEntries}
+				summary={planSummary}
+				expanded={planExpanded}
+				onToggle={togglePlan}
+				showEmojis={settings.displaySettings.showEmojis}
+			/>
+		) : null;
+
 	const messageListElement = (
 		<MessageList
 			messages={messages}
@@ -1551,6 +1584,7 @@ export const ChatPanel = React.memo(function ChatPanel({
 					{headerElement}
 				</div>
 				{cwdBanner}
+				{planStrip}
 				<div className="agent-client-floating-content">
 					<div className="agent-client-floating-messages-container">
 						{messageListElement}
@@ -1572,6 +1606,7 @@ export const ChatPanel = React.memo(function ChatPanel({
 					{headerElement}
 				</div>
 				{cwdBanner}
+				{planStrip}
 				<div className="agent-client-embedded-messages-container">
 					{messageListElement}
 				</div>
@@ -1589,6 +1624,7 @@ export const ChatPanel = React.memo(function ChatPanel({
 		>
 			{headerElement}
 			{cwdBanner}
+			{planStrip}
 			{messageListElement}
 			{inputAreaElement}
 		</div>

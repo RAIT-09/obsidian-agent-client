@@ -7,6 +7,7 @@ import type AgentClientPlugin from "../plugin";
 import { LucideIcon } from "./shared/IconButton";
 import { toRelativePath } from "../utils/paths";
 import { ToolCallContentView } from "./ToolCallContentView";
+import { useCollapsibleToggle } from "../hooks/useCollapsibleToggle";
 
 interface ToolCallBlockProps {
 	content: Extract<MessageContent, { type: "tool_call" }>;
@@ -40,33 +41,7 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 	const handleToggle = useCallback(() => {
 		onToggleExpanded?.(toolCallId);
 	}, [onToggleExpanded, toolCallId]);
-
-	// A drag-select over the title also fires a click; don't yank the body
-	// away. ownerDocument: the row's document, not the focused window's.
-	const handleClick = useCallback(
-		(event: React.MouseEvent<HTMLDivElement>) => {
-			const selection = event.currentTarget.ownerDocument.getSelection();
-			if (
-				selection &&
-				!selection.isCollapsed &&
-				event.currentTarget.contains(selection.anchorNode)
-			) {
-				return;
-			}
-			handleToggle();
-		},
-		[handleToggle],
-	);
-
-	const handleKeyDown = useCallback(
-		(event: React.KeyboardEvent<HTMLDivElement>) => {
-			if (event.key !== "Enter" && event.key !== " ") return;
-			// Space would scroll the transcript otherwise.
-			event.preventDefault();
-			handleToggle();
-		},
-		[handleToggle],
-	);
+	const toggleProps = useCollapsibleToggle(isExpanded, handleToggle);
 
 	// Images render beside the collapsed row, so they stay visible without
 	// expanding; everything else lives in the collapsible body.
@@ -123,11 +98,7 @@ export const ToolCallBlock = React.memo(function ToolCallBlock({
 			{/* The whole row is the toggle, pointer and keyboard alike. */}
 			<div
 				className="agent-client-message-tool-call-header agent-client-message-tool-call-header-toggle"
-				role="button"
-				tabIndex={0}
-				aria-expanded={isExpanded}
-				onClick={handleClick}
-				onKeyDown={handleKeyDown}
+				{...toggleProps}
 			>
 				<div className="agent-client-message-tool-call-title">
 					{showEmojis && (
