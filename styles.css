@@ -572,6 +572,9 @@ If your plugin does not need CSS, delete this file.
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 4px;
 	font-size: 0.85em;
+	/* Cast upward: lifts the dialog off transcript rows, or off the input
+	   box in short panels. */
+	box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.25);
 }
 
 /* A short panel cannot fit the dialog's fixed rows above the input, so the
