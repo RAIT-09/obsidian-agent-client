@@ -316,6 +316,14 @@ describe("prepareShellCommand", () => {
 		);
 	});
 
+	it("macOS: a root-level command resolves / as its directory", () => {
+		Platform.isMacOS = true;
+		const r = prepareShellCommand("/pi-acp", [], "/home/u", {
+			wslMode: false,
+		});
+		expect(r.args[2]).toContain(`export PATH='/':"$PATH";`);
+	});
+
 	it("macOS: bare command names get no PATH injection", () => {
 		Platform.isMacOS = true;
 		const r = prepareShellCommand("pi-acp", [], "/home/u", {

@@ -589,8 +589,10 @@ export function prepareShellCommand(
 			pathDirs.push(options.nodeDir);
 		}
 		if (command.startsWith("/")) {
-			const commandDir = command.slice(0, command.lastIndexOf("/"));
-			if (commandDir && !pathDirs.includes(commandDir)) {
+			const lastSlash = command.lastIndexOf("/");
+			const commandDir =
+				lastSlash === 0 ? "/" : command.slice(0, lastSlash);
+			if (!pathDirs.includes(commandDir)) {
 				pathDirs.push(commandDir);
 			}
 		}
