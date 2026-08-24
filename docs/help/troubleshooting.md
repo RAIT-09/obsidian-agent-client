@@ -65,6 +65,9 @@ The agent requires authentication before processing requests.
 **For Hermes Agent:**
 - Run `hermes model` in Terminal to configure a provider (there is no API key field in the plugin). See [Hermes Agent Setup](/agent-setup/hermes#authentication).
 
+**For Pi:**
+- Run `pi` in Terminal and complete the interactive setup for your provider (there is no API key field in the plugin). See [Pi Setup](/agent-setup/pi#authentication).
+
 ### "No Authentication Methods" error
 
 The agent didn't provide authentication options.
