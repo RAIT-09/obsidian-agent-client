@@ -26,7 +26,9 @@ beforeEach(resetPlatform);
 
 describe("convertWindowsPathToWsl", () => {
 	it("converts a Windows drive path", () => {
-		expect(convertWindowsPathToWsl("C:\\Users\\me")).toBe("/mnt/c/Users/me");
+		expect(convertWindowsPathToWsl("C:\\Users\\me")).toBe(
+			"/mnt/c/Users/me",
+		);
 	});
 	it("lowercases the drive letter and normalizes slashes", () => {
 		expect(convertWindowsPathToWsl("D:/Foo/Bar")).toBe("/mnt/d/Foo/Bar");
@@ -41,7 +43,9 @@ describe("convertWindowsPathToWsl", () => {
 
 describe("convertWslPathToWindows", () => {
 	it("converts a /mnt path", () => {
-		expect(convertWslPathToWindows("/mnt/c/Users/me")).toBe("C:\\Users\\me");
+		expect(convertWslPathToWindows("/mnt/c/Users/me")).toBe(
+			"C:\\Users\\me",
+		);
 	});
 	it("passes through non-/mnt paths unchanged", () => {
 		expect(convertWslPathToWindows("/home/me")).toBe("/home/me");
@@ -253,14 +257,14 @@ describe("buildWslTerminalScript", () => {
 
 describe("wrapCommandForWsl — validation", () => {
 	it("rejects UNC working directories", () => {
-		expect(() =>
-			wrapCommandForWsl("/x", [], "\\\\server\\share"),
-		).toThrow(/UNC/);
+		expect(() => wrapCommandForWsl("/x", [], "\\\\server\\share")).toThrow(
+			/UNC/,
+		);
 	});
 	it("rejects invalid distribution names", () => {
-		expect(() =>
-			wrapCommandForWsl("/x", [], "C:\\v", "bad;name"),
-		).toThrow(/distribution/i);
+		expect(() => wrapCommandForWsl("/x", [], "C:\\v", "bad;name")).toThrow(
+			/distribution/i,
+		);
 	});
 });
 
@@ -297,6 +301,38 @@ describe("prepareShellCommand", () => {
 		expect(r.args[0]).toBe("-l");
 		expect(r.args[1]).toBe("-c");
 		expect(r.needsShell).toBe(false);
+	});
+
+	it("macOS: prepends an absolute command's own directory to PATH", () => {
+		Platform.isMacOS = true;
+		const r = prepareShellCommand(
+			"/Users/u/.local/bin/pi-acp",
+			[],
+			"/home/u",
+			{ wslMode: false },
+		);
+		expect(r.args[2]).toContain(
+			`export PATH='/Users/u/.local/bin':"$PATH";`,
+		);
+	});
+
+	it("macOS: bare command names get no PATH injection", () => {
+		Platform.isMacOS = true;
+		const r = prepareShellCommand("pi-acp", [], "/home/u", {
+			wslMode: false,
+		});
+		expect(r.args[2]).not.toContain("export PATH");
+	});
+
+	it("macOS: combines nodeDir with the command directory", () => {
+		Platform.isMacOS = true;
+		const r = prepareShellCommand("/opt/agent/bin/agent", [], "/home/u", {
+			wslMode: false,
+			nodeDir: "/opt/node/bin",
+		});
+		expect(r.args[2]).toContain(
+			`export PATH='/opt/node/bin:/opt/agent/bin':"$PATH";`,
+		);
 	});
 
 	it("Windows non-WSL: needs cmd.exe shell", () => {
