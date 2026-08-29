@@ -1591,7 +1591,6 @@ If your plugin does not need CSS, delete this file.
 .agent-client-diff-word-removed {
 	background-color: rgba(248, 81, 73, 0.4);
 	font-weight: 600;
-	text-decoration: line-through;
 }
 
 /* Diff Expand/Collapse Bar */
