@@ -128,7 +128,12 @@ export function computeDiffLines(
 
 		// If we have a removed line followed by an added line, compute word diff
 		if (current.type === "removed" && next.type === "added") {
-			const wordDiff = Diff.diffWords(current.content, next.content);
+			// Whitespace-sensitive: parts must reconstruct each side verbatim,
+			// or the deleted line renders with the added line's whitespace.
+			const wordDiff = Diff.diffWordsWithSpace(
+				current.content,
+				next.content,
+			);
 			const mappedDiff = mapDiffParts(wordDiff);
 			current.wordDiff = mappedDiff;
 			next.wordDiff = mappedDiff;
