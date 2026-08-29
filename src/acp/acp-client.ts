@@ -306,6 +306,11 @@ export class AcpClient {
 				signal,
 			);
 
+			// A replaced process's late exit must not cancel the successor's work.
+			if (this.agentProcess === agentProcess) {
+				this.cancelAllOperations();
+			}
+
 			if (code === 127) {
 				this.logger.error(`[AcpClient] Command not found: ${command}`);
 
