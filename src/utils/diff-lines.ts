@@ -54,6 +54,8 @@ export function computeDiffLines(
 	if (isNewFileDiff(oldText)) {
 		// New file - all lines are added
 		const lines = newText.split("\n");
+		// split() leaves an empty item after a terminal newline; not a real line.
+		if (lines[lines.length - 1] === "") lines.pop();
 		return lines.map(
 			(line, idx): DiffLine => ({
 				type: "added",

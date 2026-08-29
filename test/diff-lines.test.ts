@@ -126,3 +126,28 @@ describe("word diff pairing", () => {
 		).toBe(true);
 	});
 });
+
+describe("new-file line splitting", () => {
+	it("drops the empty item after a terminal newline", () => {
+		expect(computeDiffLines(null, "a\n").map((l) => l.content)).toEqual([
+			"a",
+		]);
+	});
+
+	it("renders an empty file as no rows", () => {
+		expect(computeDiffLines(null, "")).toEqual([]);
+	});
+
+	it("keeps a real empty line before the terminal newline", () => {
+		expect(computeDiffLines(null, "a\n\n").map((l) => l.content)).toEqual([
+			"a",
+			"",
+		]);
+	});
+
+	it("handles text without a terminal newline", () => {
+		expect(computeDiffLines(null, "a").map((l) => l.content)).toEqual([
+			"a",
+		]);
+	});
+});
