@@ -55,3 +55,74 @@ describe("word diff reconstructs each side verbatim", () => {
 		});
 	}
 });
+
+function joinLines(lines: string[]): string {
+	return lines.join("\n");
+}
+
+describe("word diff pairing", () => {
+	it("highlights a 1:1 replacement", () => {
+		const lines = computeDiffLines(
+			joinLines(["keep", "old line", "keep2"]),
+			joinLines(["keep", "new line", "keep2"]),
+		);
+		expect(lines.find((l) => l.type === "removed")?.wordDiff).toBeDefined();
+		expect(lines.find((l) => l.type === "added")?.wordDiff).toBeDefined();
+	});
+
+	it("shares one parts array between the pair", () => {
+		const lines = computeDiffLines("a", "b");
+		expect(lines.find((l) => l.type === "removed")?.wordDiff).toBe(
+			lines.find((l) => l.type === "added")?.wordDiff,
+		);
+	});
+
+	it("skips an N:N block entirely", () => {
+		const lines = computeDiffLines(
+			joinLines(["old 1", "old 2", "old 3"]),
+			joinLines(["new 1", "new 2", "new 3"]),
+		);
+		expect(lines.every((l) => l.wordDiff === undefined)).toBe(true);
+	});
+
+	it("skips unbalanced blocks (2:1 and 1:2)", () => {
+		const a = computeDiffLines(
+			joinLines(["x", "old 1", "old 2", "y"]),
+			joinLines(["x", "new", "y"]),
+		);
+		const b = computeDiffLines(
+			joinLines(["x", "old", "y"]),
+			joinLines(["x", "new 1", "new 2", "y"]),
+		);
+		expect([...a, ...b].every((l) => l.wordDiff === undefined)).toBe(true);
+	});
+
+	it("highlights each separate 1:1 block independently", () => {
+		const lines = computeDiffLines(
+			joinLines(["keep", "old a", "keep", "old b", "keep"]),
+			joinLines(["keep", "new a", "keep", "new b", "keep"]),
+		);
+		expect(lines.filter((l) => l.wordDiff !== undefined)).toHaveLength(4);
+	});
+
+	it("puts no highlights on pure deletions or additions", () => {
+		const del = computeDiffLines(
+			joinLines(["keep", "gone", "keep2"]),
+			joinLines(["keep", "keep2"]),
+		);
+		const add = computeDiffLines(
+			joinLines(["keep", "keep2"]),
+			joinLines(["keep", "born", "keep2"]),
+		);
+		expect([...del, ...add].every((l) => l.wordDiff === undefined)).toBe(
+			true,
+		);
+	});
+
+	it("renders a new file as added lines without highlights", () => {
+		const lines = computeDiffLines(null, joinLines(["a", "b"]));
+		expect(
+			lines.every((l) => l.type === "added" && l.wordDiff === undefined),
+		).toBe(true);
+	});
+});

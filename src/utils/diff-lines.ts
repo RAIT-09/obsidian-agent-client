@@ -43,7 +43,9 @@ const CONTEXT_LINES = 3;
  *
  * Produces unified-diff lines with line numbers, hunk headers when there
  * is more than one hunk, and word-level highlight parts attached to
- * modified lines. A brand-new file renders every line as added.
+ * one-line replacements (in larger blocks no pairing is reliable, so
+ * those get line-level coloring only). A brand-new file renders every
+ * line as added.
  */
 export function computeDiffLines(
 	oldText: string | null | undefined,
@@ -121,22 +123,28 @@ export function computeDiffLines(
 		}
 	}
 
-	// Add word-level diff for modified lines that are adjacent
-	for (let i = 0; i < result.length - 1; i++) {
-		const current = result[i];
-		const next = result[i + 1];
-
-		// If we have a removed line followed by an added line, compute word diff
-		if (current.type === "removed" && next.type === "added") {
+	// Word-level highlights only for 1:1 replacements: in an N:M block the
+	// adjacent pairing is arbitrary and usually relates unrelated lines.
+	let i = 0;
+	while (i < result.length) {
+		if (result[i].type !== "removed") {
+			i++;
+			continue;
+		}
+		const removedStart = i;
+		while (i < result.length && result[i].type === "removed") i++;
+		const addedStart = i;
+		while (i < result.length && result[i].type === "added") i++;
+		if (addedStart - removedStart === 1 && i - addedStart === 1) {
+			const removed = result[removedStart];
+			const added = result[addedStart];
 			// Whitespace-sensitive: parts must reconstruct each side verbatim,
 			// or the deleted line renders with the added line's whitespace.
-			const wordDiff = Diff.diffWordsWithSpace(
-				current.content,
-				next.content,
+			const wordDiff = mapDiffParts(
+				Diff.diffWordsWithSpace(removed.content, added.content),
 			);
-			const mappedDiff = mapDiffParts(wordDiff);
-			current.wordDiff = mappedDiff;
-			next.wordDiff = mappedDiff;
+			removed.wordDiff = wordDiff;
+			added.wordDiff = wordDiff;
 		}
 	}
 
