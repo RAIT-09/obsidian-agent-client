@@ -93,6 +93,8 @@ export function computeDiffLines(
 
 		for (const line of hunk.lines) {
 			const marker = line[0];
+			// jsdiff metadata, not file content ("\ No newline at end of file").
+			if (marker === "\\") continue;
 			const content = line.substring(1);
 
 			if (marker === "+") {
