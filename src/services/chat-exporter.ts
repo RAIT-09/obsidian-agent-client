@@ -67,6 +67,14 @@ interface ConvertContext {
 	imageLocation: "obsidian" | "custom" | "base64";
 	/** Custom folder for images */
 	imageCustomFolder: string;
+	/** Counter for audio numbering (separate so image numbers stay stable) */
+	audioIndex: number;
+	/** Whether to include audio in export */
+	includeAudios: boolean;
+	/** Where to save audio (no base64 option) */
+	audioLocation: "obsidian" | "custom";
+	/** Custom folder for audio */
+	audioCustomFolder: string;
 }
 
 export class ChatExporter {
@@ -302,6 +310,10 @@ session_id: ${sessionId}${tagsLine}
 			includeImages: settings.includeImages,
 			imageLocation: settings.imageLocation,
 			imageCustomFolder: settings.imageCustomFolder,
+			audioIndex: 0,
+			includeAudios: settings.includeAudios,
+			audioLocation: settings.audioLocation,
+			audioCustomFolder: settings.audioCustomFolder,
 		};
 
 		let markdown = `# ${agentLabel}\n\n`;
@@ -448,6 +460,11 @@ session_id: ${sessionId}${tagsLine}
 							item.content,
 							context,
 						);
+					} else if (item.content.type === "audio") {
+						md += await this.convertAudioToMarkdown(
+							item.content,
+							context,
+						);
 					} else {
 						md +=
 							convertToolResultBlockToMarkdown(item.content) ??
@@ -507,6 +524,35 @@ session_id: ${sessionId}${tagsLine}
 
 		md += "```\n\n";
 		return md;
+	}
+
+	/**
+	 * Save tool-result audio as an attachment and embed it. There is no
+	 * base64 mode for audio (a data URI cannot play from markdown); when
+	 * saving fails the export carries a placeholder line instead.
+	 */
+	private async convertAudioToMarkdown(
+		audio: { data: string; mimeType: string },
+		context: ConvertContext,
+	): Promise<string> {
+		if (!context.includeAudios) return "";
+		try {
+			context.audioIndex++;
+			const attachmentPath = await this.saveMediaAsAttachment(
+				audio.data,
+				audio.mimeType,
+				context.exportFilePath,
+				context.audioIndex,
+				context.audioLocation,
+				context.audioCustomFolder,
+				"mp3",
+			);
+			const fileName = attachmentPath.split("/").pop();
+			return `![[${fileName}]]\n\n`;
+		} catch (error) {
+			this.logger.error(`Failed to save audio as attachment: ${error}`);
+			return `> Audio (${audio.mimeType}) could not be saved.\n\n`;
+		}
 	}
 
 	private convertPlanToMarkdown(

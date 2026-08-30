@@ -726,7 +726,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Include images")
-			.setDesc("Include images in exported markdown files")
+			.setDesc("Include images in exported Markdown files")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.exportSettings.includeImages)
@@ -795,6 +795,80 @@ export class AgentClientSettingTab extends PluginSettingTab {
 											...this.plugin.settings
 												.exportSettings,
 											imageCustomFolder: value,
+										},
+									},
+								);
+							}),
+					);
+			}
+		}
+
+		new Setting(containerEl)
+			.setName("Include audio")
+			.setDesc("Include tool result audio in exported Markdown files")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.exportSettings.includeAudios)
+					.onChange(async (value) => {
+						await this.plugin.settingsService.updateSettings({
+							exportSettings: {
+								...this.plugin.settings.exportSettings,
+								includeAudios: value,
+							},
+						});
+						this.renderContent();
+					}),
+			);
+
+		if (this.plugin.settings.exportSettings.includeAudios) {
+			new Setting(containerEl)
+				.setName("Audio location")
+				.setDesc("Where to save exported audio files")
+				.addDropdown((dropdown) =>
+					dropdown
+						.addOption(
+							"obsidian",
+							"Use Obsidian's attachment setting",
+						)
+						.addOption("custom", "Save to custom folder")
+						.setValue(
+							this.plugin.settings.exportSettings.audioLocation,
+						)
+						.onChange(async (value) => {
+							await this.plugin.settingsService.updateSettings({
+								exportSettings: {
+									...this.plugin.settings.exportSettings,
+									audioLocation: value as
+										| "obsidian"
+										| "custom",
+								},
+							});
+							this.renderContent();
+						}),
+				);
+
+			if (
+				this.plugin.settings.exportSettings.audioLocation === "custom"
+			) {
+				new Setting(containerEl)
+					.setName("Custom audio folder")
+					.setDesc(
+						"Folder path for exported audio (relative to vault root)",
+					)
+					.addText((text) =>
+						text
+							.setPlaceholder("Agent Client")
+							.setValue(
+								this.plugin.settings.exportSettings
+									.audioCustomFolder,
+							)
+							.onChange(async (value) => {
+								await this.plugin.settingsService.updateSettings(
+									{
+										exportSettings: {
+											...this.plugin.settings
+												.exportSettings,
+											audioCustomFolder: value,
 										},
 									},
 								);
