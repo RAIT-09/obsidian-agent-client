@@ -72,6 +72,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 	 */
 	private renderContent(): void {
 		const { containerEl } = this;
+		const scrollTop = containerEl.scrollTop;
 
 		containerEl.empty();
 		this.agentSelector = null;
@@ -956,6 +957,8 @@ export class AgentClientSettingTab extends PluginSettingTab {
 						});
 					}),
 			);
+
+		containerEl.scrollTop = scrollTop;
 	}
 
 	/**
