@@ -324,7 +324,6 @@ If your plugin does not need CSS, delete this file.
 /* ===== Inline Lucide Icons (replace emojis) ===== */
 .agent-client-message-tool-call-icon svg,
 .agent-client-collapsible-thought-label-icon svg,
-.agent-client-terminal-renderer-label-icon svg,
 .agent-client-error-overlay-suggestion-icon svg {
 	width: 14px;
 	height: 14px;
@@ -700,6 +699,9 @@ If your plugin does not need CSS, delete this file.
 /* Main container */
 .agent-client-chat-view-container {
 	--ac-chat-font-size: var(--font-text-size);
+	/* Detail blocks (tool rows, diffs, terminals, thinking) share one ratio.
+	   calc, not em: nested boxes must not compound against the tool row. */
+	--ac-chat-detail-font-size: calc(var(--ac-chat-font-size) * 0.85);
 	height: 100%;
 	display: flex;
 	flex-direction: column;
@@ -1381,7 +1383,7 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 4px;
-	font-size: 12px;
+	font-size: var(--ac-chat-detail-font-size);
 	font-family: var(--font-monospace);
 	white-space: pre-wrap;
 	word-break: break-word;
@@ -1395,7 +1397,7 @@ If your plugin does not need CSS, delete this file.
 	padding: 4px 8px;
 	color: white;
 	border-radius: 4px;
-	font-size: 11px;
+	font-size: 0.9em;
 	font-family: var(--font-interface);
 	user-select: text;
 }
@@ -1522,7 +1524,7 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 4px;
 	overflow: hidden;
 	font-family: var(--font-monospace);
-	font-size: 12px;
+	font-size: var(--ac-chat-detail-font-size);
 }
 
 .agent-client-tool-call-diff-content {
@@ -1534,8 +1536,7 @@ If your plugin does not need CSS, delete this file.
 	padding: 4px 12px;
 	background-color: var(--background-secondary);
 	color: var(--text-muted);
-	font-size: 11px;
-	font-style: italic;
+	font-size: 0.9em;
 }
 
 .agent-client-diff-line {
