@@ -1,7 +1,57 @@
 import type AgentClientPlugin from "../plugin";
-import type { ChatMessage, MessageContent } from "../types/chat";
+import type {
+	ChatMessage,
+	MessageContent,
+	ToolResultContentBlock,
+} from "../types/chat";
 import { getLogger, Logger } from "../utils/logger";
 import { TFile } from "obsidian";
+
+/**
+ * Wrap text in a fenced code block whose fence is longer than any backtick
+ * run inside, so output that itself contains ``` cannot break out.
+ */
+export function fencedCodeBlock(text: string): string {
+	const ticks = text.match(/`+/g);
+	const run = ticks ? Math.max(...ticks.map((t) => t.length)) : 0;
+	const fence = "`".repeat(Math.max(3, run + 1));
+	return `${fence}\n${text}\n${fence}\n\n`;
+}
+
+/**
+ * Convert the pure (no vault I/O) tool-result blocks to markdown.
+ * Image and audio need the attachment pipeline and are handled by the
+ * exporter class; this returns null for them.
+ */
+export function convertToolResultBlockToMarkdown(
+	block: ToolResultContentBlock,
+): string | null {
+	switch (block.type) {
+		case "text":
+			return fencedCodeBlock(block.text);
+		case "resource_link": {
+			const label = block.title || block.name;
+			const desc = block.description ? ` — ${block.description}` : "";
+			return `[${label}](${block.uri})${desc}\n\n`;
+		}
+		case "resource":
+			return "text" in block.resource
+				? `**Resource**: \`${block.resource.uri}\`\n\n` +
+						fencedCodeBlock(block.resource.text)
+				: `**Resource**: \`${block.resource.uri}\` (binary · ${block.resource.mimeType || "unknown type"})\n\n`;
+		default:
+			return null;
+	}
+}
+
+/** Convert the raw-output fallback (shown when a tool returned no content). */
+export function convertRawOutputToMarkdown(rawOutput: unknown): string {
+	const text =
+		typeof rawOutput === "string"
+			? rawOutput
+			: JSON.stringify(rawOutput, null, 2);
+	return `**Raw output**:\n\n${fencedCodeBlock(text)}`;
+}
 
 /**
  * Context for content conversion, tracking state across messages.
@@ -17,6 +67,14 @@ interface ConvertContext {
 	imageLocation: "obsidian" | "custom" | "base64";
 	/** Custom folder for images */
 	imageCustomFolder: string;
+	/** Counter for audio numbering (separate so image numbers stay stable) */
+	audioIndex: number;
+	/** Whether to include audio in export */
+	includeAudios: boolean;
+	/** Where to save audio (no base64 option) */
+	audioLocation: "obsidian" | "custom";
+	/** Custom folder for audio */
+	audioCustomFolder: string;
 }
 
 export class ChatExporter {
@@ -252,6 +310,10 @@ session_id: ${sessionId}${tagsLine}
 			includeImages: settings.includeImages,
 			imageLocation: settings.imageLocation,
 			imageCustomFolder: settings.imageCustomFolder,
+			audioIndex: 0,
+			includeAudios: settings.includeAudios,
+			audioLocation: settings.audioLocation,
+			audioCustomFolder: settings.audioCustomFolder,
 		};
 
 		let markdown = `# ${agentLabel}\n\n`;
@@ -304,7 +366,7 @@ session_id: ${sessionId}${tagsLine}
 				return `> [!info]- Thinking\n> ${content.text.split("\n").join("\n> ")}\n\n`;
 
 			case "tool_call":
-				return this.convertToolCallToMarkdown(content);
+				return this.convertToolCallToMarkdown(content, context);
 
 			case "terminal":
 				return `### 🖥️ Terminal: ${content.terminalId.slice(0, 8)}\n\n`;
@@ -316,51 +378,63 @@ session_id: ${sessionId}${tagsLine}
 				return `[${content.name}](${content.uri})\n\n`;
 
 			case "image":
-				// Skip if images are not included
-				if (!context.includeImages) {
-					return "";
-				}
-
-				// External URI - use as-is
-				if (content.uri) {
-					return `![Image](${content.uri})\n\n`;
-				}
-
-				// Base64 embedding mode
-				if (context.imageLocation === "base64") {
-					return `![Image](data:${content.mimeType};base64,${content.data})\n\n`;
-				}
-
-				// Save as attachment (obsidian or custom)
-				try {
-					context.imageIndex++;
-					const attachmentPath = await this.saveImageAsAttachment(
-						content.data,
-						content.mimeType,
-						context.exportFilePath,
-						context.imageIndex,
-						context.imageLocation,
-						context.imageCustomFolder,
-					);
-					// Use filename only (Obsidian resolves it)
-					const fileName = attachmentPath.split("/").pop();
-					return `![[${fileName}]]\n\n`;
-				} catch (error) {
-					this.logger.error(
-						`Failed to save image as attachment: ${error}`,
-					);
-					// Fallback to base64 embedding
-					return `![Image](data:${content.mimeType};base64,${content.data})\n\n`;
-				}
+				return this.convertImageToMarkdown(content, context);
 
 			default:
 				return "";
 		}
 	}
 
-	private convertToolCallToMarkdown(
+	/**
+	 * Convert a base64/uri image to markdown following the export image
+	 * policy: external uri as-is, base64 mode as a data URI, otherwise an
+	 * attachment file with a data-URI fallback when saving fails.
+	 */
+	private async convertImageToMarkdown(
+		image: { data: string; mimeType: string; uri?: string },
+		context: ConvertContext,
+	): Promise<string> {
+		// Skip if images are not included
+		if (!context.includeImages) {
+			return "";
+		}
+
+		// External URI - use as-is
+		if (image.uri) {
+			return `![Image](${image.uri})\n\n`;
+		}
+
+		// Base64 embedding mode
+		if (context.imageLocation === "base64") {
+			return `![Image](data:${image.mimeType};base64,${image.data})\n\n`;
+		}
+
+		// Save as attachment (obsidian or custom)
+		try {
+			context.imageIndex++;
+			const attachmentPath = await this.saveMediaAsAttachment(
+				image.data,
+				image.mimeType,
+				context.exportFilePath,
+				context.imageIndex,
+				context.imageLocation,
+				context.imageCustomFolder,
+				"png",
+			);
+			// Use filename only (Obsidian resolves it)
+			const fileName = attachmentPath.split("/").pop();
+			return `![[${fileName}]]\n\n`;
+		} catch (error) {
+			this.logger.error(`Failed to save image as attachment: ${error}`);
+			// Fallback to base64 embedding
+			return `![Image](data:${image.mimeType};base64,${image.data})\n\n`;
+		}
+	}
+
+	private async convertToolCallToMarkdown(
 		content: Extract<MessageContent, { type: "tool_call" }>,
-	): string {
+		context: ConvertContext,
+	): Promise<string> {
 		let md = `### 🔧 ${content.title || "Tool"}\n\n`;
 
 		// Add locations if present
@@ -375,13 +449,36 @@ session_id: ${sessionId}${tagsLine}
 
 		md += `**Status**: ${content.status}\n\n`;
 
-		// Only export diffs
+		// Terminals are ids of live processes; there is nothing to export.
 		if (content.content && content.content.length > 0) {
 			for (const item of content.content) {
 				if (item.type === "diff") {
 					md += this.convertDiffToMarkdown(item);
+				} else if (item.type === "content") {
+					if (item.content.type === "image") {
+						md += await this.convertImageToMarkdown(
+							item.content,
+							context,
+						);
+					} else if (item.content.type === "audio") {
+						md += await this.convertAudioToMarkdown(
+							item.content,
+							context,
+						);
+					} else {
+						md +=
+							convertToolResultBlockToMarkdown(item.content) ??
+							"";
+					}
 				}
 			}
+		}
+
+		if (
+			content.rawOutput !== undefined &&
+			(!content.content || content.content.length === 0)
+		) {
+			md += convertRawOutputToMarkdown(content.rawOutput);
 		}
 
 		return md;
@@ -429,6 +526,35 @@ session_id: ${sessionId}${tagsLine}
 		return md;
 	}
 
+	/**
+	 * Save tool-result audio as an attachment and embed it. There is no
+	 * base64 mode for audio (a data URI cannot play from markdown); when
+	 * saving fails the export carries a placeholder line instead.
+	 */
+	private async convertAudioToMarkdown(
+		audio: { data: string; mimeType: string },
+		context: ConvertContext,
+	): Promise<string> {
+		if (!context.includeAudios) return "";
+		try {
+			context.audioIndex++;
+			const attachmentPath = await this.saveMediaAsAttachment(
+				audio.data,
+				audio.mimeType,
+				context.exportFilePath,
+				context.audioIndex,
+				context.audioLocation,
+				context.audioCustomFolder,
+				"mp3",
+			);
+			const fileName = attachmentPath.split("/").pop();
+			return `![[${fileName}]]\n\n`;
+		} catch (error) {
+			this.logger.error(`Failed to save audio as attachment: ${error}`);
+			return `> Audio (${audio.mimeType}) could not be saved.\n\n`;
+		}
+	}
+
 	private convertPlanToMarkdown(
 		content: Extract<MessageContent, { type: "plan" }>,
 	): string {
@@ -447,30 +573,31 @@ session_id: ${sessionId}${tagsLine}
 	}
 
 	/**
-	 * Save a base64-encoded image as an attachment file.
+	 * Save a base64-encoded media file (image or audio) as an attachment.
 	 * Uses Obsidian's attachment settings to determine the save location.
 	 * Skips saving if the file already exists.
 	 */
-	private async saveImageAsAttachment(
+	private async saveMediaAsAttachment(
 		base64Data: string,
 		mimeType: string,
 		exportFilePath: string,
-		imageIndex: number,
-		imageLocation: "obsidian" | "custom",
-		imageCustomFolder: string,
+		mediaIndex: number,
+		location: "obsidian" | "custom",
+		customFolder: string,
+		fallbackExt: string,
 	): Promise<string> {
-		const ext = this.getExtensionFromMimeType(mimeType);
+		const ext = this.getExtensionFromMimeType(mimeType, fallbackExt);
 
-		// Generate image filename based on export filename
+		// Generate media filename based on export filename
 		const exportFileName = exportFilePath.replace(/\.md$/, "");
-		const baseName = exportFileName.split("/").pop() || "image";
-		const imageFileName = `${baseName}_${String(imageIndex).padStart(3, "0")}.${ext}`;
+		const baseName = exportFileName.split("/").pop() || "media";
+		const imageFileName = `${baseName}_${String(mediaIndex).padStart(3, "0")}.${ext}`;
 
 		let attachmentPath: string;
 
-		if (imageLocation === "custom") {
+		if (location === "custom") {
 			// Save to custom folder
-			const folder = imageCustomFolder || "Agent Client";
+			const folder = customFolder || "Agent Client";
 			await this.ensureFolderExists(folder);
 			attachmentPath = `${folder}/${imageFileName}`;
 
@@ -518,14 +645,26 @@ session_id: ${sessionId}${tagsLine}
 	/**
 	 * Get file extension from MIME type.
 	 */
-	private getExtensionFromMimeType(mimeType: string): string {
+	private getExtensionFromMimeType(
+		mimeType: string,
+		fallback: string,
+	): string {
 		const map: Record<string, string> = {
 			"image/png": "png",
 			"image/jpeg": "jpg",
 			"image/gif": "gif",
 			"image/webp": "webp",
+			"audio/mpeg": "mp3",
+			"audio/mp3": "mp3",
+			"audio/wav": "wav",
+			"audio/x-wav": "wav",
+			"audio/ogg": "ogg",
+			"audio/mp4": "m4a",
+			"audio/m4a": "m4a",
+			"audio/flac": "flac",
+			"audio/webm": "webm",
 		};
-		return map[mimeType] || "png";
+		return map[mimeType] || fallback;
 	}
 
 	/**

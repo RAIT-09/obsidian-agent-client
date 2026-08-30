@@ -138,6 +138,9 @@ export interface AgentClientPluginSettings {
 		includeImages: boolean;
 		imageLocation: "obsidian" | "custom" | "base64";
 		imageCustomFolder: string;
+		includeAudios: boolean;
+		audioLocation: "obsidian" | "custom";
+		audioCustomFolder: string;
 		frontmatterTag: string;
 	};
 	// WSL settings (Windows only)
@@ -202,6 +205,9 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		includeImages: true,
 		imageLocation: "obsidian",
 		imageCustomFolder: "Agent Client",
+		includeAudios: true,
+		audioLocation: "obsidian",
+		audioCustomFolder: "Agent Client",
 		frontmatterTag: "agent-client",
 	},
 	windowsWslMode: false,
@@ -1486,6 +1492,19 @@ export default class AgentClientPlugin extends Plugin {
 				imageCustomFolder: str(
 					re.imageCustomFolder,
 					D.exportSettings.imageCustomFolder,
+				),
+				includeAudios: bool(
+					re.includeAudios,
+					D.exportSettings.includeAudios,
+				),
+				audioLocation: enumVal(
+					re.audioLocation,
+					["obsidian", "custom"],
+					D.exportSettings.audioLocation,
+				),
+				audioCustomFolder: str(
+					re.audioCustomFolder,
+					D.exportSettings.audioCustomFolder,
 				),
 				frontmatterTag: str(
 					re.frontmatterTag,
