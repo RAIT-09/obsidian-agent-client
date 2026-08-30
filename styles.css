@@ -338,7 +338,7 @@ If your plugin does not need CSS, delete this file.
 .agent-client-message-tool-call {
 	margin-bottom: 12px;
 	background-color: transparent;
-	font-size: 0.85em;
+	font-size: var(--ac-chat-detail-font-size);
 	user-select: text;
 	overflow-wrap: break-word;
 	word-wrap: break-word;
@@ -1294,10 +1294,9 @@ If your plugin does not need CSS, delete this file.
 
 /* Collapsible Thought */
 .agent-client-collapsible-thought {
-	font-style: italic;
 	color: var(--text-muted);
 	background-color: transparent;
-	font-size: 0.9em;
+	font-size: var(--ac-chat-detail-font-size);
 	cursor: pointer;
 	overflow-wrap: break-word;
 	word-wrap: break-word;
