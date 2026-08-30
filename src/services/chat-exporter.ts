@@ -354,7 +354,7 @@ session_id: ${sessionId}${tagsLine}
 				return `> [!info]- Thinking\n> ${content.text.split("\n").join("\n> ")}\n\n`;
 
 			case "tool_call":
-				return this.convertToolCallToMarkdown(content);
+				return this.convertToolCallToMarkdown(content, context);
 
 			case "terminal":
 				return `### 🖥️ Terminal: ${content.terminalId.slice(0, 8)}\n\n`;
@@ -419,9 +419,10 @@ session_id: ${sessionId}${tagsLine}
 		}
 	}
 
-	private convertToolCallToMarkdown(
+	private async convertToolCallToMarkdown(
 		content: Extract<MessageContent, { type: "tool_call" }>,
-	): string {
+		context: ConvertContext,
+	): Promise<string> {
 		let md = `### 🔧 ${content.title || "Tool"}\n\n`;
 
 		// Add locations if present
@@ -442,7 +443,16 @@ session_id: ${sessionId}${tagsLine}
 				if (item.type === "diff") {
 					md += this.convertDiffToMarkdown(item);
 				} else if (item.type === "content") {
-					md += convertToolResultBlockToMarkdown(item.content) ?? "";
+					if (item.content.type === "image") {
+						md += await this.convertImageToMarkdown(
+							item.content,
+							context,
+						);
+					} else {
+						md +=
+							convertToolResultBlockToMarkdown(item.content) ??
+							"";
+					}
 				}
 			}
 		}

@@ -101,6 +101,50 @@ describe("convertToolResultBlockToMarkdown", () => {
 	});
 });
 
+describe("convertToolCallToMarkdown ordering", () => {
+	it("keeps content items in their received order", async () => {
+		// The private method touches the vault only for media; with images
+		// excluded a bare instance converts text and diffs purely.
+		const { ChatExporter } = await import("../src/services/chat-exporter");
+		const exporter = new ChatExporter(
+			{} as unknown as ConstructorParameters<typeof ChatExporter>[0],
+		);
+		const md = await (
+			exporter as unknown as {
+				convertToolCallToMarkdown(
+					c: unknown,
+					ctx: unknown,
+				): Promise<string>;
+			}
+		).convertToolCallToMarkdown(
+			{
+				type: "tool_call",
+				toolCallId: "t1",
+				status: "completed",
+				content: [
+					{ type: "content", content: { type: "text", text: "first" } },
+					{ type: "diff", path: "/f.ts", oldText: "a", newText: "b" },
+					{ type: "content", content: { type: "text", text: "last" } },
+				],
+			},
+			{
+				exportFilePath: "x.md",
+				imageIndex: 0,
+				includeImages: false,
+				imageLocation: "obsidian",
+				imageCustomFolder: "",
+			},
+		);
+		const order = [
+			md.indexOf("first"),
+			md.indexOf("```diff"),
+			md.indexOf("last"),
+		];
+		expect(order.every((i) => i >= 0)).toBe(true);
+		expect(order).toEqual([...order].sort((a, b) => a - b));
+	});
+});
+
 describe("convertRawOutputToMarkdown", () => {
 	it("passes string output through into a fence", () => {
 		expect(convertRawOutputToMarkdown("done")).toBe(
