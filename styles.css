@@ -476,10 +476,7 @@ If your plugin does not need CSS, delete this file.
 
 /* ===== Permission dialog (above the input) ===== */
 
-/* Two selectors: the floating variant has no chat-view-container. With no
-   matching container, cqh silently falls back to the viewport. */
-.agent-client-chat-view-container,
-.agent-client-floating-window {
+.agent-client-chat-view-container {
 	container-type: size;
 	/* Header + input area + gap, measured on device; transient badges make
 	   the header taller, so this is a ceiling estimate. */
