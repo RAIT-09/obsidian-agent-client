@@ -1,7 +1,57 @@
 import type AgentClientPlugin from "../plugin";
-import type { ChatMessage, MessageContent } from "../types/chat";
+import type {
+	ChatMessage,
+	MessageContent,
+	ToolResultContentBlock,
+} from "../types/chat";
 import { getLogger, Logger } from "../utils/logger";
 import { TFile } from "obsidian";
+
+/**
+ * Wrap text in a fenced code block whose fence is longer than any backtick
+ * run inside, so output that itself contains ``` cannot break out.
+ */
+export function fencedCodeBlock(text: string): string {
+	const ticks = text.match(/`+/g);
+	const run = ticks ? Math.max(...ticks.map((t) => t.length)) : 0;
+	const fence = "`".repeat(Math.max(3, run + 1));
+	return `${fence}\n${text}\n${fence}\n\n`;
+}
+
+/**
+ * Convert the pure (no vault I/O) tool-result blocks to markdown.
+ * Image and audio need the attachment pipeline and are handled by the
+ * exporter class; this returns null for them.
+ */
+export function convertToolResultBlockToMarkdown(
+	block: ToolResultContentBlock,
+): string | null {
+	switch (block.type) {
+		case "text":
+			return fencedCodeBlock(block.text);
+		case "resource_link": {
+			const label = block.title || block.name;
+			const desc = block.description ? ` — ${block.description}` : "";
+			return `[${label}](${block.uri})${desc}\n\n`;
+		}
+		case "resource":
+			return "text" in block.resource
+				? `**Resource**: \`${block.resource.uri}\`\n\n` +
+						fencedCodeBlock(block.resource.text)
+				: `**Resource**: \`${block.resource.uri}\` (binary · ${block.resource.mimeType || "unknown type"})\n\n`;
+		default:
+			return null;
+	}
+}
+
+/** Convert the raw-output fallback (shown when a tool returned no content). */
+export function convertRawOutputToMarkdown(rawOutput: unknown): string {
+	const text =
+		typeof rawOutput === "string"
+			? rawOutput
+			: JSON.stringify(rawOutput, null, 2);
+	return `**Raw output**:\n\n${fencedCodeBlock(text)}`;
+}
 
 /**
  * Context for content conversion, tracking state across messages.
@@ -386,13 +436,22 @@ session_id: ${sessionId}${tagsLine}
 
 		md += `**Status**: ${content.status}\n\n`;
 
-		// Only export diffs
+		// Terminals are ids of live processes; there is nothing to export.
 		if (content.content && content.content.length > 0) {
 			for (const item of content.content) {
 				if (item.type === "diff") {
 					md += this.convertDiffToMarkdown(item);
+				} else if (item.type === "content") {
+					md += convertToolResultBlockToMarkdown(item.content) ?? "";
 				}
 			}
+		}
+
+		if (
+			content.rawOutput !== undefined &&
+			(!content.content || content.content.length === 0)
+		) {
+			md += convertRawOutputToMarkdown(content.rawOutput);
 		}
 
 		return md;
