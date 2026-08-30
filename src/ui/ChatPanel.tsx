@@ -1573,10 +1573,12 @@ export const ChatPanel = React.memo(function ChatPanel({
 	);
 
 	if (variant === "floating") {
-		// Floating layout: no wrapper div. Parent agent-client-floating-window is the flex container.
 		// Focus tracking uses containerElProp (from FloatingChatView's containerRef).
 		return (
-			<>
+			<div
+				className="agent-client-chat-view-container"
+				style={chatFontSizeStyle}
+			>
 				<div
 					className="agent-client-floating-header"
 					onMouseDown={onFloatingHeaderMouseDown}
@@ -1591,7 +1593,7 @@ export const ChatPanel = React.memo(function ChatPanel({
 					</div>
 					{inputAreaElement}
 				</div>
-			</>
+			</div>
 		);
 	}
 
