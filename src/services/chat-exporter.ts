@@ -316,45 +316,56 @@ session_id: ${sessionId}${tagsLine}
 				return `[${content.name}](${content.uri})\n\n`;
 
 			case "image":
-				// Skip if images are not included
-				if (!context.includeImages) {
-					return "";
-				}
-
-				// External URI - use as-is
-				if (content.uri) {
-					return `![Image](${content.uri})\n\n`;
-				}
-
-				// Base64 embedding mode
-				if (context.imageLocation === "base64") {
-					return `![Image](data:${content.mimeType};base64,${content.data})\n\n`;
-				}
-
-				// Save as attachment (obsidian or custom)
-				try {
-					context.imageIndex++;
-					const attachmentPath = await this.saveImageAsAttachment(
-						content.data,
-						content.mimeType,
-						context.exportFilePath,
-						context.imageIndex,
-						context.imageLocation,
-						context.imageCustomFolder,
-					);
-					// Use filename only (Obsidian resolves it)
-					const fileName = attachmentPath.split("/").pop();
-					return `![[${fileName}]]\n\n`;
-				} catch (error) {
-					this.logger.error(
-						`Failed to save image as attachment: ${error}`,
-					);
-					// Fallback to base64 embedding
-					return `![Image](data:${content.mimeType};base64,${content.data})\n\n`;
-				}
+				return this.convertImageToMarkdown(content, context);
 
 			default:
 				return "";
+		}
+	}
+
+	/**
+	 * Convert a base64/uri image to markdown following the export image
+	 * policy: external uri as-is, base64 mode as a data URI, otherwise an
+	 * attachment file with a data-URI fallback when saving fails.
+	 */
+	private async convertImageToMarkdown(
+		image: { data: string; mimeType: string; uri?: string },
+		context: ConvertContext,
+	): Promise<string> {
+		// Skip if images are not included
+		if (!context.includeImages) {
+			return "";
+		}
+
+		// External URI - use as-is
+		if (image.uri) {
+			return `![Image](${image.uri})\n\n`;
+		}
+
+		// Base64 embedding mode
+		if (context.imageLocation === "base64") {
+			return `![Image](data:${image.mimeType};base64,${image.data})\n\n`;
+		}
+
+		// Save as attachment (obsidian or custom)
+		try {
+			context.imageIndex++;
+			const attachmentPath = await this.saveMediaAsAttachment(
+				image.data,
+				image.mimeType,
+				context.exportFilePath,
+				context.imageIndex,
+				context.imageLocation,
+				context.imageCustomFolder,
+				"png",
+			);
+			// Use filename only (Obsidian resolves it)
+			const fileName = attachmentPath.split("/").pop();
+			return `![[${fileName}]]\n\n`;
+		} catch (error) {
+			this.logger.error(`Failed to save image as attachment: ${error}`);
+			// Fallback to base64 embedding
+			return `![Image](data:${image.mimeType};base64,${image.data})\n\n`;
 		}
 	}
 
@@ -447,30 +458,31 @@ session_id: ${sessionId}${tagsLine}
 	}
 
 	/**
-	 * Save a base64-encoded image as an attachment file.
+	 * Save a base64-encoded media file (image or audio) as an attachment.
 	 * Uses Obsidian's attachment settings to determine the save location.
 	 * Skips saving if the file already exists.
 	 */
-	private async saveImageAsAttachment(
+	private async saveMediaAsAttachment(
 		base64Data: string,
 		mimeType: string,
 		exportFilePath: string,
-		imageIndex: number,
-		imageLocation: "obsidian" | "custom",
-		imageCustomFolder: string,
+		mediaIndex: number,
+		location: "obsidian" | "custom",
+		customFolder: string,
+		fallbackExt: string,
 	): Promise<string> {
-		const ext = this.getExtensionFromMimeType(mimeType);
+		const ext = this.getExtensionFromMimeType(mimeType, fallbackExt);
 
-		// Generate image filename based on export filename
+		// Generate media filename based on export filename
 		const exportFileName = exportFilePath.replace(/\.md$/, "");
-		const baseName = exportFileName.split("/").pop() || "image";
-		const imageFileName = `${baseName}_${String(imageIndex).padStart(3, "0")}.${ext}`;
+		const baseName = exportFileName.split("/").pop() || "media";
+		const imageFileName = `${baseName}_${String(mediaIndex).padStart(3, "0")}.${ext}`;
 
 		let attachmentPath: string;
 
-		if (imageLocation === "custom") {
+		if (location === "custom") {
 			// Save to custom folder
-			const folder = imageCustomFolder || "Agent Client";
+			const folder = customFolder || "Agent Client";
 			await this.ensureFolderExists(folder);
 			attachmentPath = `${folder}/${imageFileName}`;
 
@@ -518,14 +530,26 @@ session_id: ${sessionId}${tagsLine}
 	/**
 	 * Get file extension from MIME type.
 	 */
-	private getExtensionFromMimeType(mimeType: string): string {
+	private getExtensionFromMimeType(
+		mimeType: string,
+		fallback: string,
+	): string {
 		const map: Record<string, string> = {
 			"image/png": "png",
 			"image/jpeg": "jpg",
 			"image/gif": "gif",
 			"image/webp": "webp",
+			"audio/mpeg": "mp3",
+			"audio/mp3": "mp3",
+			"audio/wav": "wav",
+			"audio/x-wav": "wav",
+			"audio/ogg": "ogg",
+			"audio/mp4": "m4a",
+			"audio/m4a": "m4a",
+			"audio/flac": "flac",
+			"audio/webm": "webm",
 		};
-		return map[mimeType] || "png";
+		return map[mimeType] || fallback;
 	}
 
 	/**
