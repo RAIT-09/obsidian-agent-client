@@ -30,7 +30,7 @@ where.exe pi-acp
 3. Open **Settings → Agent Client**. The default command (`pi-acp`) works in many cases. If the agent is not found automatically, set the **Pi path** to the path found above, or click **Auto-detect**.
 
 ::: tip "Could not start pi" error
-`pi-acp` spawns `pi` as a child process, resolved via PATH. When an absolute Pi path is configured, Agent Client prepends that directory to PATH, so a `pi` installed next to `pi-acp` (the usual case) is found automatically. If `pi` lives in a different directory, make sure that directory is on your login shell's PATH (e.g. exported from `~/.zprofile`, not only `~/.zshrc`).
+`pi-acp` spawns `pi` as a child process, resolved via PATH. When an absolute Pi path is configured, Agent Client prepends that directory to PATH, so a `pi` installed next to `pi-acp` (the usual case) is found automatically. If `pi` lives in a different directory, make sure that directory is on your login shell's PATH (e.g. exported from `~/.zprofile` for zsh or `~/.profile` for bash — not only `~/.zshrc` / `~/.bashrc`).
 :::
 
 ## Authentication
@@ -48,6 +48,10 @@ Alternatively, `pi-acp --terminal-login` launches the same interactive login dir
 2. Verify that a normal chat works in the terminal before connecting from Obsidian.
 
 Credentials are stored under `~/.pi/agent/` and are picked up by the `pi-acp` process that Agent Client starts.
+
+::: tip Migrating from a custom agent
+If you previously ran Pi as a custom agent, its settings are not migrated automatically. A custom agent with the id `pi-acp` is renamed to `pi-acp-2` to make room for the preset — copy any custom path or environment variables into the preset settings, then delete the leftover custom entry.
+:::
 
 ## Verify Setup
 
