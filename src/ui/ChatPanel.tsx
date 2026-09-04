@@ -703,6 +703,14 @@ export const ChatPanel = React.memo(function ChatPanel({
 			}
 
 			menu.addItem((item: MenuItem) => {
+				item.setTitle("Minimize all floating chats")
+					.setIcon("minimize-2")
+					.onClick(() => {
+						plugin.collapseAllFloatingChats();
+					});
+			});
+
+			menu.addItem((item: MenuItem) => {
 				item.setTitle("Restart agent")
 					.setIcon("refresh-cw")
 					.onClick(() => {
