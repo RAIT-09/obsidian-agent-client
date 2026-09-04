@@ -1,6 +1,6 @@
 # Grok Build Setup
 
-Grok Build is xAI's coding agent. It communicates via ACP through the `grok agent stdio` command.
+Grok Build is xAI's coding agent. It communicates via ACP through the `grok agent stdio` command (Grok Build CLI **1.0** and later). Confirm with `grok --version`.
 
 This is the official xAI CLI (`grok`), not a third-party Grok wrapper.
 
@@ -61,12 +61,14 @@ grok login
 
 ### Option B: xAI API Key
 
-API keys are created at [console.x.ai](https://console.x.ai):
+Use this when there is **no** active `grok login` session — for example CI, a machine that never signed in, or after `grok logout`. API keys are created at [console.x.ai](https://console.x.ai) and bill API credits, which is a different account path from SuperGrok / X Premium+.
 
 1. Generate a key in the xAI console
 2. Enter it in **Settings → Agent Client → Preset agents → Grok Build → API key** (stored in Obsidian's Keychain)
 
-The API key is injected as `XAI_API_KEY` and takes precedence over browser credentials.
+The plugin injects the secret as `XAI_API_KEY`. An active `grok login` session in `~/.grok/auth.json` takes precedence over that environment variable, so a linked key does not override an existing browser login (and will not switch billing to the API-key account). To use the key, run `grok logout` first, or delete `~/.grok/auth.json`.
+
+A per-model `api_key` / `env_key` in `~/.grok/config.toml` is a separate, higher-precedence override. It is not the plugin API-key field.
 
 ::: tip Migrating from a custom agent
 If you previously ran Grok Build as a custom agent, its settings are not migrated automatically. A custom agent with the id `grok-build` is renamed to `grok-build-2` to make room for the preset — copy any custom path or environment variables into the preset settings, then delete the leftover custom entry. If your custom agent carried `XAI_API_KEY` in its environment variables, consider moving it to the **API key** field so it is stored in Obsidian's Keychain instead of plain text.
