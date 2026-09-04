@@ -879,18 +879,14 @@ export default class AgentClientPlugin extends Plugin {
 	 * Minimize every floating chat window. Sessions are preserved.
 	 */
 	collapseAllFloatingChats(): void {
-		for (const view of this.viewRegistry.getByType("floating")) {
-			view.collapse();
-		}
+		this.viewRegistry.toType("floating", (view) => view.collapse());
 	}
 
 	/**
 	 * Expand every floating chat window.
 	 */
 	expandAllFloatingChats(): void {
-		for (const view of this.viewRegistry.getByType("floating")) {
-			view.expand();
-		}
+		this.viewRegistry.toType("floating", (view) => view.expand());
 	}
 
 	/**
