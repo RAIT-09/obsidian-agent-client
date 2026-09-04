@@ -39,7 +39,7 @@ Control multiple chat views at once. See [Multi-Session Chat](/usage/multi-sessi
 | **Open new floating chat view** | Always create a new floating window |
 | **Minimize floating chat view** | Hide the focused floating window (session is preserved) |
 | **Close floating chat view** | Close the focused floating window and end the session |
-| **Toggle all floating chat views** | Minimize all floating windows, or expand all of them if none is open |
+| **Toggle all floating chat views** | Minimize all floating windows while any is expanded, or expand them all when every window is minimized |
 
 ## Agent Commands
 

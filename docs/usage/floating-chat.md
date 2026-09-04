@@ -62,7 +62,7 @@ When multiple windows exist, clicking the floating button shows an instance menu
 To see the editor without closing anything, minimize every floating window at once:
 
 - Click **"Minimize all floating chats"** from the **⋮** (More) menu in any floating window
-- Or use the command **"Toggle all floating chat views"** — it minimizes all windows while any is open, and expands all of them otherwise, so one hotkey takes you to the editor and back
+- Or use the command **"Toggle all floating chat views"** — it minimizes all windows while any is expanded, and expands them all once every window is minimized, so one hotkey takes you to the editor and back
 
 Sessions keep running while minimized.
 
@@ -78,7 +78,7 @@ The focused floating window is always displayed in front of other floating windo
 | **Open new floating chat view** | Always create a new floating window |
 | **Minimize floating chat view** | Hide the focused floating window (session is preserved) |
 | **Close floating chat view** | Close the focused floating window and end the session |
-| **Toggle all floating chat views** | Minimize all floating windows, or expand all of them if none is open |
+| **Toggle all floating chat views** | Minimize all floating windows while any is expanded, or expand them all when every window is minimized |
 
 ::: tip
 Assign keyboard shortcuts to these commands in **Settings → Hotkeys** for quick access.
