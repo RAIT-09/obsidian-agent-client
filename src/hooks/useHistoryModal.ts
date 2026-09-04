@@ -1,9 +1,11 @@
 import { useRef, useCallback, useEffect } from "react";
 import { Notice, Platform } from "obsidian";
 import { SessionHistoryModal } from "../ui/SessionHistoryModal";
+import { useSettingsSelector } from "./useSettings";
 import { getLogger } from "../utils/logger";
 import { convertWslPathToWindows } from "../utils/platform";
 import type AgentClientPlugin from "../plugin";
+import type { AgentClientPluginSettings } from "../plugin";
 import type { UseAgentReturn } from "./useAgent";
 import type { UseSessionHistoryReturn } from "./useSessionHistory";
 
@@ -20,6 +22,19 @@ import type { UseSessionHistoryReturn } from "./useSessionHistory";
  * @param isSessionReady - Whether the session is ready
  * @param debugMode - Whether debug mode is enabled
  */
+function selectHistoryFilters(s: AgentClientPluginSettings) {
+	return s.sessionHistoryFilters;
+}
+
+type HistoryFilters = ReturnType<typeof selectHistoryFilters>;
+
+function historyFiltersEqual(a: HistoryFilters, b: HistoryFilters): boolean {
+	return (
+		a.currentVaultOnly === b.currentVaultOnly &&
+		a.hideNonLocal === b.hideNonLocal
+	);
+}
+
 export function useHistoryModal(
 	plugin: AgentClientPlugin,
 	agent: UseAgentReturn,
@@ -33,6 +48,20 @@ export function useHistoryModal(
 } {
 	const logger = getLogger();
 	const historyModalRef = useRef<SessionHistoryModal | null>(null);
+	const filters = useSettingsSelector(
+		plugin,
+		selectHistoryFilters,
+		historyFiltersEqual,
+	);
+
+	const handleFiltersChange = useCallback(
+		(next: HistoryFilters) => {
+			void plugin.settingsService.updateSettings({
+				sessionHistoryFilters: next,
+			});
+		},
+		[plugin],
+	);
 
 	const handleRestoreSession = useCallback(
 		async (sessionId: string, cwd: string) => {
@@ -138,6 +167,8 @@ export function useHistoryModal(
 				localSessionIds: sessionHistory.localSessionIds,
 				isAgentReady: isSessionReady,
 				debugMode: debugMode,
+				filters,
+				onFiltersChange: handleFiltersChange,
 				onRestoreSession: handleRestoreSession,
 				onForkSession: handleForkSession,
 				onDeleteSession: handleDeleteSession,
@@ -147,7 +178,9 @@ export function useHistoryModal(
 			});
 		}
 		historyModalRef.current.open();
-		void sessionHistory.fetchSessions(vaultPath);
+		void sessionHistory.fetchSessions(
+			filters.currentVaultOnly ? vaultPath : undefined,
+		);
 	}, [
 		plugin.app,
 		sessionHistory.sessions,
@@ -163,6 +196,8 @@ export function useHistoryModal(
 		vaultPath,
 		isSessionReady,
 		debugMode,
+		filters,
+		handleFiltersChange,
 		handleRestoreSession,
 		handleForkSession,
 		handleDeleteSession,
@@ -187,6 +222,8 @@ export function useHistoryModal(
 				localSessionIds: sessionHistory.localSessionIds,
 				isAgentReady: isSessionReady,
 				debugMode: debugMode,
+				filters,
+				onFiltersChange: handleFiltersChange,
 				onRestoreSession: handleRestoreSession,
 				onForkSession: handleForkSession,
 				onDeleteSession: handleDeleteSession,
@@ -207,6 +244,8 @@ export function useHistoryModal(
 		vaultPath,
 		isSessionReady,
 		debugMode,
+		filters,
+		handleFiltersChange,
 		handleRestoreSession,
 		handleForkSession,
 		handleDeleteSession,
