@@ -9,19 +9,6 @@ import type { AgentClientPluginSettings } from "../plugin";
 import type { UseAgentReturn } from "./useAgent";
 import type { UseSessionHistoryReturn } from "./useSessionHistory";
 
-/**
- * Hook for managing the session history modal lifecycle.
- *
- * Encapsulates modal creation, props synchronization, and
- * session operation callbacks (restore, fork, delete).
- *
- * @param plugin - Plugin instance for app access
- * @param agent - Agent hook for clearMessages
- * @param sessionHistory - Session history hook for operations
- * @param vaultPath - Current working directory
- * @param isSessionReady - Whether the session is ready
- * @param debugMode - Whether debug mode is enabled
- */
 function selectHistoryFilters(s: AgentClientPluginSettings) {
 	return s.sessionHistoryFilters;
 }
@@ -35,6 +22,19 @@ function historyFiltersEqual(a: HistoryFilters, b: HistoryFilters): boolean {
 	);
 }
 
+/**
+ * Hook for managing the session history modal lifecycle.
+ *
+ * Encapsulates modal creation, props synchronization, and
+ * session operation callbacks (restore, fork, delete).
+ *
+ * @param plugin - Plugin instance for app access
+ * @param agent - Agent hook for clearMessages
+ * @param sessionHistory - Session history hook for operations
+ * @param vaultPath - Current working directory
+ * @param isSessionReady - Whether the session is ready
+ * @param debugMode - Whether debug mode is enabled
+ */
 export function useHistoryModal(
 	plugin: AgentClientPlugin,
 	agent: UseAgentReturn,
