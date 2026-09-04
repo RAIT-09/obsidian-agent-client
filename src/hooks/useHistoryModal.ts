@@ -179,7 +179,9 @@ export function useHistoryModal(
 		}
 		historyModalRef.current.open();
 		void sessionHistory.fetchSessions(
-			filters.currentVaultOnly ? vaultPath : undefined,
+			sessionHistory.canList && !filters.currentVaultOnly
+				? undefined
+				: vaultPath,
 		);
 	}, [
 		plugin.app,
