@@ -127,6 +127,14 @@ interface SessionHistoryContentProps {
 	/** Whether debug mode is enabled (shows manual input form) */
 	debugMode: boolean;
 
+	/** Filter checkbox states to start from (remembered across opens) */
+	filters: { currentVaultOnly: boolean; hideNonLocal: boolean };
+	/** Callback when either filter checkbox changes */
+	onFiltersChange: (filters: {
+		currentVaultOnly: boolean;
+		hideNonLocal: boolean;
+	}) => void;
+
 	/** Callback when a session is restored */
 	onRestoreSession: (sessionId: string, cwd: string) => Promise<void>;
 	/** Callback when a session is forked (create new branch) */
@@ -414,6 +422,8 @@ function SessionHistoryContent({
 	localSessionIds,
 	isAgentReady,
 	debugMode,
+	filters,
+	onFiltersChange,
 	onRestoreSession,
 	onForkSession,
 	onDeleteSession,
@@ -422,23 +432,48 @@ function SessionHistoryContent({
 	onFetchSessions,
 	onClose,
 }: SessionHistoryContentProps) {
-	const [filterByCurrentVault, setFilterByCurrentVault] = useState(true);
-	const [hideNonLocalSessions, setHideNonLocalSessions] = useState(false);
+	const [filterByCurrentVault, setFilterByCurrentVault] = useState(
+		filters.currentVaultOnly,
+	);
+	const [hideNonLocalSessions, setHideNonLocalSessions] = useState(
+		filters.hideNonLocal,
+	);
 
 	const handleFilterChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {
 			const checked = e.target.checked;
 			setFilterByCurrentVault(checked);
+			onFiltersChange({
+				currentVaultOnly: checked,
+				hideNonLocal: hideNonLocalSessions,
+			});
 			const cwd = checked ? currentCwd : undefined;
 			onFetchSessions(cwd);
 		},
-		[currentCwd, onFetchSessions],
+		[currentCwd, onFetchSessions, onFiltersChange, hideNonLocalSessions],
 	);
 
+	const handleHideNonLocalChange = useCallback(
+		(e: React.ChangeEvent<HTMLInputElement>) => {
+			const checked = e.target.checked;
+			setHideNonLocalSessions(checked);
+			onFiltersChange({
+				currentVaultOnly: filterByCurrentVault,
+				hideNonLocal: checked,
+			});
+		},
+		[onFiltersChange, filterByCurrentVault],
+	);
+
+	// Agent-side listing is only used when the agent can also restore or
+	// fork; otherwise sessions come from local storage and stay vault-scoped.
+	const canFilterByVault = canList && (canRestore || canFork);
+
 	const handleRetry = useCallback(() => {
-		const cwd = filterByCurrentVault ? currentCwd : undefined;
+		const cwd =
+			canFilterByVault && !filterByCurrentVault ? undefined : currentCwd;
 		onFetchSessions(cwd);
-	}, [filterByCurrentVault, currentCwd, onFetchSessions]);
+	}, [canFilterByVault, filterByCurrentVault, currentCwd, onFetchSessions]);
 
 	// Wrap onDeleteSession to show confirmation modal
 	const handleDeleteWithConfirmation = useCallback(
@@ -546,7 +581,7 @@ function SessionHistoryContent({
 			{canShowList && (
 				<>
 					{/* Filter toggles - only for agent session/list */}
-					{canList && !isUsingLocalSessions && (
+					{canFilterByVault && (
 						<div className="agent-client-session-history-filter">
 							<label className="agent-client-session-history-filter-label">
 								<input
@@ -560,11 +595,7 @@ function SessionHistoryContent({
 								<input
 									type="checkbox"
 									checked={hideNonLocalSessions}
-									onChange={(e) =>
-										setHideNonLocalSessions(
-											e.target.checked,
-										)
-									}
+									onChange={handleHideNonLocalChange}
 								/>
 								<span>Hide sessions without local data</span>
 							</label>

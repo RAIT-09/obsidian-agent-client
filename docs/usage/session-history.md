@@ -29,6 +29,17 @@ Depending on the agent's capabilities, you can perform the following actions:
 Not all actions are available for every agent. The modal shows only the actions supported by your current agent.
 :::
 
+## Filtering the List
+
+When the agent supports listing sessions, two checkboxes above the list narrow it down:
+
+| Filter | Default | Description |
+|--------|---------|-------------|
+| **Show current vault only** | On | Ask the agent for sessions started in the current vault directory |
+| **Hide sessions without local data** | Off | Show only sessions that were started from Obsidian (the plugin has a saved transcript for them) |
+
+Your choices are remembered, so the modal reopens with the filters you last used.
+
 ## Session Storage
 
 Sessions are saved automatically when you send messages. The plugin stores:

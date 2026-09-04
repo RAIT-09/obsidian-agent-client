@@ -167,6 +167,11 @@ export interface AgentClientPluginSettings {
 	lastUsedModes: Record<string, string>;
 	// Last used non-model/mode config options per agent (agentId → {optionId → value})
 	lastUsedConfigOptions: Record<string, Record<string, string>>;
+	// Session history modal filters, remembered across opens (not exposed in the settings tab)
+	sessionHistoryFilters: {
+		currentVaultOnly: boolean;
+		hideNonLocal: boolean;
+	};
 	// Floating chat settings
 	enableFloatingChat: boolean;
 	floatingButtonImage: string;
@@ -226,6 +231,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	lastUsedModels: {},
 	lastUsedModes: {},
 	lastUsedConfigOptions: {},
+	sessionHistoryFilters: { currentVaultOnly: true, hideNonLocal: false },
 	enableFloatingChat: false,
 	floatingButtonImage: "",
 	floatingWindowSize: { width: 400, height: 500 },
@@ -1596,6 +1602,19 @@ export default class AgentClientPlugin extends Plugin {
 			lastUsedModels: strRecord(raw.lastUsedModels),
 			lastUsedModes: strRecord(raw.lastUsedModes),
 			lastUsedConfigOptions: nestedStrRecord(raw.lastUsedConfigOptions),
+			sessionHistoryFilters: (() => {
+				const rf = obj(raw.sessionHistoryFilters) ?? {};
+				return {
+					currentVaultOnly: bool(
+						rf.currentVaultOnly,
+						D.sessionHistoryFilters.currentVaultOnly,
+					),
+					hideNonLocal: bool(
+						rf.hideNonLocal,
+						D.sessionHistoryFilters.hideNonLocal,
+					),
+				};
+			})(),
 			// Migration: enableFloatingChat ← showFloatingButton (old name)
 			enableFloatingChat: bool(
 				raw.enableFloatingChat,
