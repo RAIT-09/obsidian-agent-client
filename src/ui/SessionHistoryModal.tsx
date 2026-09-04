@@ -576,7 +576,7 @@ function SessionHistoryContent({
 			{canShowList && (
 				<>
 					{/* Filter toggles - only for agent session/list */}
-					{canList && !isUsingLocalSessions && (
+					{canList && canPerformAnyOperation && (
 						<div className="agent-client-session-history-filter">
 							<label className="agent-client-session-history-filter-label">
 								<input

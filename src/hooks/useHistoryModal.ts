@@ -9,12 +9,14 @@ import type { AgentClientPluginSettings } from "../plugin";
 import type { UseAgentReturn } from "./useAgent";
 import type { UseSessionHistoryReturn } from "./useSessionHistory";
 
+/** Settings slice consumed by the history modal (filter checkbox states). */
 function selectHistoryFilters(s: AgentClientPluginSettings) {
 	return s.sessionHistoryFilters;
 }
 
 type HistoryFilters = ReturnType<typeof selectHistoryFilters>;
 
+/** Field-wise equality so the selector keeps a stable reference. */
 function historyFiltersEqual(a: HistoryFilters, b: HistoryFilters): boolean {
 	return (
 		a.currentVaultOnly === b.currentVaultOnly &&
@@ -179,7 +181,9 @@ export function useHistoryModal(
 		}
 		historyModalRef.current.open();
 		void sessionHistory.fetchSessions(
-			sessionHistory.canList && !filters.currentVaultOnly
+			sessionHistory.canList &&
+			(sessionHistory.canRestore || sessionHistory.canFork) &&
+			!filters.currentVaultOnly
 				? undefined
 				: vaultPath,
 		);
