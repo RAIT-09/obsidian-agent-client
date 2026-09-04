@@ -405,6 +405,18 @@ export default class AgentClientPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "toggle-all-floating-chat-views",
+			name: "Toggle all floating chat views",
+			checkCallback: (checking) => {
+				if (!this.settings.enableFloatingChat) return false;
+				if (this.viewRegistry.getByType("floating").length === 0)
+					return false;
+				if (checking) return true;
+				this.toggleAllFloatingChats();
+			},
+		});
+
 		this.addSettingTab(new AgentClientSettingTab(this.app, this));
 
 		this.registerMarkdownCodeBlockProcessor(
@@ -860,6 +872,35 @@ export default class AgentClientPlugin extends Plugin {
 		const view = this.viewRegistry.get(viewId);
 		if (view) {
 			view.expand();
+		}
+	}
+
+	/**
+	 * Minimize every floating chat window. Sessions are preserved.
+	 */
+	collapseAllFloatingChats(): void {
+		this.viewRegistry.toType("floating", (view) => view.collapse());
+	}
+
+	/**
+	 * Expand every floating chat window.
+	 */
+	expandAllFloatingChats(): void {
+		this.viewRegistry.toType("floating", (view) => view.expand());
+	}
+
+	/**
+	 * Toggle all floating chat windows at once: minimize all while any is
+	 * expanded, otherwise expand all. Never creates or closes a window.
+	 */
+	toggleAllFloatingChats(): void {
+		const anyExpanded = this.viewRegistry
+			.getByType("floating")
+			.some((view) => view.isExpanded());
+		if (anyExpanded) {
+			this.collapseAllFloatingChats();
+		} else {
+			this.expandAllFloatingChats();
 		}
 	}
 

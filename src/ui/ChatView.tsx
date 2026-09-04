@@ -296,6 +296,10 @@ export class ChatView extends ItemView implements IChatViewContainer {
 		// Sidebar views don't have expand/collapse state - no-op
 	}
 
+	isExpanded(): boolean {
+		return true;
+	}
+
 	/**
 	 * Get the DOM container element for this view.
 	 */

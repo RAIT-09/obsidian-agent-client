@@ -702,6 +702,16 @@ export const ChatPanel = React.memo(function ChatPanel({
 				});
 			}
 
+			if (variant === "floating") {
+				menu.addItem((item: MenuItem) => {
+					item.setTitle("Minimize all floating chats")
+						.setIcon("minimize-2")
+						.onClick(() => {
+							plugin.collapseAllFloatingChats();
+						});
+				});
+			}
+
 			menu.addItem((item: MenuItem) => {
 				item.setTitle("Restart agent")
 					.setIcon("refresh-cw")
@@ -750,6 +760,7 @@ export const ChatPanel = React.memo(function ChatPanel({
 			handleOpenHistory,
 			handleExportChat,
 			onOpenNewWindow,
+			variant,
 			handleRestartAgent,
 			agentCwd,
 			handleNewChatInDirectory,
