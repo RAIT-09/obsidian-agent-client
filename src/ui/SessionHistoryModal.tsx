@@ -465,10 +465,15 @@ function SessionHistoryContent({
 		[onFiltersChange, filterByCurrentVault],
 	);
 
+	// Agent-side listing is only used when the agent can also restore or
+	// fork; otherwise sessions come from local storage and stay vault-scoped.
+	const canFilterByVault = canList && (canRestore || canFork);
+
 	const handleRetry = useCallback(() => {
-		const cwd = filterByCurrentVault ? currentCwd : undefined;
+		const cwd =
+			canFilterByVault && !filterByCurrentVault ? undefined : currentCwd;
 		onFetchSessions(cwd);
-	}, [filterByCurrentVault, currentCwd, onFetchSessions]);
+	}, [canFilterByVault, filterByCurrentVault, currentCwd, onFetchSessions]);
 
 	// Wrap onDeleteSession to show confirmation modal
 	const handleDeleteWithConfirmation = useCallback(
@@ -576,7 +581,7 @@ function SessionHistoryContent({
 			{canShowList && (
 				<>
 					{/* Filter toggles - only for agent session/list */}
-					{canList && canPerformAnyOperation && (
+					{canFilterByVault && (
 						<div className="agent-client-session-history-filter">
 							<label className="agent-client-session-history-filter-label">
 								<input
