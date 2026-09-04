@@ -67,6 +67,9 @@ function makeSettings(
 			"hermes-agent": preset("hermes-agent", "Hermes Agent", "hermes", {
 				args: ["acp"],
 			}),
+			"grok-build": preset("grok-build", "Grok Build", "grok", {
+				args: ["agent", "stdio"],
+			}),
 		},
 		customAgents: [],
 		defaultAgentId: "",
@@ -87,6 +90,7 @@ describe("getAvailableAgentsFromSettings", () => {
 			{ id: "opencode", displayName: "OpenCode" },
 			{ id: "kiro-cli", displayName: "Kiro" },
 			{ id: "hermes-agent", displayName: "Hermes Agent" },
+			{ id: "grok-build", displayName: "Grok Build" },
 			{ id: "my-custom", displayName: "My Custom" },
 		]);
 	});
@@ -119,6 +123,7 @@ describe("getAvailableAgentsFromSettings", () => {
 			"opencode",
 			"kiro-cli",
 			"hermes-agent",
+			"grok-build",
 			"my-custom",
 		]);
 	});
@@ -140,6 +145,7 @@ describe("getAllAgentsFromSettings", () => {
 			{ id: "opencode", displayName: "OpenCode" },
 			{ id: "kiro-cli", displayName: "Kiro" },
 			{ id: "hermes-agent", displayName: "Hermes Agent" },
+			{ id: "grok-build", displayName: "Grok Build" },
 			{ id: "off-custom", displayName: "Off Custom" },
 		]);
 	});
@@ -252,6 +258,7 @@ describe("buildAgentConfigWithApiKey", () => {
 		["gemini-cli", "GEMINI_API_KEY"],
 		["mistral-vibe", "MISTRAL_API_KEY"],
 		["kiro-cli", "KIRO_API_KEY"],
+		["grok-build", "XAI_API_KEY"],
 	])("attaches the %s secret as %s", (agentId, envVarName) => {
 		const agentSettings = preset(agentId, "Name", "cmd", {
 			apiKeySecretId: "my-secret",

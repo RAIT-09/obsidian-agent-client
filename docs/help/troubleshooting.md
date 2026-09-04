@@ -65,6 +65,9 @@ The agent requires authentication before processing requests.
 **For Hermes Agent:**
 - Run `hermes model` in Terminal to configure a provider (there is no API key field in the plugin). See [Hermes Agent Setup](/agent-setup/hermes#authentication).
 
+**For Grok Build:**
+- Run `grok login` in Terminal first to sign in, or link an API key in **Settings → Agent Client → Preset agents → Grok Build → API key**. See [Grok Build Setup](/agent-setup/grok-build#authentication).
+
 ### "No Authentication Methods" error
 
 The agent didn't provide authentication options.

@@ -257,6 +257,28 @@ export const PRESET_AGENTS: readonly PresetAgentDefinition[] = [
 		},
 		docsPage: "hermes",
 	},
+	{
+		presetId: "grok-build",
+		defaultDisplayName: "Grok Build",
+		defaultCommand: "grok",
+		defaultArgs: ["agent", "stdio"],
+		apiKey: {
+			envVarName: "XAI_API_KEY",
+			settingDesc:
+				"xAI API key. Required only for API-key auth — leave empty when signing in with grok login. Select from Obsidian's Keychain or create a new secret.",
+		},
+		installHint: {
+			default: "curl -fsSL https://x.ai/cli/install.sh | bash",
+			nativeWindows: "irm https://x.ai/cli/install.ps1 | iex",
+		},
+		settingsCopy: {
+			pathDesc:
+				'Command name or path to grok. Use just "grok" to let the login shell resolve it, or enter an absolute path.',
+			argsDescSuffix:
+				'(Currently, Grok Build requires the "agent stdio" options.)',
+		},
+		docsPage: "grok-build",
+	},
 ];
 
 /**
