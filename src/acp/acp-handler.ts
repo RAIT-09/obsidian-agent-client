@@ -87,19 +87,39 @@ export class AcpHandler {
 				break;
 
 			case "tool_call":
-			case "tool_call_update":
 				this.emitSessionUpdate({
-					type: update.sessionUpdate,
+					type: "tool_call",
 					sessionId,
 					toolCallId: update.toolCallId,
-					title: update.title ?? undefined,
+					title: update.title,
 					status: update.status || "pending",
 					kind: update.kind ?? undefined,
 					content: AcpTypeConverter.toToolCallContent(update.content),
-					locations: update.locations ?? undefined,
+					locations: update.locations ?? [],
 					rawInput: update.rawInput as
 						| { [k: string]: unknown }
 						| undefined,
+					rawOutput: update.rawOutput,
+				});
+				break;
+
+			case "tool_call_update":
+				this.emitSessionUpdate({
+					type: "tool_call_update",
+					sessionId,
+					toolCallId: update.toolCallId,
+					title: update.title,
+					status: update.status ?? undefined,
+					kind: update.kind ?? undefined,
+					content: AcpTypeConverter.toToolCallContent(update.content),
+					locations:
+						update.locations === undefined
+							? undefined
+							: (update.locations ?? []),
+					rawInput: update.rawInput as
+						| { [k: string]: unknown }
+						| undefined,
+					rawOutput: update.rawOutput,
 				});
 				break;
 

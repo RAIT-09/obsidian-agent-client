@@ -44,9 +44,58 @@ export type ToolKind =
 
 /**
  * Content that can be included in a tool call result.
- * Currently supports diffs and terminal output.
+ * Supports ACP standard content blocks, diffs, and terminal output.
  */
-export type ToolCallContent = DiffContent | TerminalContent;
+export type ToolCallContent =
+	| StandardToolCallContent
+	| DiffContent
+	| TerminalContent;
+
+/** A displayable ACP content block returned by a tool. */
+export type ToolResultContentBlock =
+	| {
+			type: "text";
+			text: string;
+	  }
+	| {
+			type: "image";
+			data: string;
+			mimeType: string;
+			uri?: string;
+	  }
+	| {
+			type: "audio";
+			data: string;
+			mimeType: string;
+	  }
+	| {
+			type: "resource_link";
+			uri: string;
+			name: string;
+			title?: string;
+			description?: string;
+			mimeType?: string;
+			size?: number;
+	  }
+	| {
+			type: "resource";
+			resource:
+				| {
+						uri: string;
+						mimeType?: string;
+						text: string;
+				  }
+				| {
+						uri: string;
+						mimeType?: string;
+						blob: string;
+				  };
+	  };
+
+export interface StandardToolCallContent {
+	type: "content";
+	content: ToolResultContentBlock;
+}
 
 /**
  * Represents a file modification with before/after content.
@@ -98,6 +147,14 @@ export interface ActivePermission {
 	toolCallId: string;
 	/** Available permission options */
 	options: PermissionOption[];
+	/** Tool call title, shown as the dialog heading */
+	title?: string | null;
+	/** Tool kind, for the dialog's icon */
+	kind?: ToolKind;
+	/** What the agent is about to do — the dialog's review surface */
+	content?: ToolCallContent[];
+	/** Raw tool input; carries the command for `execute` calls */
+	rawInput?: { [k: string]: unknown };
 }
 
 /**
@@ -107,21 +164,6 @@ export interface PlanEntry {
 	content: string;
 	status: "pending" | "in_progress" | "completed";
 	priority: "high" | "medium" | "low";
-}
-
-/**
- * Tool call information for permission requests.
- * Contains details about the operation being requested for user approval.
- */
-export interface ToolCallInfo {
-	toolCallId: string;
-	title?: string | null;
-	status?: ToolCallStatus | null;
-	kind?: ToolKind | null;
-	content?: ToolCallContent[] | null;
-	locations?: ToolCallLocation[] | null;
-	rawInput?: { [k: string]: unknown }; // Tool's input parameters
-	rawOutput?: { [k: string]: unknown }; // Tool's output data
 }
 
 // ============================================================================
@@ -151,7 +193,6 @@ export interface ChatMessage {
  * - resource_link: Reference to a file the agent can access (URI only)
  * - tool_call: Agent's tool execution with results
  * - plan: Agent's task breakdown
- * - permission_request: Request for user approval
  * - terminal: Reference to a terminal session
  */
 export type MessageContent =
@@ -197,7 +238,7 @@ export type MessageContent =
 			content?: ToolCallContent[];
 			locations?: ToolCallLocation[];
 			rawInput?: { [k: string]: unknown };
-			rawOutput?: { [k: string]: unknown };
+			rawOutput?: unknown;
 			permissionRequest?: {
 				requestId: string;
 				options: PermissionOption[];
@@ -209,14 +250,6 @@ export type MessageContent =
 	| {
 			type: "plan";
 			entries: PlanEntry[];
-	  }
-	| {
-			type: "permission_request";
-			toolCall: ToolCallInfo;
-			options: PermissionOption[];
-			selectedOptionId?: string;
-			isCancelled?: boolean;
-			isActive?: boolean;
 	  }
 	| {
 			type: "terminal";

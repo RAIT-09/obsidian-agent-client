@@ -120,6 +120,12 @@ export interface IChatViewContainer {
 	 */
 	collapse(): void;
 
+	/**
+	 * Whether the view is currently expanded.
+	 * Views without a collapsed state (sidebar, embedded) always return true.
+	 */
+	isExpanded(): boolean;
+
 	// ============================================================
 	// Broadcast Commands
 	// ============================================================

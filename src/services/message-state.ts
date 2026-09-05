@@ -11,6 +11,7 @@ import type {
 	MessageContent,
 	ActivePermission,
 	PermissionOption,
+	PlanEntry,
 } from "../types/chat";
 import type { SessionUpdate } from "../types/session";
 
@@ -23,6 +24,13 @@ export type ToolCallMessageContent = Extract<
 	MessageContent,
 	{ type: "tool_call" }
 >;
+export type ToolCallMessageUpdate = Omit<
+	Partial<ToolCallMessageContent>,
+	"type" | "toolCallId"
+> & {
+	type: "tool_call";
+	toolCallId: string;
+};
 
 // ============================================================================
 // Tool Call Merge
@@ -34,23 +42,10 @@ export type ToolCallMessageContent = Extract<
  */
 export function mergeToolCallContent(
 	existing: ToolCallMessageContent,
-	update: ToolCallMessageContent,
+	update: ToolCallMessageUpdate,
 ): ToolCallMessageContent {
-	// Merge content arrays
-	let mergedContent = existing.content || [];
-	if (update.content !== undefined) {
-		const newContent = update.content || [];
-
-		// If new content contains diff, replace all old diffs
-		const hasDiff = newContent.some((item) => item.type === "diff");
-		if (hasDiff) {
-			mergedContent = mergedContent.filter(
-				(item) => item.type !== "diff",
-			);
-		}
-
-		mergedContent = [...mergedContent, ...newContent];
-	}
+	const mergedContent =
+		update.content !== undefined ? update.content : existing.content;
 
 	return {
 		...existing,
@@ -68,6 +63,10 @@ export function mergeToolCallContent(
 			Object.keys(update.rawInput).length > 0
 				? update.rawInput
 				: existing.rawInput,
+		rawOutput:
+			update.rawOutput !== undefined
+				? update.rawOutput
+				: existing.rawOutput,
 		permissionRequest:
 			update.permissionRequest !== undefined
 				? update.permissionRequest
@@ -190,7 +189,7 @@ export function applyUpdateUserMessage(
  */
 export function applyUpsertToolCall(
 	prev: ChatMessage[],
-	content: ToolCallMessageContent,
+	content: ToolCallMessageUpdate,
 	toolCallIndex: Map<string, number>,
 ): ChatMessage[] {
 	// O(1) lookup via index
@@ -253,7 +252,12 @@ export function applyUpsertToolCall(
 		{
 			id: crypto.randomUUID(),
 			role: "assistant" as const,
-			content: [content],
+			content: [
+				{
+					...content,
+					status: content.status ?? "pending",
+				},
+			],
 			timestamp: new Date(),
 		},
 	];
@@ -302,6 +306,22 @@ export function applySingleUpdate(
 				text: update.text,
 			});
 		case "tool_call":
+			return applyUpsertToolCall(
+				prev,
+				{
+					type: "tool_call",
+					toolCallId: update.toolCallId,
+					title: update.title,
+					status: update.status,
+					kind: update.kind,
+					content: update.content,
+					locations: update.locations,
+					rawInput: update.rawInput,
+					rawOutput: update.rawOutput,
+					permissionRequest: update.permissionRequest,
+				},
+				toolCallIndex,
+			);
 		case "tool_call_update":
 			return applyUpsertToolCall(
 				prev,
@@ -309,11 +329,12 @@ export function applySingleUpdate(
 					type: "tool_call",
 					toolCallId: update.toolCallId,
 					title: update.title,
-					status: update.status || "pending",
+					status: update.status,
 					kind: update.kind,
 					content: update.content,
 					locations: update.locations,
 					rawInput: update.rawInput,
+					rawOutput: update.rawOutput,
 					permissionRequest: update.permissionRequest,
 				},
 				toolCallIndex,
@@ -332,8 +353,50 @@ export function applySingleUpdate(
 // Permission Helper Functions
 // ============================================================================
 
+/** The permission state carried on a tool call content item. */
+type PermissionRequestState = NonNullable<
+	Extract<MessageContent, { type: "tool_call" }>["permissionRequest"]
+>;
+
+/**
+ * Whether a permission request is still awaiting the user's decision.
+ *
+ * Note this is NOT `isActive`: only the queue head is active, so a queued
+ * request is undecided while `isActive` is false. This does not affect what
+ * the transcript renders — tool calls stay visible throughout. It feeds the
+ * dialog's queue badge and settles ghosts left in a stored transcript.
+ */
+export function isPermissionPending(
+	permissionRequest: PermissionRequestState | undefined,
+): permissionRequest is PermissionRequestState {
+	if (!permissionRequest) return false;
+	return (
+		permissionRequest.selectedOptionId === undefined &&
+		permissionRequest.isCancelled !== true
+	);
+}
+
+/** How many permission requests are still undecided, active one included. */
+export function countPendingPermissions(messages: ChatMessage[]): number {
+	let count = 0;
+	for (const message of messages) {
+		for (const content of message.content) {
+			if (
+				content.type === "tool_call" &&
+				isPermissionPending(content.permissionRequest)
+			) {
+				count++;
+			}
+		}
+	}
+	return count;
+}
+
 /**
  * Find the active permission request from messages.
+ *
+ * Carries the tool call's own details so the dialog can show what the agent
+ * is about to do without reaching back into the message list.
  */
 export function findActivePermission(
 	messages: ChatMessage[],
@@ -347,6 +410,10 @@ export function findActivePermission(
 						requestId: permission.requestId,
 						toolCallId: content.toolCallId,
 						options: permission.options,
+						title: content.title,
+						kind: content.kind,
+						content: content.content,
+						rawInput: content.rawInput,
 					};
 				}
 			}
@@ -372,4 +439,50 @@ export function selectOption(
 		if (fallbackOption) return fallbackOption;
 	}
 	return options[0];
+}
+
+// ============================================================================
+// Plan Helper Functions
+// ============================================================================
+
+/**
+ * Find the most recent plan in the transcript, newest message first.
+ * Returns null when no plan has arrived this session.
+ */
+export function findLatestPlan(messages: ChatMessage[]): PlanEntry[] | null {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		for (const content of messages[i].content) {
+			if (content.type === "plan") return content.entries;
+		}
+	}
+	return null;
+}
+
+/** Derived display state for the plan strip's collapsed line. */
+export interface PlanSummary {
+	completed: number;
+	total: number;
+	/** First in_progress entry, else first pending. Null when all done. */
+	current: PlanEntry | null;
+}
+
+/**
+ * Summarize plan entries for the strip's collapsed line.
+ *
+ * ACP puts no constraints on status distribution: all-pending is the
+ * routine first update (Claude Code writes the full list before starting),
+ * several in_progress at once is legal, and so is an empty array (the
+ * caller hides the strip for that). The "current" entry is the first
+ * in_progress, falling back to the first pending so the line always
+ * names what happens next.
+ */
+export function summarizePlan(entries: PlanEntry[]): PlanSummary {
+	const completed = entries.filter(
+		(entry) => entry.status === "completed",
+	).length;
+	const current =
+		entries.find((entry) => entry.status === "in_progress") ??
+		entries.find((entry) => entry.status === "pending") ??
+		null;
+	return { completed, total: entries.length, current };
 }

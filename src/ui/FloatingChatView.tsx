@@ -209,6 +209,10 @@ export class FloatingViewContainer implements IChatViewContainer {
 		}
 	}
 
+	isExpanded(): boolean {
+		return this.isExpandedState;
+	}
+
 	getInputState(): ChatInputState | null {
 		return this.callbacks?.getInputState() ?? null;
 	}

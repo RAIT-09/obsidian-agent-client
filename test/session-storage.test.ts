@@ -543,3 +543,80 @@ describe("SessionStorage — rename syncs the transcript's title snapshot", () =
 		expect(data.messages as unknown[]).toHaveLength(1);
 	});
 });
+
+describe("SessionStorage — stored permissions are settled on load", () => {
+	function transcriptWithPermission(
+		permissionRequest: Record<string, unknown>,
+	): string {
+		return JSON.stringify({
+			version: 1,
+			sessionId: "s1",
+			agentId: "claude",
+			savedAt: "2026-01-01T00:00:00.000Z",
+			messages: [
+				{
+					id: "m1",
+					role: "assistant",
+					content: [
+						{
+							type: "tool_call",
+							toolCallId: "call_1",
+							status: "pending",
+							permissionRequest,
+						},
+					],
+					timestamp: "2026-01-01T00:00:00.000Z",
+				},
+			],
+		});
+	}
+
+	function loadedPermission(messages: ChatMessage[] | null) {
+		const content = messages?.[0]?.content[0];
+		if (content?.type !== "tool_call") throw new Error("expected tool_call");
+		return content.permissionRequest;
+	}
+
+	it("cancels a request left undecided by a crash", async () => {
+		const { storage, files } = makeStorage();
+		// An app that exits normally records the cancellation itself; this is
+		// the state left behind when it does not get the chance.
+		files.set(
+			filePath("s1"),
+			transcriptWithPermission({
+				requestId: "r1",
+				options: [],
+				isActive: true,
+			}),
+		);
+
+		const permission = loadedPermission(
+			await storage.loadSessionMessages("s1"),
+		);
+
+		// Cancelled, not merely inactive: an undecided request would inflate
+		// the dialog's queue badge on the next real request.
+		expect(permission?.isActive).toBe(false);
+		expect(permission?.isCancelled).toBe(true);
+	});
+
+	it("leaves an answered request untouched", async () => {
+		const { storage, files } = makeStorage();
+		files.set(
+			filePath("s1"),
+			transcriptWithPermission({
+				requestId: "r1",
+				options: [],
+				isActive: false,
+				selectedOptionId: "allow",
+			}),
+		);
+
+		const permission = loadedPermission(
+			await storage.loadSessionMessages("s1"),
+		);
+
+		expect(permission?.selectedOptionId).toBe("allow");
+		expect(permission?.isCancelled).toBeUndefined();
+	});
+});

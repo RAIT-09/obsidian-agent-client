@@ -67,6 +67,7 @@ function makeSettings(
 			"hermes-agent": preset("hermes-agent", "Hermes Agent", "hermes", {
 				args: ["acp"],
 			}),
+			"pi-acp": preset("pi-acp", "Pi", "pi-acp"),
 			"grok-build": preset("grok-build", "Grok Build", "grok", {
 				args: ["agent", "stdio"],
 			}),
@@ -90,6 +91,7 @@ describe("getAvailableAgentsFromSettings", () => {
 			{ id: "opencode", displayName: "OpenCode" },
 			{ id: "kiro-cli", displayName: "Kiro" },
 			{ id: "hermes-agent", displayName: "Hermes Agent" },
+			{ id: "pi-acp", displayName: "Pi" },
 			{ id: "grok-build", displayName: "Grok Build" },
 			{ id: "my-custom", displayName: "My Custom" },
 		]);
@@ -123,6 +125,7 @@ describe("getAvailableAgentsFromSettings", () => {
 			"opencode",
 			"kiro-cli",
 			"hermes-agent",
+			"pi-acp",
 			"grok-build",
 			"my-custom",
 		]);
@@ -145,6 +148,7 @@ describe("getAllAgentsFromSettings", () => {
 			{ id: "opencode", displayName: "OpenCode" },
 			{ id: "kiro-cli", displayName: "Kiro" },
 			{ id: "hermes-agent", displayName: "Hermes Agent" },
+			{ id: "pi-acp", displayName: "Pi" },
 			{ id: "grok-build", displayName: "Grok Build" },
 			{ id: "off-custom", displayName: "Off Custom" },
 		]);

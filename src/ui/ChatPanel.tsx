@@ -17,6 +17,12 @@ import {
 	computeSessionTitle,
 	getDefaultAgentId,
 } from "../services/session-helpers";
+import {
+	countPendingPermissions,
+	findLatestPlan,
+	summarizePlan,
+} from "../services/message-state";
+import { PlanStrip } from "./PlanStrip";
 import { useHistoryModal } from "../hooks/useHistoryModal";
 import { useChatActions } from "../hooks/useChatActions";
 import { ChangeDirectoryModal } from "./ChangeDirectoryModal";
@@ -158,7 +164,10 @@ function selectChatPanelSettings(s: AgentClientPluginSettings) {
 		// fields here).
 		presetAgents: s.presetAgents,
 		customAgents: s.customAgents,
-		displaySettings: { fontSize: s.displaySettings.fontSize },
+		displaySettings: {
+			fontSize: s.displaySettings.fontSize,
+			showEmojis: s.displaySettings.showEmojis,
+		},
 	};
 }
 
@@ -180,7 +189,8 @@ function chatPanelSettingsEqual(
 		// reference compare detects agent changes (and only those).
 		a.presetAgents === b.presetAgents &&
 		a.customAgents === b.customAgents &&
-		a.displaySettings.fontSize === b.displaySettings.fontSize
+		a.displaySettings.fontSize === b.displaySettings.fontSize &&
+		a.displaySettings.showEmojis === b.displaySettings.showEmojis
 	);
 }
 
@@ -334,6 +344,42 @@ export const ChatPanel = React.memo(function ChatPanel({
 	// Input state (for broadcast commands)
 	const [inputValue, setInputValue] = useState("");
 	const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+
+	// Which tool calls are expanded. Held here rather than inside the rows
+	// because the virtualized list unmounts anything scrolled out of view.
+	const [expandedToolCalls, setExpandedToolCalls] = useState<Set<string>>(
+		() => new Set(),
+	);
+	const toggleToolCall = useCallback((toolCallId: string) => {
+		setExpandedToolCalls((prev) => {
+			const next = new Set(prev);
+			if (!next.delete(toolCallId)) next.add(toolCallId);
+			return next;
+		});
+	}, []);
+	// Plan strip: collapsed by default, derived from the transcript.
+	const [planExpanded, setPlanExpanded] = useState(false);
+	const togglePlan = useCallback(() => setPlanExpanded((v) => !v), []);
+	const planEntries = useMemo(() => findLatestPlan(messages), [messages]);
+	const planSummary = useMemo(
+		() =>
+			planEntries && planEntries.length > 0
+				? summarizePlan(planEntries)
+				: null,
+		[planEntries],
+	);
+
+	// Start every session collapsed; ids are only meaningful within one.
+	useEffect(() => {
+		setExpandedToolCalls(new Set());
+		setPlanExpanded(false);
+	}, [session.sessionId]);
+
+	// Requests waiting behind the active one, for the dialog's queue badge.
+	const queuedPermissionCount = useMemo(
+		() => Math.max(0, countPendingPermissions(messages) - 1),
+		[messages],
+	);
 
 	// Pending auto-send queued by the pending-prompt handler (drained when ready)
 	const [pendingAutoSend, setPendingAutoSend] = useState<string | null>(null);
@@ -656,6 +702,16 @@ export const ChatPanel = React.memo(function ChatPanel({
 				});
 			}
 
+			if (variant === "floating") {
+				menu.addItem((item: MenuItem) => {
+					item.setTitle("Minimize all floating chats")
+						.setIcon("minimize-2")
+						.onClick(() => {
+							plugin.collapseAllFloatingChats();
+						});
+				});
+			}
+
 			menu.addItem((item: MenuItem) => {
 				item.setTitle("Restart agent")
 					.setIcon("refresh-cw")
@@ -704,6 +760,7 @@ export const ChatPanel = React.memo(function ChatPanel({
 			handleOpenHistory,
 			handleExportChat,
 			onOpenNewWindow,
+			variant,
 			handleRestartAgent,
 			agentCwd,
 			handleNewChatInDirectory,
@@ -1454,6 +1511,17 @@ export const ChatPanel = React.memo(function ChatPanel({
 			</div>
 		) : null;
 
+	const planStrip =
+		planEntries && planEntries.length > 0 && planSummary ? (
+			<PlanStrip
+				entries={planEntries}
+				summary={planSummary}
+				expanded={planExpanded}
+				onToggle={togglePlan}
+				showEmojis={settings.displaySettings.showEmojis}
+			/>
+		) : null;
+
 	const messageListElement = (
 		<MessageList
 			messages={messages}
@@ -1464,7 +1532,8 @@ export const ChatPanel = React.memo(function ChatPanel({
 			plugin={plugin}
 			view={viewHost}
 			terminalClient={terminalClientRef.current}
-			onApprovePermission={agent.approvePermission}
+			expandedToolCalls={expandedToolCalls}
+			onToggleToolCall={toggleToolCall}
 			hasActivePermission={agent.hasActivePermission}
 		/>
 	);
@@ -1476,6 +1545,9 @@ export const ChatPanel = React.memo(function ChatPanel({
 			isRestoringSession={sessionHistory.loading}
 			agentLabel={activeAgentLabel}
 			availableCommands={session.availableCommands || []}
+			activePermission={agent.activePermission}
+			queuedPermissionCount={queuedPermissionCount}
+			onApprovePermission={agent.approvePermission}
 			autoMentionEnabled={settings.autoMentionActiveNote}
 			restoredMessage={restoredMessage}
 			suggestions={suggestions}
@@ -1512,10 +1584,12 @@ export const ChatPanel = React.memo(function ChatPanel({
 	);
 
 	if (variant === "floating") {
-		// Floating layout: no wrapper div. Parent agent-client-floating-window is the flex container.
 		// Focus tracking uses containerElProp (from FloatingChatView's containerRef).
 		return (
-			<>
+			<div
+				className="agent-client-chat-view-container"
+				style={chatFontSizeStyle}
+			>
 				<div
 					className="agent-client-floating-header"
 					onMouseDown={onFloatingHeaderMouseDown}
@@ -1523,13 +1597,14 @@ export const ChatPanel = React.memo(function ChatPanel({
 					{headerElement}
 				</div>
 				{cwdBanner}
+				{planStrip}
 				<div className="agent-client-floating-content">
 					<div className="agent-client-floating-messages-container">
 						{messageListElement}
 					</div>
 					{inputAreaElement}
 				</div>
-			</>
+			</div>
 		);
 	}
 
@@ -1544,6 +1619,7 @@ export const ChatPanel = React.memo(function ChatPanel({
 					{headerElement}
 				</div>
 				{cwdBanner}
+				{planStrip}
 				<div className="agent-client-embedded-messages-container">
 					{messageListElement}
 				</div>
@@ -1561,6 +1637,7 @@ export const ChatPanel = React.memo(function ChatPanel({
 		>
 			{headerElement}
 			{cwdBanner}
+			{planStrip}
 			{messageListElement}
 			{inputAreaElement}
 		</div>

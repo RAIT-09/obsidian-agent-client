@@ -258,6 +258,20 @@ export const PRESET_AGENTS: readonly PresetAgentDefinition[] = [
 		docsPage: "hermes",
 	},
 	{
+		presetId: "pi-acp",
+		defaultDisplayName: "Pi",
+		defaultCommand: "pi-acp",
+		defaultArgs: [],
+		installHint: {
+			default: "npm install -g @earendil-works/pi-coding-agent pi-acp",
+		},
+		settingsCopy: {
+			pathDesc:
+				'Command name or path to pi-acp. Use just "pi-acp" to let the login shell resolve it, or enter an absolute path.',
+		},
+		docsPage: "pi",
+	},
+	{
 		presetId: "grok-build",
 		defaultDisplayName: "Grok Build",
 		defaultCommand: "grok",

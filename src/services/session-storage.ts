@@ -14,6 +14,7 @@ import type { ChatMessage, MessageContent } from "../types/chat";
 import type { SavedSessionInfo } from "../types/session";
 import { convertWindowsPathToWsl } from "../utils/platform";
 import { getLogger } from "../utils/logger";
+import { isPermissionPending } from "./message-state";
 
 // ============================================================================
 // Types
@@ -86,6 +87,29 @@ function evictLeastRecentlyUsed(
 			}
 		}
 		sessions.splice(oldest, 1);
+	}
+}
+
+/**
+ * Settle permission requests found in a stored transcript.
+ *
+ * A permission belongs to a live agent process, so anything still undecided
+ * on disk died with that process — normally `cancelAll()` records that on
+ * disconnect, but a crash leaves the flags as they were. Both writes carry
+ * their own weight: clearing `isActive` stops `findActivePermission` from
+ * raising a dialog for an agent that is gone, and setting `isCancelled`
+ * stops `countPendingPermissions` from counting the ghost, which would
+ * otherwise inflate the queue badge on the next real request.
+ */
+function settleStoredPermissions(messages: ChatMessage[]): void {
+	for (const message of messages) {
+		for (const content of message.content) {
+			if (content.type !== "tool_call") continue;
+			const permission = content.permissionRequest;
+			if (!isPermissionPending(permission)) continue;
+			permission.isActive = false;
+			permission.isCancelled = true;
+		}
 	}
 }
 
@@ -421,10 +445,12 @@ export class SessionStorage {
 				return null;
 			}
 
-			return data.messages.map((msg) => ({
+			const messages = data.messages.map((msg) => ({
 				...msg,
 				timestamp: new Date(msg.timestamp),
 			}));
+			settleStoredPermissions(messages);
+			return messages;
 		} catch (error) {
 			getLogger().error(
 				`[SessionStorage] Failed to load session messages: ${error}`,

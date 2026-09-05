@@ -40,7 +40,7 @@ Built on the [Agent Client Protocol (ACP)](https://github.com/agentclientprotoco
 
 **Mission control.** The Session Manager lists every open conversation across sidebar, tabs, floating windows, and notes, with live status icons — including "waiting for permission". Click any entry to jump straight there.
 
-**Any ACP agent.** Eight presets — Claude Code, Codex, Gemini CLI, Mistral Vibe, OpenCode, Kiro, Hermes Agent, Grok Build — plus any ACP-compatible agent as a custom entry. New agent ships ACP support tomorrow? Add it as a custom entry — no plugin update needed.
+**Any ACP agent.** Nine presets — Claude Code, Codex, Gemini CLI, Mistral Vibe, OpenCode, Kiro, Hermes Agent, Pi, Grok Build — plus any ACP-compatible agent as a custom entry. New agent ships ACP support tomorrow? Add it as a custom entry — no plugin update needed.
 
 ## Features
 
@@ -69,7 +69,7 @@ Built on the [Agent Client Protocol (ACP)](https://github.com/agentclientprotoco
 
 1. Install and authenticate an agent, following its setup guide:
 
-   [Claude Code](https://rait-09.github.io/obsidian-agent-client/agent-setup/claude-code.html) · [Codex](https://rait-09.github.io/obsidian-agent-client/agent-setup/codex.html) · [Gemini CLI](https://rait-09.github.io/obsidian-agent-client/agent-setup/gemini-cli.html) · [Mistral Vibe](https://rait-09.github.io/obsidian-agent-client/agent-setup/mistral-vibe.html) · [OpenCode](https://rait-09.github.io/obsidian-agent-client/agent-setup/opencode.html) · [Kiro](https://rait-09.github.io/obsidian-agent-client/agent-setup/kiro.html) · [Hermes Agent](https://rait-09.github.io/obsidian-agent-client/agent-setup/hermes.html) · [Grok Build](https://rait-09.github.io/obsidian-agent-client/agent-setup/grok-build.html) · [Custom Agents](https://rait-09.github.io/obsidian-agent-client/agent-setup/custom-agents.html)
+   [Claude Code](https://rait-09.github.io/obsidian-agent-client/agent-setup/claude-code.html) · [Codex](https://rait-09.github.io/obsidian-agent-client/agent-setup/codex.html) · [Gemini CLI](https://rait-09.github.io/obsidian-agent-client/agent-setup/gemini-cli.html) · [Mistral Vibe](https://rait-09.github.io/obsidian-agent-client/agent-setup/mistral-vibe.html) · [OpenCode](https://rait-09.github.io/obsidian-agent-client/agent-setup/opencode.html) · [Kiro](https://rait-09.github.io/obsidian-agent-client/agent-setup/kiro.html) · [Hermes Agent](https://rait-09.github.io/obsidian-agent-client/agent-setup/hermes.html) · [Pi](https://rait-09.github.io/obsidian-agent-client/agent-setup/pi.html) · [Grok Build](https://rait-09.github.io/obsidian-agent-client/agent-setup/grok-build.html) · [Custom Agents](https://rait-09.github.io/obsidian-agent-client/agent-setup/custom-agents.html)
 
 2. Open **Settings → Agent Client** and check the agent's path — **Auto-detect** usually finds it
 3. Click the robot icon in the ribbon and start chatting

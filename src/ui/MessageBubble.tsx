@@ -154,11 +154,10 @@ interface ContentBlockProps {
 	plugin: AgentClientPlugin;
 	messageRole?: "user" | "assistant";
 	terminalClient?: AcpClient;
-	/** Callback to approve a permission request */
-	onApprovePermission?: (
-		requestId: string,
-		optionId: string,
-	) => Promise<void>;
+	/** Tool call ids whose bodies are expanded */
+	expandedToolCalls?: ReadonlySet<string>;
+	/** Toggle a tool call body */
+	onToggleToolCall?: (toolCallId: string) => void;
 }
 
 function ContentBlock({
@@ -166,7 +165,8 @@ function ContentBlock({
 	plugin,
 	messageRole,
 	terminalClient,
-	onApprovePermission,
+	expandedToolCalls,
+	onToggleToolCall,
 }: ContentBlockProps) {
 	switch (content.type) {
 		case "text":
@@ -191,54 +191,21 @@ function ContentBlock({
 			return <CollapsibleThought text={content.text} plugin={plugin} />;
 
 		case "tool_call":
+			// Shown even while a permission is pending — the dialog above the
+			// input is the place to decide; this row is the transcript.
 			return (
 				<ToolCallBlock
 					content={content}
 					plugin={plugin}
 					terminalClient={terminalClient}
-					onApprovePermission={onApprovePermission}
+					isExpanded={expandedToolCalls?.has(content.toolCallId)}
+					onToggleExpanded={onToggleToolCall}
 				/>
 			);
 
-		case "plan": {
-			const showEmojis = plugin.settings.displaySettings.showEmojis;
-			return (
-				<div className="agent-client-message-plan">
-					<div className="agent-client-message-plan-title">
-						{showEmojis && (
-							<LucideIcon
-								name="list-checks"
-								className="agent-client-message-plan-label-icon"
-							/>
-						)}
-						Plan
-					</div>
-					{content.entries.map((entry, idx) => (
-						<div
-							key={idx}
-							className={`agent-client-message-plan-entry agent-client-plan-status-${entry.status}`}
-						>
-							{showEmojis && (
-								<span
-									className={`agent-client-message-plan-entry-icon agent-client-status-${entry.status}`}
-								>
-									<LucideIcon
-										name={
-											entry.status === "completed"
-												? "check"
-												: entry.status === "in_progress"
-													? "loader"
-													: "circle"
-										}
-									/>
-								</span>
-							)}{" "}
-							{entry.content}
-						</div>
-					))}
-				</div>
-			);
-		}
+		case "plan":
+			// Rendered as the strip under the header, not in the transcript.
+			return null;
 
 		case "terminal":
 			return (
@@ -287,11 +254,10 @@ export interface MessageBubbleProps {
 	message: ChatMessage;
 	plugin: AgentClientPlugin;
 	terminalClient?: AcpClient;
-	/** Callback to approve a permission request */
-	onApprovePermission?: (
-		requestId: string,
-		optionId: string,
-	) => Promise<void>;
+	/** Tool call ids whose bodies are expanded */
+	expandedToolCalls?: ReadonlySet<string>;
+	/** Toggle a tool call body */
+	onToggleToolCall?: (toolCallId: string) => void;
 }
 
 /**
@@ -385,8 +351,18 @@ export const MessageBubble = React.memo(function MessageBubble({
 	message,
 	plugin,
 	terminalClient,
-	onApprovePermission,
+	expandedToolCalls,
+	onToggleToolCall,
 }: MessageBubbleProps) {
+	// A plan-only message (plan followed by a tool call) would render as an
+	// empty shell — the strip under the header owns plan display.
+	if (
+		message.content.length > 0 &&
+		message.content.every((content) => content.type === "plan")
+	) {
+		return null;
+	}
+
 	const groups = groupContent(message.content);
 
 	return (
@@ -408,7 +384,8 @@ export const MessageBubble = React.memo(function MessageBubble({
 									plugin={plugin}
 									messageRole={message.role}
 									terminalClient={terminalClient}
-									onApprovePermission={onApprovePermission}
+									expandedToolCalls={expandedToolCalls}
+									onToggleToolCall={onToggleToolCall}
 								/>
 							))}
 						</div>
@@ -422,7 +399,8 @@ export const MessageBubble = React.memo(function MessageBubble({
 								plugin={plugin}
 								messageRole={message.role}
 								terminalClient={terminalClient}
-								onApprovePermission={onApprovePermission}
+								expandedToolCalls={expandedToolCalls}
+								onToggleToolCall={onToggleToolCall}
 							/>
 						</div>
 					);
