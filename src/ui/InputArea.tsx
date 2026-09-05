@@ -1,6 +1,6 @@
 import * as React from "react";
 const { useRef, useState, useEffect, useCallback, useMemo } = React;
-import { setIcon, Notice } from "obsidian";
+import { FileSystemAdapter, Notice, setIcon, TFile } from "obsidian";
 
 import type AgentClientPlugin from "../plugin";
 import type { IChatViewHost } from "./view-host";
@@ -26,6 +26,11 @@ import { getLogger } from "../utils/logger";
 import type { ErrorInfo } from "../types/errors";
 import type { AgentUpdateNotification } from "../services/update-checker";
 import { useSettings } from "../hooks/useSettings";
+import {
+	deduplicateAttachments,
+	extractVaultPathsFromInternalDrag,
+	extractVaultPathsFromObsidianUris,
+} from "../utils/vault-drag";
 
 // ============================================================================
 // Image Constants
@@ -49,6 +54,18 @@ const SUPPORTED_IMAGE_TYPES = [
 ] as const;
 
 type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
+
+const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
+	md: "text/markdown",
+	txt: "text/plain",
+	json: "application/json",
+	pdf: "application/pdf",
+	png: "image/png",
+	jpg: "image/jpeg",
+	jpeg: "image/jpeg",
+	gif: "image/gif",
+	webp: "image/webp",
+};
 
 /**
  * Props for InputArea component
@@ -336,6 +353,8 @@ export function InputArea({
 	// Refs
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const dragCounterRef = useRef(0);
+	const attachedFilesRef = useRef(attachedFiles);
+	attachedFilesRef.current = attachedFiles;
 
 	// Clear attached files when agent changes
 	useEffect(() => {
@@ -349,22 +368,78 @@ export function InputArea({
 	const addAttachments = useCallback(
 		(newFiles: AttachedFile[]) => {
 			if (newFiles.length === 0) return;
-			const remaining = MAX_ATTACHMENT_COUNT - attachedFiles.length;
+			const currentFiles = attachedFilesRef.current;
+			const deduplicated = deduplicateAttachments(currentFiles, newFiles);
+			if (deduplicated.length < newFiles.length) {
+				new Notice("[Agent Client] Duplicate attachments were skipped");
+			}
+			if (deduplicated.length === 0) return;
+			const remaining = MAX_ATTACHMENT_COUNT - currentFiles.length;
 			if (remaining <= 0) {
 				new Notice(
 					`[Agent Client] Maximum ${MAX_ATTACHMENT_COUNT} attachments allowed`,
 				);
 				return;
 			}
-			const toAdd = newFiles.slice(0, remaining);
-			if (toAdd.length < newFiles.length) {
+			const toAdd = deduplicated.slice(0, remaining);
+			if (toAdd.length < deduplicated.length) {
 				new Notice(
 					`[Agent Client] Maximum ${MAX_ATTACHMENT_COUNT} attachments allowed`,
 				);
 			}
-			onAttachedFilesChange([...attachedFiles, ...toAdd]);
+			const nextFiles = [...currentFiles, ...toAdd];
+			attachedFilesRef.current = nextFiles;
+			onAttachedFilesChange(nextFiles);
 		},
-		[attachedFiles, onAttachedFilesChange],
+		[onAttachedFilesChange],
+	);
+
+	const convertVaultPathsToAttachments = useCallback(
+		(paths: string[]): AttachedFile[] => {
+			const adapter = plugin.app.vault.adapter;
+			if (!(adapter instanceof FileSystemAdapter)) {
+				new Notice(
+					"[Agent Client] Vault file attachments require a local vault",
+				);
+				return [];
+			}
+
+			const attachments: AttachedFile[] = [];
+			let rejected = 0;
+			for (const path of paths) {
+				const file = plugin.app.vault.getAbstractFileByPath(path);
+				if (!(file instanceof TFile)) {
+					rejected++;
+					continue;
+				}
+				attachments.push({
+					id: crypto.randomUUID(),
+					kind: "file",
+					mimeType:
+						MIME_BY_EXTENSION[file.extension.toLowerCase()] ??
+						"application/octet-stream",
+					name: file.name,
+					path: adapter.getFullPath(file.path),
+					vaultPath: file.path,
+					size: file.stat.size,
+				});
+			}
+			if (rejected > 0) {
+				new Notice(
+					`[Agent Client] ${rejected} dropped item${rejected === 1 ? " was" : "s were"} not a readable vault file`,
+				);
+			}
+			return attachments;
+		},
+		[plugin],
+	);
+
+	const getInternalDragPaths = useCallback(
+		() =>
+			extractVaultPathsFromInternalDrag(
+				plugin.app.dragManager?.draggable,
+			),
+		[plugin],
 	);
 
 	/**
@@ -372,10 +447,14 @@ export function InputArea({
 	 */
 	const removeFile = useCallback(
 		(id: string) => {
-			onAttachedFilesChange(attachedFiles.filter((f) => f.id !== id));
+			const nextFiles = attachedFilesRef.current.filter(
+				(file) => file.id !== id,
+			);
+			attachedFilesRef.current = nextFiles;
+			onAttachedFilesChange(nextFiles);
 			textareaRef.current?.focus();
 		},
-		[attachedFiles, onAttachedFilesChange],
+		[onAttachedFilesChange],
 	);
 
 	/**
@@ -532,35 +611,62 @@ export function InputArea({
 	/**
 	 * Handle drag over event to allow drop.
 	 */
-	const handleDragOver = useCallback((e: React.DragEvent) => {
-		if (e.dataTransfer?.types.includes("Files")) {
-			e.preventDefault();
-			e.dataTransfer.dropEffect = "copy";
-		}
-	}, []);
+	const handleDragOver = useCallback(
+		(e: React.DragEvent) => {
+			if (
+				getInternalDragPaths().length > 0 ||
+				e.dataTransfer?.types.includes("Files") ||
+				e.dataTransfer?.types.includes("text/uri-list")
+			) {
+				e.preventDefault();
+				if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+			}
+		},
+		[getInternalDragPaths],
+	);
 
 	/**
 	 * Handle drag enter event for visual feedback.
 	 * Uses counter to handle child element enter/leave correctly.
 	 */
-	const handleDragEnter = useCallback((e: React.DragEvent) => {
-		if (e.dataTransfer?.types.includes("Files")) {
-			e.preventDefault();
-			dragCounterRef.current++;
-			if (dragCounterRef.current === 1) {
-				setIsDraggingOver(true);
+	const handleDragEnter = useCallback(
+		(e: React.DragEvent) => {
+			if (
+				getInternalDragPaths().length > 0 ||
+				e.dataTransfer?.types.includes("Files") ||
+				e.dataTransfer?.types.includes("text/uri-list")
+			) {
+				e.preventDefault();
+				dragCounterRef.current++;
+				if (dragCounterRef.current === 1) {
+					setIsDraggingOver(true);
+				}
 			}
-		}
-	}, []);
+		},
+		[getInternalDragPaths],
+	);
 
 	/**
 	 * Handle drag leave event to reset visual feedback.
 	 */
 	const handleDragLeave = useCallback((_e: React.DragEvent) => {
-		dragCounterRef.current--;
+		dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
 		if (dragCounterRef.current === 0) {
 			setIsDraggingOver(false);
 		}
+	}, []);
+
+	useEffect(() => {
+		const resetDragState = () => {
+			dragCounterRef.current = 0;
+			setIsDraggingOver(false);
+		};
+		document.addEventListener("dragend", resetDragState, true);
+		document.addEventListener("drop", resetDragState, true);
+		return () => {
+			document.removeEventListener("dragend", resetDragState, true);
+			document.removeEventListener("drop", resetDragState, true);
+		};
 	}, []);
 
 	/**
@@ -572,6 +678,26 @@ export function InputArea({
 		async (e: React.DragEvent) => {
 			dragCounterRef.current = 0;
 			setIsDraggingOver(false);
+
+			const internalPaths = getInternalDragPaths();
+			const uriPaths = e.dataTransfer
+				? extractVaultPathsFromObsidianUris(
+						[
+							e.dataTransfer.getData("text/uri-list"),
+							e.dataTransfer.getData("text/plain"),
+						].join("\n"),
+						plugin.app.vault.getName(),
+					)
+				: [];
+			const vaultPaths =
+				internalPaths.length > 0 ? internalPaths : uriPaths;
+			if (vaultPaths.length > 0) {
+				e.preventDefault();
+				e.stopPropagation();
+				addAttachments(convertVaultPathsToAttachments(vaultPaths));
+				textareaRef.current?.focus();
+				return;
+			}
 
 			const files = e.dataTransfer?.files;
 			if (!files || files.length === 0) return;
@@ -618,6 +744,9 @@ export function InputArea({
 			addAttachments(newAttachments);
 		},
 		[
+			plugin,
+			getInternalDragPaths,
+			convertVaultPathsToAttachments,
 			supportsImages,
 			convertImagesToAttachments,
 			convertFilesToAttachments,
@@ -1106,7 +1235,18 @@ export function InputArea({
 				</div>
 
 				{/* Attachment Preview Strip (images + file references) */}
-				<AttachmentStrip files={attachedFiles} onRemove={removeFile} />
+				<AttachmentStrip
+					files={attachedFiles}
+					onRemove={removeFile}
+					onOpen={(file) => {
+						if (file.vaultPath) {
+							void plugin.app.workspace.openLinkText(
+								file.vaultPath,
+								"",
+							);
+						}
+					}}
+				/>
 
 				{/* Input Actions (Config Options / Mode Selector / Model Selector + Send Button) */}
 				<InputToolbar
