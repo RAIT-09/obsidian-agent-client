@@ -23,6 +23,7 @@ Each agent uses its own context file:
 | OpenCode | `AGENTS.md` (falls back to `CLAUDE.md`) |
 | Kiro | `AGENTS.md` (also `.kiro/steering/*.md`) |
 | Hermes Agent | `AGENTS.md` (falls back to `CLAUDE.md`) |
+| Grok Build | `AGENTS.md` (also `CLAUDE.md`) |
 
 Place the context file in your **vault root** to have the agent read it automatically.
 

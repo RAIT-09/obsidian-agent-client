@@ -40,7 +40,7 @@ Zed の [Agent Client Protocol (ACP)](https://github.com/agentclientprotocol/age
 
 **管制室。** Session Manager が、サイドバー・タブ・フローティング・ノート内に開いている全会話をステータスアイコン付きで一覧します（権限待ちも見えます）。クリックでその場へジャンプ。
 
-**どの ACP エージェントでも。** 7つのプリセット — Claude Code、Codex、Gemini CLI、Mistral Vibe、OpenCode、Kiro、Hermes Agent — に加えて、ACP 互換エージェントならカスタムエージェントとして追加できます。明日新しいエージェントが ACP 対応しても、カスタムエージェントに登録するだけ — プラグインの更新を待つ必要はありません。
+**どの ACP エージェントでも。** 8つのプリセット — Claude Code、Codex、Gemini CLI、Mistral Vibe、OpenCode、Kiro、Hermes Agent、Grok Build — に加えて、ACP 互換エージェントならカスタムエージェントとして追加できます。明日新しいエージェントが ACP 対応しても、カスタムエージェントに登録するだけ — プラグインの更新を待つ必要はありません。
 
 ## 機能
 
@@ -69,7 +69,7 @@ Zed の [Agent Client Protocol (ACP)](https://github.com/agentclientprotocol/age
 
 1. 使いたいエージェントをセットアップガイドに従ってインストール・認証します:
 
-   [Claude Code](https://rait-09.github.io/obsidian-agent-client/agent-setup/claude-code.html) · [Codex](https://rait-09.github.io/obsidian-agent-client/agent-setup/codex.html) · [Gemini CLI](https://rait-09.github.io/obsidian-agent-client/agent-setup/gemini-cli.html) · [Mistral Vibe](https://rait-09.github.io/obsidian-agent-client/agent-setup/mistral-vibe.html) · [OpenCode](https://rait-09.github.io/obsidian-agent-client/agent-setup/opencode.html) · [Kiro](https://rait-09.github.io/obsidian-agent-client/agent-setup/kiro.html) · [Hermes Agent](https://rait-09.github.io/obsidian-agent-client/agent-setup/hermes.html) · [カスタムエージェント](https://rait-09.github.io/obsidian-agent-client/agent-setup/custom-agents.html)
+   [Claude Code](https://rait-09.github.io/obsidian-agent-client/agent-setup/claude-code.html) · [Codex](https://rait-09.github.io/obsidian-agent-client/agent-setup/codex.html) · [Gemini CLI](https://rait-09.github.io/obsidian-agent-client/agent-setup/gemini-cli.html) · [Mistral Vibe](https://rait-09.github.io/obsidian-agent-client/agent-setup/mistral-vibe.html) · [OpenCode](https://rait-09.github.io/obsidian-agent-client/agent-setup/opencode.html) · [Kiro](https://rait-09.github.io/obsidian-agent-client/agent-setup/kiro.html) · [Hermes Agent](https://rait-09.github.io/obsidian-agent-client/agent-setup/hermes.html) · [Grok Build](https://rait-09.github.io/obsidian-agent-client/agent-setup/grok-build.html) · [カスタムエージェント](https://rait-09.github.io/obsidian-agent-client/agent-setup/custom-agents.html)
 
 2. **設定 → Agent Client** でエージェントのパスを確認します — **Auto-detect** でほとんどの場合見つかります
 3. リボンのロボットアイコンをクリックしてチャット開始
