@@ -154,6 +154,14 @@ export function useAgentMessages(
 	const enqueueUpdate = useCallback(
 		(update: SessionUpdate) => {
 			if (ignoreUpdatesRef.current) return;
+			// Some agents echo the prompt back as a user_message_chunk while
+			// the prompt RPC is still open; the transcript already holds it.
+			if (
+				update.type === "user_message_chunk" &&
+				sendPromiseRef.current !== null
+			) {
+				return;
+			}
 			pendingUpdatesRef.current.push(update);
 			if (!flushScheduledRef.current) {
 				flushScheduledRef.current = true;

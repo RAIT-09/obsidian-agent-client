@@ -132,6 +132,7 @@ FloatingChatView uses `onRegisterExpanded` callback (not CustomEvent) for expand
 - RAF batching: streaming updates accumulated per-frame via `requestAnimationFrame`
 - Tool call index: `Map<string, number>` for O(1) upsert
 - `ignoreUpdatesRef`: suppresses history replay during session/load
+- `sendPromiseRef`: serializes sends and gates out `user_message_chunk` echoes while the prompt RPC is open
 - Permission: `activePermission` (useMemo derivation), approve/reject callbacks
 
 **useSuggestions**: @mention + /command (unified)
