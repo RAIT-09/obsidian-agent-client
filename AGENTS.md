@@ -1,7 +1,7 @@
 # Agent Client Plugin - LLM Developer Guide
 
 ## Overview
-Obsidian plugin for AI agent interaction (Claude Code, Codex, Gemini CLI, Mistral Vibe, OpenCode, Kiro, Hermes Agent, Pi, custom agents) via ACP.
+Obsidian plugin for AI agent interaction (Claude Code, Codex, Gemini CLI, Mistral Vibe, OpenCode, Kiro, Hermes Agent, Pi, Grok Build, custom agents) via ACP.
 
 **Tech**: React 19, TypeScript, Obsidian API, Agent Client Protocol (ACP)
 
@@ -338,6 +338,7 @@ interface ISettingsAccess {
 - Kiro: `kiro-cli` install script (KIRO_API_KEY, optional)
 - Hermes Agent: install script (CLI-managed auth, no API key env)
 - Pi: `pi-acp` npm package (requires `pi` CLI; CLI-managed auth, no API key env)
+- Grok Build: `grok` install script (XAI_API_KEY, optional)
 - Custom: Any ACP-compatible agent
 
 ---

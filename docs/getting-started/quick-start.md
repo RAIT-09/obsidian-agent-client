@@ -16,6 +16,7 @@ Agent Client supports multiple AI agents. Choose one to start:
 | **[Kiro](/agent-setup/kiro)** | AWS | with built-in ACP support (`kiro-cli acp`) |
 | **[Hermes Agent](/agent-setup/hermes)** | Multi-provider | with built-in ACP support (`hermes acp`) |
 | **[Pi](/agent-setup/pi)** | Multi-provider | via [ACP adapter](https://github.com/svkozak/pi-acp) (`pi-acp`) |
+| **[Grok Build](/agent-setup/grok-build)** | xAI | with built-in ACP support (`grok agent stdio`) |
 | **[Custom](/agent-setup/custom-agents)** | Various | [Any ACP-compatible agent](https://agentclientprotocol.com/overview/agents) (e.g., Qwen Code) |
 
 ## Step 2: Install and Configure the Agent
@@ -30,6 +31,7 @@ Follow the setup guide for your chosen agent:
 - [Kiro Setup](/agent-setup/kiro)
 - [Hermes Agent Setup](/agent-setup/hermes)
 - [Pi Setup](/agent-setup/pi)
+- [Grok Build Setup](/agent-setup/grok-build)
 - [Custom Agents](/agent-setup/custom-agents)
 
 Each guide covers installation, path configuration, and authentication.

@@ -68,6 +68,9 @@ The agent requires authentication before processing requests.
 **For Pi:**
 - Run `pi` in Terminal and complete the interactive setup for your provider (there is no API key field in the plugin). See [Pi Setup](/agent-setup/pi#authentication).
 
+**For Grok Build:**
+- Run `grok login` in Terminal first to sign in, or link an API key (used only when no login session is active) in **Settings → Agent Client → Preset agents → Grok Build → API key**. See [Grok Build Setup](/agent-setup/grok-build#authentication).
+
 ### "No Authentication Methods" error
 
 The agent didn't provide authentication options.

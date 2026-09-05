@@ -14,13 +14,14 @@ Agent Client supports multiple AI agents through the [Agent Client Protocol (ACP
 | [Kiro](./kiro) | AWS | install script |
 | [Hermes Agent](./hermes) | Multi-provider | install script |
 | [Pi](./pi) | Multi-provider | `pi-acp` (npm) |
+| [Grok Build](./grok-build) | xAI | install script |
 | [Custom Agents](./custom-agents) | Various | Any ACP-compatible agent |
 
 ## Common Setup Steps
 
 All agents follow a similar setup pattern:
 
-1. **Install the agent** — see each agent's setup page for the exact command (npm for Claude Code / Codex / Gemini CLI; `curl` on macOS/Linux or `uv` on Windows for Mistral Vibe; `curl` or npm for OpenCode; `curl` on macOS/Linux or PowerShell on Windows for Kiro and Hermes Agent; npm for Pi)
+1. **Install the agent** — see each agent's setup page for the exact command (npm for Claude Code / Codex / Gemini CLI; `curl` on macOS/Linux or `uv` on Windows for Mistral Vibe; `curl` or npm for OpenCode; `curl` on macOS/Linux or PowerShell on Windows for Kiro, Hermes Agent, and Grok Build; npm for Pi)
 2. **Set up authentication** (API key or account login)
 
 The plugin resolves bare command names through your login shell's PATH, so path configuration is often not needed. If the agent is not found automatically, use `which` (macOS/Linux) or `where.exe` (Windows) to find the path and configure it in Settings → Agent Client.

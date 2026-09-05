@@ -68,6 +68,9 @@ function makeSettings(
 				args: ["acp"],
 			}),
 			"pi-acp": preset("pi-acp", "Pi", "pi-acp"),
+			"grok-build": preset("grok-build", "Grok Build", "grok", {
+				args: ["agent", "stdio"],
+			}),
 		},
 		customAgents: [],
 		defaultAgentId: "",
@@ -89,6 +92,7 @@ describe("getAvailableAgentsFromSettings", () => {
 			{ id: "kiro-cli", displayName: "Kiro" },
 			{ id: "hermes-agent", displayName: "Hermes Agent" },
 			{ id: "pi-acp", displayName: "Pi" },
+			{ id: "grok-build", displayName: "Grok Build" },
 			{ id: "my-custom", displayName: "My Custom" },
 		]);
 	});
@@ -122,6 +126,7 @@ describe("getAvailableAgentsFromSettings", () => {
 			"kiro-cli",
 			"hermes-agent",
 			"pi-acp",
+			"grok-build",
 			"my-custom",
 		]);
 	});
@@ -144,6 +149,7 @@ describe("getAllAgentsFromSettings", () => {
 			{ id: "kiro-cli", displayName: "Kiro" },
 			{ id: "hermes-agent", displayName: "Hermes Agent" },
 			{ id: "pi-acp", displayName: "Pi" },
+			{ id: "grok-build", displayName: "Grok Build" },
 			{ id: "off-custom", displayName: "Off Custom" },
 		]);
 	});
@@ -256,6 +262,7 @@ describe("buildAgentConfigWithApiKey", () => {
 		["gemini-cli", "GEMINI_API_KEY"],
 		["mistral-vibe", "MISTRAL_API_KEY"],
 		["kiro-cli", "KIRO_API_KEY"],
+		["grok-build", "XAI_API_KEY"],
 	])("attaches the %s secret as %s", (agentId, envVarName) => {
 		const agentSettings = preset(agentId, "Name", "cmd", {
 			apiKeySecretId: "my-secret",
