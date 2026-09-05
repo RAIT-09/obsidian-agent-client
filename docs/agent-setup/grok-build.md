@@ -28,7 +28,7 @@ Other options are listed in the [Grok Build docs](https://docs.x.ai/build/overvi
 
 ```bash [macOS/Linux]
 which grok
-# Example output: /Users/username/.grok/bin/grok
+# Example output: /Users/username/.local/bin/grok (a symlink to ~/.grok/bin/grok)
 ```
 
 ```cmd [Windows]
@@ -40,7 +40,7 @@ where.exe grok
 3. Open **Settings → Agent Client**. The default command (`grok`) works in many cases. If the agent is not found automatically, set the **Grok Build path** to the path found above, or click **Auto-detect**.
 
 ::: tip "grok" not found
-The installer adds `~/.grok/bin` to your shell's PATH through `~/.zshrc` or `~/.bashrc`, but Agent Client starts agents from a login shell that does not read those files. If the default command is not found, set the **Grok Build path** to the absolute path (usually `~/.grok/bin/grok`), or export the directory from `~/.zprofile` for zsh or `~/.profile` for bash.
+The installer puts `grok` in `~/.grok/bin` and, when `~/.local/bin` or `/usr/local/bin` is already on your PATH, symlinks it there too. Agent Client starts agents from a login shell that reads `~/.zprofile` / `~/.profile` but not `~/.zshrc` / `~/.bashrc`, so the default command resolves only if one of those directories is exported there. If it is not found, click **Auto-detect** or set the **Grok Build path** to `~/.grok/bin/grok`.
 :::
 
 4. Leave **Arguments** as `agent stdio` (set by default). Agent Client handles permission prompts in the chat, so do not add `--always-approve`.
