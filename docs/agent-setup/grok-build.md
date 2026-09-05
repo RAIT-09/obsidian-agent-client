@@ -39,8 +39,8 @@ where.exe grok
 
 3. Open **Settings → Agent Client**. The default command (`grok`) works in many cases. If the agent is not found automatically, set the **Grok Build path** to the path found above, or click **Auto-detect**.
 
-::: tip "grok" not found
-The installer puts `grok` in `~/.grok/bin` and, when `~/.local/bin` or `/usr/local/bin` is already on your PATH, symlinks it there too. Agent Client starts agents from a login shell that reads `~/.zprofile` / `~/.profile` but not `~/.zshrc` / `~/.bashrc`, so the default command resolves only if one of those directories is exported there. If it is not found, click **Auto-detect** or set the **Grok Build path** to `~/.grok/bin/grok`.
+::: tip "grok" not found (macOS/Linux)
+The installer puts `grok` in `~/.grok/bin` and, when `~/.local/bin` or `/usr/local/bin` is already on your PATH, symlinks it there too. Agent Client starts agents from a login shell that reads `~/.zprofile` / `~/.profile` but not `~/.zshrc` / `~/.bashrc`, so the default command resolves only if one of those directories is exported there. If it is not found, click **Auto-detect** or set the **Grok Build path** to `~/.grok/bin/grok`. On Windows the installer adds `%USERPROFILE%\.grok\bin` to your user PATH, which Agent Client reads directly.
 :::
 
 4. Leave **Arguments** as `agent stdio` (set by default). Agent Client handles permission prompts in the chat, so do not add `--always-approve`.
