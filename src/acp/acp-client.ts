@@ -77,6 +77,7 @@ export class AcpClient {
 	// Connection & process
 	private connection: acp.ClientConnection | null = null;
 	private agentProcess: ChildProcess | null = null;
+	private agentSocket: WebSocket | null = null;
 	private currentConfig: AgentConfig | null = null;
 	private isInitializedFlag = false;
 	private currentAgentId: string | null = null;
@@ -131,7 +132,7 @@ export class AcpClient {
 		);
 
 		// Clean up existing process if any (e.g., when switching agents)
-		if (this.agentProcess) {
+		if (this.agentProcess || this.agentSocket) {
 			this.killProcessTree();
 		}
 
@@ -221,12 +222,300 @@ export class AcpClient {
 			baseEnv = buildWslEnv(baseEnv, wslEnvNames);
 		}
 
+		const agentLabel = `${config.displayName} (${config.id})`;
+		const isWsCommand = command.startsWith("ws://") || command.startsWith("wss://");
+		const remoteWsUrl = !isWsCommand ? this.getRemoteWebSocketUrl(config.id) : null;
+
+		let streams: { input: WritableStream<Uint8Array>; output: ReadableStream<Uint8Array> };
+
+		if (isWsCommand) {
+			streams = await this.connectViaWebSocket(command, agentLabel);
+		} else if (Platform.isMobile) {
+			if (!remoteWsUrl) {
+				throw new Error(
+					"Local agent process spawning is not supported on mobile. Please configure a remote agent using a WebSocket URL (e.g. ws://host:port?token=...).",
+				);
+			}
+			this.logger.log(
+				`[AcpClient] Mobile platform detected: connecting ${agentLabel} via remote WebSocket bridge:`,
+				remoteWsUrl,
+			);
+			streams = await this.connectViaWebSocket(remoteWsUrl, agentLabel);
+		} else {
+			try {
+				streams = this.spawnLocalProcess(command, args, config, baseEnv, agentLabel, nodeDir);
+			} catch (spawnError) {
+				if (remoteWsUrl) {
+					this.logger.warn(
+						`[AcpClient] Local spawn failed for ${agentLabel}, falling back to remote WebSocket:`,
+						spawnError,
+					);
+					streams = await this.connectViaWebSocket(remoteWsUrl, agentLabel);
+				} else {
+					throw spawnError;
+				}
+			}
+		}
+
+		this.logger.log(
+			"[AcpClient] Using working directory:",
+			config.workingDirectory,
+		);
+
+		this.connection = this.createClientConnection(streams.input, streams.output);
+
+		try {
+			this.logger.log("[AcpClient] Starting ACP initialization...");
+
+			const initResult = await this.connection.agent.request(
+				"initialize",
+				{
+					protocolVersion: acp.PROTOCOL_VERSION,
+					clientCapabilities: {
+						fs: {
+							readTextFile: false,
+							writeTextFile: false,
+						},
+						terminal: true,
+					},
+					clientInfo: {
+						name: "obsidian-agent-client",
+						title: "Agent Client for Obsidian",
+						version: this.plugin.manifest.version,
+					},
+				},
+			);
+
+			this.logger.log(
+				`[AcpClient] ✅ Connected to agent (protocol v${initResult.protocolVersion})`,
+			);
+			// Adapters differ in the name/version they report (e.g. the
+			// codex-acp package move kept the bin name) — surface it so
+			// update-checker behavior can be verified from the debug log.
+			this.logger.log("[AcpClient] Agent info:", initResult.agentInfo);
+
+			this.isInitializedFlag = true;
+			this.currentAgentId = config.id;
+
+			return AcpTypeConverter.toInitializeResult(initResult);
+		} catch (error) {
+			if (remoteWsUrl && this.agentProcess && !isWsCommand) {
+				this.logger.warn(
+					`[AcpClient] Local process initialization failed for ${agentLabel}, falling back to remote WebSocket:`,
+					error,
+				);
+				this.killProcessTree();
+				this.cancelAllOperations();
+				try {
+					const fallbackStreams = await this.connectViaWebSocket(remoteWsUrl, agentLabel);
+					this.connection = this.createClientConnection(fallbackStreams.input, fallbackStreams.output);
+					const fallbackInit = await this.connection.agent.request("initialize", {
+						protocolVersion: acp.PROTOCOL_VERSION,
+						clientCapabilities: {
+							fs: { readTextFile: false, writeTextFile: false },
+							terminal: true,
+						},
+						clientInfo: {
+							name: "obsidian-agent-client",
+							title: "Agent Client for Obsidian",
+							version: this.plugin.manifest.version,
+						},
+					});
+					this.logger.log(
+						`[AcpClient] ✅ Connected to agent via remote WebSocket fallback (protocol v${fallbackInit.protocolVersion})`,
+					);
+					this.isInitializedFlag = true;
+					this.currentAgentId = config.id;
+					return AcpTypeConverter.toInitializeResult(fallbackInit);
+				} catch (fallbackError) {
+					this.logger.error("[AcpClient] Fallback to remote WebSocket also failed:", fallbackError);
+				}
+			}
+
+			this.logger.error("[AcpClient] Initialization Error:", error);
+
+			// Reset flags on failure
+			this.isInitializedFlag = false;
+			this.currentAgentId = null;
+
+			throw error;
+		}
+	}
+
+
+	private createClientConnection(
+		input: WritableStream<Uint8Array>,
+		output: ReadableStream<Uint8Array>,
+	): acp.ClientConnection {
+		const stream = acp.ndJsonStream(input, output);
+		const app = acp
+			.client({ name: "obsidian-agent-client" })
+			.onNotification("session/update", (ctx) =>
+				this.handler.sessionUpdate(ctx.params),
+			)
+			.onRequest("session/request_permission", (ctx) =>
+				this.handler.requestPermission(ctx.params),
+			)
+			.onRequest("fs/read_text_file", (ctx) =>
+				this.handler.readTextFile(ctx.params),
+			)
+			.onRequest("fs/write_text_file", (ctx) =>
+				this.handler.writeTextFile(ctx.params),
+			)
+			.onRequest("terminal/create", (ctx) =>
+				this.handler.createTerminal(ctx.params),
+			)
+			.onRequest("terminal/output", (ctx) =>
+				this.handler.terminalOutput(ctx.params),
+			)
+			.onRequest("terminal/wait_for_exit", (ctx) =>
+				this.handler.waitForTerminalExit(ctx.params),
+			)
+			.onRequest("terminal/kill", (ctx) =>
+				this.handler.killTerminal(ctx.params),
+			)
+			.onRequest("terminal/release", (ctx) =>
+				this.handler.releaseTerminal(ctx.params),
+			);
+		return app.connect(stream);
+	}
+
+	private getRemoteWebSocketUrl(preferredAgentId?: string): string | null {
+		const customAgents = this.plugin.settings.customAgents || [];
+		const remoteAgent =
+			customAgents.find(
+				(a) =>
+					a.enabled &&
+					(a.command.startsWith("ws://") ||
+						a.command.startsWith("wss://")),
+			) ||
+			customAgents.find(
+				(a) =>
+					a.command.startsWith("ws://") ||
+					a.command.startsWith("wss://"),
+			);
+		if (!remoteAgent) return null;
+		let url = remoteAgent.command;
+		if (preferredAgentId && !url.includes("agent=")) {
+			const sep = url.includes("?") ? "&" : "?";
+			url = `${url}${sep}agent=${encodeURIComponent(preferredAgentId)}`;
+		}
+		return url;
+	}
+
+	private async connectViaWebSocket(
+		url: string,
+		agentLabel: string,
+	): Promise<{
+		input: WritableStream<Uint8Array>;
+		output: ReadableStream<Uint8Array>;
+	}> {
+		this.logger.log(
+			"[AcpClient] Connecting to remote agent via WebSocket:",
+			url,
+		);
+
+		if (this.agentSocket) {
+			try {
+				this.agentSocket.close();
+			} catch {
+				// ignore
+			}
+			this.agentSocket = null;
+		}
+
+		const ws = new WebSocket(url);
+		this.agentSocket = ws;
+
+		await new Promise<void>((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				reject(new Error(`WebSocket connection timed out for ${url}`));
+			}, 10000);
+
+			ws.onopen = () => {
+				clearTimeout(timeout);
+				this.logger.log(`[AcpClient] ${agentLabel} WebSocket connected`);
+				resolve();
+			};
+
+			ws.onerror = (error) => {
+				clearTimeout(timeout);
+				this.logger.error(
+					`[AcpClient] ${agentLabel} WebSocket error:`,
+					error,
+				);
+				reject(new Error(`WebSocket connection failed for ${url}`));
+			};
+		});
+
+		const input = new WritableStream<Uint8Array>({
+			write(chunk: Uint8Array) {
+				if (ws.readyState === WebSocket.OPEN) {
+					ws.send(chunk);
+				}
+			},
+			close() {
+				try {
+					ws.close();
+				} catch {
+					// ignore
+				}
+			},
+		});
+
+		const output = new ReadableStream<Uint8Array>({
+			start(controller) {
+				ws.onmessage = async (event: MessageEvent) => {
+					const data: unknown = event.data;
+					if (typeof data === "string") {
+						controller.enqueue(new TextEncoder().encode(data));
+					} else if (data instanceof ArrayBuffer) {
+						controller.enqueue(new Uint8Array(data));
+					} else if (
+						typeof Blob !== "undefined" &&
+						data instanceof Blob
+					) {
+						controller.enqueue(
+							new Uint8Array(await data.arrayBuffer()),
+						);
+					}
+				};
+				ws.onclose = () => {
+				try {
+					controller.close();
+				} catch {
+					// ignore
+				}
+				};
+				ws.onerror = (err) => {
+				try {
+					controller.error(err);
+				} catch {
+					// ignore
+				}
+				};
+			},
+		});
+
+		return { input, output };
+	}
+
+	private spawnLocalProcess(
+		command: string,
+		args: string[],
+		config: AgentConfig,
+		baseEnv: NodeJS.ProcessEnv,
+		agentLabel: string,
+		nodeDir?: string,
+	): {
+		input: WritableStream<Uint8Array>;
+		output: ReadableStream<Uint8Array>;
+	} {
 		this.logger.log(
 			"[AcpClient] Starting agent process in directory:",
 			config.workingDirectory,
 		);
 
-		// Prepare command and args for spawning (platform-specific shell wrapping)
 		const prepared = prepareShellCommand(
 			command,
 			args,
@@ -248,11 +537,6 @@ export class AcpClient {
 			spawnArgs,
 		);
 
-		// Spawn the agent process
-		// detached: true (Unix only) creates a new process group, allowing us to kill
-		// the entire process tree (agent + child processes) with process.kill(-pid).
-		// On Windows, detached: true opens a new console window, so we skip it
-		// and use taskkill /T instead for tree kill.
 		const agentProcess = spawn(spawnCommand, spawnArgs, {
 			stdio: ["pipe", "pipe", "pipe"],
 			env: baseEnv,
@@ -262,9 +546,6 @@ export class AcpClient {
 		});
 		this.agentProcess = agentProcess;
 
-		const agentLabel = `${config.displayName} (${config.id})`;
-
-		// Set up process event handlers
 		agentProcess.on("spawn", () => {
 			this.logger.log(
 				`[AcpClient] ${agentLabel} process spawned successfully, PID:`,
@@ -306,7 +587,6 @@ export class AcpClient {
 				signal,
 			);
 
-			// A replaced process's late exit must not cancel the successor's work.
 			if (this.agentProcess === agentProcess) {
 				this.cancelAllOperations();
 			}
@@ -315,21 +595,21 @@ export class AcpClient {
 				this.logger.error(`[AcpClient] Command not found: ${command}`);
 
 				const processError: ProcessError = {
-					type: "command_not_found",
-					agentId: config.id,
-					exitCode: code,
-					title: "Command Not Found",
-					message: `The command "${command}" could not be found. Please check the path configuration for ${agentLabel}.`,
-					suggestion: getCommandNotFoundSuggestion(
-						command,
-						this.plugin.settings.windowsWslMode,
-					),
+				type: "command_not_found",
+				agentId: config.id,
+				exitCode: code,
+				title: "Command Not Found",
+				message: `The command "${command}" could not be found. Please check the path configuration for ${agentLabel}.`,
+				suggestion: getCommandNotFoundSuggestion(
+					command,
+					this.plugin.settings.windowsWslMode,
+				),
 				};
 
 				this.handler.emitSessionUpdate({
-					type: "process_error",
-					sessionId: this.currentSessionId ?? "",
-					error: processError,
+				type: "process_error",
+				sessionId: this.currentSessionId ?? "",
+				error: processError,
 				});
 			}
 		});
@@ -346,15 +626,12 @@ export class AcpClient {
 		agentProcess.stderr?.setEncoding("utf8");
 		agentProcess.stderr?.on("data", (data) => {
 			this.logger.log(`[AcpClient] ${agentLabel} stderr:`, data);
-			// Keep a rolling window of recent stderr for error diagnostics
 			this.recentStderr += data;
 			if (this.recentStderr.length > 8192) {
 				this.recentStderr = this.recentStderr.slice(-4096);
 			}
 		});
 
-		// Create stream for ACP communication
-		// stdio is configured as ["pipe", "pipe", "pipe"] so stdin/stdout are guaranteed to exist
 		if (!agentProcess.stdin || !agentProcess.stdout) {
 			throw new Error("Agent process stdin/stdout not available");
 		}
@@ -381,89 +658,7 @@ export class AcpClient {
 			},
 		});
 
-		this.logger.log(
-			"[AcpClient] Using working directory:",
-			config.workingDirectory,
-		);
-
-		const stream = acp.ndJsonStream(input, output);
-		// Build the client app by registering handlers by ACP method name, then
-		// hold the persistent connection. This is the same builder the deprecated
-		// ClientSideConnection constructed internally (legacyClientApp), inlined.
-		const app = acp
-			.client({ name: "obsidian-agent-client" })
-			.onNotification("session/update", (ctx) =>
-				this.handler.sessionUpdate(ctx.params),
-			)
-			.onRequest("session/request_permission", (ctx) =>
-				this.handler.requestPermission(ctx.params),
-			)
-			.onRequest("fs/read_text_file", (ctx) =>
-				this.handler.readTextFile(ctx.params),
-			)
-			.onRequest("fs/write_text_file", (ctx) =>
-				this.handler.writeTextFile(ctx.params),
-			)
-			.onRequest("terminal/create", (ctx) =>
-				this.handler.createTerminal(ctx.params),
-			)
-			.onRequest("terminal/output", (ctx) =>
-				this.handler.terminalOutput(ctx.params),
-			)
-			.onRequest("terminal/wait_for_exit", (ctx) =>
-				this.handler.waitForTerminalExit(ctx.params),
-			)
-			.onRequest("terminal/kill", (ctx) =>
-				this.handler.killTerminal(ctx.params),
-			)
-			.onRequest("terminal/release", (ctx) =>
-				this.handler.releaseTerminal(ctx.params),
-			);
-		this.connection = app.connect(stream);
-
-		try {
-			this.logger.log("[AcpClient] Starting ACP initialization...");
-
-			const initResult = await this.connection.agent.request(
-				"initialize",
-				{
-					protocolVersion: acp.PROTOCOL_VERSION,
-					clientCapabilities: {
-						fs: {
-							readTextFile: false,
-							writeTextFile: false,
-						},
-						terminal: true,
-					},
-					clientInfo: {
-						name: "obsidian-agent-client",
-						title: "Agent Client for Obsidian",
-						version: this.plugin.manifest.version,
-					},
-				},
-			);
-
-			this.logger.log(
-				`[AcpClient] ✅ Connected to agent (protocol v${initResult.protocolVersion})`,
-			);
-			// Adapters differ in the name/version they report (e.g. the
-			// codex-acp package move kept the bin name) — surface it so
-			// update-checker behavior can be verified from the debug log.
-			this.logger.log("[AcpClient] Agent info:", initResult.agentInfo);
-
-			this.isInitializedFlag = true;
-			this.currentAgentId = config.id;
-
-			return AcpTypeConverter.toInitializeResult(initResult);
-		} catch (error) {
-			this.logger.error("[AcpClient] Initialization Error:", error);
-
-			// Reset flags on failure
-			this.isInitializedFlag = false;
-			this.currentAgentId = null;
-
-			throw error;
-		}
+		return { input, output };
 	}
 
 	private getSafeConfigForLog(config: AgentConfig): {
@@ -638,6 +833,14 @@ export class AcpClient {
 	 * On Windows, uses taskkill /T for tree kill.
 	 */
 	private killProcessTree(): void {
+		if (this.agentSocket) {
+			try {
+				this.agentSocket.close();
+			} catch {
+				// Socket may already be closed
+			}
+			this.agentSocket = null;
+		}
 		if (!this.agentProcess) return;
 
 		const pid = this.agentProcess.pid;
@@ -700,7 +903,7 @@ export class AcpClient {
 		return (
 			this.isInitializedFlag &&
 			this.connection !== null &&
-			this.agentProcess !== null
+			(this.agentProcess !== null || this.agentSocket !== null)
 		);
 	}
 
@@ -826,7 +1029,10 @@ export class AcpClient {
 	/**
 	 * Convert working directory to WSL path if in WSL mode on Windows.
 	 */
-	private toSessionCwd(cwd: string): string {
+	private toSessionCwd(cwd?: string): string {
+		if (!cwd || cwd.trim().length === 0) {
+			return this.currentConfig?.workingDirectory ?? "";
+		}
 		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
 			return convertWindowsPathToWsl(cwd);
 		}

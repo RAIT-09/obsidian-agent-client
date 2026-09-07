@@ -1,7 +1,7 @@
 import { execFile } from "child_process";
 import { Platform } from "obsidian";
 import { access, stat } from "fs/promises";
-import { constants } from "fs";
+import { constants, existsSync } from "fs";
 import { join } from "path";
 import {
 	buildWslShellWrapper,
@@ -203,6 +203,13 @@ export function resolveNodeDirectory(
 	if (!nodePathSetting) return undefined;
 	const trimmed = nodePathSetting.trim();
 	if (!isAbsolutePath(trimmed)) return undefined;
+	try {
+		if (Platform.isDesktopApp && existsSync && !existsSync(trimmed)) {
+			return undefined;
+		}
+	} catch {
+		// ignore
+	}
 	return resolveCommandDirectory(trimmed) || undefined;
 }
 
