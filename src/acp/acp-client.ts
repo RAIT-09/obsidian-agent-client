@@ -77,6 +77,7 @@ export class AcpClient {
 	// Connection & process
 	private connection: acp.ClientConnection | null = null;
 	private agentProcess: ChildProcess | null = null;
+	private agentSocket: WebSocket | null = null;
 	private currentConfig: AgentConfig | null = null;
 	private isInitializedFlag = false;
 	private currentAgentId: string | null = null;
@@ -130,7 +131,15 @@ export class AcpClient {
 			`[AcpClient] Current state - process: ${!!this.agentProcess}, PID: ${this.agentProcess?.pid}`,
 		);
 
-		// Clean up existing process if any (e.g., when switching agents)
+		// Clean up existing socket or process if any (e.g., when switching agents)
+		if (this.agentSocket) {
+			try {
+				this.agentSocket.close();
+			} catch {
+				// ignore
+			}
+			this.agentSocket = null;
+		}
 		if (this.agentProcess) {
 			this.killProcessTree();
 		}
@@ -221,102 +230,158 @@ export class AcpClient {
 			baseEnv = buildWslEnv(baseEnv, wslEnvNames);
 		}
 
-		this.logger.log(
-			"[AcpClient] Starting agent process in directory:",
-			config.workingDirectory,
-		);
-
-		// Prepare command and args for spawning (platform-specific shell wrapping)
-		const prepared = prepareShellCommand(
-			command,
-			args,
-			config.workingDirectory,
-			{
-				wslMode: this.plugin.settings.windowsWslMode,
-				wslDistribution: this.plugin.settings.windowsWslDistribution,
-				nodeDir,
-				alwaysEscape: true,
-			},
-		);
-		const spawnCommand = prepared.command;
-		const spawnArgs = prepared.args;
-		const needsShell = prepared.needsShell;
-
-		this.logger.log(
-			"[AcpClient] Prepared spawn command:",
-			spawnCommand,
-			spawnArgs,
-		);
-
-		// Spawn the agent process
-		// detached: true (Unix only) creates a new process group, allowing us to kill
-		// the entire process tree (agent + child processes) with process.kill(-pid).
-		// On Windows, detached: true opens a new console window, so we skip it
-		// and use taskkill /T instead for tree kill.
-		const agentProcess = spawn(spawnCommand, spawnArgs, {
-			stdio: ["pipe", "pipe", "pipe"],
-			env: baseEnv,
-			cwd: config.workingDirectory,
-			shell: needsShell,
-			detached: !Platform.isWin,
-		});
-		this.agentProcess = agentProcess;
-
 		const agentLabel = `${config.displayName} (${config.id})`;
+		let input: WritableStream<Uint8Array>;
+		let output: ReadableStream<Uint8Array>;
 
-		// Set up process event handlers
-		agentProcess.on("spawn", () => {
+		if (command.startsWith("ws://") || command.startsWith("wss://")) {
 			this.logger.log(
-				`[AcpClient] ${agentLabel} process spawned successfully, PID:`,
-				agentProcess.pid,
-			);
-		});
-
-		agentProcess.on("error", (error) => {
-			this.logger.error(
-				`[AcpClient] ${agentLabel} process error:`,
-				error,
+				"[AcpClient] Connecting to remote agent via WebSocket:",
+				command,
 			);
 
-			const processError: ProcessError = {
-				type: "spawn_failed",
-				agentId: config.id,
-				errorCode: (error as NodeJS.ErrnoException).code,
-				originalError: error,
-				...getSpawnErrorInfo(
-					error,
-					command,
-					agentLabel,
-					this.plugin.settings.windowsWslMode,
-				),
-			};
+			const ws = new WebSocket(command);
+			this.agentSocket = ws;
 
-			this.handler.emitSessionUpdate({
-				type: "process_error",
-				sessionId: this.currentSessionId ?? "",
-				error: processError,
+			await new Promise<void>((resolve, reject) => {
+				const timeout = setTimeout(() => {
+					reject(
+						new Error(`WebSocket connection timed out for ${command}`),
+					);
+				}, 10000);
+
+				ws.onopen = () => {
+					clearTimeout(timeout);
+					this.logger.log(
+						`[AcpClient] ${agentLabel} WebSocket connected`,
+					);
+					resolve();
+				};
+
+				ws.onerror = (error) => {
+					clearTimeout(timeout);
+					this.logger.error(
+						`[AcpClient] ${agentLabel} WebSocket error:`,
+						error,
+					);
+					reject(
+						new Error(`WebSocket connection failed for ${command}`),
+					);
+				};
 			});
-		});
 
-		agentProcess.on("exit", (code, signal) => {
+			input = new WritableStream<Uint8Array>({
+				write(chunk: Uint8Array) {
+					if (ws.readyState === WebSocket.OPEN) {
+						ws.send(chunk);
+					}
+				},
+				close() {
+					try {
+						ws.close();
+					} catch {
+						// ignore
+					}
+				},
+			});
+
+			output = new ReadableStream<Uint8Array>({
+				start(controller) {
+					ws.onmessage = async (event: MessageEvent) => {
+						const data: unknown = event.data;
+						if (typeof data === "string") {
+							controller.enqueue(new TextEncoder().encode(data));
+						} else if (data instanceof ArrayBuffer) {
+							controller.enqueue(new Uint8Array(data));
+						} else if (typeof Blob !== "undefined" && data instanceof Blob) {
+							controller.enqueue(
+								new Uint8Array(await data.arrayBuffer()),
+							);
+						}
+					};
+					ws.onclose = () => {
+						try {
+							controller.close();
+						} catch {
+							// ignore
+						}
+					};
+					ws.onerror = (err) => {
+						try {
+							controller.error(err);
+						} catch {
+							// ignore
+						}
+					};
+				},
+			});
+		} else {
+			if (Platform.isMobile) {
+				throw new Error(
+					"Local agent process spawning is not supported on mobile. Please configure a remote agent using a WebSocket URL (e.g. ws://host:port?token=...).",
+				);
+			}
+
 			this.logger.log(
-				`[AcpClient] ${agentLabel} process exited with code:`,
-				code,
-				"signal:",
-				signal,
+				"[AcpClient] Starting agent process in directory:",
+				config.workingDirectory,
 			);
 
-			if (code === 127) {
-				this.logger.error(`[AcpClient] Command not found: ${command}`);
+			// Prepare command and args for spawning (platform-specific shell wrapping)
+			const prepared = prepareShellCommand(
+				command,
+				args,
+				config.workingDirectory,
+				{
+					wslMode: this.plugin.settings.windowsWslMode,
+					wslDistribution: this.plugin.settings.windowsWslDistribution,
+					nodeDir,
+					alwaysEscape: true,
+				},
+			);
+			const spawnCommand = prepared.command;
+			const spawnArgs = prepared.args;
+			const needsShell = prepared.needsShell;
+
+			this.logger.log(
+				"[AcpClient] Prepared spawn command:",
+				spawnCommand,
+				spawnArgs,
+			);
+
+			// Spawn the agent process
+			const agentProcess = spawn(spawnCommand, spawnArgs, {
+				stdio: ["pipe", "pipe", "pipe"],
+				env: baseEnv,
+				cwd: config.workingDirectory,
+				shell: needsShell,
+				detached: !Platform.isWin,
+			});
+			this.agentProcess = agentProcess;
+
+			// Set up process event handlers
+			agentProcess.on("spawn", () => {
+				this.logger.log(
+					`[AcpClient] ${agentLabel} process spawned successfully, PID:`,
+					agentProcess.pid,
+				);
+			});
+
+			agentProcess.on("error", (error) => {
+				this.logger.error(
+					`[AcpClient] ${agentLabel} process error:`,
+					error,
+				);
 
 				const processError: ProcessError = {
-					type: "command_not_found",
+					type: "spawn_failed",
 					agentId: config.id,
-					exitCode: code,
-					title: "Command Not Found",
-					message: `The command "${command}" could not be found. Please check the path configuration for ${agentLabel}.`,
-					suggestion: getCommandNotFoundSuggestion(
+					errorCode: (error as NodeJS.ErrnoException).code,
+					originalError: error,
+					...getSpawnErrorInfo(
+						error,
 						command,
+						agentLabel,
 						this.plugin.settings.windowsWslMode,
 					),
 				};
@@ -326,55 +391,84 @@ export class AcpClient {
 					sessionId: this.currentSessionId ?? "",
 					error: processError,
 				});
+			});
+
+			agentProcess.on("exit", (code, signal) => {
+				this.logger.log(
+					`[AcpClient] ${agentLabel} process exited with code:`,
+					code,
+					"signal:",
+					signal,
+				);
+
+				if (code === 127) {
+					this.logger.error(`[AcpClient] Command not found: ${command}`);
+
+					const processError: ProcessError = {
+						type: "command_not_found",
+						agentId: config.id,
+						exitCode: code,
+						title: "Command Not Found",
+						message: `The command "${command}" could not be found. Please check the path configuration for ${agentLabel}.`,
+						suggestion: getCommandNotFoundSuggestion(
+							command,
+							this.plugin.settings.windowsWslMode,
+						),
+					};
+
+					this.handler.emitSessionUpdate({
+						type: "process_error",
+						sessionId: this.currentSessionId ?? "",
+						error: processError,
+					});
+				}
+			});
+
+			agentProcess.on("close", (code, signal) => {
+				this.logger.log(
+					`[AcpClient] ${agentLabel} process closed with code:`,
+					code,
+					"signal:",
+					signal,
+				);
+			});
+
+			agentProcess.stderr?.setEncoding("utf8");
+			agentProcess.stderr?.on("data", (data) => {
+				this.logger.log(`[AcpClient] ${agentLabel} stderr:`, data);
+				this.recentStderr += data;
+				if (this.recentStderr.length > 8192) {
+					this.recentStderr = this.recentStderr.slice(-4096);
+				}
+			});
+
+			// Create stream for ACP communication
+			if (!agentProcess.stdin || !agentProcess.stdout) {
+				throw new Error("Agent process stdin/stdout not available");
 			}
-		});
 
-		agentProcess.on("close", (code, signal) => {
-			this.logger.log(
-				`[AcpClient] ${agentLabel} process closed with code:`,
-				code,
-				"signal:",
-				signal,
-			);
-		});
+			const stdin = agentProcess.stdin;
+			const stdout = agentProcess.stdout;
 
-		agentProcess.stderr?.setEncoding("utf8");
-		agentProcess.stderr?.on("data", (data) => {
-			this.logger.log(`[AcpClient] ${agentLabel} stderr:`, data);
-			// Keep a rolling window of recent stderr for error diagnostics
-			this.recentStderr += data;
-			if (this.recentStderr.length > 8192) {
-				this.recentStderr = this.recentStderr.slice(-4096);
-			}
-		});
-
-		// Create stream for ACP communication
-		// stdio is configured as ["pipe", "pipe", "pipe"] so stdin/stdout are guaranteed to exist
-		if (!agentProcess.stdin || !agentProcess.stdout) {
-			throw new Error("Agent process stdin/stdout not available");
+			input = new WritableStream<Uint8Array>({
+				write(chunk: Uint8Array) {
+					stdin.write(chunk);
+				},
+				close() {
+					stdin.end();
+				},
+			});
+			output = new ReadableStream<Uint8Array>({
+				start(controller) {
+					stdout.on("data", (chunk: Uint8Array) => {
+						controller.enqueue(chunk);
+					});
+					stdout.on("end", () => {
+						controller.close();
+					});
+				},
+			});
 		}
-
-		const stdin = agentProcess.stdin;
-		const stdout = agentProcess.stdout;
-
-		const input = new WritableStream<Uint8Array>({
-			write(chunk: Uint8Array) {
-				stdin.write(chunk);
-			},
-			close() {
-				stdin.end();
-			},
-		});
-		const output = new ReadableStream<Uint8Array>({
-			start(controller) {
-				stdout.on("data", (chunk: Uint8Array) => {
-					controller.enqueue(chunk);
-				});
-				stdout.on("end", () => {
-					controller.close();
-				});
-			},
-		});
 
 		this.logger.log(
 			"[AcpClient] Using working directory:",
@@ -633,6 +727,15 @@ export class AcpClient {
 	 * On Windows, uses taskkill /T for tree kill.
 	 */
 	private killProcessTree(): void {
+		if (this.agentSocket) {
+			try {
+				this.agentSocket.close();
+			} catch {
+				// Socket may already be closed
+			}
+			this.agentSocket = null;
+		}
+
 		if (!this.agentProcess) return;
 
 		const pid = this.agentProcess.pid;
@@ -821,9 +924,12 @@ export class AcpClient {
 	/**
 	 * Convert working directory to WSL path if in WSL mode on Windows.
 	 */
-	private toSessionCwd(cwd: string): string {
-		if (Platform.isWin && this.plugin.settings.windowsWslMode) {
+	private toSessionCwd(cwd?: string): string {
+		if (Platform.isWin && this.plugin.settings.windowsWslMode && cwd) {
 			return convertWindowsPathToWsl(cwd);
+		}
+		if (!cwd || cwd.trim().length === 0) {
+			return this.currentConfig?.workingDirectory ?? "";
 		}
 		return cwd;
 	}

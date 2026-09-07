@@ -2394,6 +2394,13 @@ If your plugin does not need CSS, delete this file.
 	overflow: hidden;
 }
 
+@media (max-width: 768px) {
+	.agent-client-code-block-chat {
+		height: var(--ac-embedded-max-height, 70vh);
+		max-height: 85vh;
+	}
+}
+
 .agent-client-embedded-chat-panel {
 	flex: 1 1 auto;
 	height: 100%;

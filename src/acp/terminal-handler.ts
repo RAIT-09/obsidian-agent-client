@@ -55,7 +55,7 @@ export class TerminalManager {
 
 		// Check current platform
 		if (!Platform.isDesktopApp) {
-			throw new Error("Agent Client is only available on desktop");
+			throw new Error("Terminal execution is only available on desktop");
 		}
 
 		// Set up environment variables

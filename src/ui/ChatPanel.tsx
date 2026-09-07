@@ -3,7 +3,6 @@ const { useState, useRef, useEffect, useMemo, useCallback } = React;
 import {
 	Notice,
 	FileSystemAdapter,
-	Platform,
 	Menu,
 	setIcon,
 	TFile,
@@ -210,11 +209,8 @@ export const ChatPanel = React.memo(function ChatPanel({
 	containerEl: containerElProp,
 }: ChatPanelProps) {
 	// ============================================================
-	// Platform Check
+	// Platform Check (Desktop supports local & remote; Mobile supports remote)
 	// ============================================================
-	if (!Platform.isDesktopApp) {
-		throw new Error("Agent Client is only available on desktop");
-	}
 
 	// ============================================================
 	// Context
@@ -235,7 +231,7 @@ export const ChatPanel = React.memo(function ChatPanel({
 			return adapter.getBasePath();
 		}
 		// Fallback for non-FileSystemAdapter (e.g., mobile)
-		return process.cwd();
+		return typeof process !== "undefined" && process.cwd ? process.cwd() : "";
 	}, [plugin, workingDirectory]);
 
 	// Agent working directory — defaults to vault path.
