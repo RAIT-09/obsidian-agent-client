@@ -324,9 +324,7 @@ If your plugin does not need CSS, delete this file.
 /* ===== Inline Lucide Icons (replace emojis) ===== */
 .agent-client-message-tool-call-icon svg,
 .agent-client-collapsible-thought-label-icon svg,
-.agent-client-terminal-renderer-label-icon svg,
-.agent-client-error-overlay-suggestion-icon svg,
-.agent-client-message-plan-label-icon svg {
+.agent-client-error-overlay-suggestion-icon svg {
 	width: 14px;
 	height: 14px;
 	vertical-align: -2px;
@@ -334,22 +332,13 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-muted);
 }
 
-.agent-client-message-plan-entry-icon svg {
-	width: 12px;
-	height: 12px;
-	vertical-align: -2px;
-}
-
 /* ===== Message Content Components ===== */
 
 /* Tool Call */
 .agent-client-message-tool-call {
-	padding: 8px;
 	margin-bottom: 12px;
 	background-color: transparent;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
-	font-size: 0.85em;
+	font-size: var(--ac-chat-detail-font-size);
 	user-select: text;
 	overflow-wrap: break-word;
 	word-wrap: break-word;
@@ -361,10 +350,15 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	align-items: center;
 	gap: 4px;
-	font-weight: bold;
-	margin-bottom: 4px;
+	color: var(--text-muted);
 	user-select: text;
 	white-space: nowrap;
+}
+
+/* Detail lives under the row, indented like the thought block's body. */
+.agent-client-message-tool-call-body {
+	margin-top: 8px;
+	padding-left: 16px;
 }
 
 .agent-client-message-tool-call-title-text {
@@ -372,6 +366,61 @@ If your plugin does not need CSS, delete this file.
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+.agent-client-message-tool-call-header-toggle {
+	cursor: pointer;
+}
+
+/* :focus-visible only — keyboard reveals the ring, mouse clicks never do.
+   Outline follows .agent-client-permission-option:focus-visible. */
+.agent-client-message-tool-call-header-toggle:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+	border-radius: 4px;
+}
+
+.agent-client-message-tool-call-expand-icon {
+	flex-shrink: 0;
+	opacity: 0.7;
+}
+
+.agent-client-message-tool-call-expand-icon svg {
+	width: 14px;
+	height: 14px;
+	color: var(--text-muted);
+}
+
+/* Images stay visible while the body is collapsed. */
+.agent-client-tool-result-images-strip {
+	display: flex;
+	gap: 8px;
+	padding: 4px 0 0;
+	overflow-x: auto;
+	scrollbar-width: thin;
+}
+
+.agent-client-tool-result-images-strip::-webkit-scrollbar {
+	height: 4px;
+}
+
+.agent-client-tool-result-images-strip::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.agent-client-tool-result-images-strip::-webkit-scrollbar-thumb {
+	background-color: var(--background-modifier-border);
+	border-radius: 2px;
+}
+
+.agent-client-tool-result-image-thumbnail {
+	flex-shrink: 0;
+	width: 120px;
+	height: 120px;
+	object-fit: cover;
+	object-position: center;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
 }
 
 .agent-client-message-tool-call-status-icon {
@@ -412,65 +461,9 @@ If your plugin does not need CSS, delete this file.
 	font-size: 0.9em;
 }
 
-/* Plan */
-.agent-client-message-plan {
-	padding: 8px;
-	margin: 4px 0;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
-	font-size: 12px;
-	user-select: text;
-	overflow-wrap: break-word;
-	word-wrap: break-word;
-	word-break: break-word;
-	max-width: 100%;
-}
-
-.agent-client-message-plan-title {
-	font-weight: bold;
-	margin-bottom: 4px;
-	user-select: text;
-	overflow-wrap: break-word;
-	word-wrap: break-word;
-	word-break: break-word;
-}
-
-.agent-client-message-plan-entry {
-	margin: 2px 0;
-	padding: 2px 4px;
-	border-left: 2px solid var(--text-muted);
-	user-select: text;
-	overflow-wrap: break-word;
-	word-wrap: break-word;
-	word-break: break-word;
-}
-
-.agent-client-message-plan-entry-icon.agent-client-status-completed {
-	user-select: text;
-}
-
-.agent-client-message-plan-entry-icon.agent-client-status-in_progress {
-	user-select: text;
-}
-
-.agent-client-message-plan-entry-icon.agent-client-status-pending {
-	user-select: text;
-}
-
-/* Plan entry status text styles (for emoji-off mode) */
-.agent-client-message-plan-entry.agent-client-plan-status-completed {
-	text-decoration: line-through;
-	color: var(--text-muted);
-}
-
-.agent-client-message-plan-entry.agent-client-plan-status-in_progress {
-	font-weight: bold;
-}
-
 /* ===== Permission Request (vertical option list) ===== */
-/* Mirrors .agent-client-tool-call-diff: full-bleed block inside the
-   tool call with a 1px border container. Kind colors live on the icon,
-   not the button background (theme compatibility). */
+/* PermissionDialog's option list (sole consumer; the message- prefix is a
+   relic of its transcript days). Kind colors live on the icon. */
 .agent-client-message-permission-request {
 	display: flex;
 	flex-direction: column;
@@ -478,6 +471,144 @@ If your plugin does not need CSS, delete this file.
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 4px;
 	overflow: hidden;
+}
+
+/* ===== Permission dialog (above the input) ===== */
+
+.agent-client-chat-view-container {
+	container-type: size;
+	/* Header + input area + gap, measured on device; transient badges make
+	   the header taller, so this is a ceiling estimate. */
+	--ac-permission-dialog-reserve: 240px;
+}
+
+/* Overlay like the error overlay below: bottom:100% grows upward, so a
+   short panel clips the title — never the DOM-last button row. */
+.agent-client-permission-dialog {
+	position: absolute;
+	bottom: 100%;
+	left: 8px;
+	right: 8px;
+	/* Front = easiest to dismiss; the dialog has no dismiss affordance. 20 is
+	   a floor: .agent-client-scroll-to-bottom (z 10) shares this context. */
+	z-index: 20;
+	margin-bottom: 8px;
+	padding: 8px;
+	/* Never below what the fixed rows need — the shortfall then clips the
+	   title at the panel top instead of the buttons. */
+	max-height: max(
+		calc(100cqh - var(--ac-permission-dialog-reserve, 240px)),
+		220px
+	);
+	display: flex;
+	flex-direction: column;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	font-size: 0.85em;
+	/* Cast upward: lifts the dialog off transcript rows, or off the input
+	   box in short panels. */
+	box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.25);
+}
+
+/* A short panel cannot fit the dialog's fixed rows above the input, so the
+   dialog re-anchors onto the input area — dead during a permission anyway. */
+@container (max-height: 400px) {
+	.agent-client-permission-dialog {
+		bottom: 0;
+		max-height: calc(100cqh - 24px);
+	}
+}
+
+.agent-client-permission-dialog-header {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-weight: bold;
+	flex-shrink: 0;
+	/* The gap lives on the rigid row: a margin inside the scroll box would
+	   scroll away with the content. */
+	margin-bottom: 8px;
+}
+
+.agent-client-permission-dialog-icon svg {
+	width: 14px;
+	height: 14px;
+	color: var(--text-muted);
+}
+
+.agent-client-permission-dialog-title {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* How many requests are waiting behind this one. */
+.agent-client-permission-dialog-queue {
+	flex-shrink: 0;
+	padding: 0 6px;
+	border-radius: 8px;
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
+	font-weight: normal;
+}
+
+/* The review surface — the one flexible row: it takes the leftover height
+   and scrolls internally. min-height: 0 is load-bearing for the cap. */
+.agent-client-permission-dialog-review {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	/* Reaching the end of the review must not scroll the host note. */
+	overscroll-behavior: contain;
+	/* A flex column so the diff below can opt into shrinking. */
+	display: flex;
+	flex-direction: column;
+}
+
+.agent-client-permission-dialog-review:empty {
+	display: none;
+}
+
+/* Edge gaps belong to the rigid rows; an edge margin here would exist at
+   rest and vanish once scrolled. Gaps BETWEEN items rightly scroll. */
+.agent-client-permission-dialog-review > :first-child {
+	margin-top: 0;
+}
+
+.agent-client-permission-dialog-review > :last-child {
+	margin-bottom: 0;
+}
+
+/* A diff scrolls within its own frame (the corners stay put); non-diff
+   overflow falls back to the review's own scrollbar. Dialog-scoped only. */
+.agent-client-permission-dialog-review > * {
+	flex-shrink: 0;
+}
+
+.agent-client-permission-dialog-review > .agent-client-tool-call-diff {
+	flex-shrink: 1;
+	/* A floor, not 0: rigid siblings would otherwise squeeze the diff to
+	   nothing in a mixed review. */
+	min-height: 120px;
+	display: flex;
+	flex-direction: column;
+}
+
+.agent-client-permission-dialog-review
+	> .agent-client-tool-call-diff
+	> .agent-client-tool-call-diff-content {
+	flex: 1 1 auto;
+	min-height: 0;
+	/* overflow: auto comes from the base rule */
+}
+
+/* Rigid row in the dialog's flex column; only the review gives.
+   (margin-top: 8px comes from the base rule above.) */
+.agent-client-permission-dialog > .agent-client-message-permission-request {
+	flex-shrink: 0;
 }
 
 .agent-client-message-permission-request .agent-client-permission-option {
@@ -568,6 +699,9 @@ If your plugin does not need CSS, delete this file.
 /* Main container */
 .agent-client-chat-view-container {
 	--ac-chat-font-size: var(--font-text-size);
+	/* Detail blocks (tool rows, diffs, terminals, thinking) share one ratio.
+	   calc, not em: nested boxes must not compound against the tool row. */
+	--ac-chat-detail-font-size: calc(var(--ac-chat-font-size) * 0.85);
 	height: 100%;
 	display: flex;
 	flex-direction: column;
@@ -644,10 +778,6 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* Virtual item spacing (replaces flex gap: 2px) */
-.agent-client-virtual-item {
-	padding-bottom: 2px;
-}
-
 /* Allow horizontal scroll for wide tables within messages */
 .agent-client-chat-view-messages table {
 	display: block;
@@ -719,7 +849,9 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--background-secondary);
 	border: 1px solid var(--color-red);
 	border-radius: 8px;
-	z-index: 10;
+	/* Above the permission dialog (20): the banner is dismissible, the
+	   dialog can only be answered. */
+	z-index: 30;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
@@ -1162,16 +1294,14 @@ If your plugin does not need CSS, delete this file.
 
 /* Collapsible Thought */
 .agent-client-collapsible-thought {
-	font-style: italic;
 	color: var(--text-muted);
 	background-color: transparent;
-	font-size: 0.9em;
+	font-size: var(--ac-chat-detail-font-size);
 	cursor: pointer;
 	overflow-wrap: break-word;
 	word-wrap: break-word;
 	word-break: break-word;
 	max-width: 100%;
-	margin-top: 8px;
 	margin-bottom: 12px;
 }
 
@@ -1252,7 +1382,7 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 4px;
-	font-size: 12px;
+	font-size: var(--ac-chat-detail-font-size);
 	font-family: var(--font-monospace);
 	white-space: pre-wrap;
 	word-break: break-word;
@@ -1266,7 +1396,7 @@ If your plugin does not need CSS, delete this file.
 	padding: 4px 8px;
 	color: white;
 	border-radius: 4px;
-	font-size: 11px;
+	font-size: 0.9em;
 	font-family: var(--font-interface);
 	user-select: text;
 }
@@ -1284,7 +1414,9 @@ If your plugin does not need CSS, delete this file.
 	position: relative;
 	padding: 0 16px;
 	width: 100%;
-	margin: 4px 0;
+	/* Floor for every message; collapses away when the last block carries
+	   its own bottom margin. */
+	margin-bottom: 12px;
 	/* Prevent long strings from overflowing */
 	overflow-wrap: break-word;
 	word-wrap: break-word;
@@ -1391,7 +1523,7 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 4px;
 	overflow: hidden;
 	font-family: var(--font-monospace);
-	font-size: 12px;
+	font-size: var(--ac-chat-detail-font-size);
 }
 
 .agent-client-tool-call-diff-content {
@@ -1403,8 +1535,7 @@ If your plugin does not need CSS, delete this file.
 	padding: 4px 12px;
 	background-color: var(--background-secondary);
 	color: var(--text-muted);
-	font-size: 11px;
-	font-style: italic;
+	font-size: 0.9em;
 }
 
 .agent-client-diff-line {
@@ -1457,7 +1588,6 @@ If your plugin does not need CSS, delete this file.
 .agent-client-diff-word-removed {
 	background-color: rgba(248, 81, 73, 0.4);
 	font-weight: 600;
-	text-decoration: line-through;
 }
 
 /* Diff Expand/Collapse Bar */
@@ -1532,6 +1662,68 @@ If your plugin does not need CSS, delete this file.
 	overflow-wrap: break-word;
 	word-wrap: break-word;
 	word-break: break-word;
+}
+
+.agent-client-tool-result-text,
+.agent-client-tool-result-resource-embedded pre,
+.agent-client-tool-result-raw pre {
+	max-height: 320px;
+	margin: 6px 0 0;
+	padding: 8px;
+	overflow: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	font-family: var(--font-monospace);
+	font-size: 0.9em;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.agent-client-tool-result-image {
+	display: block;
+	max-width: 100%;
+	max-height: 384px;
+	margin-top: 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	object-fit: contain;
+}
+
+.agent-client-tool-result-audio {
+	width: min(100%, 448px);
+	margin-top: 6px;
+}
+
+.agent-client-tool-result-resource {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+	max-width: 100%;
+	margin-top: 6px;
+	padding: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	color: var(--text-normal);
+	text-decoration: none;
+	overflow-wrap: anywhere;
+}
+
+.agent-client-tool-result-resource small,
+.agent-client-tool-result-resource-embedded p {
+	color: var(--text-muted);
+}
+
+.agent-client-tool-result-resource-embedded,
+.agent-client-tool-result-raw {
+	margin-top: 6px;
+}
+
+.agent-client-tool-result-resource-embedded summary,
+.agent-client-tool-result-raw summary {
+	cursor: pointer;
+	overflow-wrap: anywhere;
 }
 
 /* ===== Attachment Preview Strip ===== */
@@ -2050,6 +2242,131 @@ If your plugin does not need CSS, delete this file.
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+/* ===== Plan strip (ambient, under the header) ===== */
+/* The row is in flow; the expanded list is an overlay dropdown, so
+   toggling never resizes the message area. */
+.agent-client-plan-strip {
+	position: relative;
+	padding: 0 12px 6px;
+	font-size: var(--font-ui-smaller);
+	user-select: text;
+}
+
+.agent-client-plan-strip-summary {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	white-space: nowrap;
+	color: var(--text-muted);
+}
+
+.agent-client-plan-strip-summary:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+	border-radius: 4px;
+}
+
+.agent-client-plan-strip-icon,
+.agent-client-plan-strip-chevron {
+	flex-shrink: 0;
+}
+
+.agent-client-plan-strip-icon svg,
+.agent-client-plan-strip-chevron svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* auto margin, not a flex-1 text column: the chevron stays pinned right
+   even when no current entry is shown (all-completed). */
+.agent-client-plan-strip-chevron {
+	margin-left: auto;
+	opacity: 0.7;
+}
+
+.agent-client-plan-strip-count {
+	flex-shrink: 0;
+	font-weight: 600;
+}
+
+.agent-client-plan-strip-current {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Header-extension band over the transcript. 15 sits above the
+   scroll-to-bottom button (10) and below the permission dialog (20). */
+/* No margin-top: any gap lets the transcript show through above the band. */
+.agent-client-plan-strip-entries {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	z-index: 15;
+	padding: 2px 12px 6px;
+	max-height: 200px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	background-color: var(--background-primary);
+	border-bottom: 1px solid var(--background-modifier-border);
+	color: var(--text-normal);
+}
+
+/* Match the surface the band extends: side docks paint
+   --background-secondary on their leaves. */
+.mod-sidedock .agent-client-plan-strip-entries {
+	background-color: var(--background-secondary);
+}
+
+/* ...except the embedded panel, which paints its own primary surface
+   wherever the host note lives. Order matters: same specificity. */
+.agent-client-embedded-chat-panel .agent-client-plan-strip-entries {
+	background-color: var(--background-primary);
+}
+
+/* Icon column + text column; the icon stays centered on the row's
+   full height however far the text wraps. */
+.agent-client-plan-strip-entry {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 2px 0;
+	padding: 2px 4px;
+	border-left: 2px solid var(--text-muted);
+}
+
+.agent-client-plan-strip-entry-icon {
+	flex-shrink: 0;
+	display: flex;
+}
+
+.agent-client-plan-strip-entry-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.agent-client-plan-strip-entry-text {
+	min-width: 0;
+	overflow-wrap: break-word;
+}
+
+.agent-client-plan-strip-entry.agent-client-plan-status-completed {
+	color: var(--text-muted);
+}
+
+/* On the span, not the flex container: decoration does not reliably
+   propagate into flex items. */
+.agent-client-plan-strip-entry.agent-client-plan-status-completed
+	.agent-client-plan-strip-entry-text {
+	text-decoration: line-through;
+}
+
+.agent-client-plan-strip-entry.agent-client-plan-status-in_progress {
+	font-weight: bold;
 }
 
 .agent-client-change-dir-buttons {

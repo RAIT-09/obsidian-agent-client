@@ -32,16 +32,6 @@ interface AcpSessionResponse {
  */
 export class AcpTypeConverter {
 	/**
-	 * Convert ACP ToolCallContent to domain ToolCallContent.
-	 *
-	 * Filters out content types that are not supported by the domain model:
-	 * - Supports: "diff", "terminal"
-	 * - Ignores: "content" (not implemented in UI)
-	 *
-	 * @param acpContent - Tool call content from ACP protocol
-	 * @returns Domain model tool call content, or undefined if input is null/empty
-	 */
-	/**
 	 * Convert ACP AvailableCommand[] to domain SlashCommand[].
 	 */
 	static toSlashCommands(
@@ -54,15 +44,99 @@ export class AcpTypeConverter {
 		}));
 	}
 
+	/**
+	 * Convert ACP ToolCallContent to domain ToolCallContent.
+	 *
+	 * Preserves standard ACP content blocks as well as diffs and terminals.
+	 * The three-state return mirrors ACP's update semantics:
+	 * - omitted (`undefined`) → `undefined`: the collection is unchanged
+	 * - `null` or `[]` → `[]`: the collection is explicitly cleared
+	 * - a populated array → the converted collection, replacing the previous one
+	 *
+	 * @param acpContent - Tool call content from ACP protocol
+	 * @returns Converted content, or undefined when the input was omitted
+	 */
 	static toToolCallContent(
 		acpContent: acp.ToolCallContent[] | undefined | null,
 	): ToolCallContent[] | undefined {
-		if (!acpContent) return undefined;
+		if (acpContent === undefined) return undefined;
+		if (acpContent === null || acpContent.length === 0) return [];
 
 		const converted: ToolCallContent[] = [];
 
 		for (const item of acpContent) {
-			if (item.type === "diff") {
+			if (item.type === "content") {
+				const content = item.content;
+				switch (content.type) {
+					case "text":
+						converted.push({
+							type: "content",
+							content: { type: "text", text: content.text },
+						});
+						break;
+					case "image":
+						converted.push({
+							type: "content",
+							content: {
+								type: "image",
+								data: content.data,
+								mimeType: content.mimeType,
+								uri: content.uri ?? undefined,
+							},
+						});
+						break;
+					case "audio":
+						converted.push({
+							type: "content",
+							content: {
+								type: "audio",
+								data: content.data,
+								mimeType: content.mimeType,
+							},
+						});
+						break;
+					case "resource_link":
+						converted.push({
+							type: "content",
+							content: {
+								type: "resource_link",
+								uri: content.uri,
+								name: content.name,
+								title: content.title ?? undefined,
+								description: content.description ?? undefined,
+								mimeType: content.mimeType ?? undefined,
+								size: content.size ?? undefined,
+							},
+						});
+						break;
+					case "resource": {
+						const resource = content.resource;
+						converted.push({
+							type: "content",
+							content: {
+								type: "resource",
+								resource:
+									"text" in resource
+										? {
+												uri: resource.uri,
+												mimeType:
+													resource.mimeType ??
+													undefined,
+												text: resource.text,
+											}
+										: {
+												uri: resource.uri,
+												mimeType:
+													resource.mimeType ??
+													undefined,
+												blob: resource.blob,
+											},
+							},
+						});
+						break;
+					}
+				}
+			} else if (item.type === "diff") {
 				converted.push({
 					type: "diff",
 					path: item.path,
@@ -75,10 +149,9 @@ export class AcpTypeConverter {
 					terminalId: item.terminalId,
 				});
 			}
-			// "content" type is intentionally ignored (not implemented in UI)
 		}
 
-		return converted.length > 0 ? converted : undefined;
+		return converted;
 	}
 
 	/**
