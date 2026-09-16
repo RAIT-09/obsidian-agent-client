@@ -35,7 +35,7 @@ where.exe bob
 
 ## Authentication
 
-IBM Bob supports API key authentication.
+IBM Bob requires a single API key.
 
 ### API Key
 
@@ -43,7 +43,7 @@ IBM Bob supports API key authentication.
 2. In **Settings → Agent Client**, go to **Preset agents → IBM Bob → API key**.
 3. Click **Link...** and enter or create a secret in Obsidian's Keychain.
 
-The API key is injected as the `BOB_API_KEY` environment variable when the agent starts.
+The API key is injected as the `BOBSHELL_API_KEY` environment variable when the agent starts.
 
 ## Verify Setup
 

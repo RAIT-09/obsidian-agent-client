@@ -299,9 +299,9 @@ export const PRESET_AGENTS: readonly PresetAgentDefinition[] = [
 		defaultCommand: "bob",
 		defaultArgs: ["acp"],
 		apiKey: {
-			envVarName: "BOB_API_KEY",
+			envVarName: "BOBSHELL_API_KEY",
 			settingDesc:
-				"IBM Bob API key. Required for API-key authentication. Select from Obsidian's Keychain or create a new secret.",
+				"IBM Bob API key. Select from Obsidian's Keychain or create a new secret.",
 		},
 		installHint: {
 			default: "bob --version",
