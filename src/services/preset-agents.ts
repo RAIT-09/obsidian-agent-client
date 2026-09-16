@@ -293,6 +293,26 @@ export const PRESET_AGENTS: readonly PresetAgentDefinition[] = [
 		},
 		docsPage: "grok-build",
 	},
+	{
+		presetId: "bob-acp",
+		defaultDisplayName: "IBM Bob",
+		defaultCommand: "bob",
+		defaultArgs: ["acp"],
+		apiKey: {
+			envVarName: "BOB_API_KEY",
+			settingDesc:
+				"IBM Bob API key. Required for API-key authentication. Select from Obsidian's Keychain or create a new secret.",
+		},
+		installHint: {
+			default: "bob --version",
+		},
+		settingsCopy: {
+			pathDesc:
+				'Command name or path to bob. Use just "bob" to let the login shell resolve it, or enter an absolute path.',
+			argsDescSuffix: '(The "acp" argument is required to start IBM Bob in ACP mode.)',
+		},
+		docsPage: "bob",
+	},
 ];
 
 /**
