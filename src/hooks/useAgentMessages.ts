@@ -135,6 +135,7 @@ export function useAgentMessages(
 	const [queueDrainVersion, setQueueDrainVersion] = useState(0);
 	const isSendingRef = useRef(false);
 	const dispatchInProgressRef = useRef(false);
+	const queueGenerationRef = useRef(0);
 	type QueuedPromptJob = {
 		sessionId: string;
 		prompt: QueuedPrompt;
@@ -168,6 +169,7 @@ export function useAgentMessages(
 	}, []);
 
 	const clearQueue = useCallback(() => {
+		queueGenerationRef.current++;
 		queuedPromptJobsRef.current = [];
 		setQueuedPrompts([]);
 		setQueuePaused(false);
@@ -627,8 +629,14 @@ export function useAgentMessages(
 		if (!job) return;
 		queuedPromptJobsRef.current = remaining;
 		setQueuedPrompts(remaining.map((queuedJob) => queuedJob.prompt));
+		const queueGeneration = queueGenerationRef.current;
 		void dispatchMessage(job.prompt.content, job.options).then((result) => {
-			if (result !== "prepare_failed") return;
+			if (
+				result !== "prepare_failed" ||
+				queueGenerationRef.current !== queueGeneration
+			) {
+				return;
+			}
 			queuedPromptJobsRef.current = requeueItemAtFront(
 				queuedPromptJobsRef.current,
 				job,
