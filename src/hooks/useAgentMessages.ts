@@ -36,6 +36,7 @@ import {
 } from "../services/message-state";
 import {
 	createQueuedPrompt,
+	requeueItemAtFront,
 	removeQueuedPromptItem,
 	takeNextQueueItemForSession,
 	updateQueuedPromptItem,
@@ -263,6 +264,14 @@ export function useAgentMessages(
 	const enqueueUpdate = useCallback(
 		(update: SessionUpdate) => {
 			if (ignoreUpdatesRef.current) return;
+			// Some agents echo the prompt back as a user_message_chunk while
+			// the prompt RPC is still open; the transcript already holds it.
+			if (
+				update.type === "user_message_chunk" &&
+				sendPromiseRef.current !== null
+			) {
+				return;
+			}
 			pendingUpdatesRef.current.push(update);
 			if (!flushScheduledRef.current) {
 				flushScheduledRef.current = true;
@@ -390,13 +399,16 @@ export function useAgentMessages(
 	}, [settingsAccess]);
 
 	const dispatchMessage = useCallback(
-		async (content: string, options: SendMessageOptions): Promise<void> => {
+		async (
+			content: string,
+			options: SendMessageOptions,
+		): Promise<"settled" | "prepare_failed"> => {
 			if (!session.sessionId) {
 				setErrorInfo({
 					title: "Cannot Send Message",
 					message: "No active session. Please wait for connection.",
 				});
-				return;
+				return "settled";
 			}
 
 			dispatchInProgressRef.current = true;
@@ -529,6 +541,7 @@ export function useAgentMessages(
 
 				sendPromiseRef.current = sendPromise;
 				await sendPromise;
+				return "settled";
 			} catch (error) {
 				if (generationRef.current === generation) {
 					setSending(false);
@@ -538,6 +551,7 @@ export function useAgentMessages(
 						message: `Failed to prepare message: ${extractErrorMessage(error)}`,
 					});
 				}
+				return "prepare_failed";
 			} finally {
 				sendPromiseRef.current = null;
 				dispatchInProgressRef.current = false;
@@ -610,10 +624,22 @@ export function useAgentMessages(
 			queuedPromptJobsRef.current,
 			session.sessionId,
 		);
+		if (!job) return;
 		queuedPromptJobsRef.current = remaining;
 		setQueuedPrompts(remaining.map((queuedJob) => queuedJob.prompt));
-		if (!job) return;
-		void dispatchMessage(job.prompt.content, job.options);
+		void dispatchMessage(job.prompt.content, job.options).then((result) => {
+			if (result !== "prepare_failed") return;
+			queuedPromptJobsRef.current = requeueItemAtFront(
+				queuedPromptJobsRef.current,
+				job,
+			);
+			setQueuedPrompts(
+				queuedPromptJobsRef.current.map(
+					(queuedJob) => queuedJob.prompt,
+				),
+			);
+			setQueuePaused(true);
+		});
 	}, [
 		dispatchMessage,
 		isQueuePaused,
@@ -621,6 +647,7 @@ export function useAgentMessages(
 		queuedPrompts.length,
 		queueDrainVersion,
 		session.sessionId,
+		setQueuePaused,
 	]);
 
 	// ============================================================

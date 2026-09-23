@@ -1,15 +1,23 @@
 import type { AttachedFile, QueuedPrompt } from "../types/chat";
 
-/** Drop work from other sessions and take the next item for this session. */
+/** Take the next item for a session without disturbing any other queued work. */
 export function takeNextQueueItemForSession<T extends { sessionId: string }>(
 	queue: T[],
 	sessionId: string,
 ): { item: T | null; remaining: T[] } {
-	const matching = queue.filter((item) => item.sessionId === sessionId);
+	const index = queue.findIndex((item) => item.sessionId === sessionId);
+	if (index === -1) {
+		return { item: null, remaining: queue };
+	}
 	return {
-		item: matching[0] ?? null,
-		remaining: matching.slice(1),
+		item: queue[index],
+		remaining: [...queue.slice(0, index), ...queue.slice(index + 1)],
 	};
+}
+
+/** Restore a failed queue item ahead of work that has not been attempted. */
+export function requeueItemAtFront<T>(queue: T[], item: T): T[] {
+	return [item, ...queue];
 }
 
 /** Create an isolated queued-prompt snapshot for later dispatch. */

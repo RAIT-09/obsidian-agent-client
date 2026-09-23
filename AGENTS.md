@@ -1,7 +1,7 @@
 # Agent Client Plugin - LLM Developer Guide
 
 ## Overview
-Obsidian plugin for AI agent interaction (Claude Code, Codex, Gemini CLI, Mistral Vibe, OpenCode, Kiro, Hermes Agent, custom agents) via ACP.
+Obsidian plugin for AI agent interaction (Claude Code, Codex, Gemini CLI, Mistral Vibe, OpenCode, Kiro, Hermes Agent, Pi, Grok Build, custom agents) via ACP.
 
 **Tech**: React 19, TypeScript, Obsidian API, Agent Client Protocol (ACP)
 
@@ -132,6 +132,7 @@ FloatingChatView uses `onRegisterExpanded` callback (not CustomEvent) for expand
 - RAF batching: streaming updates accumulated per-frame via `requestAnimationFrame`
 - Tool call index: `Map<string, number>` for O(1) upsert
 - `ignoreUpdatesRef`: suppresses history replay during session/load
+- `sendPromiseRef`: serializes sends and gates out `user_message_chunk` echoes while the prompt RPC is open
 - Permission: `activePermission` (useMemo derivation), approve/reject callbacks
 
 **useSuggestions**: @mention + /command (unified)
@@ -337,6 +338,8 @@ interface ISettingsAccess {
 - OpenCode: `opencode-ai` (CLI-managed auth, no API key env)
 - Kiro: `kiro-cli` install script (KIRO_API_KEY, optional)
 - Hermes Agent: install script (CLI-managed auth, no API key env)
+- Pi: `pi-acp` npm package (requires `pi` CLI; CLI-managed auth, no API key env)
+- Grok Build: `grok` install script (XAI_API_KEY, optional)
 - Custom: Any ACP-compatible agent
 
 ---

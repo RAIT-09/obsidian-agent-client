@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	createQueuedPrompt,
+	requeueItemAtFront,
 	removeQueuedPromptItem,
 	takeNextQueueItemForSession,
 	updateQueuedPromptItem,
@@ -16,7 +17,7 @@ const attachment: AttachedFile = {
 };
 
 describe("message queue transforms", () => {
-	it("never takes queued work from another session", () => {
+	it("takes matching work without removing another session's jobs", () => {
 		const queue = [
 			{ sessionId: "session-a", value: "from-a" },
 			{ sessionId: "session-b", value: "from-b" },
@@ -28,7 +29,28 @@ describe("message queue transforms", () => {
 			sessionId: "session-b",
 			value: "from-b",
 		});
-		expect(result.remaining).toEqual([]);
+		expect(result.remaining).toEqual([
+			{ sessionId: "session-a", value: "from-a" },
+		]);
+	});
+
+	it("leaves the queue untouched when the session has no matching job", () => {
+		const queue = [{ sessionId: "session-a", value: "from-a" }];
+
+		const result = takeNextQueueItemForSession(queue, "session-b");
+
+		expect(result.item).toBeNull();
+		expect(result.remaining).toBe(queue);
+	});
+
+	it("restores a failed job at the front of the queue", () => {
+		const failed = { sessionId: "session-a", value: "failed" };
+		const waiting = { sessionId: "session-a", value: "waiting" };
+
+		expect(requeueItemAtFront([waiting], failed)).toEqual([
+			failed,
+			waiting,
+		]);
 	});
 
 	it("creates an isolated prompt with the supplied fields", () => {
