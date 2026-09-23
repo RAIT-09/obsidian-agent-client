@@ -8,6 +8,13 @@ export {};
  * to be removed without notice.
  */
 declare module "obsidian" {
+	interface App {
+		/** Current Obsidian-native drag item (private runtime API). */
+		dragManager?: {
+			draggable?: unknown;
+		};
+	}
+
 	interface Vault {
 		getConfig(key: string): unknown;
 	}
