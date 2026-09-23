@@ -53,7 +53,19 @@ export const ConversationTurnNavigator = React.memo(
 
 			const handleWheel = (event: WheelEvent) => {
 				event.preventDefault();
-				onWheel(event.deltaY);
+				const lineHeight =
+					Number.parseFloat(
+						window.getComputedStyle(navigator).lineHeight,
+					) || 16;
+				const pageHeight =
+					navigator.parentElement?.clientHeight || window.innerHeight;
+				const deltaY =
+					event.deltaMode === WheelEvent.DOM_DELTA_LINE
+						? event.deltaY * lineHeight
+						: event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+							? event.deltaY * pageHeight
+							: event.deltaY;
+				onWheel(deltaY);
 			};
 
 			navigator.addEventListener("wheel", handleWheel, {
