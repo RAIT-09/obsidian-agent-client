@@ -18,6 +18,7 @@ export const ConversationTurnNavigator = React.memo(
 		const [isInteracting, setIsInteracting] = React.useState(false);
 		const collapseTimerRef = React.useRef<number | null>(null);
 		const previewIdPrefix = React.useId();
+		const navigatorRef = React.useRef<HTMLElement>(null);
 
 		const activate = React.useCallback(() => {
 			if (collapseTimerRef.current !== null) {
@@ -46,8 +47,24 @@ export const ConversationTurnNavigator = React.memo(
 			[],
 		);
 
+		React.useEffect(() => {
+			const navigator = navigatorRef.current;
+			if (!navigator) return;
+
+			const handleWheel = (event: WheelEvent) => {
+				event.preventDefault();
+				onWheel(event.deltaY);
+			};
+
+			navigator.addEventListener("wheel", handleWheel, {
+				passive: false,
+			});
+			return () => navigator.removeEventListener("wheel", handleWheel);
+		}, [onWheel]);
+
 		return (
 			<nav
+				ref={navigatorRef}
 				className={`agent-client-turn-navigator ${isInteracting ? "agent-client-is-interacting" : ""}`}
 				aria-label="Conversation turns"
 				onMouseLeave={scheduleCollapse}
@@ -56,10 +73,6 @@ export const ConversationTurnNavigator = React.memo(
 					if (!event.currentTarget.contains(event.relatedTarget)) {
 						scheduleCollapse();
 					}
-				}}
-				onWheel={(event) => {
-					event.preventDefault();
-					onWheel(event.deltaY);
 				}}
 			>
 				{items.map((item, index) => {
@@ -73,12 +86,10 @@ export const ConversationTurnNavigator = React.memo(
 								index === activeIndex ? "step" : undefined
 							}
 							aria-describedby={previewId}
+							aria-label={`Go to turn ${index + 1}: ${item.question}`}
 							onClick={() => onNavigate(item, index)}
 							onMouseEnter={activate}
 						>
-							<span className="agent-client-turn-navigator-label">
-								Go to turn {index + 1}: {item.question}
-							</span>
 							<span
 								className="agent-client-turn-navigator-line"
 								aria-hidden="true"
@@ -86,7 +97,6 @@ export const ConversationTurnNavigator = React.memo(
 							<span
 								id={previewId}
 								className="agent-client-turn-navigator-preview"
-								role="tooltip"
 							>
 								<span className="agent-client-turn-navigator-question">
 									{item.question}

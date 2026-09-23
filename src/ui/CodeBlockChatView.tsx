@@ -278,6 +278,10 @@ export class EmbeddedChatViewContainer implements IChatViewContainer {
 
 	collapse(): void {}
 
+	isExpanded(): boolean {
+		return true;
+	}
+
 	// Owned by the host note's code block (MarkdownRenderChild); cannot be
 	// closed from the session list.
 	closeContainer(): void {}

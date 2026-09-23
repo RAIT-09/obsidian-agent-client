@@ -107,4 +107,9 @@ describe("active conversation navigation selection", () => {
 			2,
 		);
 	});
+
+	it("handles empty navigation items and positions", () => {
+		expect(selectActiveNavigationIndex([], positions, 120, false)).toBe(-1);
+		expect(selectActiveNavigationIndex(items, [], 120, false)).toBe(0);
+	});
 });

@@ -4,7 +4,6 @@ const { useRef, useState, useEffect, useCallback, useMemo } = React;
 import type { ChatMessage } from "../types/chat";
 import type { AcpClient } from "../acp/acp-client";
 import type AgentClientPlugin from "../plugin";
-import type { IChatViewHost } from "./view-host";
 import { setIcon } from "obsidian";
 import { MessageBubble } from "./MessageBubble";
 import { ConversationTurnNavigator } from "./ConversationTurnNavigator";
@@ -12,6 +11,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	getConversationNavigationItems,
 	selectActiveNavigationIndex,
+	type ConversationNavigationItem,
 } from "../services/conversation-navigation";
 
 // How long (ms) after a tab is re-shown we refuse to shrink measured item
@@ -20,6 +20,7 @@ import {
 // total size, which clamps scrollTop to 0 and loses the position. Riding out
 // this window keeps total stable so the scroll position is preserved. (#321)
 const SHOW_SETTLE_MS = 500;
+const MIN_TURNS_FOR_NAVIGATOR = 3;
 
 /**
  * Props for MessageList component
@@ -37,15 +38,12 @@ export interface MessageListProps {
 	agentLabel: string;
 	/** Plugin instance */
 	plugin: AgentClientPlugin;
-	/** View instance for event registration */
-	view: IChatViewHost;
 	/** Terminal client for output polling */
 	terminalClient?: AcpClient;
-	/** Callback to approve a permission request */
-	onApprovePermission?: (
-		requestId: string,
-		optionId: string,
-	) => Promise<void>;
+	/** Tool call ids whose bodies are expanded */
+	expandedToolCalls: ReadonlySet<string>;
+	/** Toggle a tool call body */
+	onToggleToolCall: (toolCallId: string) => void;
 	/** Whether a permission request is currently pending */
 	hasActivePermission: boolean;
 }
@@ -69,19 +67,25 @@ export function MessageList({
 	isRestoringSession,
 	agentLabel,
 	plugin,
-	view,
 	terminalClient,
-	onApprovePermission,
+	expandedToolCalls,
+	onToggleToolCall,
 	hasActivePermission,
 }: MessageListProps) {
-	const containerRef = useRef<HTMLDivElement>(null);
+	const containerRef = useRef<HTMLDivElement | null>(null);
+	const [scrollContainer, setScrollContainer] =
+		useState<HTMLDivElement | null>(null);
+	const setContainerRef = useCallback((node: HTMLDivElement | null) => {
+		containerRef.current = node;
+		setScrollContainer(node);
+	}, []);
 	const navigationItems = useMemo(
 		() => getConversationNavigationItems(messages),
 		[messages],
 	);
 	const navigationItemsRef = useRef(navigationItems);
 	navigationItemsRef.current = navigationItems;
-	const showTurnNavigator = navigationItems.length >= 3;
+	const showTurnNavigator = navigationItems.length >= MIN_TURNS_FOR_NAVIGATOR;
 	const [isAtBottom, setIsAtBottom] = useState(true);
 	const [activeNavigationIndex, setActiveNavigationIndex] = useState(0);
 	const isAtBottomRef = useRef(true);
@@ -242,20 +246,23 @@ export function MessageList({
 
 	// Set up scroll event listener for isAtBottom detection
 	useEffect(() => {
-		const container = containerRef.current;
-		if (!container) return;
+		if (!scrollContainer) return;
 
 		const handleScroll = () => {
 			const isNearBottom = checkIfAtBottom();
 			updateActiveNavigation(isNearBottom);
 		};
 
-		view.registerDomEvent(container, "scroll", handleScroll);
+		scrollContainer.addEventListener("scroll", handleScroll);
 
 		// Initial check
 		const isNearBottom = checkIfAtBottom();
 		updateActiveNavigation(isNearBottom);
-	}, [view, checkIfAtBottom, updateActiveNavigation]);
+
+		return () => {
+			scrollContainer.removeEventListener("scroll", handleScroll);
+		};
+	}, [scrollContainer, checkIfAtBottom, updateActiveNavigation]);
 
 	useEffect(() => {
 		const frame = window.requestAnimationFrame(() => {
@@ -264,6 +271,21 @@ export function MessageList({
 		return () => window.cancelAnimationFrame(frame);
 	}, [navigationItems, updateActiveNavigation]);
 
+	const handleNavigate = useCallback(
+		(item: ConversationNavigationItem, index: number) => {
+			setActiveNavigationIndex(index);
+			virtualizer.scrollToIndex(item.messageIndex, {
+				align: "start",
+				behavior: "smooth",
+			});
+		},
+		[virtualizer],
+	);
+
+	const handleNavigatorWheel = useCallback((deltaY: number) => {
+		containerRef.current?.scrollBy({ top: deltaY });
+	}, []);
+
 	// ============================================================
 	// Render
 	// ============================================================
@@ -271,7 +293,10 @@ export function MessageList({
 	// Empty state
 	if (messages.length === 0) {
 		return (
-			<div ref={containerRef} className="agent-client-chat-view-messages">
+			<div
+				ref={setContainerRef}
+				className="agent-client-chat-view-messages"
+			>
 				<div className="agent-client-chat-empty-state">
 					{isRestoringSession
 						? "Restoring session..."
@@ -288,7 +313,7 @@ export function MessageList({
 	return (
 		<div className="agent-client-message-list-shell">
 			<div
-				ref={containerRef}
+				ref={setContainerRef}
 				className={`agent-client-chat-view-messages ${
 					showTurnNavigator ? "agent-client-has-turn-navigator" : ""
 				}`}
@@ -322,7 +347,8 @@ export function MessageList({
 									message={message}
 									plugin={plugin}
 									terminalClient={terminalClient}
-									onApprovePermission={onApprovePermission}
+									expandedToolCalls={expandedToolCalls}
+									onToggleToolCall={onToggleToolCall}
 								/>
 							</div>
 						);
@@ -372,16 +398,8 @@ export function MessageList({
 				<ConversationTurnNavigator
 					items={navigationItems}
 					activeIndex={activeNavigationIndex}
-					onNavigate={(item, index) => {
-						setActiveNavigationIndex(index);
-						virtualizer.scrollToIndex(item.messageIndex, {
-							align: "start",
-							behavior: "smooth",
-						});
-					}}
-					onWheel={(deltaY) => {
-						containerRef.current?.scrollBy({ top: deltaY });
-					}}
+					onNavigate={handleNavigate}
+					onWheel={handleNavigatorWheel}
 				/>
 			)}
 		</div>

@@ -579,10 +579,28 @@ export function prepareShellCommand(
 			commandString = command;
 		}
 
-		// Prepend PATH export if nodeDir is provided
+		// Prepend PATH exports: nodeDir (plugin setting) and, for absolute
+		// command paths, the command's own directory. Wrapper agents
+		// (e.g. pi-acp spawning `pi`) resolve sibling executables via PATH,
+		// and non-interactive login shells may not include that directory
+		// (npm-global bin, ~/.local/bin, ...).
+		const pathDirs: string[] = [];
 		if (options.nodeDir) {
-			const escapedNodeDir = options.nodeDir.replace(/'/g, "'\\''");
-			commandString = `export PATH='${escapedNodeDir}':"$PATH"; ${commandString}`;
+			pathDirs.push(options.nodeDir);
+		}
+		if (command.startsWith("/")) {
+			const lastSlash = command.lastIndexOf("/");
+			const commandDir =
+				lastSlash === 0 ? "/" : command.slice(0, lastSlash);
+			if (!pathDirs.includes(commandDir)) {
+				pathDirs.push(commandDir);
+			}
+		}
+		if (pathDirs.length > 0) {
+			const escapedDirs = pathDirs
+				.map((dir) => dir.replace(/'/g, "'\\''"))
+				.join(":");
+			commandString = `export PATH='${escapedDirs}':"$PATH"; ${commandString}`;
 		}
 
 		return {
