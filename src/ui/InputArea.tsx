@@ -30,6 +30,7 @@ import {
 	deduplicateAttachments,
 	extractVaultPathsFromInternalDrag,
 	extractVaultPathsFromObsidianUris,
+	hasSupportedVaultDragPayload,
 } from "../utils/vault-drag";
 
 // ============================================================================
@@ -613,14 +614,13 @@ export function InputArea({
 	 */
 	const handleDragOver = useCallback(
 		(e: React.DragEvent) => {
-			if (
-				getInternalDragPaths().length > 0 ||
-				e.dataTransfer?.types.includes("Files") ||
-				e.dataTransfer?.types.includes("text/uri-list")
-			) {
-				e.preventDefault();
-				if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-			}
+			const hasSupportedPayload = hasSupportedVaultDragPayload(
+				e.dataTransfer?.types,
+				getInternalDragPaths(),
+			);
+			if (!hasSupportedPayload) return;
+			e.preventDefault();
+			if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
 		},
 		[getInternalDragPaths],
 	);
@@ -631,16 +631,15 @@ export function InputArea({
 	 */
 	const handleDragEnter = useCallback(
 		(e: React.DragEvent) => {
-			if (
-				getInternalDragPaths().length > 0 ||
-				e.dataTransfer?.types.includes("Files") ||
-				e.dataTransfer?.types.includes("text/uri-list")
-			) {
-				e.preventDefault();
-				dragCounterRef.current++;
-				if (dragCounterRef.current === 1) {
-					setIsDraggingOver(true);
-				}
+			const hasSupportedPayload = hasSupportedVaultDragPayload(
+				e.dataTransfer?.types,
+				getInternalDragPaths(),
+			);
+			if (!hasSupportedPayload) return;
+			e.preventDefault();
+			dragCounterRef.current++;
+			if (dragCounterRef.current === 1) {
+				setIsDraggingOver(true);
 			}
 		},
 		[getInternalDragPaths],

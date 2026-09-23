@@ -3,6 +3,7 @@ import {
 	deduplicateAttachments,
 	extractVaultPathsFromInternalDrag,
 	extractVaultPathsFromObsidianUris,
+	hasSupportedVaultDragPayload,
 } from "../src/utils/vault-drag";
 import type { AttachedFile } from "../src/types/chat";
 
@@ -99,5 +100,15 @@ describe("extractVaultPathsFromObsidianUris", () => {
 				"Vault",
 			),
 		).toEqual([]);
+	});
+});
+
+describe("hasSupportedVaultDragPayload", () => {
+	it("accepts a vault drop that only advertises text/plain", () => {
+		expect(hasSupportedVaultDragPayload(["text/plain"], [])).toBe(true);
+	});
+
+	it("rejects unsupported payload types", () => {
+		expect(hasSupportedVaultDragPayload(["text/html"], [])).toBe(false);
 	});
 });

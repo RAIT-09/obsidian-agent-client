@@ -6,6 +6,8 @@ interface PathLike {
 	path: string;
 }
 
+const SUPPORTED_DRAG_TYPES = ["Files", "text/uri-list", "text/plain"];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
@@ -41,6 +43,17 @@ export function deduplicateAttachments(
 		keys.forEach((key) => existingKeys.add(key));
 		return true;
 	});
+}
+
+/** Whether a drag contains a payload that can resolve to a vault attachment. */
+export function hasSupportedVaultDragPayload(
+	types: readonly string[] | undefined,
+	internalPaths: readonly string[],
+): boolean {
+	return (
+		internalPaths.length > 0 ||
+		SUPPORTED_DRAG_TYPES.some((type) => types?.includes(type))
+	);
 }
 
 /** Extract vault-relative paths from Obsidian's current internal drag item. */
