@@ -138,6 +138,9 @@ export interface AgentClientPluginSettings {
 		includeImages: boolean;
 		imageLocation: "obsidian" | "custom" | "base64";
 		imageCustomFolder: string;
+		includeAudios: boolean;
+		audioLocation: "obsidian" | "custom";
+		audioCustomFolder: string;
 		frontmatterTag: string;
 	};
 	// WSL settings (Windows only)
@@ -164,6 +167,11 @@ export interface AgentClientPluginSettings {
 	lastUsedModes: Record<string, string>;
 	// Last used non-model/mode config options per agent (agentId → {optionId → value})
 	lastUsedConfigOptions: Record<string, Record<string, string>>;
+	// Session history modal filters, remembered across opens (not exposed in the settings tab)
+	sessionHistoryFilters: {
+		currentVaultOnly: boolean;
+		hideNonLocal: boolean;
+	};
 	// Floating chat settings
 	enableFloatingChat: boolean;
 	floatingButtonImage: string;
@@ -202,6 +210,9 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 		includeImages: true,
 		imageLocation: "obsidian",
 		imageCustomFolder: "Agent Client",
+		includeAudios: true,
+		audioLocation: "obsidian",
+		audioCustomFolder: "Agent Client",
 		frontmatterTag: "agent-client",
 	},
 	windowsWslMode: false,
@@ -220,6 +231,7 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	lastUsedModels: {},
 	lastUsedModes: {},
 	lastUsedConfigOptions: {},
+	sessionHistoryFilters: { currentVaultOnly: true, hideNonLocal: false },
 	enableFloatingChat: false,
 	floatingButtonImage: "",
 	floatingWindowSize: { width: 400, height: 500 },
@@ -396,6 +408,18 @@ export default class AgentClientPlugin extends Plugin {
 				if (!(focused && focused.viewType === "floating")) return false;
 				if (checking) return true;
 				this.closeFloatingChat(focused.viewId);
+			},
+		});
+
+		this.addCommand({
+			id: "toggle-all-floating-chat-views",
+			name: "Toggle all floating chat views",
+			checkCallback: (checking) => {
+				if (!this.settings.enableFloatingChat) return false;
+				if (this.viewRegistry.getByType("floating").length === 0)
+					return false;
+				if (checking) return true;
+				this.toggleAllFloatingChats();
 			},
 		});
 
@@ -854,6 +878,35 @@ export default class AgentClientPlugin extends Plugin {
 		const view = this.viewRegistry.get(viewId);
 		if (view) {
 			view.expand();
+		}
+	}
+
+	/**
+	 * Minimize every floating chat window. Sessions are preserved.
+	 */
+	collapseAllFloatingChats(): void {
+		this.viewRegistry.toType("floating", (view) => view.collapse());
+	}
+
+	/**
+	 * Expand every floating chat window.
+	 */
+	expandAllFloatingChats(): void {
+		this.viewRegistry.toType("floating", (view) => view.expand());
+	}
+
+	/**
+	 * Toggle all floating chat windows at once: minimize all while any is
+	 * expanded, otherwise expand all. Never creates or closes a window.
+	 */
+	toggleAllFloatingChats(): void {
+		const anyExpanded = this.viewRegistry
+			.getByType("floating")
+			.some((view) => view.isExpanded());
+		if (anyExpanded) {
+			this.collapseAllFloatingChats();
+		} else {
+			this.expandAllFloatingChats();
 		}
 	}
 
@@ -1487,6 +1540,19 @@ export default class AgentClientPlugin extends Plugin {
 					re.imageCustomFolder,
 					D.exportSettings.imageCustomFolder,
 				),
+				includeAudios: bool(
+					re.includeAudios,
+					D.exportSettings.includeAudios,
+				),
+				audioLocation: enumVal(
+					re.audioLocation,
+					["obsidian", "custom"],
+					D.exportSettings.audioLocation,
+				),
+				audioCustomFolder: str(
+					re.audioCustomFolder,
+					D.exportSettings.audioCustomFolder,
+				),
 				frontmatterTag: str(
 					re.frontmatterTag,
 					D.exportSettings.frontmatterTag,
@@ -1536,6 +1602,19 @@ export default class AgentClientPlugin extends Plugin {
 			lastUsedModels: strRecord(raw.lastUsedModels),
 			lastUsedModes: strRecord(raw.lastUsedModes),
 			lastUsedConfigOptions: nestedStrRecord(raw.lastUsedConfigOptions),
+			sessionHistoryFilters: (() => {
+				const rf = obj(raw.sessionHistoryFilters) ?? {};
+				return {
+					currentVaultOnly: bool(
+						rf.currentVaultOnly,
+						D.sessionHistoryFilters.currentVaultOnly,
+					),
+					hideNonLocal: bool(
+						rf.hideNonLocal,
+						D.sessionHistoryFilters.hideNonLocal,
+					),
+				};
+			})(),
 			// Migration: enableFloatingChat ← showFloatingButton (old name)
 			enableFloatingChat: bool(
 				raw.enableFloatingChat,
