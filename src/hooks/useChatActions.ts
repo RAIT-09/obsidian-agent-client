@@ -188,6 +188,7 @@ export function useChatActions(
 				resourceLinks:
 					resourceLinks.length > 0 ? resourceLinks : undefined,
 				isFirstMessage,
+				attachments: attachments ? [...attachments] : undefined,
 			});
 
 			// Save session metadata locally on first message
