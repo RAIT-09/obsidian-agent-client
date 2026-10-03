@@ -6,6 +6,7 @@ import type { AttachedFile } from "../../types/chat";
 interface AttachmentStripProps {
 	files: AttachedFile[];
 	onRemove: (id: string) => void;
+	onOpen?: (file: AttachedFile) => void;
 }
 
 /** Remove button with a stable ref so setIcon runs once on mount. */
@@ -38,10 +39,7 @@ function FileIcon() {
 		if (ref.current) setIcon(ref.current, "file");
 	}, []);
 	return (
-		<span
-			ref={ref}
-			className="agent-client-attachment-preview-file-icon"
-		/>
+		<span ref={ref} className="agent-client-attachment-preview-file-icon" />
 	);
 }
 
@@ -50,7 +48,11 @@ function FileIcon() {
  * - Images: show thumbnail
  * - Files: show file icon with filename
  */
-export function AttachmentStrip({ files, onRemove }: AttachmentStripProps) {
+export function AttachmentStrip({
+	files,
+	onRemove,
+	onOpen,
+}: AttachmentStripProps) {
 	if (files.length === 0) return null;
 
 	return (
@@ -59,6 +61,7 @@ export function AttachmentStrip({ files, onRemove }: AttachmentStripProps) {
 				<div
 					key={file.id}
 					className="agent-client-attachment-preview-item"
+					title={file.vaultPath ?? file.path ?? file.name}
 				>
 					{file.kind === "image" && file.data ? (
 						<img
@@ -67,12 +70,27 @@ export function AttachmentStrip({ files, onRemove }: AttachmentStripProps) {
 							className="agent-client-attachment-preview-thumbnail"
 						/>
 					) : (
-						<div className="agent-client-attachment-preview-file">
+						<button
+							type="button"
+							className="agent-client-attachment-preview-file"
+							onClick={() => onOpen?.(file)}
+							disabled={!file.vaultPath || !onOpen}
+						>
 							<FileIcon />
-							<span className="agent-client-attachment-preview-file-name">
-								{file.name ?? "file"}
+							<span className="agent-client-attachment-preview-file-labels">
+								<span className="agent-client-attachment-preview-file-name">
+									{file.name ?? "file"}
+								</span>
+								{file.vaultPath?.includes("/") && (
+									<span className="agent-client-attachment-preview-file-path">
+										{file.vaultPath.slice(
+											0,
+											file.vaultPath.lastIndexOf("/"),
+										)}
+									</span>
+								)}
 							</span>
-						</div>
+						</button>
 					)}
 					<RemoveButton fileId={file.id} onRemove={onRemove} />
 				</div>
