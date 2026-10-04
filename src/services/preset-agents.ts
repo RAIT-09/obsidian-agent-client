@@ -306,7 +306,7 @@ export const PRESET_AGENTS: readonly PresetAgentDefinition[] = [
 		installHint: {
 			default: "curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash",
 			nativeWindows:
-				'powershell -ep Bypass \'irm -Uri "https://bob.ibm.com/download/bobshell.ps1" | iex\'',
+				'powershell -ep Bypass -Command \'irm -Uri "https://bob.ibm.com/download/bobshell.ps1" | iex\'',
 		},
 		settingsCopy: {
 			pathDesc:
