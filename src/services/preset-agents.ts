@@ -304,7 +304,9 @@ export const PRESET_AGENTS: readonly PresetAgentDefinition[] = [
 				"IBM Bob API key. Select from Obsidian's Keychain or create a new secret.",
 		},
 		installHint: {
-			default: "bob --version",
+			default: "curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash",
+			nativeWindows:
+				'powershell -ep Bypass \'irm -Uri "https://bob.ibm.com/download/bobshell.ps1" | iex\'',
 		},
 		settingsCopy: {
 			pathDesc:
