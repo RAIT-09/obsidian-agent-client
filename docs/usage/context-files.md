@@ -25,6 +25,7 @@ Each agent uses its own context file:
 | Hermes Agent | `AGENTS.md` (falls back to `CLAUDE.md`) |
 | Pi | `AGENTS.md` |
 | Grok Build | `AGENTS.md` (also `CLAUDE.md`) |
+| IBM Bob | `AGENTS.md` |
 
 Place the context file in your **vault root** to have the agent read it automatically.
 
