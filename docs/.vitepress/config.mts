@@ -65,6 +65,7 @@ export default defineConfig({
           { text: "Hermes Agent", link: "/agent-setup/hermes" },
           { text: "Pi", link: "/agent-setup/pi" },
           { text: "Grok Build", link: "/agent-setup/grok-build" },
+          { text: "IBM Bob", link: "/agent-setup/bob" },
           { text: "Custom Agents", link: "/agent-setup/custom-agents" },
         ],
       },

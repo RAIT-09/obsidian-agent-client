@@ -293,6 +293,28 @@ export const PRESET_AGENTS: readonly PresetAgentDefinition[] = [
 		},
 		docsPage: "grok-build",
 	},
+	{
+		presetId: "bob-acp",
+		defaultDisplayName: "IBM Bob",
+		defaultCommand: "bob",
+		defaultArgs: ["acp"],
+		apiKey: {
+			envVarName: "BOBSHELL_API_KEY",
+			settingDesc:
+				"IBM Bob API key. Select from Obsidian's Keychain or create a new secret.",
+		},
+		installHint: {
+			default: "curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash",
+			nativeWindows:
+				'powershell -ep Bypass -Command \'irm -Uri "https://bob.ibm.com/download/bobshell.ps1" | iex\'',
+		},
+		settingsCopy: {
+			pathDesc:
+				'Command name or path to bob. Use just "bob" to let the login shell resolve it, or enter an absolute path.',
+			argsDescSuffix: '(The "acp" argument is required to start IBM Bob in ACP mode.)',
+		},
+		docsPage: "bob",
+	},
 ];
 
 /**

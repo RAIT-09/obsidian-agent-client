@@ -340,6 +340,7 @@ interface ISettingsAccess {
 - Hermes Agent: install script (CLI-managed auth, no API key env)
 - Pi: `pi-acp` npm package (requires `pi` CLI; CLI-managed auth, no API key env)
 - Grok Build: `grok` install script (XAI_API_KEY, optional)
+- IBM Bob: `bob` install script (BOBSHELL_API_KEY, optional)
 - Custom: Any ACP-compatible agent
 
 ---
