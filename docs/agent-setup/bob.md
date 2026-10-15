@@ -6,7 +6,7 @@ IBM Bob is IBM's AI coding agent. This page covers how to set it up to work with
 
 Open a terminal (Terminal on macOS/Linux, PowerShell on Windows) and run the following commands.
 
-1. Install IBM Bob by following the [IBM Bob installation guide](https://ibm.com/bob).
+1. Install Bob Shell by following the [IBM Bob installation guide](https://bob.ibm.com/docs/shell/getting-started/install-and-setup).
 
 2. Verify the installation:
 
@@ -35,7 +35,13 @@ where.exe bob
 
 ## Authentication
 
-IBM Bob requires a single API key.
+Bob supports a saved browser login or an API key. An API key is optional if you have already signed in to Bob Shell on this machine. See IBM's [ACP authentication documentation](https://bob.ibm.com/docs/shell/features/acp#authentication).
+
+### Browser Login
+
+1. Open a terminal in your vault directory and run `bob`.
+2. Complete the browser sign-in when prompted.
+3. Exit Bob Shell and connect to IBM Bob from Agent Client. Bob reuses the saved token; leave the plugin's API key field empty.
 
 ### API Key
 
@@ -44,6 +50,12 @@ IBM Bob requires a single API key.
 3. Click **Link...** and enter or create a secret in Obsidian's Keychain.
 
 The API key is injected as the `BOBSHELL_API_KEY` environment variable when the agent starts.
+
+## Workspace Trust
+
+Bob requires a trusted workspace before creating an ACP session, regardless of the authentication method. In a terminal, change to your vault directory, run `bob`, and confirm workspace trust when prompted. Then exit Bob Shell and reconnect from Agent Client. For **New chat in directory**, trust that directory instead.
+
+See IBM's [workspace trust documentation](https://bob.ibm.com/docs/shell/features/acp#workspace-trust).
 
 ## Verify Setup
 
