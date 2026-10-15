@@ -72,7 +72,7 @@ The agent requires authentication before processing requests.
 - Run `grok login` in Terminal first to sign in, or link an API key (used only when no login session is active) in **Settings → Agent Client → Preset agents → Grok Build → API key**. See [Grok Build Setup](/agent-setup/grok-build#authentication).
 
 **For IBM Bob:**
-- Link your IBM Bob API key in **Settings → Agent Client → Preset agents → IBM Bob → API key**. See [IBM Bob Setup](/agent-setup/bob#authentication).
+- Run `bob` in your vault directory and complete browser sign-in, or link an API key in **Settings → Agent Client → Preset agents → IBM Bob → API key**. Also confirm workspace trust in Bob Shell before connecting. See [IBM Bob Setup](/agent-setup/bob#authentication).
 
 ### "No Authentication Methods" error
 
