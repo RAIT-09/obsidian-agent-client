@@ -1,6 +1,12 @@
 import * as React from "react";
 const { useRef, useState, useEffect, useCallback, useMemo } = React;
-import { setIcon, Notice } from "obsidian";
+import {
+	setIcon,
+	Notice,
+	FileSystemAdapter,
+	arrayBufferToBase64,
+} from "obsidian";
+import type { TFile } from "obsidian";
 
 import type AgentClientPlugin from "../plugin";
 import type { IChatViewHost } from "./view-host";
@@ -23,6 +29,8 @@ import { PermissionDialog } from "./PermissionDialog";
 import { AttachmentStrip } from "./shared/AttachmentStrip";
 import { InputToolbar } from "./InputToolbar";
 import { getLogger } from "../utils/logger";
+import { insertMentions } from "../utils/mention-parser";
+import { getVaultDragFiles, mimeTypeFromExtension } from "../utils/vault-drag";
 import type { ErrorInfo } from "../types/errors";
 import type { AgentUpdateNotification } from "../services/update-checker";
 import { useSettings } from "../hooks/useSettings";
@@ -530,43 +538,167 @@ export function InputArea({
 	);
 
 	/**
+	 * Convert vault files (from an Obsidian-internal drag) to AttachedFile
+	 * objects. Mirrors the OS-file path: images are embedded as Base64 if the
+	 * agent supports it, everything else (PDF, CSV, ...) becomes a
+	 * resource_link to the file's absolute path.
+	 */
+	const convertVaultFilesToAttachments = useCallback(
+		async (files: TFile[]): Promise<AttachedFile[]> => {
+			if (files.length === 0) return [];
+			const { vault } = plugin.app;
+			const adapter = vault.adapter;
+			if (!(adapter instanceof FileSystemAdapter)) {
+				new Notice("[Agent Client] Could not determine file path");
+				return [];
+			}
+
+			const result: AttachedFile[] = [];
+			for (const file of files) {
+				const mimeType = mimeTypeFromExtension(file.extension);
+				const isImage = SUPPORTED_IMAGE_TYPES.includes(
+					mimeType as SupportedImageType,
+				);
+				if (isImage && supportsImages) {
+					if (file.stat.size > MAX_IMAGE_SIZE_BYTES) {
+						new Notice(
+							`[Agent Client] Image too large (max ${MAX_IMAGE_SIZE_MB}MB)`,
+						);
+						continue;
+					}
+					try {
+						const data = arrayBufferToBase64(
+							await vault.readBinary(file),
+						);
+						result.push({
+							id: crypto.randomUUID(),
+							kind: "image",
+							data,
+							mimeType,
+						});
+					} catch (error) {
+						getLogger().error("Failed to read vault image:", error);
+						new Notice("[Agent Client] Failed to attach image");
+					}
+					continue;
+				}
+				result.push({
+					id: crypto.randomUUID(),
+					kind: "file",
+					mimeType,
+					name: file.name,
+					path: adapter.getFullPath(file.path),
+					size: file.stat.size,
+				});
+			}
+			return result;
+		},
+		[plugin, supportsImages],
+	);
+
+	/**
+	 * Common logic for setting cursor position after text replacement.
+	 * The cursor goes to the end of the text unless `cursorPos` is given.
+	 */
+	const setTextAndFocus = useCallback(
+		(newText: string, cursorPos: number = newText.length) => {
+			onInputChange(newText);
+
+			window.setTimeout(() => {
+				const textarea = textareaRef.current;
+				if (textarea) {
+					textarea.selectionStart = cursorPos;
+					textarea.selectionEnd = cursorPos;
+					textarea.focus();
+				}
+			}, 0);
+		},
+		[onInputChange],
+	);
+
+	/**
+	 * Insert `@[[note]]` mentions for notes dropped onto the input, at the
+	 * textarea's caret.
+	 */
+	const insertNoteMentions = useCallback(
+		(notes: TFile[]) => {
+			if (notes.length === 0) return;
+			const position =
+				textareaRef.current?.selectionEnd ?? inputValue.length;
+			const { newText, newCursorPos } = insertMentions(
+				inputValue,
+				position,
+				notes.map((note) => note.basename),
+			);
+			setTextAndFocus(newText, newCursorPos);
+		},
+		[inputValue, setTextAndFocus],
+	);
+
+	/**
+	 * Whether a drag carries something the input box accepts: OS files
+	 * (Finder/Explorer) or vault files from an Obsidian-internal drag (file
+	 * explorer, search results, links, ...). Evaluated identically on
+	 * enter/over/leave so the highlight counter stays balanced.
+	 */
+	const isAcceptedDrag = useCallback(
+		(e: React.DragEvent): boolean =>
+			(e.dataTransfer?.types.includes("Files") ?? false) ||
+			getVaultDragFiles(plugin.app) !== null,
+		[plugin],
+	);
+
+	/**
 	 * Handle drag over event to allow drop.
 	 */
-	const handleDragOver = useCallback((e: React.DragEvent) => {
-		if (e.dataTransfer?.types.includes("Files")) {
-			e.preventDefault();
-			e.dataTransfer.dropEffect = "copy";
-		}
-	}, []);
+	const handleDragOver = useCallback(
+		(e: React.DragEvent) => {
+			if (isAcceptedDrag(e)) {
+				e.preventDefault();
+				e.dataTransfer.dropEffect = "copy";
+			}
+		},
+		[isAcceptedDrag],
+	);
 
 	/**
 	 * Handle drag enter event for visual feedback.
 	 * Uses counter to handle child element enter/leave correctly.
 	 */
-	const handleDragEnter = useCallback((e: React.DragEvent) => {
-		if (e.dataTransfer?.types.includes("Files")) {
-			e.preventDefault();
-			dragCounterRef.current++;
-			if (dragCounterRef.current === 1) {
-				setIsDraggingOver(true);
+	const handleDragEnter = useCallback(
+		(e: React.DragEvent) => {
+			if (isAcceptedDrag(e)) {
+				e.preventDefault();
+				dragCounterRef.current++;
+				if (dragCounterRef.current === 1) {
+					setIsDraggingOver(true);
+				}
 			}
-		}
-	}, []);
+		},
+		[isAcceptedDrag],
+	);
 
 	/**
 	 * Handle drag leave event to reset visual feedback.
 	 */
-	const handleDragLeave = useCallback((_e: React.DragEvent) => {
-		dragCounterRef.current--;
-		if (dragCounterRef.current === 0) {
-			setIsDraggingOver(false);
-		}
-	}, []);
+	const handleDragLeave = useCallback(
+		(e: React.DragEvent) => {
+			// Only drags counted on enter are uncounted here; otherwise text
+			// drags would drive the counter negative and break the highlight.
+			if (!isAcceptedDrag(e)) return;
+			dragCounterRef.current--;
+			if (dragCounterRef.current === 0) {
+				setIsDraggingOver(false);
+			}
+		},
+		[isAcceptedDrag],
+	);
 
 	/**
 	 * Handle drop event for file attachments.
 	 * Images are embedded as Base64 if agent supports it, otherwise sent as resource_link.
 	 * Non-image files are always sent as resource_link.
+	 * Markdown notes dragged from inside Obsidian become `@[[note]]` mentions.
 	 */
 	const handleDrop = useCallback(
 		async (e: React.DragEvent) => {
@@ -574,7 +706,25 @@ export function InputArea({
 			setIsDraggingOver(false);
 
 			const files = e.dataTransfer?.files;
-			if (!files || files.length === 0) return;
+			if (!files || files.length === 0) {
+				// Obsidian-internal drag: dataTransfer only carries
+				// obsidian:// URLs, so take the TFiles from the drag manager.
+				const vaultDrag = getVaultDragFiles(plugin.app);
+				if (!vaultDrag) return;
+
+				// Synchronously, before any await: stops the textarea from
+				// inserting the URL and Obsidian's own leaf drop handling.
+				e.preventDefault();
+
+				insertNoteMentions(vaultDrag.notes);
+				if (vaultDrag.skippedCount > 0) {
+					new Notice("[Agent Client] Folders cannot be attached");
+				}
+				addAttachments(
+					await convertVaultFilesToAttachments(vaultDrag.files),
+				);
+				return;
+			}
 
 			e.preventDefault();
 
@@ -618,32 +768,14 @@ export function InputArea({
 			addAttachments(newAttachments);
 		},
 		[
+			plugin,
 			supportsImages,
 			convertImagesToAttachments,
 			convertFilesToAttachments,
+			convertVaultFilesToAttachments,
+			insertNoteMentions,
 			addAttachments,
 		],
-	);
-
-	/**
-	 * Common logic for setting cursor position after text replacement.
-	 */
-	const setTextAndFocus = useCallback(
-		(newText: string) => {
-			onInputChange(newText);
-
-			// Set cursor position to end of text
-			window.setTimeout(() => {
-				const textarea = textareaRef.current;
-				if (textarea) {
-					const cursorPos = newText.length;
-					textarea.selectionStart = cursorPos;
-					textarea.selectionEnd = cursorPos;
-					textarea.focus();
-				}
-			}, 0);
-		},
-		[onInputChange],
 	);
 
 	/**
