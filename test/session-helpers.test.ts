@@ -74,6 +74,14 @@ function makeSettings(
 			"bob-acp": preset("bob-acp", "IBM Bob", "bob", {
 				args: ["acp"],
 			}),
+			"antigravity-cli": preset(
+				"antigravity-cli",
+				"Antigravity CLI",
+				"agy",
+				{
+					args: ["acp"],
+				},
+			),
 		},
 		customAgents: [],
 		defaultAgentId: "",
@@ -97,6 +105,7 @@ describe("getAvailableAgentsFromSettings", () => {
 			{ id: "pi-acp", displayName: "Pi" },
 			{ id: "grok-build", displayName: "Grok Build" },
 			{ id: "bob-acp", displayName: "IBM Bob" },
+			{ id: "antigravity-cli", displayName: "Antigravity CLI" },
 			{ id: "my-custom", displayName: "My Custom" },
 		]);
 	});
@@ -132,6 +141,7 @@ describe("getAvailableAgentsFromSettings", () => {
 			"pi-acp",
 			"grok-build",
 			"bob-acp",
+			"antigravity-cli",
 			"my-custom",
 		]);
 	});
@@ -156,6 +166,7 @@ describe("getAllAgentsFromSettings", () => {
 			{ id: "pi-acp", displayName: "Pi" },
 			{ id: "grok-build", displayName: "Grok Build" },
 			{ id: "bob-acp", displayName: "IBM Bob" },
+			{ id: "antigravity-cli", displayName: "Antigravity CLI" },
 			{ id: "off-custom", displayName: "Off Custom" },
 		]);
 	});
@@ -270,6 +281,7 @@ describe("buildAgentConfigWithApiKey", () => {
 		["kiro-cli", "KIRO_API_KEY"],
 		["grok-build", "XAI_API_KEY"],
 		["bob-acp", "BOBSHELL_API_KEY"],
+		["antigravity-cli", "GEMINI_API_KEY"],
 	])("attaches the %s secret as %s", (agentId, envVarName) => {
 		const agentSettings = preset(agentId, "Name", "cmd", {
 			apiKeySecretId: "my-secret",

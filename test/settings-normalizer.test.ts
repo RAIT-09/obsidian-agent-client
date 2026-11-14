@@ -18,6 +18,36 @@ const noMigration: ApiKeyMigrator = ({ current }) => current;
 const PRESET_IDS = PRESET_AGENTS.map((def) => def.presetId);
 
 describe("normalizePresetAgents", () => {
+	it("adds Antigravity defaults without replacing a configured Gemini preset", () => {
+		const result = normalizePresetAgents(
+			{
+				presetAgents: {
+					"gemini-cli": {
+						command: "/opt/gemini",
+						args: ["--experimental-acp"],
+						apiKeySecretId: "gemini-secret",
+					},
+				},
+			},
+			PRESET_AGENTS,
+			noMigration,
+		);
+		expect(result["antigravity-cli"]).toEqual({
+			id: "antigravity-cli",
+			displayName: "Antigravity CLI",
+			command: "agy",
+			args: ["acp"],
+			apiKeySecretId: "",
+			env: [],
+			enabled: true,
+		});
+		expect(result["gemini-cli"]).toMatchObject({
+			command: "/opt/gemini",
+			args: ["--experimental-acp"],
+			apiKeySecretId: "gemini-secret",
+		});
+	});
+
 	it("migrates the legacy per-agent sub-objects with values preserved", () => {
 		const raw = {
 			claude: {
@@ -237,6 +267,30 @@ describe("ensureUniqueCustomAgentIds with reserved ids", () => {
 });
 
 describe("absorbCustomAgents", () => {
+	it("keeps Antigravity customs separate and suffix-renames a preset-id collision", () => {
+		const configured = {
+			id: "antigravity-cli",
+			displayName: "My Antigravity",
+			command: "/opt/agy",
+			args: ["acp", "--sandbox"],
+			env: [{ key: "EXAMPLE", value: "value" }],
+			enabled: false,
+		};
+		const result = absorbCustomAgents(
+			{ customAgents: [configured] },
+			PRESET_AGENTS,
+		);
+		expect(result.absorbed).toEqual([]);
+		expect(result.presetAgents["antigravity-cli"]).toBeUndefined();
+		const customs = ensureUniqueCustomAgentIds(
+			result.customAgents.map((entry) =>
+				normalizeCustomAgent(entry as Record<string, unknown>),
+			),
+			PRESET_IDS,
+		);
+		expect(customs).toEqual([{ ...configured, id: "antigravity-cli-2" }]);
+	});
+
 	const docsAdvisedCustom = {
 		id: "opencode",
 		displayName: "My OpenCode",
@@ -343,7 +397,11 @@ describe("absorbCustomAgents", () => {
 
 	it("backfills empty absorbed args to the registry default", () => {
 		const result = absorbCustomAgents(
-			{ customAgents: [{ id: "opencode", command: "opencode", args: [] }] },
+			{
+				customAgents: [
+					{ id: "opencode", command: "opencode", args: [] },
+				],
+			},
 			PRESET_AGENTS,
 		);
 		const normalized = normalizePresetAgents(

@@ -58,6 +58,7 @@ Agent Client is an Obsidian plugin that brings AI coding agents directly into yo
 | **[Pi](https://github.com/earendil-works/pi)** | Multi-provider | via [ACP adapter](https://github.com/svkozak/pi-acp) (`pi-acp`) |
 | **[Grok Build](https://docs.x.ai/build/overview)** | xAI | with built-in ACP support (`grok agent stdio`) |
 | **[IBM Bob](https://ibm.com/bob)** | IBM | with built-in ACP support (`bob acp`) |
+| **[Antigravity CLI](https://antigravity.google/)** | Google | with built-in ACP support (`agy acp`) |
 | **Custom** | Various | [Any ACP-compatible agent](https://agentclientprotocol.com/overview/agents) (e.g., Qwen Code) |
 
 ### Key Features
