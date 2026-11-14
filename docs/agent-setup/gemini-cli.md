@@ -1,7 +1,9 @@
 # Gemini CLI Setup
 
-::: warning Gemini CLI is being discontinued
-Google is retiring account login for Gemini CLI (Pro / Ultra / free tiers) on **June 18, 2026**. Google states Gemini CLI stays accessible via a **paid** Gemini API key. See **[Gemini CLI Discontinuation & Migration](/announcements/gemini-cli-deprecation)**.
+::: warning Preset removal planned for 0.14.0
+The Gemini CLI preset will be removed in **Agent Client 0.14.0**. Saved settings and API keys in Obsidian's Keychain will be kept, but the preset will no longer be available. To keep using Gemini CLI, configure a [custom agent](/agent-setup/custom-agents); there is no automatic conversion. See [Gemini CLI Preset Removal & Migration](/announcements/gemini-cli-deprecation).
+
+For Google account login, use the [Antigravity CLI preset](/agent-setup/antigravity-cli).
 :::
 
 Gemini CLI is Google's AI assistant. You can authenticate using your **Google account**, an **API key**, or **Vertex AI**.
@@ -45,7 +47,7 @@ Choose one of the following methods:
 If you have a Google account and prefer not to use an API key, you can log in directly.
 
 ::: warning
-Account login is being discontinued for Pro / Ultra / free tiers on June 18, 2026. See [Gemini CLI Discontinuation & Migration](/announcements/gemini-cli-deprecation).
+Google announced the end of Gemini CLI account login for Pro / Ultra / free tiers on June 18, 2026. For those accounts, use [Antigravity CLI](/agent-setup/antigravity-cli) instead. See [Gemini CLI Preset Removal & Migration](/announcements/gemini-cli-deprecation).
 :::
 
 1. Run Gemini CLI in your terminal and choose "Login with Google":

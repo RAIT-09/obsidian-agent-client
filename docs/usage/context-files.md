@@ -26,6 +26,7 @@ Each agent uses its own context file:
 | Pi | `AGENTS.md` |
 | Grok Build | `AGENTS.md` (also `CLAUDE.md`) |
 | IBM Bob | `AGENTS.md` |
+| Antigravity CLI | `AGENTS.md`, `GEMINI.md`, and `.agents/rules/*.md` |
 
 Place the context file in your **vault root** to have the agent read it automatically.
 

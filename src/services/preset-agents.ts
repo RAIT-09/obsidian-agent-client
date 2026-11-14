@@ -317,13 +317,34 @@ export const PRESET_AGENTS: readonly PresetAgentDefinition[] = [
 		},
 		docsPage: "bob",
 	},
+	{
+		presetId: "antigravity-cli",
+		defaultDisplayName: "Antigravity CLI",
+		defaultCommand: "agy",
+		defaultArgs: ["acp"],
+		apiKey: {
+			envVarName: "GEMINI_API_KEY",
+			settingDesc:
+				"Gemini API key for ACP API-key authentication. Leave empty when signed in with agy. Select from Obsidian's Keychain or create a new secret.",
+		},
+		installHint: {
+			default:
+				"curl -fsSL https://antigravity.google/cli/install.sh | bash",
+			nativeWindows:
+				"irm https://antigravity.google/cli/install.ps1 | iex",
+		},
+		settingsCopy: {
+			pathDesc:
+				'Command name or path to agy. Use just "agy" to let the login shell resolve it, or enter an absolute path.',
+			argsDescSuffix:
+				' (The "acp" argument is required to start Antigravity CLI in ACP mode.)',
+		},
+		docsPage: "antigravity-cli",
+	},
 ];
 
 /**
- * The Gemini preset id, referenced by the time-boxed Gemini CLI deprecation
- * notice (Google retires account login on June 18, 2026). Deliberately a
- * standalone constant instead of a registry field: the notice is temporary
- * and should be deleted together with this constant's references, without
- * leaving a dead field in the permanent registry schema.
+ * Gemini preset id for the temporary removal notice.
+ * Remove with the preset and notice in 0.14.0.
  */
 export const GEMINI_PRESET_ID = "gemini-cli";

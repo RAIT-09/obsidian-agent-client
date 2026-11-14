@@ -66,6 +66,7 @@ export default defineConfig({
           { text: "Pi", link: "/agent-setup/pi" },
           { text: "Grok Build", link: "/agent-setup/grok-build" },
           { text: "IBM Bob", link: "/agent-setup/bob" },
+          { text: "Antigravity CLI", link: "/agent-setup/antigravity-cli" },
           { text: "Custom Agents", link: "/agent-setup/custom-agents" },
         ],
       },
@@ -108,7 +109,7 @@ export default defineConfig({
         text: "Announcements",
         items: [
           {
-            text: "Gemini CLI Discontinuation",
+            text: "Gemini CLI Preset Removal",
             link: "/announcements/gemini-cli-deprecation",
           },
         ],
