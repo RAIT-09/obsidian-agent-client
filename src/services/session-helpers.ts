@@ -302,19 +302,16 @@ export const GEMINI_DEPRECATION_DOCS_URL =
 	"https://rait-09.github.io/obsidian-agent-client/announcements/gemini-cli-deprecation.html";
 
 /**
- * Build the in-app notice shown while the Gemini CLI agent is selected.
- *
- * Google is retiring Gemini CLI for account-login (Pro/Ultra/free) tiers on
- * June 18, 2026. This notice is static (no network) and is driven purely by the
- * active agent id, unlike the npm-registry-backed agent update check.
+ * Build the static removal notice shown while the Gemini CLI preset is selected.
  */
 export function buildGeminiDeprecationNotice(): AgentUpdateNotification {
 	return {
 		variant: "info",
-		title: "Gemini CLI is being discontinued",
+		title: "Gemini CLI preset removal in 0.14.0",
 		message:
-			"Google is retiring account login for Gemini CLI (Pro/Ultra/free tiers) on June 18, 2026. " +
-			"Google states Gemini CLI stays accessible via a paid Gemini API key — see the guide for setup and privacy notes.",
+			"Use the Antigravity CLI preset for Google account login. " +
+			"The Gemini CLI preset will be removed in 0.14.0; saved settings and Keychain API keys will be kept. " +
+			"To keep using Gemini CLI, configure a custom agent.",
 		link: { text: "Learn more", url: GEMINI_DEPRECATION_DOCS_URL },
 	};
 }
