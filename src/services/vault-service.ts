@@ -287,8 +287,23 @@ export class VaultService implements IVaultAccess, IWikilinkResolver {
 	 * @returns Promise resolving to active note metadata, or null if no note is active
 	 */
 	getActiveNote(): Promise<NoteMetadata | null> {
-		const activeFile = this.plugin.app.workspace.getActiveFile();
+		const workspace = this.plugin.app.workspace;
+		const activeFile = workspace.getActiveFile();
 		if (!activeFile) return Promise.resolve(null);
+
+		// getActiveFile() falls back to the most recently active file when the
+		// focused view is not a FileView (e.g. the chat panel), even after that
+		// file has been closed. Only use it if it is still open in a markdown leaf.
+		if (!workspace.getActiveViewOfType(MarkdownView)) {
+			const stillOpen = workspace
+				.getLeavesOfType("markdown")
+				.some(
+					(leaf) =>
+						leaf.view instanceof MarkdownView &&
+						leaf.view.file === activeFile,
+				);
+			if (!stillOpen) return Promise.resolve(null);
+		}
 
 		const metadata = this.convertToMetadata(activeFile);
 
@@ -392,6 +407,13 @@ export class VaultService implements IVaultAccess, IWikilinkResolver {
 		this.detachEditorListener();
 
 		if (!view?.file) {
+			// No markdown editor is active (e.g. the note was closed or a
+			// non-markdown view got focus). Notify listeners so they re-query
+			// the active note, and reset the key so re-attaching to a note
+			// emits again. The stored selection is kept so it is still
+			// available when focus moves to the chat panel.
+			this.lastSelectionKey = "none";
+			this.notifySelectionListeners();
 			return;
 		}
 
