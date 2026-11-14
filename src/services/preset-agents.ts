@@ -344,10 +344,7 @@ export const PRESET_AGENTS: readonly PresetAgentDefinition[] = [
 ];
 
 /**
- * The Gemini preset id, referenced by the time-boxed Gemini CLI deprecation
- * notice (Google retires account login on June 18, 2026). Deliberately a
- * standalone constant instead of a registry field: the notice is temporary
- * and should be deleted together with this constant's references, without
- * leaving a dead field in the permanent registry schema.
+ * Gemini preset id for the temporary removal notice.
+ * Remove with the preset and notice in 0.14.0.
  */
 export const GEMINI_PRESET_ID = "gemini-cli";

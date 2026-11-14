@@ -109,7 +109,7 @@ export default defineConfig({
         text: "Announcements",
         items: [
           {
-            text: "Gemini CLI Discontinuation",
+            text: "Gemini CLI Preset Removal",
             link: "/announcements/gemini-cli-deprecation",
           },
         ],
