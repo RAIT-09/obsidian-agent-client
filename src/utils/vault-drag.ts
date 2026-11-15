@@ -106,8 +106,8 @@ const MIME_TYPES_BY_EXTENSION: Record<string, string> = {
  * `application/octet-stream` like OS-dropped files do.
  */
 export function mimeTypeFromExtension(extension: string): string {
-	return (
-		MIME_TYPES_BY_EXTENSION[extension.toLowerCase()] ??
-		"application/octet-stream"
-	);
+	const key = extension.toLowerCase();
+	return Object.prototype.hasOwnProperty.call(MIME_TYPES_BY_EXTENSION, key)
+		? MIME_TYPES_BY_EXTENSION[key]
+		: "application/octet-stream";
 }
