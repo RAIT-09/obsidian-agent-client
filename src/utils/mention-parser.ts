@@ -100,6 +100,34 @@ export function replaceMention(
 	return { newText, newCursorPos };
 }
 
+// Insert @[[note]] mentions at a position (e.g. notes dropped onto the input),
+// padding with spaces so they don't fuse with the surrounding text.
+export function insertMentions(
+	text: string,
+	position: number,
+	noteTitles: string[],
+): { newText: string; newCursorPos: number } {
+	if (noteTitles.length === 0) {
+		return { newText: text, newCursorPos: position };
+	}
+
+	const pos = Math.max(0, Math.min(position, text.length));
+	const before = text.slice(0, pos);
+	const after = text.slice(pos);
+
+	const leading = before.length > 0 && !/\s$/.test(before) ? " " : "";
+	const trailing = /^\s/.test(after) ? "" : " ";
+	const inserted =
+		leading +
+		noteTitles.map((title) => `@[[${title}]]`).join(" ") +
+		trailing;
+
+	return {
+		newText: before + inserted + after,
+		newCursorPos: pos + inserted.length,
+	};
+}
+
 // Extract all @mentions from text
 export function extractMentionedNotes(
 	text: string,
