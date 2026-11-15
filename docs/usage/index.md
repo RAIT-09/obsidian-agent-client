@@ -29,7 +29,7 @@ The chat panel opens in the right sidebar.
 You can attach images and files to your messages by pasting or dragging and dropping.
 
 1. **Paste**: Copy a file or image and paste (`Cmd/Ctrl + V`) in the input field
-2. **Drag and Drop**: Drag files directly onto the input area
+2. **Drag and Drop**: Drag files onto the input area from Finder/Explorer or from Obsidian's file explorer (notes dragged from Obsidian become `@[[note]]` mentions)
 
 Attached files appear as thumbnails or file icons below the text area. Click the **×** to remove.
 
