@@ -104,4 +104,13 @@ describe("mimeTypeFromExtension", () => {
 		expect(mimeTypeFromExtension("xyz")).toBe("application/octet-stream");
 		expect(mimeTypeFromExtension("")).toBe("application/octet-stream");
 	});
+
+	it.each(["__proto__", "constructor"])(
+		"falls back for inherited property %s",
+		(extension) => {
+			expect(mimeTypeFromExtension(extension)).toBe(
+				"application/octet-stream",
+			);
+		},
+	);
 });
