@@ -42,6 +42,7 @@ src/
 │   ├── useSessionHistory.ts     # Session list/load/resume/fork
 │   ├── useChatActions.ts        # Business callbacks (send, newChat, export, restart, etc.)
 │   ├── useHistoryModal.ts       # Session history modal lifecycle
+│   ├── useHoverLinkPreview.ts   # Emits `hover-link` so Page preview shows note popovers
 │   └── useSettings.ts           # Settings subscription (useSyncExternalStore)
 ├── ui/                          # React components
 │   ├── ChatContext.ts           # React Context (plugin, acpClient, vaultService, settingsService)
@@ -68,7 +69,7 @@ src/
 │       └── AttachmentStrip.tsx  # Attachment preview strip
 ├── utils/                       # Shared utilities (pure functions)
 │   ├── platform.ts              # Shell, WSL, Windows env, command building
-│   ├── paths.ts                 # Path resolution, file:// URI
+│   ├── paths.ts                 # Path resolution, file:// URI, internal-link href → linktext
 │   ├── error-utils.ts           # ACP error conversion
 │   ├── mention-parser.ts        # @[[note]] detection/extraction
 │   └── logger.ts                # Debug-mode logger

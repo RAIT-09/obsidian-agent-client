@@ -6,8 +6,8 @@ import {
 	MarkdownRenderer as ObsidianMarkdownRenderer,
 	Platform,
 } from "obsidian";
-import { convertWslPathToWindows } from "../../utils/platform";
-import { isAbsolutePath } from "../../utils/paths";
+import { resolveInternalLinkHref } from "../../utils/paths";
+import { useHoverLinkPreview } from "../../hooks/useHoverLinkPreview";
 import type AgentClientPlugin from "../../plugin";
 
 interface MarkdownRendererProps {
@@ -17,6 +17,7 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ text, plugin }: MarkdownRendererProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
+	const triggerHoverLink = useHoverLinkPreview(plugin);
 
 	useEffect(() => {
 		const el = containerRef.current;
@@ -37,62 +38,57 @@ export function MarkdownRenderer({ text, plugin }: MarkdownRendererProps) {
 			component,
 		);
 
-		// Handle internal link clicks
+		// MarkdownRenderer.render() only emits `a.internal-link[data-href]`;
+		// click and hover handling is up to the host (us).
 		const vaultBasePath =
 			plugin.app.vault.adapter instanceof FileSystemAdapter
 				? plugin.app.vault.adapter.getBasePath()
 				: null;
-
-		// Prepare normalized vault base path for comparison (forward slashes)
 		const isWslMode = Platform.isWin && plugin.settings.windowsWslMode;
-		const normalizedVaultBase = vaultBasePath
-			? vaultBasePath.replace(/\\/g, "/").replace(/\/+$/, "")
-			: null;
+
+		/**
+		 * The internal link under the event target, with its vault linktext
+		 * (null when it can't be opened, e.g. an absolute path outside the vault)
+		 */
+		const findInternalLink = (
+			e: MouseEvent,
+		): { link: HTMLElement; linktext: string | null } | null => {
+			const link = (e.target as HTMLElement).closest<HTMLElement>(
+				"a.internal-link",
+			);
+			if (!link) return null;
+			const rawHref = link.getAttribute("data-href");
+			const linktext = rawHref
+				? resolveInternalLinkHref(rawHref, vaultBasePath, isWslMode)
+				: null;
+			return { link, linktext };
+		};
 
 		const handleInternalLinkClick = (e: MouseEvent) => {
-			const target = e.target as HTMLElement;
-			const link = target.closest("a.internal-link");
-			if (link) {
-				e.preventDefault();
-				const rawHref = link.getAttribute("data-href");
-				if (rawHref) {
-					let href = decodeURIComponent(rawHref);
-
-					// WSL mode: convert /mnt/c/... paths to Windows format
-					if (isWslMode && href.startsWith("/mnt/")) {
-						href = convertWslPathToWindows(href);
-					}
-
-					// Normalize for comparison (forward slashes)
-					const normalizedHref = href.replace(/\\/g, "/");
-
-					if (
-						normalizedVaultBase &&
-						normalizedHref.startsWith(normalizedVaultBase + "/")
-					) {
-						// Absolute vault path → convert to relative
-						const relativePath = normalizedHref.slice(
-							normalizedVaultBase.length + 1,
-						);
-						void plugin.app.workspace.openLinkText(
-							relativePath,
-							"",
-						);
-					} else if (!isAbsolutePath(href)) {
-						// Already relative or wiki-link style — pass through
-						void plugin.app.workspace.openLinkText(href, "");
-					}
-					// Absolute path outside vault — ignore
-				}
+			const found = findInternalLink(e);
+			if (!found) return;
+			e.preventDefault();
+			if (found.linktext !== null) {
+				void plugin.app.workspace.openLinkText(found.linktext, "");
 			}
 		};
+
+		const handleInternalLinkHover = (e: MouseEvent) => {
+			const found = findInternalLink(e);
+			if (found && found.linktext !== null) {
+				triggerHoverLink(e, found.link, found.linktext);
+			}
+		};
+
 		el.addEventListener("click", handleInternalLinkClick);
+		el.addEventListener("mouseover", handleInternalLinkHover);
 
 		return () => {
 			el.removeEventListener("click", handleInternalLinkClick);
+			el.removeEventListener("mouseover", handleInternalLinkHover);
 			component.unload();
 		};
-	}, [text, plugin]);
+	}, [text, plugin, triggerHoverLink]);
 
 	return (
 		<div
