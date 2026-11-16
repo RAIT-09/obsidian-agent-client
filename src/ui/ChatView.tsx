@@ -268,12 +268,11 @@ export class ChatView extends ItemView implements IChatViewContainer {
 	 */
 	focus(): void {
 		void this.app.workspace.revealLeaf(this.leaf).then(() => {
-			const textarea = this.containerEl.querySelector(
-				"textarea.agent-client-chat-input-textarea",
-			);
-			if (textarea instanceof HTMLTextAreaElement) {
-				textarea.focus();
-			}
+			const textarea =
+				this.containerEl.querySelector<HTMLTextAreaElement>(
+					"textarea.agent-client-chat-input-textarea",
+				);
+			textarea?.focus();
 		});
 	}
 
