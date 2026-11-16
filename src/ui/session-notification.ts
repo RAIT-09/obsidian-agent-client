@@ -17,7 +17,7 @@ export function notifySessionEvent(
 
 	const sessionId = view.getSessionId();
 	const message = createFragment();
-	message.appendText(`${view.getSessionTitle()}: ${body} `);
+	message.appendText(`[Agent Client] ${view.getSessionTitle()}: ${body} `);
 	const link = message.createEl("a", { text: "Open chat", href: "#" });
 	const notice = new Notice(message);
 	link.addEventListener("click", (event) => {

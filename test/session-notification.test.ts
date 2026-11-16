@@ -68,7 +68,7 @@ describe("session notifications", () => {
 		expect(systemNotification).not.toHaveBeenCalled();
 		expect(Notice).toHaveBeenCalledWith(fragment);
 		expect(fragment.appendText).toHaveBeenCalledWith(
-			`Review the demo note: ${body} `,
+			`[Agent Client] Review the demo note: ${body} `,
 		);
 		expect(fragment.createEl).toHaveBeenCalledWith("a", {
 			text: "Open chat",
