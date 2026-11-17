@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { NoteMetadata, IVaultAccess } from "../services/vault-service";
 import {
 	detectMention,
@@ -37,6 +37,8 @@ export interface MentionsState {
 	isAutoMentionDisabled: boolean;
 	/** Toggle auto-mention enabled/disabled state */
 	toggleAutoMention: (disabled?: boolean) => void;
+	/** Drop any per-chat override and return to the settings default */
+	resetAutoMention: () => void;
 	/** Update the active note from the vault */
 	updateActiveNote: () => Promise<void>;
 }
@@ -140,6 +142,15 @@ export function useSuggestions(
 		} else {
 			setIsAutoMentionDisabled(disabled);
 		}
+	}, []);
+
+	// Read through a ref: callers like handleNewChat await before resetting,
+	// and the setting may have changed by then.
+	const autoMentionDefaultRef = useRef(autoMentionDefault);
+	autoMentionDefaultRef.current = autoMentionDefault;
+
+	const resetAutoMention = useCallback(() => {
+		setIsAutoMentionDisabled(!autoMentionDefaultRef.current);
 	}, []);
 
 	// ============================================================
@@ -304,6 +315,7 @@ export function useSuggestions(
 			activeNote,
 			isAutoMentionDisabled,
 			toggleAutoMention,
+			resetAutoMention,
 			updateActiveNote,
 		}),
 		[
@@ -318,6 +330,7 @@ export function useSuggestions(
 			activeNote,
 			isAutoMentionDisabled,
 			toggleAutoMention,
+			resetAutoMention,
 			updateActiveNote,
 		],
 	);
