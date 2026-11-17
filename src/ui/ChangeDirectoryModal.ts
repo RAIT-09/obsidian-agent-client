@@ -62,9 +62,10 @@ export class ChangeDirectoryModal extends Modal {
 			inputEl.select();
 		}, 10);
 
-		// Enter key to start
+		// Enter key to start (ignored while an IME is composing, where Enter
+		// confirms the conversion rather than submitting)
 		inputEl.addEventListener("keydown", (e) => {
-			if (e.key === "Enter") {
+			if (e.key === "Enter" && !e.isComposing) {
 				e.preventDefault();
 				this.selectAndClose(inputEl.value);
 			}
