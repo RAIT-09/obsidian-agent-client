@@ -453,11 +453,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 							enableFloatingChat: value,
 						});
 
-						// Handle dynamic toggle of floating chat
-						if (value && !wasEnabled) {
-							// Turning ON: create floating chat instance
-							this.plugin.openNewFloatingChat();
-						} else if (!value && wasEnabled) {
+						// Turning ON only shows the button: a window opens when
+						// asked for. Turning OFF closes the windows.
+						if (!value && wasEnabled) {
 							// Turning OFF: close all floating chat instances
 							const instances =
 								this.plugin.getFloatingChatInstances();
