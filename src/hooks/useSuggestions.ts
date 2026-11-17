@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { NoteMetadata, IVaultAccess } from "../services/vault-service";
 import {
 	detectMention,
@@ -144,9 +144,14 @@ export function useSuggestions(
 		}
 	}, []);
 
+	// Read through a ref: callers like handleNewChat await before resetting,
+	// and the setting may have changed by then.
+	const autoMentionDefaultRef = useRef(autoMentionDefault);
+	autoMentionDefaultRef.current = autoMentionDefault;
+
 	const resetAutoMention = useCallback(() => {
-		setIsAutoMentionDisabled(!autoMentionDefault);
-	}, [autoMentionDefault]);
+		setIsAutoMentionDisabled(!autoMentionDefaultRef.current);
+	}, []);
 
 	// ============================================================
 	// Mention Callbacks
