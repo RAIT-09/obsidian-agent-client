@@ -890,7 +890,8 @@ export class AcpClient {
 					title: s.title ?? undefined,
 					updatedAt: s.updatedAt ?? undefined,
 				})),
-				nextCursor: response.nextCursor ?? undefined,
+				// An empty cursor can't be sent back: treat it as the end
+				nextCursor: response.nextCursor || undefined,
 			};
 		} catch (error) {
 			this.logger.error("[AcpClient] List Sessions Error:", error);

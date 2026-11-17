@@ -2052,27 +2052,37 @@ If your plugin does not need CSS, delete this file.
 	cursor: pointer;
 }
 
-.agent-client-session-history-load-more {
+.agent-client-session-history-search {
+	width: 100%;
+	margin-bottom: 12px;
+}
+
+.agent-client-session-history-pager {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
 	margin-top: 16px;
+}
+
+.agent-client-session-history-pager-range {
+	font-size: 13px;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.agent-client-session-history-load-more-error {
+	margin-top: 12px;
 	text-align: center;
 }
 
-.agent-client-session-history-load-more-button {
-	padding: 8px 16px;
-	background: var(--background-secondary);
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
-	cursor: pointer;
-	font-size: 14px;
-	color: var(--text-normal);
-}
-
-.agent-client-session-history-load-more-button:hover {
-	background: var(--background-modifier-hover);
-}
-
-.agent-client-session-history-load-more-button:disabled {
+.agent-client-session-history-retry-button:disabled {
 	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.agent-client-session-history-pager-button:disabled {
+	opacity: 0.4;
 	cursor: not-allowed;
 }
 

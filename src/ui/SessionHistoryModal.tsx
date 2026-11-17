@@ -5,13 +5,21 @@
  * and the confirmation modal for session deletion.
  */
 
-import { Modal, App, Notice, setIcon } from "obsidian";
+import { Modal, App, Notice, Platform, setIcon } from "obsidian";
 import { EditTitleModal } from "./EditTitleModal";
 import * as React from "react";
-const { useState, useCallback } = React;
+const { useState, useCallback, useEffect, useMemo, useRef } = React;
 import { createRoot, Root } from "react-dom/client";
 import type { SessionInfo } from "../types/session";
 import { truncateTitle } from "../utils/text";
+import {
+	SESSION_HISTORY_PAGE_SIZE,
+	UNTITLED_SESSION_TITLE,
+	filterSessionsByTitle,
+	formatPageRange,
+	getPageWindow,
+	shouldFetchNextPage,
+} from "../utils/session-list";
 
 // ============================================================
 // ConfirmDeleteModal (internal)
@@ -107,6 +115,8 @@ interface SessionHistoryContentProps {
 	loading: boolean;
 	/** Error message if fetch fails */
 	error: string | null;
+	/** Error message if fetching the next page failed (the list stays) */
+	loadMoreError: string | null;
 	/** Whether there are more sessions to load */
 	hasMore: boolean;
 	/** Current working directory for filtering */
@@ -156,7 +166,7 @@ interface SessionHistoryContentProps {
 		newTitle: string,
 		sessionCwd: string,
 	) => void | Promise<void>;
-	/** Callback to load more sessions (pagination) */
+	/** Callback to fetch the agent's next session/list page (appends) */
 	onLoadMore: () => void;
 	/** Callback to fetch sessions with filter */
 	onFetchSessions: (cwd?: string) => void;
@@ -191,6 +201,40 @@ function IconButton({
 			ref={iconRef}
 			className={className}
 			aria-label={label}
+			onClick={onClick}
+		/>
+	);
+}
+
+/**
+ * Previous/next page button. A real <button> (unlike IconButton) so the
+ * disabled state blocks clicks and is announced.
+ */
+function PagerButton({
+	iconName,
+	label,
+	disabled,
+	onClick,
+}: {
+	iconName: string;
+	label: string;
+	disabled: boolean;
+	onClick: () => void;
+}) {
+	const buttonRef = useRef<HTMLButtonElement>(null);
+
+	useEffect(() => {
+		if (buttonRef.current) {
+			setIcon(buttonRef.current, iconName);
+		}
+	}, [iconName]);
+
+	return (
+		<button
+			ref={buttonRef}
+			className="clickable-icon agent-client-session-history-pager-button"
+			aria-label={label}
+			disabled={disabled}
 			onClick={onClick}
 		/>
 	);
@@ -353,7 +397,7 @@ function SessionItem({
 			<div className="agent-client-session-history-item-content">
 				<div className="agent-client-session-history-item-title">
 					<span>
-						{truncateTitle(session.title ?? "Untitled Session")}
+						{truncateTitle(session.title ?? UNTITLED_SESSION_TITLE)}
 					</span>
 				</div>
 				<div className="agent-client-session-history-item-metadata">
@@ -414,14 +458,16 @@ function SessionItem({
  * - Debug form (when debug mode enabled)
  * - Local sessions banner
  * - Filter toggle (for agent session/list)
- * - Session list with load/resume/fork actions
- * - Pagination
+ * - Title search
+ * - Session list with load/resume/fork actions, one page at a time
+ * - Pager (pulls the agent's next session/list page on demand)
  */
 function SessionHistoryContent({
 	app,
 	sessions,
 	loading,
 	error,
+	loadMoreError,
 	hasMore,
 	currentCwd,
 	canList,
@@ -449,11 +495,14 @@ function SessionHistoryContent({
 	const [hideNonLocalSessions, setHideNonLocalSessions] = useState(
 		filters.hideNonLocal,
 	);
+	const [query, setQuery] = useState("");
+	const [page, setPage] = useState(0);
 
 	const handleFilterChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {
 			const checked = e.target.checked;
 			setFilterByCurrentVault(checked);
+			setPage(0);
 			onFiltersChange({
 				currentVaultOnly: checked,
 				hideNonLocal: hideNonLocalSessions,
@@ -468,6 +517,7 @@ function SessionHistoryContent({
 		(e: React.ChangeEvent<HTMLInputElement>) => {
 			const checked = e.target.checked;
 			setHideNonLocalSessions(checked);
+			setPage(0);
 			onFiltersChange({
 				currentVaultOnly: filterByCurrentVault,
 				hideNonLocal: checked,
@@ -507,7 +557,7 @@ function SessionHistoryContent({
 			const targetSession = sessions.find(
 				(s) => s.sessionId === sessionId,
 			);
-			const sessionTitle = targetSession?.title ?? "Untitled Session";
+			const sessionTitle = targetSession?.title ?? UNTITLED_SESSION_TITLE;
 
 			const confirmModal = new ConfirmDeleteModal(
 				app,
@@ -530,7 +580,7 @@ function SessionHistoryContent({
 			const targetSession = sessions.find(
 				(s) => s.sessionId === sessionId,
 			);
-			const currentTitle = targetSession?.title ?? "Untitled Session";
+			const currentTitle = targetSession?.title ?? UNTITLED_SESSION_TITLE;
 			const sessionCwd = targetSession?.cwd ?? currentCwd;
 
 			const modal = new EditTitleModal(app, currentTitle, (newTitle) => {
@@ -543,12 +593,81 @@ function SessionHistoryContent({
 
 	// Filter sessions based on hideNonLocalSessions setting
 	// Only applies to agent session/list (not local sessions which are already filtered)
-	const filteredSessions = React.useMemo(() => {
-		if (isUsingLocalSessions || !hideNonLocalSessions) {
-			return sessions;
-		}
-		return sessions.filter((s) => localSessionIds.has(s.sessionId));
-	}, [sessions, isUsingLocalSessions, hideNonLocalSessions, localSessionIds]);
+	const filteredSessions = useMemo(() => {
+		const shown =
+			isUsingLocalSessions || !hideNonLocalSessions
+				? sessions
+				: sessions.filter((s) => localSessionIds.has(s.sessionId));
+		return filterSessionsByTitle(shown, query);
+	}, [
+		sessions,
+		isUsingLocalSessions,
+		hideNonLocalSessions,
+		localSessionIds,
+		query,
+	]);
+
+	const pageWindow = getPageWindow(
+		filteredSessions.length,
+		page,
+		SESSION_HISTORY_PAGE_SIZE,
+	);
+	const pageSessions = filteredSessions.slice(
+		pageWindow.start,
+		pageWindow.end,
+	);
+	const isOnLastLoadedPage = pageWindow.page >= pageWindow.pageCount - 1;
+	// The search, and hiding sessions without local data (applied here to an
+	// agent's listing; local listings come filtered already)
+	const isFiltering =
+		query.trim() !== "" || (hideNonLocalSessions && !isUsingLocalSessions);
+
+	// Pull the agent's next session/list page when the pager or a filter
+	// needs it (see shouldFetchNextPage)
+	const fetchNextPage =
+		isAgentReady &&
+		!error &&
+		shouldFetchNextPage({
+			hasMore,
+			loading,
+			failed: loadMoreError !== null,
+			onLastLoadedPage: isOnLastLoadedPage,
+			filtering: isFiltering,
+		});
+	useEffect(() => {
+		if (fetchNextPage) onLoadMore();
+	}, [fetchNextPage, onLoadMore]);
+
+	const searchInputRef = useRef<HTMLInputElement>(null);
+
+	const handleQueryChange = useCallback(
+		(e: React.ChangeEvent<HTMLInputElement>) => {
+			setQuery(e.target.value);
+			setPage(0);
+		},
+		[],
+	);
+
+	const handleClearQuery = useCallback(() => {
+		setQuery("");
+		setPage(0);
+		searchInputRef.current?.focus();
+	}, []);
+
+	// Turning the page swaps the rows under the pager, so bring the top of the
+	// list (the search box) back into view.
+	const goToPage = useCallback((next: number) => {
+		setPage(next);
+		searchInputRef.current?.scrollIntoView({ block: "nearest" });
+	}, []);
+	const handlePrevPage = useCallback(
+		() => goToPage(pageWindow.page - 1),
+		[goToPage, pageWindow.page],
+	);
+	const handleNextPage = useCallback(
+		() => goToPage(pageWindow.page + 1),
+		[goToPage, pageWindow.page],
+	);
 
 	// Show preparing message if agent is not ready
 	if (!isAgentReady) {
@@ -646,26 +765,57 @@ function SessionHistoryContent({
 						</div>
 					)}
 
-					{/* Loading state */}
-					{!error && loading && filteredSessions.length === 0 && (
-						<div className="agent-client-session-history-loading">
-							<p>Loading sessions...</p>
-						</div>
-					)}
+					{/* Title search */}
+					<div className="search-input-container agent-client-session-history-search">
+						<input
+							ref={searchInputRef}
+							type="search"
+							enterKeyHint="search"
+							placeholder="Search sessions by title..."
+							aria-label="Search sessions by title"
+							value={query}
+							onChange={handleQueryChange}
+							autoFocus={!Platform.isMobile}
+						/>
+						{query && (
+							<div
+								className="search-input-clear-button"
+								aria-label="Clear search"
+								onClick={handleClearQuery}
+							/>
+						)}
+					</div>
+
+					{/* Loading state. With more pages on the agent the effect
+					    above is already fetching them, so an empty result is
+					    not final yet (unless fetching the next one failed). */}
+					{!error &&
+						!loadMoreError &&
+						(loading || hasMore) &&
+						filteredSessions.length === 0 && (
+							<div className="agent-client-session-history-loading">
+								<p>Loading sessions...</p>
+							</div>
+						)}
 
 					{/* Empty state */}
-					{!error && !loading && filteredSessions.length === 0 && (
-						<div className="agent-client-session-history-empty">
-							<p className="agent-client-session-history-empty-text">
-								No previous sessions
-							</p>
-						</div>
-					)}
+					{!error &&
+						!loading &&
+						!hasMore &&
+						filteredSessions.length === 0 && (
+							<div className="agent-client-session-history-empty">
+								<p className="agent-client-session-history-empty-text">
+									{query.trim()
+										? "No sessions match your search"
+										: "No previous sessions"}
+								</p>
+							</div>
+						)}
 
-					{/* Session list */}
-					{!error && filteredSessions.length > 0 && (
+					{/* Session list (current page) */}
+					{!error && pageSessions.length > 0 && (
 						<div className="agent-client-session-history-list">
-							{filteredSessions.map((session) => (
+							{pageSessions.map((session) => (
 								<SessionItem
 									key={session.sessionId}
 									session={session}
@@ -684,15 +834,46 @@ function SessionHistoryContent({
 						</div>
 					)}
 
-					{/* Load more button */}
-					{!error && hasMore && (
-						<div className="agent-client-session-history-load-more">
+					{/* Pager */}
+					{!error &&
+						filteredSessions.length > 0 &&
+						(pageWindow.pageCount > 1 || hasMore) && (
+							<div className="agent-client-session-history-pager">
+								<PagerButton
+									iconName="chevron-left"
+									label="Previous page"
+									disabled={pageWindow.page === 0}
+									onClick={handlePrevPage}
+								/>
+								<span className="agent-client-session-history-pager-range">
+									{formatPageRange(
+										pageWindow,
+										filteredSessions.length,
+										hasMore,
+									)}
+									{loading && hasMore && " · loading..."}
+								</span>
+								<PagerButton
+									iconName="chevron-right"
+									label="Next page"
+									disabled={isOnLastLoadedPage}
+									onClick={handleNextPage}
+								/>
+							</div>
+						)}
+
+					{/* Next page failed: the loaded pages stay */}
+					{!error && loadMoreError && (
+						<div className="agent-client-session-history-load-more-error">
+							<p className="agent-client-session-history-error-text">
+								{loadMoreError}
+							</p>
 							<button
-								className="agent-client-session-history-load-more-button"
+								className="agent-client-session-history-retry-button"
 								disabled={loading}
 								onClick={onLoadMore}
 							>
-								{loading ? "Loading..." : "Load more"}
+								Retry
 							</button>
 						</div>
 					)}
