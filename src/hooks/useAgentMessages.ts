@@ -1,8 +1,8 @@
 /**
  * Sub-hook for managing chat messages, streaming, and permissions.
  *
- * Handles message state, RAF batching for streaming updates,
- * send/receive operations, and permission approve/reject.
+ * Handles message state, per-frame batching of streaming updates (see
+ * UpdateBatcher), send/receive operations, and permission approve/reject.
  */
 
 import * as React from "react";
@@ -25,6 +25,7 @@ import type { IMentionService } from "../utils/mention-parser";
 import { preparePrompt, sendPreparedPrompt } from "../services/message-sender";
 import { extractErrorMessage } from "../utils/error-utils";
 import { Platform } from "obsidian";
+import { UpdateBatcher } from "../services/update-batcher";
 import {
 	rebuildToolCallIndex,
 	applySingleUpdate,
@@ -76,7 +77,7 @@ export interface UseAgentMessagesReturn {
 	setMessagesFromLocal: (localMessages: ChatMessage[]) => void;
 	clearError: () => void;
 	setIgnoreUpdates: (ignore: boolean) => void;
-	/** Discard any pending RAF updates and reset streaming state (call after stop/cancel). */
+	/** Discard any pending batched updates and reset streaming state (call after stop/cancel). */
 	clearPendingUpdates: () => void;
 
 	// Permission
@@ -129,27 +130,22 @@ export function useAgentMessages(
 	// Streaming Update Batching
 	// ============================================================
 
-	const pendingUpdatesRef = useRef<SessionUpdate[]>([]);
-	const flushScheduledRef = useRef(false);
-
-	const flushPendingUpdates = useCallback(() => {
-		flushScheduledRef.current = false;
-		const updates = pendingUpdatesRef.current;
-		if (updates.length === 0) return;
-		pendingUpdatesRef.current = [];
-
-		setMessages((prev) => {
-			let result = prev;
-			for (const update of updates) {
-				result = applySingleUpdate(
-					result,
-					update,
-					toolCallIndexRef.current,
-				);
-			}
-			return result;
-		});
-	}, []);
+	const [batcher] = useState(
+		() =>
+			new UpdateBatcher<SessionUpdate>((updates) => {
+				setMessages((prev) => {
+					let result = prev;
+					for (const update of updates) {
+						result = applySingleUpdate(
+							result,
+							update,
+							toolCallIndexRef.current,
+						);
+					}
+					return result;
+				});
+			}),
+	);
 
 	const enqueueUpdate = useCallback(
 		(update: SessionUpdate) => {
@@ -162,23 +158,18 @@ export function useAgentMessages(
 			) {
 				return;
 			}
-			pendingUpdatesRef.current.push(update);
-			if (!flushScheduledRef.current) {
-				flushScheduledRef.current = true;
-				window.requestAnimationFrame(flushPendingUpdates);
-			}
+			batcher.enqueue(update);
 		},
-		[flushPendingUpdates],
+		[batcher],
 	);
 
 	// Clean up on unmount
 	useEffect(() => {
 		return () => {
-			pendingUpdatesRef.current = [];
-			flushScheduledRef.current = false;
+			batcher.discard();
 			toolCallIndexRef.current.clear();
 		};
-	}, []);
+	}, [batcher]);
 
 	// ============================================================
 	// Message Operations
@@ -199,9 +190,7 @@ export function useAgentMessages(
 	 * instead of staying stuck (#326).
 	 */
 	const clearPendingUpdates = useCallback((): void => {
-		const queued = pendingUpdatesRef.current;
-		pendingUpdatesRef.current = [];
-		flushScheduledRef.current = false;
+		const queued = batcher.discard();
 
 		// Streaming deltas are dropped; only terminal permission updates
 		// (cancelled or answered) are applied so `findActivePermission` stops
@@ -228,7 +217,7 @@ export function useAgentMessages(
 		}
 
 		setIsSending(false);
-	}, []);
+	}, [batcher]);
 
 	const clearMessages = useCallback((): void => {
 		setMessages([]);
@@ -395,6 +384,10 @@ export function useAgentMessages(
 					// Discard results if a newer send has started
 					if (generationRef.current !== generation) return;
 
+					// The turn is over: apply what it streamed before the
+					// turn-end save reads the messages, frame or not
+					batcher.flush();
+
 					if (result.success) {
 						setIsSending(false);
 						setLastUserMessage(null);
@@ -415,6 +408,7 @@ export function useAgentMessages(
 					}
 				} catch (error) {
 					if (generationRef.current !== generation) return;
+					batcher.flush();
 					setIsSending(false);
 					setErrorInfo({
 						title: "Send Message Failed",
@@ -442,6 +436,7 @@ export function useAgentMessages(
 			shouldConvertToWsl,
 			addMessage,
 			setErrorInfo,
+			batcher,
 		],
 	);
 
