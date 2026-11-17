@@ -37,6 +37,8 @@ export interface MentionsState {
 	isAutoMentionDisabled: boolean;
 	/** Toggle auto-mention enabled/disabled state */
 	toggleAutoMention: (disabled?: boolean) => void;
+	/** Drop any per-chat override and return to the settings default */
+	resetAutoMention: () => void;
 	/** Update the active note from the vault */
 	updateActiveNote: () => Promise<void>;
 }
@@ -141,6 +143,10 @@ export function useSuggestions(
 			setIsAutoMentionDisabled(disabled);
 		}
 	}, []);
+
+	const resetAutoMention = useCallback(() => {
+		setIsAutoMentionDisabled(!autoMentionDefault);
+	}, [autoMentionDefault]);
 
 	// ============================================================
 	// Mention Callbacks
@@ -304,6 +310,7 @@ export function useSuggestions(
 			activeNote,
 			isAutoMentionDisabled,
 			toggleAutoMention,
+			resetAutoMention,
 			updateActiveNote,
 		}),
 		[
@@ -318,6 +325,7 @@ export function useSuggestions(
 			activeNote,
 			isAutoMentionDisabled,
 			toggleAutoMention,
+			resetAutoMention,
 			updateActiveNote,
 		],
 	);
