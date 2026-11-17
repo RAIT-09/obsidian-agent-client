@@ -42,9 +42,10 @@ export class EditTitleModal extends Modal {
 			inputEl.select();
 		}, 10);
 
-		// Enter key to save
+		// Enter key to save (ignored while an IME is composing, where Enter
+		// confirms the conversion rather than submitting)
 		inputEl.addEventListener("keydown", (e) => {
-			if (e.key === "Enter") {
+			if (e.key === "Enter" && !e.isComposing) {
 				e.preventDefault();
 				this.saveAndClose(inputEl.value);
 			}
