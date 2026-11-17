@@ -456,8 +456,6 @@ export default class AgentClientPlugin extends Plugin {
 			name: "Toggle all floating chat views",
 			checkCallback: (checking) => {
 				if (!this.settings.enableFloatingChat) return false;
-				if (this.viewRegistry.getByType("floating").length === 0)
-					return false;
 				if (checking) return true;
 				this.toggleAllFloatingChats();
 			},
@@ -477,10 +475,9 @@ export default class AgentClientPlugin extends Plugin {
 		this.floatingButton = new FloatingButtonContainer(this);
 		this.floatingButton.mount();
 
-		// Mount initial floating chat instance only if enabled
-		if (this.settings.enableFloatingChat) {
-			this.openNewFloatingChat();
-		}
+		// No floating chat window until one is asked for (the button, a
+		// command): a hidden one would start its agent and a new session on
+		// every start-up, for nothing if it is never opened.
 
 		// Clean up all ACP sessions when Obsidian quits
 		// Note: We don't wait for disconnect to complete to avoid blocking quit
@@ -937,12 +934,17 @@ export default class AgentClientPlugin extends Plugin {
 
 	/**
 	 * Toggle all floating chat windows at once: minimize all while any is
-	 * expanded, otherwise expand all. Never creates or closes a window.
+	 * expanded, otherwise expand all. Never closes a window; opens one when
+	 * there is none, so the toggle also brings up the floating chat the
+	 * first time (no window exists until one is asked for).
 	 */
 	toggleAllFloatingChats(): void {
-		const anyExpanded = this.viewRegistry
-			.getByType("floating")
-			.some((view) => view.isExpanded());
+		const windows = this.viewRegistry.getByType("floating");
+		if (windows.length === 0) {
+			this.openNewFloatingChat(true);
+			return;
+		}
+		const anyExpanded = windows.some((view) => view.isExpanded());
 		if (anyExpanded) {
 			this.collapseAllFloatingChats();
 		} else {
