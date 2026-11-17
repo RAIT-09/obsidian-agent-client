@@ -13,6 +13,8 @@ import type {
 import type { ChatMessage } from "../types/chat";
 import { extractErrorMessage } from "../utils/error-utils";
 import { truncateTitle } from "../utils/text";
+import { getLogger } from "../utils/logger";
+import { appendUniqueSessions, nextPageCursor } from "../utils/session-list";
 
 // ============================================================================
 // Session Capability Helpers (from session-capability-utils.ts)
@@ -113,6 +115,11 @@ export interface UseSessionHistoryReturn {
 	loading: boolean;
 	/** Error message if fetch fails */
 	error: string | null;
+	/**
+	 * Error message if fetching the next page failed. Separate from `error`:
+	 * the pages already loaded stay usable.
+	 */
+	loadMoreError: string | null;
 	/** Whether there are more sessions to load */
 	hasMore: boolean;
 
@@ -296,6 +303,7 @@ export function useSessionHistory(
 	const [sessions, setSessions] = useState<SessionInfo[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 	const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
 	const [localSessionIds, setLocalSessionIds] = useState<Set<string>>(
 		new Set(),
@@ -304,6 +312,26 @@ export function useSessionHistory(
 	// Cache reference (not state to avoid re-renders)
 	const cacheRef = useRef<SessionCache | null>(null);
 	const currentCwdRef = useRef<string | undefined>(undefined);
+	// Bumped by every fetchSessions: a list response (first page or a later
+	// one) that arrives after the list was re-fetched — e.g. the cwd filter
+	// was toggled while the modal was paging — belongs to a stale listing
+	// and is dropped instead of being merged into the new one.
+	const listGenerationRef = useRef(0);
+	// The cursor of the listing on show, read by loadMoreSessions instead of
+	// the `nextCursor` its closure saw: the modal can call a loadMoreSessions
+	// from before a re-fetch (its first render on reopening uses the props it
+	// last had), and that must not page on with the replaced listing's cursor.
+	const nextCursorRef = useRef<string | undefined>(undefined);
+	// Generation of the next-page request in flight, so pages are fetched one
+	// at a time
+	const loadMoreGenerationRef = useRef<number | null>(null);
+	// Cursors already used for the listing on show (see nextPageCursor)
+	const usedCursorsRef = useRef(new Set<string>());
+
+	const setCursor = useCallback((cursor: string | undefined) => {
+		nextCursorRef.current = cursor;
+		setNextCursor(cursor);
+	}, []);
 
 	// External rename detection: when `savedSessions` changes (e.g. via Session
 	// Manager's Rename), re-merge titles into the currently displayed list
@@ -368,6 +396,14 @@ export function useSessionHistory(
 	 */
 	const fetchSessions = useCallback(
 		async (cwd?: string) => {
+			const generation = ++listGenerationRef.current;
+			// From here on, the listing being shown is this fetch's: its
+			// scope, and no cursor until it has one
+			currentCwdRef.current = cwd;
+			nextCursorRef.current = undefined;
+			usedCursorsRef.current = new Set();
+			setLoadMoreError(null);
+
 			// Use local sessions if:
 			// - Agent doesn't support session/list, OR
 			// - Agent doesn't support any restoration operation (for delete only)
@@ -393,8 +429,10 @@ export function useSessionHistory(
 				setLocalSessionIds(
 					new Set(localSessions.map((s) => s.sessionId)),
 				);
-				setNextCursor(undefined); // No pagination for local sessions
+				setCursor(undefined); // No pagination for local sessions
 				setError(null);
+				// A superseded in-flight request no longer clears `loading`.
+				setLoading(false);
 				return;
 			}
 
@@ -414,18 +452,19 @@ export function useSessionHistory(
 					localSessions,
 				);
 				setSessions(sessionsWithLocalTitles);
-				setNextCursor(cacheRef.current!.nextCursor);
+				setCursor(cacheRef.current!.nextCursor);
 				setError(null);
+				setLoading(false);
 				return;
 			}
 
 			setLoading(true);
 			setError(null);
-			currentCwdRef.current = cwd;
 
 			try {
 				const result: ListSessionsResult =
 					await agentClient.listSessions(cwd);
+				if (generation !== listGenerationRef.current) return;
 
 				// Merge with local titles for better UX
 				// (some agents return poor quality titles)
@@ -443,7 +482,7 @@ export function useSessionHistory(
 				setLocalSessionIds(
 					new Set(localSessions.map((s) => s.sessionId)),
 				);
-				setNextCursor(result.nextCursor);
+				setCursor(result.nextCursor);
 
 				// Update cache (with merged titles)
 				cacheRef.current = {
@@ -453,12 +492,15 @@ export function useSessionHistory(
 					timestamp: Date.now(),
 				};
 			} catch (err) {
+				if (generation !== listGenerationRef.current) return;
 				const errorMessage = extractErrorMessage(err);
 				setError(`Failed to fetch sessions: ${errorMessage}`);
 				setSessions([]);
-				setNextCursor(undefined);
+				setCursor(undefined);
 			} finally {
-				setLoading(false);
+				if (generation === listGenerationRef.current) {
+					setLoading(false);
+				}
 			}
 		},
 		[
@@ -468,6 +510,7 @@ export function useSessionHistory(
 			isCacheValid,
 			settingsAccess,
 			session.agentId,
+			setCursor,
 		],
 	);
 
@@ -476,60 +519,89 @@ export function useSessionHistory(
 	 * Appends to existing sessions list.
 	 */
 	const loadMoreSessions = useCallback(async () => {
-		// Guard: Check if there's more to load
-		if (!nextCursor || !capabilities.canList) {
+		const cursor = nextCursorRef.current;
+		const cwd = currentCwdRef.current;
+		const generation = listGenerationRef.current;
+		// Guard: more to load, and no page of this listing already on its way
+		if (
+			!cursor ||
+			!capabilities.canList ||
+			loadMoreGenerationRef.current === generation
+		) {
 			return;
 		}
 
+		loadMoreGenerationRef.current = generation;
+		usedCursorsRef.current.add(cursor);
 		setLoading(true);
-		setError(null);
+		setLoadMoreError(null);
 
 		try {
 			const result: ListSessionsResult = await agentClient.listSessions(
-				currentCwdRef.current,
-				nextCursor,
+				cwd,
+				cursor,
 			);
+			if (generation !== listGenerationRef.current) return;
 
 			// Merge with local titles for better UX
 			// (some agents return poor quality titles)
 			const localSessions = settingsAccess.getSavedSessions(
 				session.agentId,
-				currentCwdRef.current,
+				cwd,
 			);
 			const sessionsWithLocalTitles = mergeWithLocalTitles(
 				result.sessions,
 				localSessions,
 			);
+			// A cursor handed back again ends the listing instead of paging
+			// in a circle
+			const newCursor = nextPageCursor(
+				result.nextCursor,
+				usedCursorsRef.current,
+			);
+			if (newCursor === undefined && result.nextCursor !== undefined) {
+				getLogger().warn(
+					`[useSessionHistory] session/list returned a cursor already used for this listing (${result.nextCursor}); ending the listing`,
+				);
+			}
 
 			// Append new sessions to existing list (use functional setState)
-			setSessions((prev) => [...prev, ...sessionsWithLocalTitles]);
+			setSessions((prev) =>
+				appendUniqueSessions(prev, sessionsWithLocalTitles),
+			);
 			setLocalSessionIds(new Set(localSessions.map((s) => s.sessionId)));
-			setNextCursor(result.nextCursor);
+			setCursor(newCursor);
 
 			// Update cache with appended sessions (with merged titles)
 			if (cacheRef.current) {
 				cacheRef.current = {
 					...cacheRef.current,
-					sessions: [
-						...cacheRef.current.sessions,
-						...sessionsWithLocalTitles,
-					],
-					nextCursor: result.nextCursor,
+					sessions: appendUniqueSessions(
+						cacheRef.current.sessions,
+						sessionsWithLocalTitles,
+					),
+					nextCursor: newCursor,
 					timestamp: Date.now(),
 				};
 			}
 		} catch (err) {
+			if (generation !== listGenerationRef.current) return;
 			const errorMessage = extractErrorMessage(err);
-			setError(`Failed to load more sessions: ${errorMessage}`);
+			setLoadMoreError(`Failed to load more sessions: ${errorMessage}`);
 		} finally {
-			setLoading(false);
+			if (loadMoreGenerationRef.current === generation) {
+				loadMoreGenerationRef.current = null;
+			}
+			if (generation === listGenerationRef.current) {
+				setLoading(false);
+			}
 		}
 	}, [
 		agentClient,
 		capabilities.canList,
-		nextCursor,
 		settingsAccess,
 		session.agentId,
+		setCursor,
 	]);
 
 	/**
@@ -842,6 +914,7 @@ export function useSessionHistory(
 			sessions,
 			loading,
 			error,
+			loadMoreError,
 			hasMore: nextCursor !== undefined,
 
 			// Capability flags
@@ -872,6 +945,7 @@ export function useSessionHistory(
 			sessions,
 			loading,
 			error,
+			loadMoreError,
 			nextCursor,
 			capabilities.canList,
 			capabilities.canLoad,

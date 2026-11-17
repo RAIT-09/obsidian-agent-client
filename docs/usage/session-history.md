@@ -40,6 +40,16 @@ When the agent supports listing sessions, two checkboxes above the list narrow i
 
 Your choices are remembered, so the modal reopens with the filters you last used.
 
+## Searching and Paging
+
+Type in the search box at the top of the list to find sessions by title. The search ignores case, and every word you type must appear in the title, in any order (`hover preview` finds "Fix hover link preview").
+
+The list shows 50 sessions per page; use the arrows below it to move between pages. Older sessions are fetched from the agent as you page forward. While you search, or while **Hide sessions without local data** is on, the modal keeps fetching until the agent's whole history has been covered. A `+` after the total (e.g. `1–50 of 1000+`) means there are still sessions left to fetch. If fetching more fails, the sessions already loaded stay, with a **Retry** button below them.
+
+::: tip
+The list only contains sessions the agent still keeps. Some agents delete old sessions on their own — Claude Code, for example, removes transcripts not used for 30 days unless you raise [`cleanupPeriodDays`](https://code.claude.com/docs/en/settings-reference#cleanupperioddays) in its settings.
+:::
+
 ## Session Storage
 
 Sessions are saved automatically when you send messages. The plugin stores:
