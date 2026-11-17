@@ -34,6 +34,10 @@ import { getVaultDragFiles, mimeTypeFromExtension } from "../utils/vault-drag";
 import type { ErrorInfo } from "../types/errors";
 import type { AgentUpdateNotification } from "../services/update-checker";
 import { useSettings } from "../hooks/useSettings";
+import {
+	useSuggestionKeymap,
+	type SuggestionKeyActions,
+} from "../hooks/useSuggestionKeymap";
 
 // ============================================================================
 // Image Constants
@@ -343,6 +347,7 @@ export function InputArea({
 
 	// Refs
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const inputWrapperRef = useRef<HTMLDivElement>(null);
 	const dragCounterRef = useRef(0);
 
 	// Clear attached files when agent changes
@@ -901,76 +906,40 @@ export function InputArea({
 	]);
 
 	/**
-	 * Handle dropdown keyboard navigation.
+	 * Keys for the open dropdown (slash commands take precedence), handled
+	 * through Obsidian's keymap like its own suggestion popups.
 	 */
-	const handleDropdownKeyPress = useCallback(
-		(e: React.KeyboardEvent): boolean => {
-			const isSlashCommandActive = slashCommands.isOpen;
-			const isMentionActive = mentions.isOpen;
-
-			if (!isSlashCommandActive && !isMentionActive) {
-				return false;
-			}
-
-			// Arrow navigation
-			if (e.key === "ArrowDown") {
-				e.preventDefault();
-				if (isSlashCommandActive) {
-					slashCommands.navigate("down");
-				} else {
-					mentions.navigate("down");
-				}
-				return true;
-			}
-
-			if (e.key === "ArrowUp") {
-				e.preventDefault();
-				if (isSlashCommandActive) {
-					slashCommands.navigate("up");
-				} else {
-					mentions.navigate("up");
-				}
-				return true;
-			}
-
-			// Select item (Enter or Tab)
-			if (e.key === "Enter" || e.key === "Tab") {
-				// Skip Enter during IME composition (allow Tab to still work)
-				if (e.key === "Enter" && e.nativeEvent.isComposing) {
-					return false;
-				}
-				e.preventDefault();
-				if (isSlashCommandActive) {
+	const dropdownKeyActions = useMemo((): SuggestionKeyActions | null => {
+		if (slashCommands.isOpen) {
+			return {
+				navigate: slashCommands.navigate,
+				select: () => {
 					const selectedCommand =
 						slashCommands.suggestions[slashCommands.selectedIndex];
 					if (selectedCommand) {
 						handleSelectSlashCommand(selectedCommand);
 					}
-				} else {
+				},
+				close: slashCommands.close,
+			};
+		}
+		if (mentions.isOpen) {
+			return {
+				navigate: mentions.navigate,
+				select: () => {
 					const selectedSuggestion =
 						mentions.suggestions[mentions.selectedIndex];
 					if (selectedSuggestion) {
 						selectMention(selectedSuggestion);
 					}
-				}
-				return true;
-			}
+				},
+				close: mentions.close,
+			};
+		}
+		return null;
+	}, [slashCommands, mentions, handleSelectSlashCommand, selectMention]);
 
-			// Close dropdown (Escape)
-			if (e.key === "Escape") {
-				e.preventDefault();
-				if (isSlashCommandActive) {
-					slashCommands.close();
-				} else {
-					mentions.close();
-				}
-				return true;
-			}
-
-			return false;
-		},
-		[slashCommands, mentions, handleSelectSlashCommand, selectMention],
-	);
+	useSuggestionKeymap(plugin.app, inputWrapperRef, dropdownKeyActions);
 
 	// Button disabled state - also allow sending if files are attached
 	const isButtonDisabled =
@@ -984,10 +953,8 @@ export function InputArea({
 	 */
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
-			// Handle dropdown navigation first
-			if (handleDropdownKeyPress(e)) {
-				return;
-			}
+			// An open dropdown takes its keys before they get here
+			// (useSuggestionKeymap)
 
 			// Handle input history navigation (ArrowUp/ArrowDown)
 			if (handleHistoryKeyDown(e, textareaRef.current)) {
@@ -1015,7 +982,6 @@ export function InputArea({
 			}
 		},
 		[
-			handleDropdownKeyPress,
 			handleHistoryKeyDown,
 			isSending,
 			isButtonDisabled,
@@ -1210,7 +1176,10 @@ export function InputArea({
 				)}
 
 				{/* Textarea with Hint Overlay */}
-				<div className="agent-client-textarea-wrapper">
+				<div
+					ref={inputWrapperRef}
+					className="agent-client-textarea-wrapper"
+				>
 					<textarea
 						ref={textareaRef}
 						value={inputValue}

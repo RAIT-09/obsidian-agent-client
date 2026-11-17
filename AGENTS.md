@@ -38,6 +38,7 @@ src/
 │   ├── useAgentSession.ts       # Session lifecycle, config options, optimistic updates
 │   ├── useAgentMessages.ts      # Message state, streaming (RAF batch), permissions
 │   ├── useSuggestions.ts        # @[[note]] mentions + /command suggestions (unified)
+│   ├── useSuggestionKeymap.ts   # Dropdown keys via an Obsidian Scope (arrows, Ctrl+P/N, Enter, Tab, Esc)
 │   ├── useSessionHistory.ts     # Session list/load/resume/fork
 │   ├── useChatActions.ts        # Business callbacks (send, newChat, export, restart, etc.)
 │   ├── useHistoryModal.ts       # Session history modal lifecycle
@@ -140,6 +141,7 @@ FloatingChatView uses `onRegisterExpanded` callback (not CustomEvent) for expand
 - Slash command filtering and selection
 - Auto-mention toggle coordination (slash commands disable auto-mention)
 - Return is `useMemo`-wrapped (mentions + commands objects)
+- Dropdown keys are not handled in the input's `onKeyDown`: `useSuggestionKeymap` (called by InputArea) pushes an Obsidian `Scope` while a dropdown is open and the input has focus, so the keys win over Obsidian hotkeys like native suggestion popups
 
 **useChatActions**: Business callbacks
 - handleSendMessage, handleNewChat, handleExportChat, handleRestartAgent, etc.
