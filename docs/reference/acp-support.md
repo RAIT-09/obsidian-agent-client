@@ -27,6 +27,7 @@ Methods the plugin can call on agents.
 | `session/list` | ✅ Supported | Unstable API |
 | `session/resume` | ✅ Supported | Unstable API |
 | `session/fork` | ✅ Supported | Unstable API |
+| `session/delete` | ✅ Supported | |
 | `session/set_config_option` | ✅ Supported | |
 
 ::: tip

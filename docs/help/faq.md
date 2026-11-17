@@ -151,7 +151,7 @@ Yes. The plugin automatically saves session metadata and message history when yo
 
 ### Can I delete old sessions?
 
-Yes. Open the session history modal and click the **Delete** button (trash icon) on any session. Deletion is permanent.
+Yes. Open the session history modal and click the **Delete** button (trash icon) on the session. A session that is open in a chat can't be deleted until you start a new chat there or close it. Deletion is permanent. If the agent supports deleting sessions (such as Claude Code), the session is deleted on the agent side too; otherwise only the plugin's copy is removed. See [Deleting Sessions](/usage/session-history#deleting-sessions).
 
 ## Windows
 
