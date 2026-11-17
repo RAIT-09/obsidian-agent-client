@@ -328,6 +328,14 @@ export default class AgentClientPlugin extends Plugin {
 			(leaf) => new SessionManagerView(leaf, this),
 		);
 
+		// Let Page preview show hover popovers for links in chat messages
+		// (emitted by useHoverLinkPreview). Mod+hover by default, like the
+		// editor; users can change it in Page preview settings.
+		this.registerHoverLinkSource(this.manifest.id, {
+			display: this.manifest.name,
+			defaultMod: true,
+		});
+
 		const ribbonIconEl = this.addRibbonIcon(
 			"bot-message-square",
 			"Open agent client",
