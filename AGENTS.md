@@ -32,6 +32,7 @@ src/
 │   ├── message-sender.ts        # Prompt preparation + sending (pure functions)
 │   ├── chat-exporter.ts         # Markdown export with frontmatter
 │   ├── view-registry.ts         # Multi-view management, focus, broadcast
+│   ├── update-batcher.ts        # Per-frame batching of streaming updates (timer fallback)
 │   └── update-checker.ts        # Agent/plugin version checking
 ├── hooks/                       # React custom hooks (state + logic)
 │   ├── useAgent.ts              # Facade: composes useAgentSession + useAgentMessages
@@ -131,7 +132,7 @@ FloatingChatView uses `onRegisterExpanded` callback (not CustomEvent) for expand
 
 **useAgentMessages**: Messaging + streaming + permissions
 - `sendMessage()`: Prepare (auto-mention, path conversion) → send via AcpClient
-- RAF batching: streaming updates accumulated per-frame via `requestAnimationFrame`
+- Frame batching (`UpdateBatcher`): streaming updates applied once per `requestAnimationFrame`, with a timer fallback (no frames while the window isn't drawn) and a flush when the prompt RPC settles, so the turn-end save always has the reply
 - Tool call index: `Map<string, number>` for O(1) upsert
 - `ignoreUpdatesRef`: suppresses history replay during session/load
 - `sendPromiseRef`: serializes sends and gates out `user_message_chunk` echoes while the prompt RPC is open
@@ -249,7 +250,7 @@ interface ISettingsAccess {
 2. **sessionRef pattern**: useAgentSession stores session in useRef for callback access without adding session to deps
 3. **Individual method deps**: useChatActions uses `agent.sendMessage` not `agent` as deps — prevents callback recreation when unrelated state changes
 4. **Workspace event refs**: ChatPanel stores event handler callbacks in refs, keeping useEffect deps minimal
-5. **RAF batching**: useAgentMessages batches streaming updates per animation frame (~60fps) instead of per-chunk
+5. **Frame batching**: useAgentMessages batches streaming updates per animation frame (~60fps) instead of per-chunk (`UpdateBatcher`; never rely on frames alone — they stop while the window isn't drawn)
 6. **React.memo**: MessageBubble, ToolCallBlock, TerminalBlock wrapped for skip-render optimization
 7. **Virtual scroll**: MessageList uses @tanstack/react-virtual for large conversations
 8. **O(1) tool call index**: Map<string, number> for tool call upsert without linear scan
