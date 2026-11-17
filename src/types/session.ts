@@ -624,6 +624,8 @@ export interface SessionCapabilities {
 	fork?: Record<string, unknown>;
 	/** session/list support (unstable) */
 	list?: Record<string, unknown>;
+	/** session/delete support */
+	delete?: Record<string, unknown>;
 }
 
 /**
