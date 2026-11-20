@@ -25,6 +25,7 @@ import {
 	buildWslEnv,
 } from "../utils/platform";
 import { resolveNodeDirectory } from "../utils/paths";
+import { buildPromptInjectionInstructions } from "../utils/prompt-injection";
 import {
 	extractStderrErrorHint,
 	getSpawnErrorInfo,
@@ -116,6 +117,13 @@ export class AcpClient {
 	private isInitializedFlag = false;
 	private currentAgentId: string | null = null;
 	private currentSessionId: string | null = null;
+	/** Whether the agent takes `systemPrompt` (`sessionCapabilities.systemPrompt`) */
+	private takesSystemPrompt = false;
+	/**
+	 * The prompt-injection instructions in each session's system prompt, as
+	 * this client sent them, by session id
+	 */
+	private sessionPromptInjection = new Map<string, string[]>();
 
 	// Callbacks (none — all events flow through onSessionUpdate via AcpHandler)
 
@@ -175,6 +183,13 @@ export class AcpClient {
 			this.logger.log("[AcpClient] Cleaning up existing connection");
 			this.connection = null;
 		}
+
+		// Not initialized until this agent answers: a chat that switches back
+		// to the previous agent meanwhile must start it again rather than
+		// send its session to the process being started here.
+		this.isInitializedFlag = false;
+		this.currentAgentId = null;
+		this.takesSystemPrompt = false;
 
 		this.currentConfig = config;
 
@@ -475,7 +490,8 @@ export class AcpClient {
 			.onRequest("terminal/release", (ctx) =>
 				this.handler.releaseTerminal(ctx.params),
 			);
-		this.connection = app.connect(stream);
+		const connection = app.connect(stream);
+		this.connection = connection;
 
 		try {
 			this.logger.log("[AcpClient] Starting ACP initialization...");
@@ -507,16 +523,28 @@ export class AcpClient {
 			// update-checker behavior can be verified from the debug log.
 			this.logger.log("[AcpClient] Agent info:", initResult.agentInfo);
 
+			// The connection closed, or a newer initialize (another agent)
+			// replaced it, meanwhile: leave the current state alone.
+			if (this.connection !== connection) {
+				throw new Error("The agent connection closed or was replaced");
+			}
+
 			this.isInitializedFlag = true;
 			this.currentAgentId = config.id;
+			this.takesSystemPrompt =
+				!!initResult.agentCapabilities?.sessionCapabilities
+					?.systemPrompt;
 
 			return AcpTypeConverter.toInitializeResult(initResult);
 		} catch (error) {
 			this.logger.error("[AcpClient] Initialization Error:", error);
 
-			// Reset flags on failure
-			this.isInitializedFlag = false;
-			this.currentAgentId = null;
+			// Reset flags on failure, unless they belong to a newer connection
+			if (this.connection === connection) {
+				this.isInitializedFlag = false;
+				this.currentAgentId = null;
+				this.takesSystemPrompt = false;
+			}
 
 			throw error;
 		}
@@ -560,10 +588,20 @@ export class AcpClient {
 		try {
 			this.logger.log("[AcpClient] Creating new session...");
 
+			const promptInjection = this.systemPromptInstructions(
+				buildPromptInjectionInstructions(
+					this.plugin.settings.promptInjection,
+				),
+			);
 			const response = await connection.agent.request("session/new", {
 				cwd: this.toSessionCwd(workingDirectory),
 				mcpServers: [],
+				...this.systemPromptParams(promptInjection),
 			});
+			this.sessionPromptInjection.set(
+				response.sessionId,
+				promptInjection,
+			);
 
 			this.logger.log(
 				`[AcpClient] Created session: ${response.sessionId}`,
@@ -744,6 +782,9 @@ export class AcpClient {
 		this.isInitializedFlag = false;
 		this.currentAgentId = null;
 		this.currentSessionId = null;
+		this.takesSystemPrompt = false;
+		// sessionPromptInjection stays: a turn that ends after a restart still
+		// saves its session with the instructions it was set up with.
 
 		this.logger.log("[AcpClient] Disconnected");
 		return Promise.resolve();
@@ -880,6 +921,38 @@ export class AcpClient {
 	}
 
 	/**
+	 * The prompt-injection instructions in the session's system prompt: those
+	 * this client sent when it set the session up (session/new, load, resume
+	 * or fork). Prompts carry the instructions it lacks (useAgentMessages).
+	 */
+	getSessionPromptInjection(sessionId: string): string[] {
+		return this.sessionPromptInjection.get(sessionId) ?? [];
+	}
+
+	/**
+	 * The prompt-injection instructions to put in the system prompt of a
+	 * session being set up: none when the agent does not take a system
+	 * prompt. Saved instructions come from data.json, so keep strings only.
+	 */
+	private systemPromptInstructions(instructions: unknown): string[] {
+		if (!this.takesSystemPrompt || !Array.isArray(instructions)) return [];
+		return instructions.filter((i): i is string => typeof i === "string");
+	}
+
+	/**
+	 * `systemPrompt` for session/new, load, resume or fork: the instructions,
+	 * appended to the agent's own system prompt, where they stay through
+	 * compaction. Nothing for no instructions.
+	 */
+	private systemPromptParams(instructions: string[]): {
+		systemPrompt?: acp.SystemPrompt;
+	} {
+		const systemPrompt =
+			AcpTypeConverter.toAppendedSystemPrompt(instructions);
+		return systemPrompt ? { systemPrompt } : {};
+	}
+
+	/**
 	 * Convert working directory to WSL path if in WSL mode on Windows.
 	 */
 	private toSessionCwd(cwd: string): string {
@@ -991,10 +1064,20 @@ export class AcpClient {
 	 *
 	 * @param sessionId - Session to load
 	 * @param cwd - Working directory
+	 * @param promptInjection - The prompt-injection instructions the session
+	 *   was set up with (saved with it), which go in its system prompt again:
+	 *   ACP asks clients to send the value a session was created with
 	 * @returns Promise resolving to session result with modes and models
 	 */
-	async loadSession(sessionId: string, cwd: string): Promise<SessionResult> {
+	async loadSession(
+		sessionId: string,
+		cwd: string,
+		promptInjection?: readonly string[],
+	): Promise<SessionResult> {
 		const connection = this.requireConnection();
+		const instructions = this.systemPromptInstructions(
+			promptInjection ?? this.sessionPromptInjection.get(sessionId),
+		);
 
 		// Set sessionId before await so replay updates pass the sessionId filter
 		this.currentSessionId = sessionId;
@@ -1006,7 +1089,9 @@ export class AcpClient {
 				sessionId,
 				cwd: this.toSessionCwd(cwd),
 				mcpServers: [],
+				...this.systemPromptParams(instructions),
 			});
+			this.sessionPromptInjection.set(sessionId, instructions);
 
 			this.logger.log(`[AcpClient] Session loaded: ${sessionId}`);
 			const result = AcpTypeConverter.toSessionResult(
@@ -1028,13 +1113,19 @@ export class AcpClient {
 	 *
 	 * @param sessionId - Session to resume
 	 * @param cwd - Working directory
+	 * @param promptInjection - The prompt-injection instructions the session
+	 *   was set up with (see loadSession)
 	 * @returns Promise resolving to session result with modes and models
 	 */
 	async resumeSession(
 		sessionId: string,
 		cwd: string,
+		promptInjection?: readonly string[],
 	): Promise<SessionResult> {
 		const connection = this.requireConnection();
+		const instructions = this.systemPromptInstructions(
+			promptInjection ?? this.sessionPromptInjection.get(sessionId),
+		);
 
 		// Set sessionId before await so any updates pass the sessionId filter
 		this.currentSessionId = sessionId;
@@ -1046,7 +1137,9 @@ export class AcpClient {
 				sessionId,
 				cwd: this.toSessionCwd(cwd),
 				mcpServers: [],
+				...this.systemPromptParams(instructions),
 			});
+			this.sessionPromptInjection.set(sessionId, instructions);
 
 			this.logger.log(`[AcpClient] Session resumed: ${sessionId}`);
 			const result = AcpTypeConverter.toSessionResult(
@@ -1068,10 +1161,19 @@ export class AcpClient {
 	 *
 	 * @param sessionId - Session to fork from
 	 * @param cwd - Working directory
+	 * @param promptInjection - The prompt-injection instructions the source
+	 *   session was set up with (see loadSession), which the fork gets too
 	 * @returns Promise resolving to session result with new sessionId
 	 */
-	async forkSession(sessionId: string, cwd: string): Promise<SessionResult> {
+	async forkSession(
+		sessionId: string,
+		cwd: string,
+		promptInjection?: readonly string[],
+	): Promise<SessionResult> {
 		const connection = this.requireConnection();
+		const instructions = this.systemPromptInstructions(
+			promptInjection ?? this.sessionPromptInjection.get(sessionId),
+		);
 
 		try {
 			this.logger.log(`[AcpClient] Forking session: ${sessionId}...`);
@@ -1085,7 +1187,9 @@ export class AcpClient {
 				sessionId,
 				cwd: this.toSessionCwd(cwd),
 				mcpServers: [],
+				...this.systemPromptParams(instructions),
 			});
+			this.sessionPromptInjection.set(response.sessionId, instructions);
 
 			this.logger.log(
 				`[AcpClient] Session forked: ${sessionId} -> ${response.sessionId}`,

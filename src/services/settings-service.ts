@@ -118,6 +118,16 @@ export interface ISettingsAccess {
 		patch: Partial<Omit<SavedSessionInfo, "sessionId" | "createdAt">>,
 	): Promise<void>;
 
+	/**
+	 * The prompt-injection instructions saved with a session (its index entry,
+	 * or its transcript once the entry is evicted), to send again when it is
+	 * restored or forked. Undefined when none are saved for this agent.
+	 */
+	getSessionPromptInjection(
+		sessionId: string,
+		agentId?: string,
+	): Promise<string[] | undefined>;
+
 	// ============================================================
 	// Session Message History Methods
 	// ============================================================
@@ -321,6 +331,16 @@ export class SettingsService implements ISettingsAccess {
 		sessionId: string,
 	): Promise<ChatMessage[] | null> {
 		return this.sessionStorage.loadSessionMessages(sessionId);
+	}
+
+	getSessionPromptInjection(
+		sessionId: string,
+		agentId?: string,
+	): Promise<string[] | undefined> {
+		return this.sessionStorage.getSessionPromptInjection(
+			sessionId,
+			agentId,
+		);
 	}
 
 	async deleteSessionMessages(sessionId: string): Promise<void> {

@@ -24,6 +24,7 @@ import type { ErrorInfo } from "../types/errors";
 import type { IMentionService } from "../utils/mention-parser";
 import { preparePrompt, sendPreparedPrompt } from "../services/message-sender";
 import { extractErrorMessage } from "../utils/error-utils";
+import { promptInjectionForPrompts } from "../utils/prompt-injection";
 import { Platform } from "obsidian";
 import {
 	rebuildToolCallIndex,
@@ -50,8 +51,11 @@ export interface SendMessageOptions {
 	images?: ImagePromptContent[];
 	/** Attached file references (resource links) */
 	resourceLinks?: ResourceLinkPromptContent[];
-	/** Whether this is the first message in the session */
-	isFirstMessage?: boolean;
+	/**
+	 * Whether the prompt-injection instructions have yet to go with a prompt
+	 * of this session (see promptInjectionPending in message-sender)
+	 */
+	promptInjectionPending?: boolean;
 }
 
 export interface UseAgentMessagesReturn {
@@ -317,14 +321,11 @@ export function useAgentMessages(
 					maxNoteLength: settings.displaySettings.maxNoteLength,
 					maxSelectionLength:
 						settings.displaySettings.maxSelectionLength,
-					isFirstMessage: options.isFirstMessage,
-					promptInjection: settings.promptInjection.enabled
-						? {
-								latex: settings.promptInjection.latex,
-								wikiLinks: settings.promptInjection.wikiLinks,
-								tables: settings.promptInjection.tables,
-							}
-						: undefined,
+					promptInjectionPending: options.promptInjectionPending,
+					promptInjection: promptInjectionForPrompts(
+						settings.promptInjection,
+						agentClient.getSessionPromptInjection(currentSessionId),
+					),
 					expandWikilinkContext: settings.expandWikilinkContext,
 					wikilinkResolver: vaultAccess,
 				},

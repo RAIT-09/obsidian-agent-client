@@ -225,6 +225,20 @@ export class AcpTypeConverter {
 	}
 
 	/**
+	 * A `systemPrompt` that appends the given instructions to the agent's own,
+	 * one text block each; undefined for none (ACP forbids empty content).
+	 */
+	static toAppendedSystemPrompt(
+		instructions: string[],
+	): acp.SystemPrompt | undefined {
+		if (instructions.length === 0) return undefined;
+		return {
+			mode: "append",
+			content: instructions.map((text) => ({ type: "text", text })),
+		};
+	}
+
+	/**
 	 * Convert ACP session response to domain SessionResult.
 	 *
 	 * Handles the modes/models/configOptions conversion that is common

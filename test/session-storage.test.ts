@@ -425,6 +425,89 @@ describe("SessionStorage — transcript metadata snapshot (self-contained archiv
 	});
 });
 
+describe("SessionStorage — saved prompt-injection instructions", () => {
+	const makeMessage = (text: string): ChatMessage => ({
+		id: "m1",
+		role: "user",
+		content: [{ type: "text", text }],
+		timestamp: new Date("2026-03-01T00:00:00.000Z"),
+	});
+
+	it("snapshots them into the transcript, and reads them from it once the entry is evicted", async () => {
+		const { storage, state } = makeStorage();
+		state.savedSessions = [
+			makeSession({ sessionId: "s1", promptInjection: ["wiki"] }),
+		];
+		expect(await storage.getSessionPromptInjection("s1", "claude")).toEqual(
+			["wiki"],
+		);
+
+		await storage.saveSessionMessages("s1", "claude", [makeMessage("hi")]);
+		state.savedSessions = []; // evicted from the index
+		expect(await storage.getSessionPromptInjection("s1", "claude")).toEqual(
+			["wiki"],
+		);
+		// The next save carries them over from the old snapshot
+		await storage.saveSessionMessages("s1", "claude", [
+			makeMessage("more"),
+		]);
+		expect(await storage.getSessionPromptInjection("s1")).toEqual(["wiki"]);
+	});
+
+	it("keeps them through a rename that recreates an evicted session's entry", async () => {
+		const { storage, state } = makeStorage();
+		state.savedSessions = [
+			makeSession({ sessionId: "s1", promptInjection: ["wiki"] }),
+		];
+		await storage.saveSessionMessages("s1", "claude", [makeMessage("hi")]);
+		state.savedSessions = []; // evicted from the index
+
+		await storage.updateSessionTitle("s1", "Renamed", {
+			agentId: "claude",
+			cwd: "/vault",
+		});
+		expect(await storage.getSessionPromptInjection("s1", "claude")).toEqual(
+			["wiki"],
+		);
+		await storage.saveSessionMessages("s1", "claude", [
+			makeMessage("more"),
+		]);
+		state.savedSessions = []; // evicted again
+		expect(await storage.getSessionPromptInjection("s1", "claude")).toEqual(
+			["wiki"],
+		);
+	});
+
+	it("has none for another agent's session, an unknown one, or a malformed value", async () => {
+		const { storage, state, files } = makeStorage();
+		state.savedSessions = [
+			makeSession({ sessionId: "s1", promptInjection: ["wiki"] }),
+			makeSession({
+				sessionId: "bad",
+				promptInjection: "wiki" as unknown as string[],
+			}),
+		];
+		files.set(
+			filePath("other"),
+			JSON.stringify({
+				version: 1,
+				sessionId: "other",
+				agentId: "codex",
+				promptInjection: ["wiki"],
+				messages: [],
+			}),
+		);
+		expect(
+			await storage.getSessionPromptInjection("s1", "codex"),
+		).toBeUndefined();
+		expect(
+			await storage.getSessionPromptInjection("other", "claude"),
+		).toBeUndefined();
+		expect(await storage.getSessionPromptInjection("none")).toBeUndefined();
+		expect(await storage.getSessionPromptInjection("bad")).toBeUndefined();
+	});
+});
+
 describe("SessionStorage — rename syncs the transcript's title snapshot", () => {
 	it("patches the title in the file and leaves everything else intact", async () => {
 		const { storage, state, files } = makeStorage();

@@ -5,7 +5,7 @@
  * config changes, and related UI state (restoredMessage, agentUpdateNotification).
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Notice, Platform } from "obsidian";
 
 import type AgentClientPlugin from "../plugin";
@@ -22,6 +22,7 @@ import type {
 import type { AgentClientPluginSettings } from "../plugin";
 import type { AgentUpdateNotification } from "../services/update-checker";
 import { ChatExporter } from "../services/chat-exporter";
+import { promptInjectionPending } from "../services/message-sender";
 import { getLogger } from "../utils/logger";
 import { buildFileUri } from "../utils/paths";
 import { convertWindowsPathToWsl } from "../utils/platform";
@@ -90,6 +91,11 @@ export function useChatActions(
 	const [restoredMessage, setRestoredMessage] = useState<string | null>(null);
 	const [agentUpdateNotification, setAgentUpdateNotification] =
 		useState<AgentUpdateNotification | null>(null);
+
+	// Read when a prompt is sent, so that handleSendMessage need not change
+	// with every streamed chunk
+	const messagesRef = useRef(messages);
+	messagesRef.current = messages;
 
 	// ============================================================
 	// Auto-export
@@ -187,7 +193,9 @@ export function useChatActions(
 				images: images.length > 0 ? images : undefined,
 				resourceLinks:
 					resourceLinks.length > 0 ? resourceLinks : undefined,
-				isFirstMessage,
+				promptInjectionPending: promptInjectionPending(
+					messagesRef.current,
+				),
 			});
 
 			// Save session metadata locally on first message

@@ -533,6 +533,29 @@ export function useSessionHistory(
 	]);
 
 	/**
+	 * The prompt-injection instructions saved with a session, which go in its
+	 * system prompt again when it is restored or forked
+	 */
+	const savedPromptInjection = useCallback(
+		(sessionId: string): Promise<string[] | undefined> =>
+			settingsAccess.getSessionPromptInjection(
+				sessionId,
+				session.agentId || undefined,
+			),
+		[settingsAccess, session.agentId],
+	);
+
+	/** The prompt-injection instructions to save with a session, if it has any */
+	const promptInjectionToSave = useCallback(
+		(sessionId: string): Pick<SavedSessionInfo, "promptInjection"> => {
+			const promptInjection =
+				agentClient.getSessionPromptInjection(sessionId);
+			return promptInjection.length > 0 ? { promptInjection } : {};
+		},
+		[agentClient],
+	);
+
+	/**
 	 * Restore a specific session by ID.
 	 * Uses load if available (with history replay), otherwise resume (without history replay).
 	 */
@@ -545,6 +568,7 @@ export function useSessionHistory(
 				// IMPORTANT: Update session.sessionId BEFORE calling restore
 				// so that session/update notifications are not ignored
 				onSessionLoad(sessionId, undefined, undefined);
+				const promptInjection = await savedPromptInjection(sessionId);
 
 				if (capabilities.canLoad) {
 					// Check local messages first to decide whether to use them or agent replay
@@ -559,6 +583,7 @@ export function useSessionHistory(
 							const result = await agentClient.loadSession(
 								sessionId,
 								cwd,
+								promptInjection,
 							);
 							onSessionLoad(
 								result.sessionId,
@@ -574,6 +599,7 @@ export function useSessionHistory(
 						const result = await agentClient.loadSession(
 							sessionId,
 							cwd,
+							promptInjection,
 						);
 						onSessionLoad(
 							result.sessionId,
@@ -586,6 +612,7 @@ export function useSessionHistory(
 					const result = await agentClient.resumeSession(
 						sessionId,
 						cwd,
+						promptInjection,
 					);
 					onSessionLoad(
 						result.sessionId,
@@ -616,6 +643,7 @@ export function useSessionHistory(
 			capabilities.canResume,
 			onSessionLoad,
 			settingsAccess,
+			savedPromptInjection,
 			onMessagesRestore,
 			onIgnoreUpdates,
 			onClearMessages,
@@ -633,7 +661,11 @@ export function useSessionHistory(
 			setError(null);
 
 			try {
-				const result = await agentClient.forkSession(sessionId, cwd);
+				const result = await agentClient.forkSession(
+					sessionId,
+					cwd,
+					await savedPromptInjection(sessionId),
+				);
 
 				// Update with new session ID and modes/models from result
 				// For fork, the new session ID is returned in result
@@ -668,6 +700,7 @@ export function useSessionHistory(
 						agentId: session.agentId,
 						cwd,
 						title: newTitle,
+						...promptInjectionToSave(result.sessionId),
 						createdAt: now,
 						updatedAt: now,
 					});
@@ -696,6 +729,8 @@ export function useSessionHistory(
 			agentClient,
 			onSessionLoad,
 			settingsAccess,
+			savedPromptInjection,
+			promptInjectionToSave,
 			onMessagesRestore,
 			invalidateCache,
 			session.agentId,
@@ -796,11 +831,12 @@ export function useSessionHistory(
 				cwd: agentCwd,
 				title,
 				embedId,
+				...promptInjectionToSave(sessionId),
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			});
 		},
-		[session.agentId, agentCwd, settingsAccess],
+		[session.agentId, agentCwd, settingsAccess, promptInjectionToSave],
 	);
 
 	/**

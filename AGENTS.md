@@ -72,6 +72,7 @@ src/
 │   ├── paths.ts                 # Path resolution, file:// URI, internal-link href → linktext
 │   ├── error-utils.ts           # ACP error conversion
 │   ├── mention-parser.ts        # @[[note]] detection/extraction
+│   ├── prompt-injection.ts      # Obsidian Markdown instructions (system prompt / first prompt)
 │   └── logger.ts                # Debug-mode logger
 ├── plugin.ts                    # Obsidian plugin lifecycle, settings persistence
 └── main.ts                      # Entry point

@@ -567,6 +567,12 @@ export interface SavedSessionInfo {
 	 * session and stay recoverable. Device-local; never written into note content.
 	 */
 	embedId?: string;
+	/**
+	 * The prompt-injection instructions in the session's system prompt,
+	 * which go in it again when the session is restored or forked. Absent
+	 * when it has none.
+	 */
+	promptInjection?: string[];
 	/** ISO 8601 timestamp of session creation */
 	createdAt: string;
 	/** ISO 8601 timestamp of last activity */

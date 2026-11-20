@@ -33,6 +33,8 @@ Methods the plugin can call on agents.
 Methods marked "Unstable API" may change in future ACP versions. The SDK has their types in `@agentclientprotocol/sdk/unstable`.
 :::
 
+When the agent advertises `sessionCapabilities.systemPrompt`, `session/new` carries a `systemPrompt` in `append` mode with the [Prompt Injection](/usage/prompt-injection) instructions. `session/load`, `session/resume` and `session/fork` carry the ones the session started with, which the plugin saves with it.
+
 ### Agent → Client (Notifications)
 
 Session updates the plugin can receive from agents via `session/update`.
