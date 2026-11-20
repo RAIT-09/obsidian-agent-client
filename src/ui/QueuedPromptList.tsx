@@ -12,19 +12,21 @@ import { AttachmentStrip } from "./shared/AttachmentStrip";
 interface QueuedPromptListProps {
 	prompts: QueuedPrompt[];
 	isPaused: boolean;
+	queuePauseRevision: number;
 	onUpdate: (
 		id: string,
 		content: string,
 		attachments: AttachedFile[],
 	) => void;
 	onRemove: (id: string) => void;
-	onResume: () => void;
-	onPause: () => void;
+	onResume: (expectedPauseRevision?: number) => void;
+	onPause: () => number;
 }
 
 export const QueuedPromptList = React.memo(function QueuedPromptList({
 	prompts,
 	isPaused,
+	queuePauseRevision,
 	onUpdate,
 	onRemove,
 	onResume,
@@ -33,6 +35,7 @@ export const QueuedPromptList = React.memo(function QueuedPromptList({
 	const [editState, setEditState] = useState<QueuedPromptEditState>({
 		editingId: null,
 		resumeAfterEdit: false,
+		pauseRevision: null,
 	});
 	const [draft, setDraft] = useState("");
 	const [draftAttachments, setDraftAttachments] = useState<AttachedFile[]>(
@@ -41,13 +44,23 @@ export const QueuedPromptList = React.memo(function QueuedPromptList({
 	const canSave = draft.trim().length > 0 || draftAttachments.length > 0;
 	const finishEditing = useCallback(
 		(resumeNow = false) => {
-			const result = finishQueuedPromptEdit(editState, resumeNow);
+			const result = finishQueuedPromptEdit(
+				editState,
+				queuePauseRevision,
+				resumeNow,
+			);
 			setEditState(result.state);
 			setDraft("");
 			setDraftAttachments([]);
-			if (result.shouldResume) onResume();
+			if (result.shouldResume) {
+				onResume(
+					resumeNow
+						? undefined
+						: (editState.pauseRevision ?? undefined),
+				);
+			}
 		},
-		[editState, onResume],
+		[editState, onResume, queuePauseRevision],
 	);
 	const saveEditing = useCallback(
 		(id: string) => {
@@ -189,8 +202,15 @@ export const QueuedPromptList = React.memo(function QueuedPromptList({
 													prompt.id,
 													isPaused,
 												);
-											if (result.shouldPause) onPause();
-											setEditState(result.state);
+											const pauseRevision =
+												result.shouldPause
+													? onPause()
+													: result.state
+															.pauseRevision;
+											setEditState({
+												...result.state,
+												pauseRevision,
+											});
 											setDraft(prompt.content);
 											setDraftAttachments([
 												...prompt.attachments,

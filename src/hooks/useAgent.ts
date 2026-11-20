@@ -53,6 +53,7 @@ export interface UseAgentReturn {
 	lastUserMessage: string | null;
 	queuedPrompts: QueuedPrompt[];
 	isQueuePaused: boolean;
+	queuePauseRevision: number;
 
 	// Combined error
 	errorInfo: ErrorInfo | null;
@@ -102,8 +103,8 @@ export interface UseAgentReturn {
 		attachments: AttachedFile[],
 	) => void;
 	removeQueuedPrompt: (id: string) => void;
-	resumeQueue: () => void;
-	pauseQueue: () => void;
+	resumeQueue: (expectedPauseRevision?: number) => void;
+	pauseQueue: () => number;
 	// Permission
 	activePermission: ActivePermission | null;
 	hasActivePermission: boolean;
@@ -199,6 +200,7 @@ export function useAgent(
 			lastUserMessage: agentMessages.lastUserMessage,
 			queuedPrompts: agentMessages.queuedPrompts,
 			isQueuePaused: agentMessages.isQueuePaused,
+			queuePauseRevision: agentMessages.queuePauseRevision,
 
 			// Combined error
 			errorInfo,
@@ -243,6 +245,7 @@ export function useAgent(
 			agentMessages.lastUserMessage,
 			agentMessages.queuedPrompts,
 			agentMessages.isQueuePaused,
+			agentMessages.queuePauseRevision,
 			errorInfo,
 			agentSession.createSession,
 			agentSession.restartSession,

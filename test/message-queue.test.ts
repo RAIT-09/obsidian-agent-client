@@ -21,16 +21,21 @@ const attachment: AttachedFile = {
 describe("message queue transforms", () => {
 	it("keeps automatic resume intent when switching edited items", () => {
 		const first = beginQueuedPromptEdit(
-			{ editingId: null, resumeAfterEdit: false },
+			{ editingId: null, resumeAfterEdit: false, pauseRevision: null },
 			"q1",
 			false,
 		);
-		const second = beginQueuedPromptEdit(first.state, "q2", true);
-		const finished = finishQueuedPromptEdit(second.state);
+		const editing = { ...first.state, pauseRevision: 4 };
+		const second = beginQueuedPromptEdit(editing, "q2", true);
+		const finished = finishQueuedPromptEdit(second.state, 4);
 
 		expect(first.shouldPause).toBe(true);
 		expect(second).toEqual({
-			state: { editingId: "q2", resumeAfterEdit: true },
+			state: {
+				editingId: "q2",
+				resumeAfterEdit: true,
+				pauseRevision: 4,
+			},
 			shouldPause: false,
 		});
 		expect(finished.shouldResume).toBe(true);
@@ -38,27 +43,44 @@ describe("message queue transforms", () => {
 
 	it("does not resume a queue that was paused before editing", () => {
 		const editing = beginQueuedPromptEdit(
-			{ editingId: null, resumeAfterEdit: false },
+			{ editingId: null, resumeAfterEdit: false, pauseRevision: null },
 			"q1",
 			true,
 		);
 
 		expect(editing.shouldPause).toBe(false);
-		expect(finishQueuedPromptEdit(editing.state).shouldResume).toBe(false);
+		expect(finishQueuedPromptEdit(editing.state, 3).shouldResume).toBe(
+			false,
+		);
 	});
 
 	it("explicit Resume closes editing and resumes regardless of origin", () => {
 		const editing = beginQueuedPromptEdit(
-			{ editingId: null, resumeAfterEdit: false },
+			{ editingId: null, resumeAfterEdit: false, pauseRevision: null },
 			"q1",
 			true,
 		);
-		const finished = finishQueuedPromptEdit(editing.state, true);
+		const finished = finishQueuedPromptEdit(editing.state, 3, true);
 
 		expect(finished).toEqual({
-			state: { editingId: null, resumeAfterEdit: false },
+			state: {
+				editingId: null,
+				resumeAfterEdit: false,
+				pauseRevision: null,
+			},
 			shouldResume: true,
 		});
+	});
+
+	it("does not resume when a newer pause supersedes the edit pause", () => {
+		const editing = beginQueuedPromptEdit(
+			{ editingId: null, resumeAfterEdit: false, pauseRevision: null },
+			"q1",
+			false,
+		);
+		const ownedPause = { ...editing.state, pauseRevision: 7 };
+
+		expect(finishQueuedPromptEdit(ownedPause, 8).shouldResume).toBe(false);
 	});
 
 	it("takes matching work without removing another session's jobs", () => {

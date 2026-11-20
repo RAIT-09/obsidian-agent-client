@@ -3,6 +3,7 @@ import type { AttachedFile, QueuedPrompt } from "../types/chat";
 export interface QueuedPromptEditState {
 	editingId: string | null;
 	resumeAfterEdit: boolean;
+	pauseRevision: number | null;
 }
 
 export interface BeginQueuedPromptEditResult {
@@ -35,6 +36,7 @@ export function beginQueuedPromptEdit(
 		state: {
 			editingId: id,
 			resumeAfterEdit: !isPaused,
+			pauseRevision: null,
 		},
 		shouldPause: !isPaused,
 	};
@@ -43,11 +45,19 @@ export function beginQueuedPromptEdit(
 /** Finish an edit and decide whether the queue should run again. */
 export function finishQueuedPromptEdit(
 	state: QueuedPromptEditState,
+	currentPauseRevision: number,
 	resumeNow = false,
 ): FinishQueuedPromptEditResult {
 	return {
-		state: { editingId: null, resumeAfterEdit: false },
-		shouldResume: resumeNow || state.resumeAfterEdit,
+		state: {
+			editingId: null,
+			resumeAfterEdit: false,
+			pauseRevision: null,
+		},
+		shouldResume:
+			resumeNow ||
+			(state.resumeAfterEdit &&
+				state.pauseRevision === currentPauseRevision),
 	};
 }
 

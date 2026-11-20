@@ -73,6 +73,7 @@ export interface UseAgentMessagesReturn {
 	lastUserMessage: string | null;
 	queuedPrompts: QueuedPrompt[];
 	isQueuePaused: boolean;
+	queuePauseRevision: number;
 
 	// Message operations
 	sendMessage: (
@@ -98,8 +99,8 @@ export interface UseAgentMessagesReturn {
 		attachments: AttachedFile[],
 	) => void;
 	removeQueuedPrompt: (id: string) => void;
-	resumeQueue: () => void;
-	pauseQueue: () => void;
+	resumeQueue: (expectedPauseRevision?: number) => void;
+	pauseQueue: () => number;
 
 	// Permission
 	activePermission: ActivePermission | null;
@@ -132,6 +133,8 @@ export function useAgentMessages(
 	const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
 	const [queuedPrompts, setQueuedPrompts] = useState<QueuedPrompt[]>([]);
 	const [isQueuePaused, setIsQueuePaused] = useState(false);
+	const [queuePauseRevision, setQueuePauseRevision] = useState(0);
+	const queuePauseRevisionRef = useRef(0);
 	const [queueDrainVersion, setQueueDrainVersion] = useState(0);
 	const isSendingRef = useRef(false);
 	const dispatchInProgressRef = useRef(false);
@@ -170,20 +173,34 @@ export function useAgentMessages(
 
 	const clearQueue = useCallback(() => {
 		queueGenerationRef.current++;
+		queuePauseRevisionRef.current++;
+		setQueuePauseRevision(queuePauseRevisionRef.current);
 		queuedPromptJobsRef.current = [];
 		setQueuedPrompts([]);
 		setQueuePaused(false);
 	}, [setQueuePaused]);
 
-	const pauseQueue = useCallback(() => {
+	const pauseQueue = useCallback((): number => {
 		if (queuedPromptJobsRef.current.length > 0) {
+			queuePauseRevisionRef.current++;
+			setQueuePauseRevision(queuePauseRevisionRef.current);
 			setQueuePaused(true);
 		}
+		return queuePauseRevisionRef.current;
 	}, [setQueuePaused]);
 
-	const resumeQueue = useCallback(() => {
-		setQueuePaused(false);
-	}, [setQueuePaused]);
+	const resumeQueue = useCallback(
+		(expectedPauseRevision?: number) => {
+			if (
+				expectedPauseRevision !== undefined &&
+				expectedPauseRevision !== queuePauseRevisionRef.current
+			) {
+				return;
+			}
+			setQueuePaused(false);
+		},
+		[setQueuePaused],
+	);
 
 	const removeQueuedPrompt = useCallback(
 		(id: string) => {
@@ -720,6 +737,7 @@ export function useAgentMessages(
 		lastUserMessage,
 		queuedPrompts,
 		isQueuePaused,
+		queuePauseRevision,
 		sendMessage,
 		clearMessages,
 		setInitialMessages,

@@ -978,6 +978,10 @@ If your plugin does not need CSS, delete this file.
 
 /* Input area */
 .agent-client-chat-input-container {
+	display: flex;
+	max-height: min(72%, 34rem);
+	min-height: 0;
+	flex-direction: column;
 	flex-shrink: 0;
 	padding: 0 8px;
 	position: relative;
@@ -986,11 +990,17 @@ If your plugin does not need CSS, delete this file.
 /* The queue is a sibling above this anchor. Composer overlays therefore stay
    beside the input instead of moving away as queued messages accumulate. */
 .agent-client-chat-composer {
+	min-height: 0;
+	flex: 0 1 auto;
 	position: relative;
 }
 
 /* Queued prompts */
 .agent-client-queued-prompts {
+	display: flex;
+	min-height: 0;
+	flex: 0 1 auto;
+	flex-direction: column;
 	margin-bottom: 6px;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 8px;
@@ -1042,7 +1052,8 @@ If your plugin does not need CSS, delete this file.
 
 .agent-client-queued-prompts-list {
 	display: flex;
-	max-height: 180px;
+	max-height: min(14em, 32vh);
+	min-height: 0;
 	flex-direction: column;
 	overflow-y: auto;
 }
@@ -1121,6 +1132,7 @@ If your plugin does not need CSS, delete this file.
 /* Input box - outer container with border and background */
 .agent-client-chat-input-box {
 	display: flex;
+	max-height: 100%;
 	flex-direction: column;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 8px;

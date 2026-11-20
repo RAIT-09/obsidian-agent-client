@@ -274,14 +274,15 @@ export interface InputAreaProps {
 	messages: ChatMessage[];
 	queuedPrompts: QueuedPrompt[];
 	isQueuePaused: boolean;
+	queuePauseRevision: number;
 	onUpdateQueuedPrompt: (
 		id: string,
 		content: string,
 		attachments: AttachedFile[],
 	) => void;
 	onRemoveQueuedPrompt: (id: string) => void;
-	onResumeQueue: () => void;
-	onPauseQueue: () => void;
+	onResumeQueue: (expectedPauseRevision?: number) => void;
+	onPauseQueue: () => number;
 }
 
 /**
@@ -338,6 +339,7 @@ export function InputArea({
 	messages,
 	queuedPrompts,
 	isQueuePaused,
+	queuePauseRevision,
 	onUpdateQueuedPrompt,
 	onRemoveQueuedPrompt,
 	onResumeQueue,
@@ -1086,6 +1088,7 @@ export function InputArea({
 			<QueuedPromptList
 				prompts={queuedPrompts}
 				isPaused={isQueuePaused}
+				queuePauseRevision={queuePauseRevision}
 				onUpdate={onUpdateQueuedPrompt}
 				onRemove={onRemoveQueuedPrompt}
 				onResume={onResumeQueue}
