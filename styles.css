@@ -1021,7 +1021,8 @@ If your plugin does not need CSS, delete this file.
 
 .agent-client-queued-prompts-header button,
 .agent-client-queued-prompt-actions button,
-.agent-client-queued-prompt-edit-actions button {
+.agent-client-queued-prompt-drag-handle,
+.agent-client-queue-edit-banner button {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -1039,13 +1040,15 @@ If your plugin does not need CSS, delete this file.
 
 .agent-client-queued-prompts-header button:hover,
 .agent-client-queued-prompt-actions button:hover,
-.agent-client-queued-prompt-edit-actions button:hover {
+.agent-client-queued-prompt-drag-handle:hover,
+.agent-client-queue-edit-banner button:hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
 
 .agent-client-queued-prompt-action-icon,
-.agent-client-queued-prompt-actions svg {
+.agent-client-queued-prompt-actions svg,
+.agent-client-queued-prompt-drag-handle svg {
 	width: 14px;
 	height: 14px;
 }
@@ -1062,12 +1065,46 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	align-items: flex-start;
 	gap: 8px;
-	padding: 7px 8px;
+	min-height: 42px;
+	padding: 7px 8px 7px 4px;
+	border: 1px solid transparent;
 	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	transition:
+		opacity 0.12s ease,
+		border-color 0.12s ease,
+		transform 0.12s ease;
 }
 
 .agent-client-queued-prompt:last-child {
 	border-bottom: none;
+}
+
+.agent-client-queued-prompt.is-dragging {
+	opacity: 0.45;
+}
+
+.agent-client-queued-prompt.is-drop-target {
+	border-color: var(--interactive-accent);
+	transform: translateY(1px);
+}
+
+.agent-client-queued-prompt.is-editing {
+	border-color: color-mix(
+		in srgb,
+		var(--interactive-accent) 42%,
+		transparent
+	);
+}
+
+.agent-client-queued-prompt-drag-handle {
+	align-self: stretch;
+	cursor: grab;
+	color: var(--text-muted);
+}
+
+.agent-client-queued-prompt-drag-handle:active {
+	cursor: grabbing;
 }
 
 .agent-client-queued-prompt-index {
@@ -1106,27 +1143,54 @@ If your plugin does not need CSS, delete this file.
 }
 
 .agent-client-queued-prompt-actions,
-.agent-client-queued-prompt-edit-actions {
+.agent-client-queue-edit-banner {
 	display: flex;
 	align-items: center;
 	gap: 2px;
 }
 
-.agent-client-queued-prompt textarea {
-	width: 100%;
-	min-height: 48px;
-	resize: vertical;
-	font-family: inherit;
-	font-size: var(--font-ui-small);
+.agent-client-queued-prompt-actions {
+	align-self: center;
 }
 
-.agent-client-queued-prompt-edit-actions {
-	justify-content: flex-end;
-	margin-top: 4px;
+.agent-client-queued-prompt-actions button:disabled,
+.agent-client-queued-prompt-drag-handle:disabled {
+	opacity: 0.35;
+	cursor: default;
 }
 
-.agent-client-queued-prompt .agent-client-attachment-preview-strip {
-	padding: 6px 0;
+.agent-client-queued-prompt-actions .lucide-loader-circle {
+	animation: agent-client-spin 0.8s linear infinite;
+}
+
+.agent-client-queued-prompt-editing-label {
+	margin-top: 2px;
+	color: var(--text-accent);
+	font-size: var(--font-ui-smaller);
+}
+
+.agent-client-queue-edit-banner {
+	justify-content: space-between;
+	padding: 5px 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: color-mix(
+		in srgb,
+		var(--interactive-accent) 9%,
+		var(--background-primary)
+	);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.agent-client-queue-edit-banner-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.agent-client-queue-edit-banner-label svg {
+	width: 14px;
+	height: 14px;
 }
 
 /* Input box - outer container with border and background */

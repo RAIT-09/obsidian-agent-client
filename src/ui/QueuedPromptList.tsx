@@ -1,84 +1,49 @@
 import * as React from "react";
-const { useCallback, useEffect, useState } = React;
+const { useCallback, useRef, useState } = React;
 import { setIcon } from "obsidian";
-import {
-	beginQueuedPromptEdit,
-	finishQueuedPromptEdit,
-	type QueuedPromptEditState,
-} from "../services/message-queue";
-import type { AttachedFile, QueuedPrompt } from "../types/chat";
-import { AttachmentStrip } from "./shared/AttachmentStrip";
+import type { QueuedPrompt } from "../types/chat";
 
 interface QueuedPromptListProps {
 	prompts: QueuedPrompt[];
 	isPaused: boolean;
-	queuePauseRevision: number;
-	onUpdate: (
-		id: string,
-		content: string,
-		attachments: AttachedFile[],
-	) => void;
+	isSending: boolean;
+	supportsSteering: boolean;
+	editingId: string | null;
+	onEdit: (prompt: QueuedPrompt) => void;
 	onRemove: (id: string) => void;
 	onResume: (expectedPauseRevision?: number) => void;
 	onPause: () => number;
+	onReorder: (draggedId: string, targetId: string) => void;
+	onSteer: (id: string) => Promise<void>;
 }
 
 export const QueuedPromptList = React.memo(function QueuedPromptList({
 	prompts,
 	isPaused,
-	queuePauseRevision,
-	onUpdate,
+	isSending,
+	supportsSteering,
+	editingId,
+	onEdit,
 	onRemove,
 	onResume,
 	onPause,
+	onReorder,
+	onSteer,
 }: QueuedPromptListProps) {
-	const [editState, setEditState] = useState<QueuedPromptEditState>({
-		editingId: null,
-		resumeAfterEdit: false,
-		pauseRevision: null,
-	});
-	const [draft, setDraft] = useState("");
-	const [draftAttachments, setDraftAttachments] = useState<AttachedFile[]>(
-		[],
-	);
-	const canSave = draft.trim().length > 0 || draftAttachments.length > 0;
-	const finishEditing = useCallback(
-		(resumeNow = false) => {
-			const result = finishQueuedPromptEdit(
-				editState,
-				queuePauseRevision,
-				resumeNow,
-			);
-			setEditState(result.state);
-			setDraft("");
-			setDraftAttachments([]);
-			if (result.shouldResume) {
-				onResume(
-					resumeNow
-						? undefined
-						: (editState.pauseRevision ?? undefined),
-				);
-			}
-		},
-		[editState, onResume, queuePauseRevision],
-	);
-	const saveEditing = useCallback(
-		(id: string) => {
-			if (!canSave) return;
-			onUpdate(id, draft.trim(), draftAttachments);
-			finishEditing();
-		},
-		[canSave, draft, draftAttachments, finishEditing, onUpdate],
-	);
+	const [draggedId, setDraggedId] = useState<string | null>(null);
+	const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+	const [steeringId, setSteeringId] = useState<string | null>(null);
+	const resumeAfterDragRef = useRef<number | null>(null);
 
-	useEffect(() => {
-		if (
-			editState.editingId &&
-			!prompts.some((prompt) => prompt.id === editState.editingId)
-		) {
-			finishEditing();
+	const finishDrag = useCallback(() => {
+		setDraggedId(null);
+		setDropTargetId(null);
+		if (resumeAfterDragRef.current !== null) {
+			const ownedPauseRevision = resumeAfterDragRef.current;
+			resumeAfterDragRef.current = null;
+			onResume(ownedPauseRevision);
 		}
-	}, [editState.editingId, finishEditing, prompts]);
+	}, [onResume]);
 
 	if (prompts.length === 0) return null;
 
@@ -93,7 +58,7 @@ export const QueuedPromptList = React.memo(function QueuedPromptList({
 					{prompts.length === 1 ? "" : "s"}
 				</span>
 				{isPaused && (
-					<button type="button" onClick={() => finishEditing(true)}>
+					<button type="button" onClick={() => onResume()}>
 						<span
 							className="agent-client-queued-prompt-action-icon"
 							ref={(element) => {
@@ -105,134 +70,128 @@ export const QueuedPromptList = React.memo(function QueuedPromptList({
 				)}
 			</header>
 			<div className="agent-client-queued-prompts-list">
-				{prompts.map((prompt, index) => {
-					const isEditing = prompt.id === editState.editingId;
+				{prompts.map((prompt) => {
+					const isEditing = prompt.id === editingId;
+					const canSteer =
+						isSending && supportsSteering && !isEditing;
+					const steerTitle = !supportsSteering
+						? "This agent does not support mid-turn steering"
+						: !isSending
+							? "Steering is available while a turn is running"
+							: "Steer the running turn with this message";
 					return (
 						<article
 							key={prompt.id}
-							className="agent-client-queued-prompt"
+							className={`agent-client-queued-prompt${draggedId === prompt.id ? " is-dragging" : ""}${dropTargetId === prompt.id ? " is-drop-target" : ""}${isEditing ? " is-editing" : ""}`}
+							onDragOver={(event) => {
+								if (!draggedId || draggedId === prompt.id)
+									return;
+								event.preventDefault();
+								event.dataTransfer.dropEffect = "move";
+								setDropTargetId(prompt.id);
+							}}
+							onDragLeave={() => {
+								if (dropTargetId === prompt.id) {
+									setDropTargetId(null);
+								}
+							}}
+							onDrop={(event) => {
+								event.preventDefault();
+								if (draggedId && draggedId !== prompt.id) {
+									onReorder(draggedId, prompt.id);
+								}
+								finishDrag();
+							}}
 						>
-							<span className="agent-client-queued-prompt-index">
-								{index + 1}
-							</span>
+							<button
+								type="button"
+								className="agent-client-queued-prompt-drag-handle"
+								draggable={!isEditing}
+								disabled={isEditing}
+								title="Drag to change queue priority"
+								aria-label="Drag to change queue priority"
+								onDragStart={(event) => {
+									if (isEditing) {
+										event.preventDefault();
+										return;
+									}
+									event.dataTransfer.effectAllowed = "move";
+									event.dataTransfer.setData(
+										"text/plain",
+										prompt.id,
+									);
+									setDraggedId(prompt.id);
+									resumeAfterDragRef.current = !isPaused
+										? onPause()
+										: null;
+								}}
+								onDragEnd={finishDrag}
+								ref={(element) => {
+									if (element)
+										setIcon(element, "grip-vertical");
+								}}
+							/>
 							<div className="agent-client-queued-prompt-body">
-								{isEditing ? (
-									<>
-										<textarea
-											value={draft}
-											onChange={(event) =>
-												setDraft(event.target.value)
-											}
-											onKeyDown={(event) => {
-												if (event.key === "Escape") {
-													event.preventDefault();
-													finishEditing();
-													return;
-												}
-												if (
-													event.key === "Enter" &&
-													(event.metaKey ||
-														event.ctrlKey)
-												) {
-													event.preventDefault();
-													saveEditing(prompt.id);
-												}
-											}}
-											rows={2}
-											aria-label="Edit queued message"
-											autoFocus
-										/>
-										<AttachmentStrip
-											files={draftAttachments}
-											onRemove={(id) =>
-												setDraftAttachments((files) =>
-													files.filter(
-														(file) =>
-															file.id !== id,
-													),
-												)
-											}
-										/>
-										<div className="agent-client-queued-prompt-edit-actions">
-											<button
-												type="button"
-												onClick={() =>
-													saveEditing(prompt.id)
-												}
-												disabled={!canSave}
-											>
-												Save
-											</button>
-											<button
-												type="button"
-												onClick={() => finishEditing()}
-											>
-												Cancel
-											</button>
-										</div>
-									</>
-								) : (
-									<>
-										<div className="agent-client-queued-prompt-text">
-											{prompt.content ||
-												"Attachment message"}
-										</div>
-										{prompt.attachments.length > 0 && (
-											<div className="agent-client-queued-prompt-attachment-count">
-												{prompt.attachments.length}{" "}
-												attachment
-												{prompt.attachments.length === 1
-													? ""
-													: "s"}
-											</div>
-										)}
-									</>
+								<div className="agent-client-queued-prompt-text">
+									{prompt.content || "Attachment message"}
+								</div>
+								{prompt.attachments.length > 0 && (
+									<div className="agent-client-queued-prompt-attachment-count">
+										{prompt.attachments.length} attachment
+										{prompt.attachments.length === 1
+											? ""
+											: "s"}
+									</div>
+								)}
+								{isEditing && (
+									<div className="agent-client-queued-prompt-editing-label">
+										Editing in composer
+									</div>
 								)}
 							</div>
-							{!isEditing && (
-								<div className="agent-client-queued-prompt-actions">
-									<button
-										type="button"
-										title="Edit queued message"
-										aria-label="Edit queued message"
-										onClick={() => {
-											const result =
-												beginQueuedPromptEdit(
-													editState,
-													prompt.id,
-													isPaused,
-												);
-											const pauseRevision =
-												result.shouldPause
-													? onPause()
-													: result.state
-															.pauseRevision;
-											setEditState({
-												...result.state,
-												pauseRevision,
-											});
-											setDraft(prompt.content);
-											setDraftAttachments([
-												...prompt.attachments,
-											]);
-										}}
-										ref={(element) => {
-											if (element)
-												setIcon(element, "pencil");
-										}}
-									/>
-									<button
-										type="button"
-										title="Delete queued message"
-										aria-label="Delete queued message"
-										onClick={() => onRemove(prompt.id)}
-										ref={(element) => {
-											if (element)
-												setIcon(element, "trash-2");
-										}}
-									/>
-								</div>
-							)}
+							<div className="agent-client-queued-prompt-actions">
+								<button
+									type="button"
+									title={steerTitle}
+									aria-label={steerTitle}
+									disabled={!canSteer || steeringId !== null}
+									onClick={() => {
+										setSteeringId(prompt.id);
+										void onSteer(prompt.id).finally(() =>
+											setSteeringId(null),
+										);
+									}}
+									ref={(element) => {
+										if (element)
+											setIcon(
+												element,
+												steeringId === prompt.id
+													? "loader-circle"
+													: "navigation",
+											);
+									}}
+								/>
+								<button
+									type="button"
+									title="Edit queued message in composer"
+									aria-label="Edit queued message in composer"
+									disabled={isEditing}
+									onClick={() => onEdit(prompt)}
+									ref={(element) => {
+										if (element) setIcon(element, "pencil");
+									}}
+								/>
+								<button
+									type="button"
+									title="Delete queued message"
+									aria-label="Delete queued message"
+									onClick={() => onRemove(prompt.id)}
+									ref={(element) => {
+										if (element)
+											setIcon(element, "trash-2");
+									}}
+								/>
+							</div>
 						</article>
 					);
 				})}

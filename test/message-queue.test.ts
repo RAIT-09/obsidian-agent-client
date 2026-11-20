@@ -4,6 +4,7 @@ import {
 	createQueuedPrompt,
 	finishQueuedPromptEdit,
 	isQueueDispatchCurrent,
+	moveQueueItem,
 	requeueItemAtFront,
 	removeQueuedPromptItem,
 	takeNextQueueItemForSession,
@@ -131,6 +132,30 @@ describe("message queue transforms", () => {
 			false,
 		);
 		expect(isQueueDispatchCurrent(4, 4, "session-a", null)).toBe(false);
+	});
+
+	it("moves queued work to the requested priority without mutation", () => {
+		const queue = ["first", "second", "third"];
+
+		expect(moveQueueItem(queue, 2, 0)).toEqual([
+			"third",
+			"first",
+			"second",
+		]);
+		expect(moveQueueItem(queue, 0, 2)).toEqual([
+			"second",
+			"third",
+			"first",
+		]);
+		expect(queue).toEqual(["first", "second", "third"]);
+	});
+
+	it("leaves queue identity unchanged for invalid or no-op moves", () => {
+		const queue = ["first", "second"];
+
+		expect(moveQueueItem(queue, 0, 0)).toBe(queue);
+		expect(moveQueueItem(queue, -1, 1)).toBe(queue);
+		expect(moveQueueItem(queue, 0, 4)).toBe(queue);
 	});
 
 	it("creates an isolated prompt with the supplied fields", () => {

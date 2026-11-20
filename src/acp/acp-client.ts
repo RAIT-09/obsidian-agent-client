@@ -71,6 +71,12 @@ export interface TerminalOutputResult {
 	} | null;
 }
 
+export type SteeringResult =
+	| { outcome: "injected" }
+	| { outcome: "startedNewTurn" }
+	| { outcome: "promptRequired"; reason: "noRunningTurn" }
+	| { outcome: "failed" };
+
 /**
  * ACP client for agent communication and process lifecycle management.
  */
@@ -82,6 +88,7 @@ export class AcpClient {
 	private isInitializedFlag = false;
 	private currentAgentId: string | null = null;
 	private currentSessionId: string | null = null;
+	private steeringSupported = false;
 
 	// Callbacks (none — all events flow through onSessionUpdate via AcpHandler)
 
@@ -141,6 +148,7 @@ export class AcpClient {
 			this.logger.log("[AcpClient] Cleaning up existing connection");
 			this.connection = null;
 		}
+		this.steeringSupported = false;
 
 		this.currentConfig = config;
 
@@ -451,6 +459,15 @@ export class AcpClient {
 			// codex-acp package move kept the bin name) — surface it so
 			// update-checker behavior can be verified from the debug log.
 			this.logger.log("[AcpClient] Agent info:", initResult.agentInfo);
+			const initMeta = initResult._meta as
+				| { steering?: { supported?: boolean } }
+				| null
+				| undefined;
+			this.steeringSupported = initMeta?.steering?.supported === true;
+			this.logger.log(
+				"[AcpClient] Steering supported:",
+				this.steeringSupported,
+			);
 
 			this.isInitializedFlag = true;
 			this.currentAgentId = config.id;
@@ -462,6 +479,7 @@ export class AcpClient {
 			// Reset flags on failure
 			this.isInitializedFlag = false;
 			this.currentAgentId = null;
+			this.steeringSupported = false;
 
 			throw error;
 		}
@@ -609,6 +627,35 @@ export class AcpClient {
 		}
 	}
 
+	/** Whether the connected agent advertised the ACP steering extension. */
+	supportsSteering(): boolean {
+		return this.steeringSupported;
+	}
+
+	/** Inject a queued message into the turn currently running for a session. */
+	async steerPrompt(
+		sessionId: string,
+		content: PromptContent[],
+	): Promise<SteeringResult> {
+		if (!this.steeringSupported) {
+			throw new Error("The connected agent does not support steering");
+		}
+		const connection = this.requireConnection();
+		const prompt = content.map((item) =>
+			AcpTypeConverter.toAcpContentBlock(item),
+		);
+		return await connection.agent.request<SteeringResult>(
+			"_session/steering",
+			{
+				sessionId,
+				prompt,
+				_meta: {
+					steering: { idleBehavior: "promptRequired" },
+				},
+			},
+		);
+	}
+
 	/**
 	 * Cancel the current operation in a session.
 	 */
@@ -689,6 +736,7 @@ export class AcpClient {
 		this.isInitializedFlag = false;
 		this.currentAgentId = null;
 		this.currentSessionId = null;
+		this.steeringSupported = false;
 
 		this.logger.log("[AcpClient] Disconnected");
 		return Promise.resolve();

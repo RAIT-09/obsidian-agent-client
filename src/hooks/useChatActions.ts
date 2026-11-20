@@ -10,6 +10,7 @@ import { Notice, Platform } from "obsidian";
 
 import type AgentClientPlugin from "../plugin";
 import type { UseAgentReturn } from "./useAgent";
+import type { SendMessageOptions } from "./useAgentMessages";
 import type { UseSessionHistoryReturn } from "./useSessionHistory";
 import type { UseSuggestionsReturn } from "./useSuggestions";
 import type { ChatSession } from "../types/session";
@@ -35,6 +36,11 @@ export interface UseChatActionsReturn {
 	handleSendMessage: (
 		content: string,
 		attachments?: AttachedFile[],
+	) => Promise<void>;
+	handleUpdateQueuedPrompt: (
+		id: string,
+		content: string,
+		attachments: AttachedFile[],
 	) => Promise<void>;
 	handleStopGeneration: () => Promise<void>;
 	handleNewChat: (requestedAgentId?: string) => Promise<void>;
@@ -140,15 +146,11 @@ export function useChatActions(
 
 	const shouldConvertToWsl = Platform.isWin && settings.windowsWslMode;
 
-	const handleSendMessage = useCallback(
-		async (content: string, attachments?: AttachedFile[]) => {
-			// Dismiss overlays on send
-			agent.clearError();
-			setAgentUpdateNotification(null);
-
-			const isFirstMessage = messages.length === 0;
-
-			// Split attachments by kind
+	const buildSendMessageOptions = useCallback(
+		async (
+			attachments: AttachedFile[] | undefined,
+			isFirstMessage: boolean,
+		): Promise<SendMessageOptions> => {
 			const images: ImagePromptContent[] = [];
 			const resourceLinks: ResourceLinkPromptContent[] = [];
 
@@ -179,7 +181,7 @@ export function useChatActions(
 				}
 			}
 
-			await agent.sendMessage(content, {
+			return {
 				activeNote: suggestions.mentions.activeNote,
 				vaultBasePath: vaultPath,
 				isAutoMentionDisabled:
@@ -189,7 +191,27 @@ export function useChatActions(
 					resourceLinks.length > 0 ? resourceLinks : undefined,
 				isFirstMessage,
 				attachments: attachments ? [...attachments] : undefined,
-			});
+			};
+		},
+		[
+			shouldConvertToWsl,
+			suggestions.mentions.activeNote,
+			suggestions.mentions.isAutoMentionDisabled,
+			vaultPath,
+		],
+	);
+
+	const handleSendMessage = useCallback(
+		async (content: string, attachments?: AttachedFile[]) => {
+			// Dismiss overlays on send
+			agent.clearError();
+			setAgentUpdateNotification(null);
+
+			const isFirstMessage = messages.length === 0;
+			await agent.sendMessage(
+				content,
+				await buildSendMessageOptions(attachments, isFirstMessage),
+			);
 
 			// Save session metadata locally on first message
 			if (isFirstMessage && session.sessionId) {
@@ -211,11 +233,19 @@ export function useChatActions(
 			sessionHistory.saveSessionLocally,
 			persistentEmbedId,
 			logger,
-			suggestions.mentions.activeNote,
-			suggestions.mentions.isAutoMentionDisabled,
-			shouldConvertToWsl,
-			vaultPath,
+			buildSendMessageOptions,
 		],
+	);
+
+	const handleUpdateQueuedPrompt = useCallback(
+		async (id: string, content: string, attachments: AttachedFile[]) => {
+			agent.updateQueuedPrompt(
+				id,
+				content,
+				await buildSendMessageOptions(attachments, false),
+			);
+		},
+		[agent.updateQueuedPrompt, buildSendMessageOptions],
 	);
 
 	const handleStopGeneration = useCallback(async () => {
@@ -377,6 +407,7 @@ export function useChatActions(
 
 	return {
 		handleSendMessage,
+		handleUpdateQueuedPrompt,
 		handleStopGeneration,
 		handleNewChat,
 		handleExportChat,

@@ -30,6 +30,11 @@ import { PermissionDialog } from "./PermissionDialog";
 import { AttachmentStrip } from "./shared/AttachmentStrip";
 import { InputToolbar } from "./InputToolbar";
 import { QueuedPromptList } from "./QueuedPromptList";
+import {
+	beginQueuedPromptEdit,
+	finishQueuedPromptEdit,
+	type QueuedPromptEditState,
+} from "../services/message-queue";
 import { getLogger } from "../utils/logger";
 import { insertMentions } from "../utils/mention-parser";
 import { getVaultDragFiles, mimeTypeFromExtension } from "../utils/vault-drag";
@@ -275,12 +280,15 @@ export interface InputAreaProps {
 	queuedPrompts: QueuedPrompt[];
 	isQueuePaused: boolean;
 	queuePauseRevision: number;
+	supportsSteering: boolean;
 	onUpdateQueuedPrompt: (
 		id: string,
 		content: string,
 		attachments: AttachedFile[],
-	) => void;
+	) => Promise<void>;
 	onRemoveQueuedPrompt: (id: string) => void;
+	onReorderQueuedPrompt: (draggedId: string, targetId: string) => void;
+	onSteerQueuedPrompt: (id: string) => Promise<void>;
 	onResumeQueue: (expectedPauseRevision?: number) => void;
 	onPauseQueue: () => number;
 }
@@ -340,8 +348,11 @@ export function InputArea({
 	queuedPrompts,
 	isQueuePaused,
 	queuePauseRevision,
+	supportsSteering,
 	onUpdateQueuedPrompt,
 	onRemoveQueuedPrompt,
+	onReorderQueuedPrompt,
+	onSteerQueuedPrompt,
 	onResumeQueue,
 	onPauseQueue,
 }: InputAreaProps) {
@@ -359,6 +370,13 @@ export function InputArea({
 	const [hintText, setHintText] = useState<string | null>(null);
 	const [commandText, setCommandText] = useState<string>("");
 	const [isDraggingOver, setIsDraggingOver] = useState(false);
+	const [queueEditState, setQueueEditState] = useState<QueuedPromptEditState>(
+		{
+			editingId: null,
+			resumeAfterEdit: false,
+			pauseRevision: null,
+		},
+	);
 
 	const { handleHistoryKeyDown, resetHistory } = useInputHistory(
 		messages,
@@ -369,6 +387,10 @@ export function InputArea({
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const inputWrapperRef = useRef<HTMLDivElement>(null);
 	const dragCounterRef = useRef(0);
+	const composerBeforeQueueEditRef = useRef<{
+		content: string;
+		attachments: AttachedFile[];
+	} | null>(null);
 
 	// Clear attached files when agent changes
 	useEffect(() => {
@@ -641,6 +663,101 @@ export function InputArea({
 		[onInputChange],
 	);
 
+	const finishQueueEdit = useCallback(
+		(resumeNow = false) => {
+			if (!queueEditState.editingId) {
+				if (resumeNow) onResumeQueue();
+				return;
+			}
+			const result = finishQueuedPromptEdit(
+				queueEditState,
+				queuePauseRevision,
+				resumeNow,
+			);
+			const previous = composerBeforeQueueEditRef.current;
+			composerBeforeQueueEditRef.current = null;
+			setQueueEditState(result.state);
+			setTextAndFocus(previous?.content ?? "");
+			onAttachedFilesChange(previous?.attachments ?? []);
+			setHintText(null);
+			setCommandText("");
+			mentions.close();
+			slashCommands.close();
+			if (result.shouldResume) {
+				onResumeQueue(
+					resumeNow
+						? undefined
+						: (queueEditState.pauseRevision ?? undefined),
+				);
+			}
+		},
+		[
+			mentions,
+			onAttachedFilesChange,
+			onResumeQueue,
+			queuePauseRevision,
+			queueEditState,
+			setTextAndFocus,
+			slashCommands,
+		],
+	);
+
+	const startQueueEdit = useCallback(
+		(prompt: QueuedPrompt) => {
+			const result = beginQueuedPromptEdit(
+				queueEditState,
+				prompt.id,
+				isQueuePaused,
+			);
+			if (!queueEditState.editingId) {
+				composerBeforeQueueEditRef.current = {
+					content: inputValue,
+					attachments: [...attachedFiles],
+				};
+			}
+			const pauseRevision = result.shouldPause
+				? onPauseQueue()
+				: result.state.pauseRevision;
+			setQueueEditState({ ...result.state, pauseRevision });
+			setTextAndFocus(prompt.content);
+			onAttachedFilesChange([...prompt.attachments]);
+			setHintText(null);
+			setCommandText("");
+			mentions.close();
+			slashCommands.close();
+		},
+		[
+			attachedFiles,
+			inputValue,
+			isQueuePaused,
+			mentions,
+			onAttachedFilesChange,
+			onPauseQueue,
+			queueEditState,
+			setTextAndFocus,
+			slashCommands,
+		],
+	);
+
+	const removeQueuedPrompt = useCallback(
+		(id: string) => {
+			if (queueEditState.editingId === id) finishQueueEdit();
+			onRemoveQueuedPrompt(id);
+		},
+		[finishQueueEdit, onRemoveQueuedPrompt, queueEditState.editingId],
+	);
+
+	useEffect(() => {
+		if (
+			queueEditState.editingId &&
+			!queuedPrompts.some(
+				(prompt) => prompt.id === queueEditState.editingId,
+			)
+		) {
+			finishQueueEdit();
+		}
+	}, [finishQueueEdit, queueEditState.editingId, queuedPrompts]);
+
 	/**
 	 * Insert `@[[note]]` mentions for notes dropped onto the input, at the
 	 * textarea's caret.
@@ -895,6 +1012,16 @@ export function InputArea({
 	const handleSendOrStop = useCallback(async () => {
 		const hasContent =
 			inputValue.trim().length > 0 || attachedFiles.length > 0;
+		if (queueEditState.editingId) {
+			if (!hasContent) return;
+			await onUpdateQueuedPrompt(
+				queueEditState.editingId,
+				inputValue.trim(),
+				[...attachedFiles],
+			);
+			finishQueueEdit();
+			return;
+		}
 		if (isSending && !hasContent) {
 			await onStopGeneration();
 			return;
@@ -925,6 +1052,9 @@ export function InputArea({
 		onInputChange,
 		onAttachedFilesChange,
 		resetHistory,
+		queueEditState.editingId,
+		onUpdateQueuedPrompt,
+		finishQueueEdit,
 	]);
 
 	/**
@@ -964,11 +1094,14 @@ export function InputArea({
 	useSuggestionKeymap(plugin.app, inputWrapperRef, dropdownKeyActions);
 
 	// Button disabled state - also allow sending if files are attached
-	const isButtonDisabled =
-		!isSending &&
-		((inputValue.trim() === "" && attachedFiles.length === 0) ||
+	const isButtonDisabled = queueEditState.editingId
+		? (inputValue.trim() === "" && attachedFiles.length === 0) ||
 			!isSessionReady ||
-			isRestoringSession);
+			isRestoringSession
+		: !isSending &&
+			((inputValue.trim() === "" && attachedFiles.length === 0) ||
+				!isSessionReady ||
+				isRestoringSession);
 
 	/**
 	 * Handle keyboard events in the textarea.
@@ -977,6 +1110,11 @@ export function InputArea({
 		(e: React.KeyboardEvent) => {
 			// An open dropdown takes its keys before they get here
 			// (useSuggestionKeymap)
+			if (e.key === "Escape" && queueEditState.editingId) {
+				e.preventDefault();
+				finishQueueEdit();
+				return;
+			}
 
 			// Handle input history navigation (ArrowUp/ArrowDown)
 			if (handleHistoryKeyDown(e, textareaRef.current)) {
@@ -1014,6 +1152,8 @@ export function InputArea({
 			isRestoringSession,
 			handleSendOrStop,
 			settings.sendMessageShortcut,
+			queueEditState.editingId,
+			finishQueueEdit,
 		],
 	);
 
@@ -1088,11 +1228,21 @@ export function InputArea({
 			<QueuedPromptList
 				prompts={queuedPrompts}
 				isPaused={isQueuePaused}
-				queuePauseRevision={queuePauseRevision}
-				onUpdate={onUpdateQueuedPrompt}
-				onRemove={onRemoveQueuedPrompt}
-				onResume={onResumeQueue}
+				isSending={isSending}
+				supportsSteering={supportsSteering}
+				editingId={queueEditState.editingId}
+				onEdit={startQueueEdit}
+				onRemove={removeQueuedPrompt}
+				onResume={(expectedPauseRevision) => {
+					if (expectedPauseRevision === undefined) {
+						finishQueueEdit(true);
+					} else {
+						onResumeQueue(expectedPauseRevision);
+					}
+				}}
 				onPause={onPauseQueue}
+				onReorder={onReorderQueuedPrompt}
+				onSteer={onSteerQueuedPrompt}
 			/>
 
 			<div className="agent-client-chat-composer">
@@ -1165,6 +1315,24 @@ export function InputArea({
 					onDragLeave={handleDragLeave}
 					onDrop={(e) => void handleDrop(e)}
 				>
+					{queueEditState.editingId && (
+						<div className="agent-client-queue-edit-banner">
+							<span className="agent-client-queue-edit-banner-label">
+								<span
+									ref={(element) => {
+										if (element) setIcon(element, "pencil");
+									}}
+								/>
+								Editing queued message
+							</span>
+							<button
+								type="button"
+								onClick={() => finishQueueEdit()}
+							>
+								Cancel
+							</button>
+						</div>
+					)}
 					{/* Auto-mention Badge */}
 					{mentions.activeNote && (
 						<button
@@ -1250,6 +1418,9 @@ export function InputArea({
 					{/* Input Actions (Config Options / Mode Selector / Model Selector + Send Button) */}
 					<InputToolbar
 						isSending={isSending}
+						isEditingQueuedMessage={
+							queueEditState.editingId !== null
+						}
 						isButtonDisabled={isButtonDisabled}
 						hasContent={
 							inputValue.trim() !== "" || attachedFiles.length > 0

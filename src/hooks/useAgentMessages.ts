@@ -27,7 +27,7 @@ import type { ErrorInfo } from "../types/errors";
 import type { IMentionService } from "../utils/mention-parser";
 import { preparePrompt, sendPreparedPrompt } from "../services/message-sender";
 import { extractErrorMessage } from "../utils/error-utils";
-import { Platform } from "obsidian";
+import { Notice, Platform } from "obsidian";
 import {
 	rebuildToolCallIndex,
 	applySingleUpdate,
@@ -37,6 +37,7 @@ import {
 import {
 	createQueuedPrompt,
 	isQueueDispatchCurrent,
+	moveQueueItem,
 	requeueItemAtFront,
 	removeQueuedPromptItem,
 	takeNextQueueItemForSession,
@@ -97,9 +98,12 @@ export interface UseAgentMessagesReturn {
 	updateQueuedPrompt: (
 		id: string,
 		content: string,
-		attachments: AttachedFile[],
+		options: SendMessageOptions,
 	) => void;
 	removeQueuedPrompt: (id: string) => void;
+	reorderQueuedPrompt: (draggedId: string, targetId: string) => void;
+	steerQueuedPrompt: (id: string) => Promise<void>;
+	supportsSteering: boolean;
 	resumeQueue: (expectedPauseRevision?: number) => void;
 	pauseQueue: () => number;
 
@@ -219,20 +223,12 @@ export function useAgentMessages(
 	);
 
 	const updateQueuedPrompt = useCallback(
-		(id: string, content: string, attachments: AttachedFile[]) => {
+		(id: string, content: string, options: SendMessageOptions) => {
 			const job = queuedPromptJobsRef.current.find(
 				(candidate) => candidate.prompt.id === id,
 			);
 			if (!job) return;
-
-			const previousAttachments = job.prompt.attachments;
-			const retainedIds = new Set(attachments.map((file) => file.id));
-			const previousImages = previousAttachments.filter(
-				(file) => file.kind === "image" && Boolean(file.data),
-			);
-			const previousResources = previousAttachments.filter(
-				(file) => file.kind === "file" && Boolean(file.path),
-			);
+			const attachments = options.attachments ?? [];
 
 			job.prompt = {
 				...job.prompt,
@@ -241,18 +237,34 @@ export function useAgentMessages(
 			};
 			job.options = {
 				...job.options,
-				attachments: [...attachments],
-				images: job.options.images?.filter((_image, index) =>
-					retainedIds.has(previousImages[index]?.id ?? ""),
-				),
-				resourceLinks: job.options.resourceLinks?.filter(
-					(_link, index) =>
-						retainedIds.has(previousResources[index]?.id ?? ""),
-				),
+				...options,
+				attachments:
+					attachments.length > 0 ? [...attachments] : undefined,
+				isFirstMessage: false,
 			};
 			setQueuedPrompts((queue) =>
 				updateQueuedPromptItem(queue, id, { content, attachments }),
 			);
+		},
+		[],
+	);
+
+	const reorderQueuedPrompt = useCallback(
+		(draggedId: string, targetId: string) => {
+			const fromIndex = queuedPromptJobsRef.current.findIndex(
+				(job) => job.prompt.id === draggedId,
+			);
+			const toIndex = queuedPromptJobsRef.current.findIndex(
+				(job) => job.prompt.id === targetId,
+			);
+			const reordered = moveQueueItem(
+				queuedPromptJobsRef.current,
+				fromIndex,
+				toIndex,
+			);
+			if (reordered === queuedPromptJobsRef.current) return;
+			queuedPromptJobsRef.current = reordered;
+			setQueuedPrompts(reordered.map((job) => job.prompt));
 		},
 		[],
 	);
@@ -638,6 +650,122 @@ export function useAgentMessages(
 		[dispatchMessage, session.sessionId, setErrorInfo],
 	);
 
+	const steerQueuedPrompt = useCallback(
+		async (id: string): Promise<void> => {
+			const currentSessionId = session.sessionId;
+			const job = queuedPromptJobsRef.current.find(
+				(candidate) => candidate.prompt.id === id,
+			);
+			if (!currentSessionId || !job) return;
+			if (!agentClient.supportsSteering()) {
+				new Notice(
+					"[Agent Client] This agent does not support mid-turn steering",
+				);
+				return;
+			}
+
+			try {
+				const settings = settingsAccess.getSnapshot();
+				const options = job.options;
+				const prepared = await preparePrompt(
+					{
+						message: job.prompt.content,
+						images: options.images,
+						resourceLinks: options.resourceLinks,
+						activeNote: options.activeNote,
+						vaultBasePath: options.vaultBasePath,
+						isAutoMentionDisabled: options.isAutoMentionDisabled,
+						convertToWsl: shouldConvertToWsl,
+						supportsEmbeddedContext:
+							session.promptCapabilities?.embeddedContext ??
+							false,
+						maxNoteLength: settings.displaySettings.maxNoteLength,
+						maxSelectionLength:
+							settings.displaySettings.maxSelectionLength,
+						isFirstMessage: false,
+						promptInjection: settings.promptInjection.enabled
+							? {
+									latex: settings.promptInjection.latex,
+									wikiLinks:
+										settings.promptInjection.wikiLinks,
+									tables: settings.promptInjection.tables,
+								}
+							: undefined,
+						expandWikilinkContext: settings.expandWikilinkContext,
+						wikilinkResolver: vaultAccess,
+					},
+					vaultAccess,
+					vaultAccess,
+				);
+
+				const result = await agentClient.steerPrompt(
+					currentSessionId,
+					prepared.agentContent,
+				);
+				if (result.outcome === "promptRequired") {
+					new Notice(
+						"[Agent Client] The turn already finished; the message remains queued",
+					);
+					return;
+				}
+				if (result.outcome === "failed") {
+					throw new Error("The agent could not apply the steer");
+				}
+
+				const userMessageContent: MessageContent[] = [];
+				if (prepared.autoMentionContext) {
+					userMessageContent.push({
+						type: "text_with_context",
+						text: job.prompt.content,
+						autoMentionContext: prepared.autoMentionContext,
+					});
+				} else {
+					userMessageContent.push({
+						type: "text",
+						text: job.prompt.content,
+					});
+				}
+				for (const image of options.images ?? []) {
+					userMessageContent.push({
+						type: "image",
+						data: image.data,
+						mimeType: image.mimeType,
+					});
+				}
+				for (const link of options.resourceLinks ?? []) {
+					userMessageContent.push({
+						type: "resource_link",
+						uri: link.uri,
+						name: link.name,
+						mimeType: link.mimeType,
+						size: link.size,
+					});
+				}
+				addMessage({
+					id: crypto.randomUUID(),
+					role: "user",
+					content: userMessageContent,
+					timestamp: new Date(),
+				});
+				removeQueuedPrompt(id);
+			} catch (error) {
+				new Notice(
+					`[Agent Client] Could not steer: ${extractErrorMessage(error)}`,
+				);
+			}
+		},
+		[
+			addMessage,
+			agentClient,
+			removeQueuedPrompt,
+			session.promptCapabilities?.embeddedContext,
+			session.sessionId,
+			settingsAccess,
+			shouldConvertToWsl,
+			vaultAccess,
+		],
+	);
+
 	useLayoutEffect(() => {
 		clearQueue();
 	}, [clearQueue, session.sessionId]);
@@ -762,6 +890,9 @@ export function useAgentMessages(
 		clearPendingUpdates,
 		updateQueuedPrompt,
 		removeQueuedPrompt,
+		reorderQueuedPrompt,
+		steerQueuedPrompt,
+		supportsSteering: agentClient.supportsSteering(),
 		resumeQueue,
 		pauseQueue,
 		activePermission,

@@ -94,6 +94,28 @@ export function isQueueDispatchCurrent(
 	);
 }
 
+/** Move one queue item to another item's position without mutating the source. */
+export function moveQueueItem<T>(
+	queue: T[],
+	fromIndex: number,
+	toIndex: number,
+): T[] {
+	if (
+		fromIndex === toIndex ||
+		fromIndex < 0 ||
+		toIndex < 0 ||
+		fromIndex >= queue.length ||
+		toIndex >= queue.length
+	) {
+		return queue;
+	}
+
+	const reordered = [...queue];
+	const [item] = reordered.splice(fromIndex, 1);
+	reordered.splice(toIndex, 0, item);
+	return reordered;
+}
+
 /** Create an isolated queued-prompt snapshot for later dispatch. */
 export function createQueuedPrompt(
 	content: string,

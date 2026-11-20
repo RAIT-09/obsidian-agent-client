@@ -29,7 +29,6 @@ export type { AgentDisplayInfo } from "../services/session-helpers";
 import type {
 	ChatMessage,
 	ActivePermission,
-	AttachedFile,
 	QueuedPrompt,
 } from "../types/chat";
 import type {
@@ -54,6 +53,7 @@ export interface UseAgentReturn {
 	queuedPrompts: QueuedPrompt[];
 	isQueuePaused: boolean;
 	queuePauseRevision: number;
+	supportsSteering: boolean;
 
 	// Combined error
 	errorInfo: ErrorInfo | null;
@@ -100,9 +100,11 @@ export interface UseAgentReturn {
 	updateQueuedPrompt: (
 		id: string,
 		content: string,
-		attachments: AttachedFile[],
+		options: SendMessageOptions,
 	) => void;
 	removeQueuedPrompt: (id: string) => void;
+	reorderQueuedPrompt: (draggedId: string, targetId: string) => void;
+	steerQueuedPrompt: (id: string) => Promise<void>;
 	resumeQueue: (expectedPauseRevision?: number) => void;
 	pauseQueue: () => number;
 	// Permission
@@ -206,6 +208,7 @@ export function useAgent(
 			queuedPrompts: agentMessages.queuedPrompts,
 			isQueuePaused: agentMessages.isQueuePaused,
 			queuePauseRevision: agentMessages.queuePauseRevision,
+			supportsSteering: agentMessages.supportsSteering,
 
 			// Combined error
 			errorInfo,
@@ -232,6 +235,8 @@ export function useAgent(
 			setIgnoreUpdates: agentMessages.setIgnoreUpdates,
 			updateQueuedPrompt: agentMessages.updateQueuedPrompt,
 			removeQueuedPrompt: agentMessages.removeQueuedPrompt,
+			reorderQueuedPrompt: agentMessages.reorderQueuedPrompt,
+			steerQueuedPrompt: agentMessages.steerQueuedPrompt,
 			resumeQueue: agentMessages.resumeQueue,
 			pauseQueue: agentMessages.pauseQueue,
 
@@ -251,6 +256,7 @@ export function useAgent(
 			agentMessages.queuedPrompts,
 			agentMessages.isQueuePaused,
 			agentMessages.queuePauseRevision,
+			agentMessages.supportsSteering,
 			errorInfo,
 			agentSession.createSession,
 			agentSession.restartSession,
@@ -269,6 +275,8 @@ export function useAgent(
 			agentMessages.setIgnoreUpdates,
 			agentMessages.updateQueuedPrompt,
 			agentMessages.removeQueuedPrompt,
+			agentMessages.reorderQueuedPrompt,
+			agentMessages.steerQueuedPrompt,
 			agentMessages.resumeQueue,
 			agentMessages.pauseQueue,
 			agentMessages.activePermission,

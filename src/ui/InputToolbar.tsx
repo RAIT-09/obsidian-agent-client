@@ -146,6 +146,7 @@ function getUsageColorClass(percentage: number): string {
 
 export interface InputToolbarProps {
 	isSending: boolean;
+	isEditingQueuedMessage?: boolean;
 	isButtonDisabled: boolean;
 	hasContent: boolean;
 	onSendOrStop: () => void;
@@ -159,6 +160,7 @@ export interface InputToolbarProps {
 
 export function InputToolbar({
 	isSending,
+	isEditingQueuedMessage = false,
 	isButtonDisabled,
 	hasContent,
 	onSendOrStop,
@@ -179,7 +181,7 @@ export function InputToolbar({
 				"agent-client-icon-inactive",
 			);
 
-			if (isSending && !hasContent) {
+			if (!isEditingQueuedMessage && isSending && !hasContent) {
 				svg.classList.add("agent-client-icon-sending");
 			} else {
 				svg.classList.add(
@@ -189,20 +191,23 @@ export function InputToolbar({
 				);
 			}
 		},
-		[isSending, hasContent],
+		[isEditingQueuedMessage, isSending, hasContent],
 	);
 
 	useEffect(() => {
 		if (sendButtonRef.current) {
-			const iconName =
-				isSending && !hasContent ? "square" : "send-horizontal";
+			const iconName = isEditingQueuedMessage
+				? "check"
+				: isSending && !hasContent
+					? "square"
+					: "send-horizontal";
 			setIcon(sendButtonRef.current, iconName);
 			const svg = sendButtonRef.current.querySelector("svg");
 			if (svg) {
 				updateIconColor(svg);
 			}
 		}
-	}, [hasContent, isSending, updateIconColor]);
+	}, [hasContent, isEditingQueuedMessage, isSending, updateIconColor]);
 
 	useEffect(() => {
 		if (sendButtonRef.current) {
@@ -330,24 +335,28 @@ export function InputToolbar({
 				type="button"
 				onClick={onSendOrStop}
 				disabled={isButtonDisabled}
-				className={`agent-client-chat-send-button ${isSending && !hasContent ? "sending" : ""} ${isButtonDisabled ? "agent-client-disabled" : ""}`}
+				className={`agent-client-chat-send-button ${!isEditingQueuedMessage && isSending && !hasContent ? "sending" : ""} ${isButtonDisabled ? "agent-client-disabled" : ""}`}
 				aria-label={
 					!isSessionReady
 						? "Connecting"
-						: isSending
-							? hasContent
-								? "Queue message"
-								: "Stop generation"
-							: "Send message"
+						: isEditingQueuedMessage
+							? "Save queued message"
+							: isSending
+								? hasContent
+									? "Queue message"
+									: "Stop generation"
+								: "Send message"
 				}
 				title={
 					!isSessionReady
 						? "Connecting..."
-						: isSending
-							? hasContent
-								? "Queue message"
-								: "Stop generation"
-							: "Send message"
+						: isEditingQueuedMessage
+							? "Save queued message"
+							: isSending
+								? hasContent
+									? "Queue message"
+									: "Stop generation"
+								: "Send message"
 				}
 			></button>
 		</div>

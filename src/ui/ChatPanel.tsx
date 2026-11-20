@@ -446,6 +446,7 @@ export const ChatPanel = React.memo(function ChatPanel({
 
 	const {
 		handleSendMessage,
+		handleUpdateQueuedPrompt,
 		handleStopGeneration,
 		handleNewChat,
 		handleExportChat,
@@ -1587,8 +1588,11 @@ export const ChatPanel = React.memo(function ChatPanel({
 			queuedPrompts={agent.queuedPrompts}
 			isQueuePaused={agent.isQueuePaused}
 			queuePauseRevision={agent.queuePauseRevision}
-			onUpdateQueuedPrompt={agent.updateQueuedPrompt}
+			supportsSteering={agent.supportsSteering}
+			onUpdateQueuedPrompt={handleUpdateQueuedPrompt}
 			onRemoveQueuedPrompt={agent.removeQueuedPrompt}
+			onReorderQueuedPrompt={agent.reorderQueuedPrompt}
+			onSteerQueuedPrompt={agent.steerQueuedPrompt}
 			onResumeQueue={agent.resumeQueue}
 			onPauseQueue={agent.pauseQueue}
 		/>
