@@ -24,20 +24,49 @@ function truncateSummary(value: string, limit: number): string {
 	return value.length <= limit ? value : `${value.slice(0, limit - 1)}…`;
 }
 
-function textFromContent(content: MessageContent[]): string | undefined {
-	const text = content
-		.flatMap((item) => {
-			switch (item.type) {
-				case "text":
-				case "text_with_context":
-					return [item.text];
-				default:
-					return [];
+function appendSummary(
+	current: string,
+	value: string,
+	limit: number,
+): { value: string; complete: boolean } {
+	const normalized = normalizeSummary(value);
+	if (!normalized) return { value: current, complete: false };
+	const combined = current ? `${current} ${normalized}` : normalized;
+	return combined.length > limit
+		? { value: truncateSummary(combined, limit), complete: true }
+		: { value: combined, complete: false };
+}
+
+function textFromContent(
+	content: MessageContent[],
+	limit: number,
+): string | undefined {
+	let summary = "";
+	for (const item of content) {
+		if (item.type !== "text" && item.type !== "text_with_context") continue;
+		const result = appendSummary(summary, item.text, limit);
+		summary = result.value;
+		if (result.complete) break;
+	}
+	return summary || undefined;
+}
+
+function textFromMessages(
+	messages: ChatMessage[],
+	limit: number,
+): string | undefined {
+	let summary = "";
+	for (const message of messages) {
+		for (const item of message.content) {
+			if (item.type !== "text" && item.type !== "text_with_context") {
+				continue;
 			}
-		})
-		.join(" ");
-	const normalized = normalizeSummary(text);
-	return normalized || undefined;
+			const result = appendSummary(summary, item.text, limit);
+			summary = result.value;
+			if (result.complete) return summary;
+		}
+	}
+	return summary || undefined;
 }
 
 function getUserFallback(message: ChatMessage): string {
@@ -98,21 +127,16 @@ export function getConversationNavigationItems(
 		const assistantMessages = messages
 			.slice(messageIndex + 1, nextUserIndex)
 			.filter((message) => message.role === "assistant");
-		const assistantText = assistantMessages
-			.map((message) => textFromContent(message.content))
-			.filter((value): value is string => Boolean(value))
-			.join(" ");
-
 		items.push({
 			id: userMessage.id,
 			messageIndex,
 			question: truncateSummary(
-				textFromContent(userMessage.content) ??
+				textFromContent(userMessage.content, QUESTION_SUMMARY_LIMIT) ??
 					getUserFallback(userMessage),
 				QUESTION_SUMMARY_LIMIT,
 			),
 			response: truncateSummary(
-				normalizeSummary(assistantText) ||
+				textFromMessages(assistantMessages, RESPONSE_SUMMARY_LIMIT) ||
 					getAssistantFallback(assistantMessages),
 				RESPONSE_SUMMARY_LIMIT,
 			),

@@ -73,6 +73,26 @@ describe("conversation navigation projection", () => {
 			"Assistant response includes an image.",
 		);
 	});
+
+	it("stops reading response chunks once the preview is full", () => {
+		const unreadText = { type: "text", text: "unused" } as MessageContent;
+		Object.defineProperty(unreadText, "text", {
+			get: () => {
+				throw new Error("later response chunk should not be read");
+			},
+		});
+
+		const items = getConversationNavigationItems([
+			message("u1", "user", [{ type: "text", text: "Question" }]),
+			message("a1", "assistant", [
+				{ type: "text", text: "x".repeat(400) },
+				unreadText,
+			]),
+		]);
+
+		expect(items[0].response).toHaveLength(280);
+		expect(items[0].response.endsWith("…")).toBe(true);
+	});
 });
 
 describe("active conversation navigation selection", () => {

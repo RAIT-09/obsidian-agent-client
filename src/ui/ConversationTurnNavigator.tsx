@@ -19,6 +19,12 @@ export const ConversationTurnNavigator = React.memo(
 		const collapseTimerRef = React.useRef<number | null>(null);
 		const previewIdPrefix = React.useId();
 		const navigatorRef = React.useRef<HTMLElement>(null);
+		const density =
+			items.length > 60
+				? "compact"
+				: items.length > 20
+					? "dense"
+					: "normal";
 
 		const activate = React.useCallback(() => {
 			if (collapseTimerRef.current !== null) {
@@ -78,6 +84,7 @@ export const ConversationTurnNavigator = React.memo(
 			<nav
 				ref={navigatorRef}
 				className={`agent-client-turn-navigator ${isInteracting ? "agent-client-is-interacting" : ""}`}
+				data-density={density}
 				aria-label="Conversation turns"
 				onMouseLeave={scheduleCollapse}
 				onFocus={activate}

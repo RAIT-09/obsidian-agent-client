@@ -786,7 +786,7 @@ If your plugin does not need CSS, delete this file.
 }
 
 .agent-client-chat-view-messages.agent-client-has-turn-navigator {
-	padding-inline-start: 48px;
+	padding-inline-start: 32px;
 }
 
 /* Conversation turn navigator */
@@ -794,7 +794,7 @@ If your plugin does not need CSS, delete this file.
 	position: absolute;
 	z-index: 20;
 	top: 50%;
-	inset-inline-start: 9px;
+	inset-inline-start: 8px;
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
@@ -813,7 +813,7 @@ If your plugin does not need CSS, delete this file.
 }
 
 .agent-client-turn-navigator.agent-client-is-interacting {
-	width: 36px;
+	width: 28px;
 	padding: 8px 0;
 	gap: 0;
 	pointer-events: auto;
@@ -844,7 +844,7 @@ If your plugin does not need CSS, delete this file.
 .agent-client-turn-navigator.agent-client-is-interacting
 	.agent-client-turn-navigator-item {
 	flex: 0 0 12px;
-	width: 36px;
+	width: 28px;
 	height: 12px;
 	min-height: 12px !important;
 }
@@ -881,7 +881,7 @@ If your plugin does not need CSS, delete this file.
 
 .agent-client-turn-navigator.agent-client-is-interacting
 	.agent-client-turn-navigator-line {
-	width: 20px;
+	width: 18px;
 	opacity: 0.4;
 }
 
@@ -891,8 +891,40 @@ If your plugin does not need CSS, delete this file.
 .agent-client-turn-navigator.agent-client-is-interacting
 	.agent-client-turn-navigator-item:focus-visible
 	.agent-client-turn-navigator-line {
-	width: 32px;
+	width: 26px;
 	opacity: 1;
+}
+
+.agent-client-turn-navigator[data-density="dense"],
+.agent-client-turn-navigator[data-density="compact"] {
+	height: min(50%, 320px);
+	max-height: none;
+	gap: 2px;
+}
+
+.agent-client-turn-navigator[data-density="dense"]
+	.agent-client-turn-navigator-item {
+	flex: 1 1 2px;
+	min-height: 1px !important;
+}
+
+.agent-client-turn-navigator[data-density="dense"].agent-client-is-interacting
+	.agent-client-turn-navigator-item {
+	flex: 1 1 6px;
+	min-height: 1px !important;
+}
+
+.agent-client-turn-navigator[data-density="compact"] {
+	gap: 0;
+}
+
+.agent-client-turn-navigator[data-density="compact"]
+	.agent-client-turn-navigator-item,
+.agent-client-turn-navigator[data-density="compact"].agent-client-is-interacting
+	.agent-client-turn-navigator-item {
+	flex: 1 1 2px;
+	height: 2px;
+	min-height: 1px !important;
 }
 
 .agent-client-turn-navigator-preview {
@@ -900,10 +932,12 @@ If your plugin does not need CSS, delete this file.
 	position: absolute;
 	z-index: 2;
 	top: 50%;
-	inset-inline-start: 44px;
+	inset-inline-start: 34px;
 	display: block;
-	width: min(360px, calc(100cqw - 92px));
-	padding: 13px 15px 14px;
+	width: min(340px, calc(100cqw - 48px));
+	max-height: min(140px, calc(50cqh - 16px));
+	padding: 10px 12px 11px;
+	overflow: hidden;
 	visibility: hidden;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 14px;
@@ -919,6 +953,21 @@ If your plugin does not need CSS, delete this file.
 		opacity 100ms ease,
 		transform 140ms ease,
 		visibility 0s linear 140ms;
+}
+
+@container (max-width: 360px) {
+	.agent-client-chat-view-messages.agent-client-has-turn-navigator {
+		padding-inline-start: 26px;
+	}
+
+	.agent-client-turn-navigator {
+		inset-inline-start: 4px;
+	}
+
+	.agent-client-turn-navigator-preview {
+		inset-inline-start: 30px;
+		width: calc(100cqw - 38px);
+	}
 }
 
 .agent-client-turn-navigator-question,
@@ -2925,6 +2974,18 @@ If your plugin does not need CSS, delete this file.
 	padding: 12px 10px;
 	overflow-y: auto;
 	overscroll-behavior: contain;
+}
+
+.agent-client-embedded-messages-container
+	.agent-client-chat-view-messages.agent-client-has-turn-navigator {
+	padding-inline-start: 32px;
+}
+
+@container (max-width: 360px) {
+	.agent-client-embedded-messages-container
+		.agent-client-chat-view-messages.agent-client-has-turn-navigator {
+		padding-inline-start: 26px;
+	}
 }
 
 .agent-client-embedded-chat-panel .agent-client-chat-input-container {
