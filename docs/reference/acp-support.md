@@ -23,16 +23,17 @@ Methods the plugin can call on agents.
 | `session/cancel` | ✅ Supported | |
 | `session/set_mode` | ✅ Supported | |
 | `session/load` | ✅ Supported | |
-| `session/set_model` | ✅ Supported | Unstable API |
-| `session/list` | ✅ Supported | Unstable API |
-| `session/resume` | ✅ Supported | Unstable API |
+| `session/list` | ✅ Supported | |
+| `session/resume` | ✅ Supported | |
 | `session/fork` | ✅ Supported | Unstable API |
 | `session/delete` | ✅ Supported | |
 | `session/set_config_option` | ✅ Supported | |
 
 ::: tip
-Methods marked "Unstable API" may change in future ACP versions. They are prefixed with `unstable_` in the SDK.
+Methods marked "Unstable API" may change in future ACP versions. The SDK has their types in `@agentclientprotocol/sdk/unstable`.
 :::
+
+When the agent advertises `sessionCapabilities.systemPrompt`, `session/new` carries a `systemPrompt` in `append` mode with the [Prompt Injection](/usage/prompt-injection) instructions. `session/load`, `session/resume` and `session/fork` carry the ones the session started with, which the plugin saves with it.
 
 ### Agent → Client (Notifications)
 

@@ -514,7 +514,7 @@ export interface SessionInfo {
 }
 
 /**
- * Result of session/list (unstable).
+ * Result of session/list.
  */
 export interface ListSessionsResult {
 	/** Array of session metadata */
@@ -567,6 +567,12 @@ export interface SavedSessionInfo {
 	 * session and stay recoverable. Device-local; never written into note content.
 	 */
 	embedId?: string;
+	/**
+	 * The prompt-injection instructions in the session's system prompt,
+	 * which go in it again when the session is restored or forked. Absent
+	 * when it has none.
+	 */
+	promptInjection?: string[];
 	/** ISO 8601 timestamp of session creation */
 	createdAt: string;
 	/** ISO 8601 timestamp of last activity */
@@ -614,15 +620,15 @@ export interface McpCapabilities {
 }
 
 /**
- * Session-related capabilities (unstable features).
+ * Session-related capabilities.
  * From agentCapabilities.sessionCapabilities in initialize response.
  */
 export interface SessionCapabilities {
-	/** session/resume support (unstable) */
+	/** session/resume support */
 	resume?: Record<string, unknown>;
 	/** session/fork support (unstable) */
 	fork?: Record<string, unknown>;
-	/** session/list support (unstable) */
+	/** session/list support */
 	list?: Record<string, unknown>;
 	/** session/delete support */
 	delete?: Record<string, unknown>;
@@ -638,7 +644,7 @@ export interface AgentCapabilities {
 	/** Whether the agent supports session/load for resuming sessions (stable) */
 	loadSession?: boolean;
 
-	/** Session management capabilities (unstable features) */
+	/** Session management capabilities */
 	sessionCapabilities?: SessionCapabilities;
 
 	/** MCP connection capabilities */

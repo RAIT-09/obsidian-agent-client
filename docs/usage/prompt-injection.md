@@ -1,6 +1,6 @@
 # Prompt Injection
 
-Guide agents to produce **Obsidian-flavored Markdown** by injecting short formatting instructions into the first message of each session.
+Guide agents to produce **Obsidian-flavored Markdown** by giving them short formatting instructions for each session.
 
 ## Why?
 
@@ -14,10 +14,13 @@ Prompt injection adds short, focused instructions so the agent produces output t
 
 ## How it works
 
-When you send the **first message** of a new session, the plugin appends one or more short instruction sentences to your prompt. The agent sees both your message and the formatting guidance, and applies it across the rest of the session.
+The plugin gives the agent one or more short instruction sentences, which it applies across the session. How they reach the agent depends on the agent:
+
+- **As part of the system prompt**, for agents that take one from the client (ACP's `systemPrompt`; recent versions of Claude Code and Codex do). When the plugin starts a session, it asks the agent to append the instructions to its own system prompt. It saves them with the session and sends the same ones again when it restores or forks the session. They stay in effect for the whole session, also after the agent compacts the conversation, and they are not part of your messages.
+- **With your first message**, for other agents. The plugin adds the instructions to the first message of the session, in an `<obsidian_system_instruction>` block. A slash command doesn't carry them, since the agent reads the command from the start of the message; they go with your first message that isn't one. They are then part of the conversation, which the agent may summarize away when it compacts it.
 
 ::: info
-Instructions are only injected on the **first message** of each session, not on every message. They live for the duration of the agent's context window.
+Changes to these settings apply to the sessions you start afterwards; a session keeps the instructions it started with. A chat starts its session as soon as it opens, though, and with an agent that takes a system prompt, that is when the session gets the instructions. If you change the settings while such a chat is still empty, instructions you turn on go with your first message instead, and ones you turn off stay in that session until you restart the agent.
 :::
 
 ## Settings
@@ -55,7 +58,7 @@ You may want to turn off some or all toggles if:
 
 - You are writing prose that doesn't reference notes, math, or tables
 - The agent already follows Obsidian conventions reliably for your use case
-- You want to minimize the size of the first prompt for performance or cost reasons
+- You want to keep the agent's context as small as possible for performance or cost reasons
 
 ::: tip
 If an agent ignores some instructions despite the toggle being on, that is an agent limitation rather than a plugin bug. Try a different model or agent, or rephrase the instruction in your own message.

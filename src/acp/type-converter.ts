@@ -1,4 +1,5 @@
 import * as acp from "@agentclientprotocol/sdk";
+import type * as acpUnstable from "@agentclientprotocol/sdk/unstable";
 import type { ToolCallContent, PromptContent } from "../types/chat";
 import type {
 	InitializeResult,
@@ -224,6 +225,20 @@ export class AcpTypeConverter {
 	}
 
 	/**
+	 * A `systemPrompt` that appends the given instructions to the agent's own,
+	 * one text block each; undefined for none (ACP forbids empty content).
+	 */
+	static toAppendedSystemPrompt(
+		instructions: string[],
+	): acp.SystemPrompt | undefined {
+		if (instructions.length === 0) return undefined;
+		return {
+			mode: "append",
+			content: instructions.map((text) => ({ type: "text", text })),
+		};
+	}
+
+	/**
 	 * Convert ACP session response to domain SessionResult.
 	 *
 	 * Handles the modes/models/configOptions conversion that is common
@@ -296,9 +311,12 @@ export class AcpTypeConverter {
 
 	/**
 	 * Convert ACP InitializeResponse to domain InitializeResult.
+	 *
+	 * Takes the unstable type, which also has `sessionCapabilities.fork`;
+	 * the SDK passes the response through as the agent sent it.
 	 */
 	static toInitializeResult(
-		initResult: acp.InitializeResponse,
+		initResult: acpUnstable.InitializeResponse,
 	): InitializeResult {
 		const promptCaps = initResult.agentCapabilities?.promptCapabilities;
 		const mcpCaps = initResult.agentCapabilities?.mcpCapabilities;

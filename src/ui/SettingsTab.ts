@@ -537,7 +537,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Inject Obsidian Markdown instructions")
 			.setDesc(
-				"Include formatting guidance in the first message of each session so agents produce Obsidian-compatible Markdown.",
+				"Give agents formatting guidance so they produce Obsidian-compatible Markdown: in their system prompt when they take one, otherwise in the first message of each session.",
 			)
 			.addToggle((toggle) =>
 				toggle

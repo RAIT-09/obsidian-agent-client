@@ -38,6 +38,7 @@ interface SessionMessagesFile {
 	cwd?: string;
 	title?: string;
 	embedId?: string;
+	promptInjection?: string[];
 	createdAt?: string;
 	updatedAt?: string;
 	messages: Array<{
@@ -64,6 +65,12 @@ interface SessionStorageSettingsAccess {
 
 /** Maximum number of saved sessions to keep */
 const MAX_SAVED_SESSIONS = 50;
+
+/** The strings of a value read from data.json or a transcript, if it is an array */
+function stringArray(value: unknown): string[] | undefined {
+	if (!Array.isArray(value)) return undefined;
+	return value.filter((item): item is string => typeof item === "string");
+}
 
 /**
  * Evict the least-recently-used entries (oldest updatedAt) until the list
@@ -380,6 +387,12 @@ export class SessionStorage {
 						cwd: entry.cwd,
 						title: entry.title,
 						embedId: entry.embedId,
+						// An entry recreated for an evicted session (e.g. by a
+						// rename) lacks them; keep the transcript's.
+						promptInjection:
+							entry.promptInjection ??
+							(await this.readExistingMeta(sessionId))
+								.promptInjection,
 						createdAt: entry.createdAt,
 						updatedAt: entry.updatedAt,
 					}
@@ -470,7 +483,12 @@ export class SessionStorage {
 		Partial<
 			Pick<
 				SessionMessagesFile,
-				"cwd" | "title" | "embedId" | "createdAt" | "updatedAt"
+				| "cwd"
+				| "title"
+				| "embedId"
+				| "promptInjection"
+				| "createdAt"
+				| "updatedAt"
 			>
 		>
 	> {
@@ -486,11 +504,48 @@ export class SessionStorage {
 				cwd: data.cwd,
 				title: data.title,
 				embedId: data.embedId,
+				promptInjection: data.promptInjection,
 				createdAt: data.createdAt,
 				updatedAt: data.updatedAt,
 			};
 		} catch {
 			return {};
+		}
+	}
+
+	/**
+	 * The prompt-injection instructions saved with a session: from its index
+	 * entry, or from its transcript's snapshot once the entry is evicted.
+	 * Undefined when neither has them, or they belong to another agent (custom
+	 * agents may reuse session ids).
+	 */
+	async getSessionPromptInjection(
+		sessionId: string,
+		agentId?: string,
+	): Promise<string[] | undefined> {
+		const ofAgent = (s: { agentId?: string }) =>
+			agentId === undefined || s.agentId === agentId;
+		const entry = (
+			this.settingsAccess.getSnapshot().savedSessions || []
+		).find((s) => s.sessionId === sessionId && ofAgent(s));
+		const fromEntry = stringArray(entry?.promptInjection);
+		if (fromEntry) return fromEntry;
+		// No entry (evicted), or one recreated without them (e.g. by a
+		// rename of an evicted session): the transcript may have them.
+
+		const filePath = this.getSessionFilePath(sessionId);
+		const adapter = this.plugin.app.vault.adapter;
+		try {
+			if (!(await adapter.exists(filePath))) return undefined;
+			const data = JSON.parse(
+				await adapter.read(filePath),
+			) as Partial<SessionMessagesFile> | null;
+			if (!data || typeof data !== "object" || !ofAgent(data)) {
+				return undefined;
+			}
+			return stringArray(data.promptInjection);
+		} catch {
+			return undefined;
 		}
 	}
 
