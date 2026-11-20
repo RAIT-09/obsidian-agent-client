@@ -41,7 +41,7 @@
 		"yaml": "^2.9.0"
 	},
 	"dependencies": {
-		"@agentclientprotocol/sdk": "^0.28.1",
+		"@agentclientprotocol/sdk": "^2.8.0",
 		"@codemirror/state": "6.5.0",
 		"@codemirror/view": "^6.35.0",
 		"@tanstack/react-virtual": "^3.13.23",

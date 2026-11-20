@@ -1,4 +1,5 @@
 import * as acp from "@agentclientprotocol/sdk";
+import type * as acpUnstable from "@agentclientprotocol/sdk/unstable";
 import type { ToolCallContent, PromptContent } from "../types/chat";
 import type {
 	InitializeResult,
@@ -296,9 +297,12 @@ export class AcpTypeConverter {
 
 	/**
 	 * Convert ACP InitializeResponse to domain InitializeResult.
+	 *
+	 * Takes the unstable type, which also has `sessionCapabilities.fork`;
+	 * the SDK passes the response through as the agent sent it.
 	 */
 	static toInitializeResult(
-		initResult: acp.InitializeResponse,
+		initResult: acpUnstable.InitializeResponse,
 	): InitializeResult {
 		const promptCaps = initResult.agentCapabilities?.promptCapabilities;
 		const mcpCaps = initResult.agentCapabilities?.mcpCapabilities;

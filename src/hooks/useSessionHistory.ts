@@ -21,7 +21,7 @@ import { truncateTitle } from "../utils/text";
 interface SessionCapabilityFlags {
 	/** Whether session/load is supported (stable) */
 	canLoad: boolean;
-	/** Whether session/resume is supported (unstable) */
+	/** Whether session/resume is supported */
 	canResume: boolean;
 	/** Whether session/fork is supported (unstable) */
 	canFork: boolean;
