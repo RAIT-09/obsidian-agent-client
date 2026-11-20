@@ -983,6 +983,12 @@ If your plugin does not need CSS, delete this file.
 	position: relative;
 }
 
+/* The queue is a sibling above this anchor. Composer overlays therefore stay
+   beside the input instead of moving away as queued messages accumulate. */
+.agent-client-chat-composer {
+	position: relative;
+}
+
 /* Queued prompts */
 .agent-client-queued-prompts {
 	margin-bottom: 6px;
@@ -1465,7 +1471,7 @@ If your plugin does not need CSS, delete this file.
 	bottom: 100%;
 	left: 8px;
 	right: 8px;
-	max-height: 250px;
+	max-height: min(250px, calc(100cqh - 160px));
 	background-color: var(--background-secondary);
 	border: 2px solid var(--background-modifier-border);
 	border-radius: 8px;
@@ -1474,6 +1480,17 @@ If your plugin does not need CSS, delete this file.
 	font-size: 14px;
 	margin-bottom: 8px;
 	z-index: 1000;
+}
+
+/* In very short panels, cover the inactive composer instead of clipping the
+   top of a suggestion list or dismissible notification. */
+@container (max-height: 400px) {
+	.agent-client-mention-dropdown,
+	.agent-client-error-overlay {
+		bottom: 0;
+		max-height: calc(100cqh - 24px);
+		overflow-y: auto;
+	}
 }
 
 .agent-client-mention-dropdown-item {

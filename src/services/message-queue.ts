@@ -1,5 +1,56 @@
 import type { AttachedFile, QueuedPrompt } from "../types/chat";
 
+export interface QueuedPromptEditState {
+	editingId: string | null;
+	resumeAfterEdit: boolean;
+}
+
+export interface BeginQueuedPromptEditResult {
+	state: QueuedPromptEditState;
+	shouldPause: boolean;
+}
+
+export interface FinishQueuedPromptEditResult {
+	state: QueuedPromptEditState;
+	shouldResume: boolean;
+}
+
+/**
+ * Start or switch a queue edit without forgetting who paused the queue.
+ * Switching from one item to another keeps the original resume intent.
+ */
+export function beginQueuedPromptEdit(
+	state: QueuedPromptEditState,
+	id: string,
+	isPaused: boolean,
+): BeginQueuedPromptEditResult {
+	if (state.editingId !== null) {
+		return {
+			state: { ...state, editingId: id },
+			shouldPause: false,
+		};
+	}
+
+	return {
+		state: {
+			editingId: id,
+			resumeAfterEdit: !isPaused,
+		},
+		shouldPause: !isPaused,
+	};
+}
+
+/** Finish an edit and decide whether the queue should run again. */
+export function finishQueuedPromptEdit(
+	state: QueuedPromptEditState,
+	resumeNow = false,
+): FinishQueuedPromptEditResult {
+	return {
+		state: { editingId: null, resumeAfterEdit: false },
+		shouldResume: resumeNow || state.resumeAfterEdit,
+	};
+}
+
 /** Take the next item for a session without disturbing any other queued work. */
 export function takeNextQueueItemForSession<T extends { sessionId: string }>(
 	queue: T[],

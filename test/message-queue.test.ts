@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+	beginQueuedPromptEdit,
 	createQueuedPrompt,
+	finishQueuedPromptEdit,
 	requeueItemAtFront,
 	removeQueuedPromptItem,
 	takeNextQueueItemForSession,
@@ -17,6 +19,48 @@ const attachment: AttachedFile = {
 };
 
 describe("message queue transforms", () => {
+	it("keeps automatic resume intent when switching edited items", () => {
+		const first = beginQueuedPromptEdit(
+			{ editingId: null, resumeAfterEdit: false },
+			"q1",
+			false,
+		);
+		const second = beginQueuedPromptEdit(first.state, "q2", true);
+		const finished = finishQueuedPromptEdit(second.state);
+
+		expect(first.shouldPause).toBe(true);
+		expect(second).toEqual({
+			state: { editingId: "q2", resumeAfterEdit: true },
+			shouldPause: false,
+		});
+		expect(finished.shouldResume).toBe(true);
+	});
+
+	it("does not resume a queue that was paused before editing", () => {
+		const editing = beginQueuedPromptEdit(
+			{ editingId: null, resumeAfterEdit: false },
+			"q1",
+			true,
+		);
+
+		expect(editing.shouldPause).toBe(false);
+		expect(finishQueuedPromptEdit(editing.state).shouldResume).toBe(false);
+	});
+
+	it("explicit Resume closes editing and resumes regardless of origin", () => {
+		const editing = beginQueuedPromptEdit(
+			{ editingId: null, resumeAfterEdit: false },
+			"q1",
+			true,
+		);
+		const finished = finishQueuedPromptEdit(editing.state, true);
+
+		expect(finished).toEqual({
+			state: { editingId: null, resumeAfterEdit: false },
+			shouldResume: true,
+		});
+	});
+
 	it("takes matching work without removing another session's jobs", () => {
 		const queue = [
 			{ sessionId: "session-a", value: "from-a" },
