@@ -48,7 +48,7 @@ Check your version under **Settings → General → Version**. If you are on an 
 ### Node.js
 
 ::: tip Not always required
-Node.js is needed for npm-based agents like Claude Code, Codex, and Gemini CLI. If your agent is a standalone binary, you can skip this step.
+Node.js is needed for npm-based agents like Claude Code, Codex, and Gemini CLI. Standalone agents such as [Antigravity CLI](/agent-setup/antigravity-cli) do not require Node.js, so you can skip this step for them.
 :::
 
 If you need Node.js:

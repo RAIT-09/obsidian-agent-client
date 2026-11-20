@@ -252,7 +252,7 @@ export function useChatActions(
 				await autoExportIfEnabled("newChat", messages, session);
 			}
 
-			suggestions.mentions.toggleAutoMention(false);
+			suggestions.mentions.resetAutoMention();
 			agent.clearMessages();
 
 			const newAgentId = isAgentSwitch
@@ -272,7 +272,7 @@ export function useChatActions(
 			agent.cancelOperation,
 			agent.clearMessages,
 			agent.restartSession,
-			suggestions.mentions.toggleAutoMention,
+			suggestions.mentions.resetAutoMention,
 			sessionHistory.invalidateCache,
 		],
 	);

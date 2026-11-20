@@ -5,6 +5,7 @@ import type { ChatMessage, MessageContent } from "../types/chat";
 import type { AcpClient } from "../acp/acp-client";
 import type AgentClientPlugin from "../plugin";
 import { MarkdownRenderer } from "./shared/MarkdownRenderer";
+import { useHoverLinkPreview } from "../hooks/useHoverLinkPreview";
 import { TerminalBlock } from "./TerminalBlock";
 import { ToolCallBlock } from "./ToolCallBlock";
 import { LucideIcon } from "./shared/IconButton";
@@ -32,6 +33,7 @@ function TextWithMentions({
 	plugin,
 	autoMentionContext,
 }: TextWithMentionsProps): React.ReactElement {
+	const triggerHoverLink = useHoverLinkPreview(plugin);
 	// Match @[[filename]] format only
 	const mentionRegex = /@\[\[([^\]]+)\]\]/g;
 	const parts: React.ReactNode[] = [];
@@ -52,6 +54,13 @@ function TextWithMentions({
 						"",
 					);
 				}}
+				onMouseOver={(e) =>
+					triggerHoverLink(
+						e.nativeEvent,
+						e.currentTarget,
+						autoMentionContext.notePath,
+					)
+				}
 			>
 				{displayText}
 			</span>,
@@ -85,6 +94,13 @@ function TextWithMentions({
 					onClick={() => {
 						void plugin.app.workspace.openLinkText(file.path, "");
 					}}
+					onMouseOver={(e) =>
+						triggerHoverLink(
+							e.nativeEvent,
+							e.currentTarget,
+							file.path,
+						)
+					}
 				>
 					@{noteName}
 				</span>,

@@ -4,6 +4,7 @@ import { SessionHistoryModal } from "../ui/SessionHistoryModal";
 import { useSettingsSelector } from "./useSettings";
 import { getLogger } from "../utils/logger";
 import { convertWslPathToWindows } from "../utils/platform";
+import { extractErrorMessage } from "../utils/error-utils";
 import type AgentClientPlugin from "../plugin";
 import type { AgentClientPluginSettings } from "../plugin";
 import type { UseAgentReturn } from "./useAgent";
@@ -118,7 +119,10 @@ export function useHistoryModal(
 				await sessionHistory.deleteSession(sessionId);
 				new Notice("[Agent Client] Session deleted");
 			} catch (error) {
-				new Notice("[Agent Client] Failed to delete session");
+				// With session/delete, this can be the agent refusing
+				new Notice(
+					`[Agent Client] Failed to delete session: ${extractErrorMessage(error)}`,
+				);
 				logger.error("Session delete error:", error);
 			}
 		},
@@ -140,6 +144,15 @@ export function useHistoryModal(
 			}
 		},
 		[sessionHistory.updateSessionTitle, logger],
+	);
+
+	// Read live from the registry: chats open and close while the modal is up
+	const isSessionOpen = useCallback(
+		(sessionId: string) =>
+			plugin.viewRegistry
+				.getAll()
+				.some((view) => view.getSessionId() === sessionId),
+		[plugin],
 	);
 
 	const handleLoadMore = useCallback(() => {
@@ -165,6 +178,7 @@ export function useHistoryModal(
 				canList: sessionHistory.canList,
 				canRestore: sessionHistory.canRestore,
 				canFork: sessionHistory.canFork,
+				canDelete: sessionHistory.canDelete,
 				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
 				localSessionIds: sessionHistory.localSessionIds,
 				isAgentReady: isSessionReady,
@@ -174,6 +188,7 @@ export function useHistoryModal(
 				onRestoreSession: handleRestoreSession,
 				onForkSession: handleForkSession,
 				onDeleteSession: handleDeleteSession,
+				isSessionOpen,
 				onEditTitle: handleEditTitle,
 				onLoadMore: handleLoadMore,
 				onFetchSessions: handleFetchSessions,
@@ -196,6 +211,7 @@ export function useHistoryModal(
 		sessionHistory.canList,
 		sessionHistory.canRestore,
 		sessionHistory.canFork,
+		sessionHistory.canDelete,
 		sessionHistory.isUsingLocalSessions,
 		sessionHistory.localSessionIds,
 		sessionHistory.fetchSessions,
@@ -207,6 +223,7 @@ export function useHistoryModal(
 		handleRestoreSession,
 		handleForkSession,
 		handleDeleteSession,
+		isSessionOpen,
 		handleEditTitle,
 		handleLoadMore,
 		handleFetchSessions,
@@ -224,6 +241,7 @@ export function useHistoryModal(
 				canList: sessionHistory.canList,
 				canRestore: sessionHistory.canRestore,
 				canFork: sessionHistory.canFork,
+				canDelete: sessionHistory.canDelete,
 				isUsingLocalSessions: sessionHistory.isUsingLocalSessions,
 				localSessionIds: sessionHistory.localSessionIds,
 				isAgentReady: isSessionReady,
@@ -233,6 +251,7 @@ export function useHistoryModal(
 				onRestoreSession: handleRestoreSession,
 				onForkSession: handleForkSession,
 				onDeleteSession: handleDeleteSession,
+				isSessionOpen,
 				onEditTitle: handleEditTitle,
 				onLoadMore: handleLoadMore,
 				onFetchSessions: handleFetchSessions,
@@ -246,6 +265,7 @@ export function useHistoryModal(
 		sessionHistory.canList,
 		sessionHistory.canRestore,
 		sessionHistory.canFork,
+		sessionHistory.canDelete,
 		sessionHistory.isUsingLocalSessions,
 		vaultPath,
 		isSessionReady,
@@ -255,6 +275,7 @@ export function useHistoryModal(
 		handleRestoreSession,
 		handleForkSession,
 		handleDeleteSession,
+		isSessionOpen,
 		handleEditTitle,
 		handleLoadMore,
 		handleFetchSessions,

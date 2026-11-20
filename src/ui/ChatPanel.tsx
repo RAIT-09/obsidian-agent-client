@@ -27,6 +27,7 @@ import { useHistoryModal } from "../hooks/useHistoryModal";
 import { useChatActions } from "../hooks/useChatActions";
 import { ChangeDirectoryModal } from "./ChangeDirectoryModal";
 import { addRenameSessionMenuItem } from "./EditTitleModal";
+import { notifySessionEvent } from "./session-notification";
 
 // Service imports
 import { getLogger } from "../utils/logger";
@@ -1049,14 +1050,12 @@ export const ChatPanel = React.memo(function ChatPanel({
 				`[ChatPanel] Session messages saved: ${session.sessionId}`,
 			);
 
-			// System notification on response completion
-			if (
-				settings.enableSystemNotifications &&
-				!activeDocument.hasFocus()
-			) {
-				new Notification("Agent Client", {
-					body: `${activeAgentLabel} has completed the response.`,
-				});
+			if (settings.enableSystemNotifications) {
+				notifySessionEvent(
+					plugin.viewRegistry,
+					viewId,
+					`${activeAgentLabel} has completed the response.`,
+				);
 			}
 		}
 	}, [
@@ -1067,6 +1066,8 @@ export const ChatPanel = React.memo(function ChatPanel({
 		settings.enableSystemNotifications,
 		activeAgentLabel,
 		logger,
+		plugin.viewRegistry,
+		viewId,
 	]);
 
 	// Some agents (e.g. OpenCode) emit trailing message chunks *after* end_turn,
@@ -1128,7 +1129,7 @@ export const ChatPanel = React.memo(function ChatPanel({
 	}, [onSessionTitleChanged, sessionTitle]);
 
 	// ============================================================
-	// Effects - System Notification on Permission Request
+	// Effects - Notification on Permission Request
 	// ============================================================
 	const prevHasActivePermissionRef = useRef<boolean>(false);
 
@@ -1140,17 +1141,20 @@ export const ChatPanel = React.memo(function ChatPanel({
 		if (
 			!wasActive &&
 			agent.hasActivePermission &&
-			settings.enableSystemNotifications &&
-			!activeDocument.hasFocus()
+			settings.enableSystemNotifications
 		) {
-			new Notification("Agent Client", {
-				body: `${activeAgentLabel} is requesting permission.`,
-			});
+			notifySessionEvent(
+				plugin.viewRegistry,
+				viewId,
+				`${activeAgentLabel} is requesting permission.`,
+			);
 		}
 	}, [
 		agent.hasActivePermission,
 		settings.enableSystemNotifications,
 		activeAgentLabel,
+		plugin.viewRegistry,
+		viewId,
 	]);
 
 	// ============================================================

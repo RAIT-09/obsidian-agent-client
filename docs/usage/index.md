@@ -24,12 +24,20 @@ The chat panel opens in the right sidebar.
   <img src="/images/sending-messages.webp" alt="Sending Messages"  width="400" />
 </p>
 
+## Note Links in Messages
+
+Note links in the agent's replies (`[[Note Name]]` wikilinks, or links to note paths inside your vault) and `@[[note]]` mentions in your own messages are clickable and open the note. Hold `Cmd/Ctrl` while hovering over one to preview the note, just like in the editor.
+
+::: tip
+Hover previews come from Obsidian's **Page preview** core plugin. To preview without holding `Cmd/Ctrl`, turn off **Agent Client** under **Settings → Page preview**. Agents are asked to write wikilinks by default; see [Prompt Injection](/usage/prompt-injection).
+:::
+
 ## Sending Images and Files
 
 You can attach images and files to your messages by pasting or dragging and dropping.
 
 1. **Paste**: Copy a file or image and paste (`Cmd/Ctrl + V`) in the input field
-2. **Drag and Drop**: Drag files directly onto the input area
+2. **Drag and Drop**: Drag files onto the input area from Finder/Explorer or from Obsidian's file explorer (notes dragged from Obsidian become `@[[note]]` mentions)
 
 Attached files appear as thumbnails or file icons below the text area. Click the **×** to remove.
 

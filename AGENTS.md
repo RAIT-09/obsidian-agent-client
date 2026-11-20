@@ -1,7 +1,7 @@
 # Agent Client Plugin - LLM Developer Guide
 
 ## Overview
-Obsidian plugin for AI agent interaction (Claude Code, Codex, Gemini CLI, Mistral Vibe, OpenCode, Kiro, Hermes Agent, Pi, Grok Build, custom agents) via ACP.
+Obsidian plugin for AI agent interaction (Claude Code, Codex, Gemini CLI, Mistral Vibe, OpenCode, Kiro, Hermes Agent, Pi, Grok Build, IBM Bob, Antigravity CLI, custom agents) via ACP.
 
 **Tech**: React 19, TypeScript, Obsidian API, Agent Client Protocol (ACP)
 
@@ -38,9 +38,11 @@ src/
 │   ├── useAgentSession.ts       # Session lifecycle, config options, optimistic updates
 │   ├── useAgentMessages.ts      # Message state, streaming (RAF batch), permissions
 │   ├── useSuggestions.ts        # @[[note]] mentions + /command suggestions (unified)
+│   ├── useSuggestionKeymap.ts   # Dropdown keys via an Obsidian Scope (arrows, Ctrl+P/N, Enter, Tab, Esc)
 │   ├── useSessionHistory.ts     # Session list/load/resume/fork
 │   ├── useChatActions.ts        # Business callbacks (send, newChat, export, restart, etc.)
 │   ├── useHistoryModal.ts       # Session history modal lifecycle
+│   ├── useHoverLinkPreview.ts   # Emits `hover-link` so Page preview shows note popovers
 │   └── useSettings.ts           # Settings subscription (useSyncExternalStore)
 ├── ui/                          # React components
 │   ├── ChatContext.ts           # React Context (plugin, acpClient, vaultService, settingsService)
@@ -67,7 +69,7 @@ src/
 │       └── AttachmentStrip.tsx  # Attachment preview strip
 ├── utils/                       # Shared utilities (pure functions)
 │   ├── platform.ts              # Shell, WSL, Windows env, command building
-│   ├── paths.ts                 # Path resolution, file:// URI
+│   ├── paths.ts                 # Path resolution, file:// URI, internal-link href → linktext
 │   ├── error-utils.ts           # ACP error conversion
 │   ├── mention-parser.ts        # @[[note]] detection/extraction
 │   └── logger.ts                # Debug-mode logger
@@ -140,6 +142,7 @@ FloatingChatView uses `onRegisterExpanded` callback (not CustomEvent) for expand
 - Slash command filtering and selection
 - Auto-mention toggle coordination (slash commands disable auto-mention)
 - Return is `useMemo`-wrapped (mentions + commands objects)
+- Dropdown keys are not handled in the input's `onKeyDown`: `useSuggestionKeymap` (called by InputArea) pushes an Obsidian `Scope` while a dropdown is open and the input has focus, so the keys win over Obsidian hotkeys like native suggestion popups
 
 **useChatActions**: Business callbacks
 - handleSendMessage, handleNewChat, handleExportChat, handleRestartAgent, etc.
@@ -328,7 +331,7 @@ interface ISettingsAccess {
 **Methods**: initialize, newSession, authenticate, prompt, cancel, setSessionConfigOption
 **Notifications**: session/update (agent_message_chunk, agent_thought_chunk, user_message_chunk, tool_call, tool_call_update, plan, available_commands_update, current_mode_update, session_info_update, usage_update, config_option_update)
 **Requests**: requestPermission
-**Session Management** (unstable): session/list, session/load, session/resume, session/fork
+**Session Management** (unstable): session/list, session/load, session/resume, session/fork; session/delete (stable)
 
 **Agents**:
 - Claude Code: `@agentclientprotocol/claude-agent-acp` (ANTHROPIC_API_KEY)
@@ -340,6 +343,8 @@ interface ISettingsAccess {
 - Hermes Agent: install script (CLI-managed auth, no API key env)
 - Pi: `pi-acp` npm package (requires `pi` CLI; CLI-managed auth, no API key env)
 - Grok Build: `grok` install script (XAI_API_KEY, optional)
+- IBM Bob: `bob` install script (BOBSHELL_API_KEY, optional)
+- Antigravity CLI: `agy` install script, `agy acp` (GEMINI_API_KEY, optional)
 - Custom: Any ACP-compatible agent
 
 ---

@@ -6,9 +6,21 @@ Attach images and files to your messages to provide context to the AI agent.
 
 ### Drag and Drop
 
-1. Drag files from Finder/Explorer onto the input area
+1. Drag files from Finder/Explorer — or from Obsidian's file explorer — onto the input area
 2. The input area highlights when you drag over it
 3. Thumbnails (images) or file icons (other files) appear below the text area
+
+#### Dragging from Obsidian
+
+Files dragged from inside Obsidian (file explorer, search results, links) are handled by type:
+
+- **Markdown notes** are inserted as `@[[note]]` [mentions](./mentions.md), not attached
+- **Other files** (PDFs, CSVs, images, ...) are attached just like files from Finder/Explorer
+- **Folders** are skipped
+
+::: tip
+Obsidian's file explorer hides file types it can't open (such as CSV) by default. Turn on **Settings → Files and links → Detect all file extensions** to show them so they can be dragged into the chat.
+:::
 
 ### Paste from Clipboard
 

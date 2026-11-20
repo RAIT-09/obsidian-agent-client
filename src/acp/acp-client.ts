@@ -10,7 +10,7 @@ import type {
 	SessionResult,
 } from "../types/session";
 import type { PromptContent } from "../types/chat";
-import type { ProcessError } from "../types/errors";
+import { AcpErrorCode, type ProcessError } from "../types/errors";
 import { AcpTypeConverter } from "./type-converter";
 import { TerminalManager } from "./terminal-handler";
 import { PermissionManager } from "./permission-handler";
@@ -30,6 +30,7 @@ import {
 	getCommandNotFoundSuggestion,
 	isEmptyResponseError,
 	isUserAbortedError,
+	extractErrorCode,
 } from "../utils/error-utils";
 
 /**
@@ -893,6 +894,36 @@ export class AcpClient {
 			};
 		} catch (error) {
 			this.logger.error("[AcpClient] List Sessions Error:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Delete a session on the agent side, so session/list no longer returns
+	 * it and it can't be loaded or resumed again.
+	 *
+	 * Only available if session.agentCapabilities.sessionCapabilities?.delete is defined.
+	 *
+	 * A -32002 (resource not found) answer counts as deleted, as ACP asks:
+	 * the agent no longer has the session.
+	 *
+	 * @param sessionId - Session to delete
+	 */
+	async deleteSession(sessionId: string): Promise<void> {
+		const connection = this.requireConnection();
+
+		try {
+			this.logger.log(`[AcpClient] Deleting session: ${sessionId}...`);
+			await connection.agent.request("session/delete", { sessionId });
+			this.logger.log(`[AcpClient] Session deleted: ${sessionId}`);
+		} catch (error) {
+			if (extractErrorCode(error) === AcpErrorCode.RESOURCE_NOT_FOUND) {
+				this.logger.log(
+					`[AcpClient] Session already gone on the agent: ${sessionId}`,
+				);
+				return;
+			}
+			this.logger.error("[AcpClient] Delete Session Error:", error);
 			throw error;
 		}
 	}
