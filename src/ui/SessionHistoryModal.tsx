@@ -113,7 +113,7 @@ interface SessionHistoryContentProps {
 	currentCwd: string;
 
 	// Capability flags (from useSessionHistory)
-	/** Whether session/list is supported (unstable) */
+	/** Whether session/list is supported */
 	canList: boolean;
 	/** Whether session can be restored (load or resume supported) */
 	canRestore: boolean;

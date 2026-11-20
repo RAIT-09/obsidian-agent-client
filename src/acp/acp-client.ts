@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from "child_process";
 import * as acp from "@agentclientprotocol/sdk";
+import type * as acpUnstable from "@agentclientprotocol/sdk/unstable";
 import { Platform } from "obsidian";
 
 import type {
@@ -69,6 +70,39 @@ export interface TerminalOutputResult {
 		exitCode: number | null;
 		signal: string | null;
 	} | null;
+}
+
+/** What stdoutStream needs of the agent's stdout (a Node.js Readable) */
+export interface DataEvents {
+	on(event: string, listener: (chunk: Uint8Array) => void): unknown;
+	off(event: string, listener: (chunk: Uint8Array) => void): unknown;
+}
+
+/**
+ * The agent's stdout as a web stream, for the SDK to read messages from. The
+ * SDK cancels the stream when it gives up on the connection, e.g. on a message
+ * over its size limit (32 MiB); the stream then stops reading stdout, since
+ * passing it more data would throw.
+ */
+export function stdoutStream(
+	stdout: DataEvents,
+	onCancel: (reason: unknown) => void,
+): ReadableStream<Uint8Array> {
+	let onData: ((chunk: Uint8Array) => void) | undefined;
+	let onEnd: (() => void) | undefined;
+	return new ReadableStream<Uint8Array>({
+		start(controller) {
+			onData = (chunk) => controller.enqueue(chunk);
+			onEnd = () => controller.close();
+			stdout.on("data", onData);
+			stdout.on("end", onEnd);
+		},
+		cancel(reason) {
+			if (onData) stdout.off("data", onData);
+			if (onEnd) stdout.off("end", onEnd);
+			onCancel(reason);
+		},
+	});
 }
 
 /**
@@ -310,6 +344,10 @@ export class AcpClient {
 			// A replaced process's late exit must not cancel the successor's work.
 			if (this.agentProcess === agentProcess) {
 				this.cancelAllOperations();
+				// Its connection is gone: start the agent again for the next
+				// session.
+				this.connection = null;
+				this.isInitializedFlag = false;
 			}
 
 			if (code === 127) {
@@ -371,15 +409,32 @@ export class AcpClient {
 				stdin.end();
 			},
 		});
-		const output = new ReadableStream<Uint8Array>({
-			start(controller) {
-				stdout.on("data", (chunk: Uint8Array) => {
-					controller.enqueue(chunk);
-				});
-				stdout.on("end", () => {
-					controller.close();
-				});
-			},
+		const output = stdoutStream(stdout, (reason) => {
+			this.logger.error("[AcpClient] Stopped reading the agent:", reason);
+			// A replaced process's stream must not touch the successor.
+			if (this.agentProcess !== agentProcess) return;
+			// The connection is closed, so nothing can watch or cancel the
+			// agent any more: stop it, and say so. The next session starts it
+			// again.
+			this.cancelAllOperations();
+			this.killProcessTree();
+			this.connection = null;
+			this.isInitializedFlag = false;
+			const processError: ProcessError = {
+				type: "process_crashed",
+				agentId: config.id,
+				title: "Connection Lost",
+				message: `The connection to ${agentLabel} closed: ${
+					reason instanceof Error ? reason.message : String(reason)
+				}.`,
+				suggestion: "Restart the agent to reconnect.",
+				originalError: reason,
+			};
+			this.handler.emitSessionUpdate({
+				type: "process_error",
+				sessionId: this.currentSessionId ?? "",
+				error: processError,
+			});
 		});
 
 		this.logger.log(
@@ -855,7 +910,7 @@ export class AcpClient {
 	// ========================================================================
 
 	/**
-	 * List available sessions (unstable).
+	 * List available sessions.
 	 *
 	 * Only available if session.agentCapabilities.sessionCapabilities?.list is defined.
 	 *
@@ -967,7 +1022,7 @@ export class AcpClient {
 	}
 
 	/**
-	 * Resume a session without history replay (unstable).
+	 * Resume a session without history replay.
 	 *
 	 * Use when client manages its own history storage.
 	 *
@@ -1021,7 +1076,12 @@ export class AcpClient {
 		try {
 			this.logger.log(`[AcpClient] Forking session: ${sessionId}...`);
 
-			const response = await connection.agent.request("session/fork", {
+			// session/fork is still unstable in ACP, so the SDK's stable
+			// entry point leaves it untyped.
+			const response = await connection.agent.request<
+				acpUnstable.ForkSessionResponse,
+				acpUnstable.ForkSessionRequest
+			>("session/fork", {
 				sessionId,
 				cwd: this.toSessionCwd(cwd),
 				mcpServers: [],

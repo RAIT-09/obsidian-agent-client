@@ -514,7 +514,7 @@ export interface SessionInfo {
 }
 
 /**
- * Result of session/list (unstable).
+ * Result of session/list.
  */
 export interface ListSessionsResult {
 	/** Array of session metadata */
@@ -614,15 +614,15 @@ export interface McpCapabilities {
 }
 
 /**
- * Session-related capabilities (unstable features).
+ * Session-related capabilities.
  * From agentCapabilities.sessionCapabilities in initialize response.
  */
 export interface SessionCapabilities {
-	/** session/resume support (unstable) */
+	/** session/resume support */
 	resume?: Record<string, unknown>;
 	/** session/fork support (unstable) */
 	fork?: Record<string, unknown>;
-	/** session/list support (unstable) */
+	/** session/list support */
 	list?: Record<string, unknown>;
 	/** session/delete support */
 	delete?: Record<string, unknown>;
@@ -638,7 +638,7 @@ export interface AgentCapabilities {
 	/** Whether the agent supports session/load for resuming sessions (stable) */
 	loadSession?: boolean;
 
-	/** Session management capabilities (unstable features) */
+	/** Session management capabilities */
 	sessionCapabilities?: SessionCapabilities;
 
 	/** MCP connection capabilities */

@@ -331,7 +331,7 @@ interface ISettingsAccess {
 **Methods**: initialize, newSession, authenticate, prompt, cancel, setSessionConfigOption
 **Notifications**: session/update (agent_message_chunk, agent_thought_chunk, user_message_chunk, tool_call, tool_call_update, plan, available_commands_update, current_mode_update, session_info_update, usage_update, config_option_update)
 **Requests**: requestPermission
-**Session Management** (unstable): session/list, session/load, session/resume, session/fork; session/delete (stable)
+**Session Management**: session/list, session/load, session/resume, session/delete; session/fork (unstable)
 
 **Agents**:
 - Claude Code: `@agentclientprotocol/claude-agent-acp` (ANTHROPIC_API_KEY)
