@@ -127,6 +127,8 @@ export interface SessionModeState {
  * Reported by the agent via `usage_update` session notifications.
  */
 export interface SessionUsage {
+	/** The session that reported it */
+	sessionId: string;
 	/** Tokens currently in context */
 	used: number;
 	/** Total context window size in tokens */

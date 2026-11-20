@@ -150,6 +150,7 @@ export function useAgentSession(
 					setSession((prev) => ({
 						...prev,
 						usage: {
+							sessionId: update.sessionId,
 							used: update.used,
 							size: update.size,
 							cost: update.cost ?? undefined,
@@ -415,6 +416,15 @@ export function useAgentSession(
 				state: "ready",
 				modes: finalModes ?? prev.modes,
 				configOptions: finalConfigOptions ?? prev.configOptions,
+				// Keep only the usage that this session reported. Comparing the
+				// React session ID is not enough: AcpClient passes a fork's
+				// updates before this call sets the fork's ID, and the previous
+				// session's updates until a restore's load starts, after the
+				// restore set the new ID.
+				usage:
+					prev.usage?.sessionId === sessionId
+						? prev.usage
+						: undefined,
 				lastActivityAt: new Date(),
 			}));
 		},

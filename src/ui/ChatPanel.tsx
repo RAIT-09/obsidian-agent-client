@@ -1566,7 +1566,13 @@ export const ChatPanel = React.memo(function ChatPanel({
 			onConfigOptionChange={(configId, value) =>
 				void handleSetConfigOption(configId, value)
 			}
-			usage={session.usage}
+			// Only the shown session's usage: the previous session's can
+			// still arrive while a restore loads.
+			usage={
+				session.usage?.sessionId === session.sessionId
+					? session.usage
+					: undefined
+			}
 			supportsImages={session.promptCapabilities?.image ?? false}
 			agentId={session.agentId}
 			// Controlled component props (for broadcast commands)
