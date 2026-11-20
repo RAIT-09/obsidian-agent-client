@@ -2,10 +2,11 @@ import { execFile } from "child_process";
 import { Platform } from "obsidian";
 import { access, stat } from "fs/promises";
 import { constants } from "fs";
-import { join } from "path";
+import { join, posix } from "path";
 import {
 	buildWslShellWrapper,
 	convertWindowsPathToWsl,
+	convertWslPathToWindows,
 	getLoginShell,
 } from "./platform";
 
@@ -14,6 +15,91 @@ import {
  */
 export function isAbsolutePath(path: string): boolean {
 	return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
+}
+
+/**
+ * Turn the `data-href` of an `a.internal-link` rendered from agent output into
+ * a linktext Obsidian can resolve (for `openLinkText` / `hover-link`).
+ *
+ * Agents often link notes by absolute filesystem path, so an absolute path
+ * inside the vault is converted to a vault-relative one. Relative paths and
+ * wikilink-style targets pass through unchanged.
+ *
+ * @param rawHref - The link's `data-href` attribute (may be URI-encoded)
+ * @param vaultBasePath - Absolute vault root, or null when not on a filesystem adapter
+ * @param wslMode - Whether `/mnt/<drive>/...` paths should be read as Windows paths
+ * @returns Linktext to resolve, or null for absolute paths outside the vault
+ */
+export function resolveInternalLinkHref(
+	rawHref: string,
+	vaultBasePath: string | null,
+	wslMode: boolean,
+): string | null {
+	let href: string;
+	try {
+		href = decodeURIComponent(rawHref);
+	} catch {
+		// Malformed escape sequence (e.g. a literal "%") — use it verbatim
+		href = rawHref;
+	}
+
+	if (vaultBasePath) {
+		const normalizedVaultBase = normalizePathForComparison(
+			vaultBasePath,
+		).replace(/\/+$/, "");
+		// WSL `/mnt/<drive>/...` paths are converted only for comparison, so
+		// the conversion never touches the heading text we return
+		const toComparable = (path: string) =>
+			normalizePathForComparison(
+				wslMode && path.startsWith("/mnt/")
+					? convertWslPathToWindows(path)
+					: path,
+			);
+
+		// The `#subpath` starts at the first `#` that isn't one of the vault
+		// root's own (e.g. in `/Users/me/#work/vault`). Only the path before
+		// it is normalized and checked, so heading text like `#A/../B` can
+		// never change which file the link points to.
+		let hashIndex = href.indexOf("#");
+		while (hashIndex !== -1) {
+			const before = toComparable(href.slice(0, hashIndex));
+			const isVaultRootHash =
+				normalizedVaultBase.startsWith(before) &&
+				normalizedVaultBase[before.length] === "#";
+			if (!isVaultRootHash) break;
+			hashIndex = href.indexOf("#", hashIndex + 1);
+		}
+		const pathPart = hashIndex === -1 ? href : href.slice(0, hashIndex);
+		const subpath = hashIndex === -1 ? "" : href.slice(hashIndex);
+
+		const normalizedPath = toComparable(pathPart);
+		if (normalizedPath.startsWith(normalizedVaultBase + "/")) {
+			return (
+				normalizedPath.slice(normalizedVaultBase.length + 1) + subpath
+			);
+		}
+	}
+	// Anything absolute is outside the vault by now. A leading backslash
+	// (e.g. a UNC `\\server\share` path) counts too, though isAbsolutePath
+	// doesn't treat it as absolute.
+	if (!isAbsolutePath(href) && !href.startsWith("\\")) {
+		return href;
+	}
+	return null;
+}
+
+/**
+ * Normalize a path for a prefix comparison: forward slashes (so Windows paths
+ * match too) and collapsed `.`/`..` segments (so `<vault>/../x` isn't mistaken
+ * for an in-vault path).
+ */
+function normalizePathForComparison(path: string): string {
+	const slashed = path.replace(/\\/g, "/");
+	const normalized = posix.normalize(slashed);
+	// posix.normalize collapses a UNC `//server` prefix to `/server`
+	return slashed.startsWith("//") && !normalized.startsWith("//")
+		? "/" + normalized
+		: normalized;
 }
 
 /**

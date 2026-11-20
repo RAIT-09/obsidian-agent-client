@@ -425,13 +425,17 @@ function FloatingChatComponent({
 		return () => observer.disconnect();
 	}, [isExpanded, size.width, size.height]);
 
-	// Save size to settings
+	// Save size and position to settings.
+	//
+	// Both effects run only when this window's own geometry changes, and
+	// compare against the saved value at save time. The saved value is shared
+	// by every floating window, so it must not be a dependency: each window
+	// would write its own geometry back whenever another window saved a
+	// different one, and two windows would overwrite each other forever.
 	useEffect(() => {
 		const saveSize = async () => {
-			if (
-				size.width !== settings.floatingWindowSize.width ||
-				size.height !== settings.floatingWindowSize.height
-			) {
+			const saved = plugin.settings.floatingWindowSize;
+			if (size.width !== saved.width || size.height !== saved.height) {
 				await plugin.saveSettingsAndNotify({
 					...plugin.settings,
 					floatingWindowSize: size,
@@ -443,16 +447,12 @@ function FloatingChatComponent({
 			void saveSize();
 		}, 500);
 		return () => window.clearTimeout(timer);
-	}, [size, plugin, settings.floatingWindowSize]);
+	}, [size, plugin]);
 
-	// Save position to settings
 	useEffect(() => {
 		const savePosition = async () => {
-			if (
-				!settings.floatingWindowPosition ||
-				position.x !== settings.floatingWindowPosition.x ||
-				position.y !== settings.floatingWindowPosition.y
-			) {
+			const saved = plugin.settings.floatingWindowPosition;
+			if (!saved || position.x !== saved.x || position.y !== saved.y) {
 				await plugin.saveSettingsAndNotify({
 					...plugin.settings,
 					floatingWindowPosition: position,
@@ -464,7 +464,7 @@ function FloatingChatComponent({
 			void savePosition();
 		}, 500);
 		return () => window.clearTimeout(timer);
-	}, [position, plugin, settings.floatingWindowPosition]);
+	}, [position, plugin]);
 
 	// ============================================================
 	// Dragging Logic (View-Specific)

@@ -27,6 +27,8 @@ interface SessionCapabilityFlags {
 	canFork: boolean;
 	/** Whether session/list is supported (unstable) */
 	canList: boolean;
+	/** Whether session/delete is supported */
+	canDelete: boolean;
 }
 
 function getSessionCapabilityFlags(
@@ -38,6 +40,7 @@ function getSessionCapabilityFlags(
 		canResume: sessionCaps?.resume !== undefined,
 		canFork: sessionCaps?.fork !== undefined,
 		canList: sessionCaps?.list !== undefined,
+		canDelete: sessionCaps?.delete !== undefined,
 	};
 }
 
@@ -122,6 +125,8 @@ export interface UseSessionHistoryReturn {
 	canFork: boolean;
 	/** Whether session/list is supported (unstable) */
 	canList: boolean;
+	/** Whether deleting also deletes the session on the agent side (session/delete) */
+	canDelete: boolean;
 	/** Whether sessions are from local storage (agent doesn't support list) */
 	isUsingLocalSessions: boolean;
 
@@ -159,7 +164,8 @@ export interface UseSessionHistoryReturn {
 	forkSession: (sessionId: string, cwd: string) => Promise<void>;
 
 	/**
-	 * Delete a session (local metadata + message file).
+	 * Delete a session: on the agent side when canDelete, then the local
+	 * metadata + message file.
 	 * @param sessionId - Session to delete
 	 */
 	deleteSession: (sessionId: string) => Promise<void>;
@@ -700,27 +706,32 @@ export function useSessionHistory(
 	/**
 	 * Delete a session (local metadata + message file).
 	 * Removes from both local state and persistent storage.
+	 *
+	 * Failures are thrown for the caller to report, not put in `error`: that
+	 * would swap the whole list for an error panel.
 	 */
 	const deleteSession = useCallback(
 		async (sessionId: string) => {
-			try {
-				// Delete from persistent storage (metadata + message file)
-				await settingsAccess.deleteSession(sessionId);
-
-				// Remove from local state
-				setSessions((prev) =>
-					prev.filter((s) => s.sessionId !== sessionId),
-				);
-
-				// Invalidate cache to ensure consistency
-				invalidateCache();
-			} catch (err) {
-				const errorMessage = extractErrorMessage(err);
-				setError(`Failed to delete session: ${errorMessage}`);
-				throw err; // Re-throw to allow caller to handle
+			// Agent side first. The agent keeps listing a session the plugin
+			// forgot, so deleting only the local copy would bring it back on
+			// the next fetch; and if the agent refuses, nothing is gone yet
+			// and the delete can simply be retried.
+			if (capabilities.canDelete) {
+				await agentClient.deleteSession(sessionId);
 			}
+
+			// Delete from persistent storage (metadata + message file)
+			await settingsAccess.deleteSession(sessionId);
+
+			// Remove from local state
+			setSessions((prev) =>
+				prev.filter((s) => s.sessionId !== sessionId),
+			);
+
+			// Invalidate cache to ensure consistency
+			invalidateCache();
 		},
-		[settingsAccess, invalidateCache],
+		[agentClient, capabilities.canDelete, settingsAccess, invalidateCache],
 	);
 
 	/**
@@ -842,6 +853,7 @@ export function useSessionHistory(
 			canRestore: capabilities.canLoad || capabilities.canResume,
 			canFork: capabilities.canFork,
 			canList: capabilities.canList,
+			canDelete: capabilities.canDelete,
 			isUsingLocalSessions: !capabilities.canList,
 			localSessionIds,
 
@@ -865,6 +877,7 @@ export function useSessionHistory(
 			capabilities.canLoad,
 			capabilities.canResume,
 			capabilities.canFork,
+			capabilities.canDelete,
 			localSessionIds,
 			fetchSessions,
 			loadMoreSessions,

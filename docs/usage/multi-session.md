@@ -54,6 +54,16 @@ Control multiple chat views at once from the command palette:
 Broadcast commands are useful for comparing how different agents respond to the same prompt.
 :::
 
+## Session Notifications
+
+When **Settings → Agent Client → Session notifications** is enabled, Agent Client alerts you when an agent completes a response or requests permission:
+
+- While Obsidian is unfocused, it sends an OS notification.
+- While Obsidian is focused on another view, it shows an in-app notice with the session title. Click **Open chat** to jump to that session.
+- While the session's own view has focus, it stays silent.
+
+Disabling the setting turns off both kinds of notification.
+
 ## Focus Navigation
 
 Quickly switch between chat views:

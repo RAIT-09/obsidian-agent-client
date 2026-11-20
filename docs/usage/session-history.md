@@ -23,7 +23,7 @@ Depending on the agent's capabilities, you can perform the following actions:
 | **Edit title** | Rename the session from the history modal |
 | **Restore** | Resume the session where you left off |
 | **Fork** | Create a new branch from that point in the conversation |
-| **Delete** | Remove the session from history |
+| **Delete** | Remove the session from history (and from the agent, if it supports deleting) |
 
 ::: tip
 Not all actions are available for every agent. The modal shows only the actions supported by your current agent.
@@ -83,8 +83,15 @@ To delete a session:
 1. Click the **Delete** button (trash icon) on the session
 2. Confirm the deletion in the dialog
 
+What gets deleted depends on the agent:
+
+- **Agents that support deleting sessions** (such as Claude Code): the session is deleted from the plugin and from the agent, so it no longer appears in the list and can't be restored, from Obsidian or from the agent's own CLI.
+- **Other agents**: the session is removed from the plugin's local storage only. It still exists on the agent side, and if the agent lists its sessions, it shows up again the next time you open the history. Turn on **Hide sessions without local data** to keep such sessions out of the list.
+
+A session that is open in a chat in this vault can't be deleted. Start a new chat there (or close it) first. Sessions open elsewhere, such as in the agent's own CLI, aren't detected.
+
 ::: warning
-Deletion removes the session from the plugin's local storage only. The session still exists on the agent side.
+Deletion is permanent. If you might still need the conversation, fork the session first: a fork is a separate session that stays when the original is deleted. Restoring doesn't keep a copy, since it continues the same session.
 :::
 
 ## Troubleshooting

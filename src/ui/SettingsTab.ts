@@ -514,9 +514,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName("Notifications").setHeading();
 
 		new Setting(containerEl)
-			.setName("System notifications")
+			.setName("Session notifications")
 			.setDesc(
-				"Show OS notifications when the agent completes a response or requests permission. Notifications are suppressed while Obsidian is focused.",
+				"Notify when the agent completes a response or requests permission. Show OS notifications when Obsidian is unfocused, or a clickable in-app notice when another view has focus.",
 			)
 			.addToggle((toggle) =>
 				toggle

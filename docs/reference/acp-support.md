@@ -6,7 +6,7 @@ This page documents which Agent Client Protocol (ACP) features are supported by 
 
 The [Agent Client Protocol (ACP)](https://agentclientprotocol.com/) is an open standard for communication between AI agents and client applications. It defines how clients send prompts, receive responses, handle permissions, and manage sessions.
 
-Agent Client implements ACP as a **client**, communicating with ACP-compatible agents like Claude Code, Codex, Gemini CLI, Mistral Vibe, OpenCode, Kiro, Hermes Agent, Pi, and Grok Build.
+Agent Client implements ACP as a **client**, communicating with ACP-compatible agents like Claude Code, Codex, Gemini CLI, Mistral Vibe, OpenCode, Kiro, Hermes Agent, Pi, Grok Build, IBM Bob, and Antigravity CLI.
 
 ## Methods
 
@@ -27,6 +27,7 @@ Methods the plugin can call on agents.
 | `session/list` | ✅ Supported | Unstable API |
 | `session/resume` | ✅ Supported | Unstable API |
 | `session/fork` | ✅ Supported | Unstable API |
+| `session/delete` | ✅ Supported | |
 | `session/set_config_option` | ✅ Supported | |
 
 ::: tip

@@ -1,5 +1,6 @@
 import {
 	Plugin,
+	type ViewCreator,
 	WorkspaceLeaf,
 	Notice,
 	requestUrl,
@@ -275,6 +276,41 @@ export default class AgentClientPlugin extends Plugin {
 	/** Guards against concurrent embed-id injection for the same block. */
 	private embedIdInjectionInFlight = new Set<string>();
 
+	/**
+	 * registerView, first taking the view type back from an instance of this
+	 * plugin that still has it registered: overlapping loads (the plugin
+	 * toggled on and off quickly) leave one behind that is never unloaded,
+	 * and registerView would throw (#235).
+	 *
+	 * Leaves of the type are left alone, unlike the detachLeavesOfType this
+	 * replaces. On a plugin reload or update (anything but the user turning
+	 * the plugin off), Obsidian keeps them and reopens them with their saved
+	 * view state once the type is registered again: chat tabs come back where
+	 * they were, with their agent, but start a new session (the conversation
+	 * isn't resumed), and the Session Manager stays where it was.
+	 */
+	private registerOwnView(type: string, creator: ViewCreator): void {
+		// Internal API (App.viewRegistry), checked before use
+		const registry = (
+			this.app as unknown as {
+				viewRegistry?: {
+					viewByType?: Record<string, unknown>;
+					unregisterView?: (type: string) => void;
+				};
+			}
+		).viewRegistry;
+		if (
+			registry?.viewByType &&
+			Object.prototype.hasOwnProperty.call(registry.viewByType, type)
+		) {
+			getLogger().warn(
+				`[AgentClient] View type "${type}" is still registered by a previous instance; taking it over`,
+			);
+			registry.unregisterView?.(type);
+		}
+		this.registerView(type, creator);
+	}
+
 	async onload() {
 		await this.loadSettings();
 
@@ -283,18 +319,22 @@ export default class AgentClientPlugin extends Plugin {
 		// Initialize settings store
 		this.settingsService = createSettingsService(this.settings, this);
 
-		// Detach stale leaves from a previous plugin instance to prevent
-		// "Attempting to register an existing view type" when Obsidian's
-		// hot-reload races onunload/onload (e.g. rapid toggle or npm run dev).
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_CHAT);
-
-		this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
-
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_SESSION_MANAGER);
-		this.registerView(
+		this.registerOwnView(
+			VIEW_TYPE_CHAT,
+			(leaf) => new ChatView(leaf, this),
+		);
+		this.registerOwnView(
 			VIEW_TYPE_SESSION_MANAGER,
 			(leaf) => new SessionManagerView(leaf, this),
 		);
+
+		// Let Page preview show hover popovers for links in chat messages
+		// (emitted by useHoverLinkPreview). Mod+hover by default, like the
+		// editor; users can change it in Page preview settings.
+		this.registerHoverLinkSource(this.manifest.id, {
+			display: this.manifest.name,
+			defaultMod: true,
+		});
 
 		const ribbonIconEl = this.addRibbonIcon(
 			"bot-message-square",

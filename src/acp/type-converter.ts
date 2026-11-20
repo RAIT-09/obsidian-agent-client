@@ -319,6 +319,7 @@ export class AcpTypeConverter {
 							resume: sessionCaps.resume ?? undefined,
 							fork: sessionCaps.fork ?? undefined,
 							list: sessionCaps.list ?? undefined,
+							delete: sessionCaps.delete ?? undefined,
 						}
 					: undefined,
 				mcpCapabilities: mcpCaps

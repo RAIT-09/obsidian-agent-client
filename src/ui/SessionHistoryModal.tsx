@@ -5,7 +5,7 @@
  * and the confirmation modal for session deletion.
  */
 
-import { Modal, App, setIcon } from "obsidian";
+import { Modal, App, Notice, setIcon } from "obsidian";
 import { EditTitleModal } from "./EditTitleModal";
 import * as React from "react";
 const { useState, useCallback } = React;
@@ -25,15 +25,18 @@ import { truncateTitle } from "../utils/text";
  */
 class ConfirmDeleteModal extends Modal {
 	private sessionTitle: string;
+	private deletesOnAgent: boolean;
 	private onConfirm: () => void | Promise<void>;
 
 	constructor(
 		app: App,
 		sessionTitle: string,
+		deletesOnAgent: boolean,
 		onConfirm: () => void | Promise<void>,
 	) {
 		super(app);
 		this.sessionTitle = sessionTitle;
+		this.deletesOnAgent = deletesOnAgent;
 		this.onConfirm = onConfirm;
 	}
 
@@ -51,7 +54,9 @@ class ConfirmDeleteModal extends Modal {
 		});
 
 		contentEl.createEl("p", {
-			text: "This only removes the session from this plugin. The session data will remain on the agent side.",
+			text: this.deletesOnAgent
+				? "This deletes the session from this plugin and from the agent. It cannot be restored afterwards."
+				: "This only removes the session from this plugin. The session data will remain on the agent side.",
 			cls: "agent-client-confirm-delete-warning",
 		});
 
@@ -114,6 +119,8 @@ interface SessionHistoryContentProps {
 	canRestore: boolean;
 	/** Whether session/fork is supported (unstable) */
 	canFork: boolean;
+	/** Whether deleting also deletes the session on the agent side (session/delete) */
+	canDelete: boolean;
 
 	/** Whether using locally saved sessions (instead of agent session/list) */
 	isUsingLocalSessions: boolean;
@@ -141,6 +148,8 @@ interface SessionHistoryContentProps {
 	onForkSession: (sessionId: string, cwd: string) => Promise<void>;
 	/** Callback when a session is deleted */
 	onDeleteSession: (sessionId: string) => void | Promise<void>;
+	/** Whether a session is open in a chat view right now (can't be deleted) */
+	isSessionOpen: (sessionId: string) => boolean;
 	/** Callback when a session title is edited */
 	onEditTitle: (
 		sessionId: string,
@@ -418,6 +427,7 @@ function SessionHistoryContent({
 	canList,
 	canRestore,
 	canFork,
+	canDelete,
 	isUsingLocalSessions,
 	localSessionIds,
 	isAgentReady,
@@ -427,6 +437,7 @@ function SessionHistoryContent({
 	onRestoreSession,
 	onForkSession,
 	onDeleteSession,
+	isSessionOpen,
 	onEditTitle,
 	onLoadMore,
 	onFetchSessions,
@@ -475,9 +486,24 @@ function SessionHistoryContent({
 		onFetchSessions(cwd);
 	}, [canFilterByVault, filterByCurrentVault, currentCwd, onFetchSessions]);
 
+	// The chat would keep using (and re-saving) the session, and an agent
+	// that deletes it tears it down under that chat
+	const refuseIfOpen = useCallback(
+		(sessionId: string): boolean => {
+			if (!isSessionOpen(sessionId)) return false;
+			new Notice(
+				"[Agent Client] This session is open in a chat. Start a new chat there or close it before deleting the session.",
+			);
+			return true;
+		},
+		[isSessionOpen],
+	);
+
 	// Wrap onDeleteSession to show confirmation modal
 	const handleDeleteWithConfirmation = useCallback(
 		(sessionId: string) => {
+			if (refuseIfOpen(sessionId)) return;
+
 			const targetSession = sessions.find(
 				(s) => s.sessionId === sessionId,
 			);
@@ -486,13 +512,16 @@ function SessionHistoryContent({
 			const confirmModal = new ConfirmDeleteModal(
 				app,
 				sessionTitle,
+				canDelete,
 				() => {
+					// Again: a chat may have opened it while the dialog was up
+					if (refuseIfOpen(sessionId)) return;
 					void onDeleteSession(sessionId);
 				},
 			);
 			confirmModal.open();
 		},
-		[app, sessions, onDeleteSession],
+		[app, sessions, canDelete, refuseIfOpen, onDeleteSession],
 	);
 
 	// Open edit title modal for a session

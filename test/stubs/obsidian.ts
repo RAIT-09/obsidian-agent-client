@@ -22,16 +22,21 @@ export const Platform = {
 };
 
 /**
- * Minimal `TFile` stand-in for tests that resolve wikilinks. Only the fields
- * the resolver reads (`path`, `basename`) plus real-class identity so that
- * `resolved instanceof TFile` works with fixtures.
+ * Minimal `TFile` stand-in for tests that resolve wikilinks or classify
+ * dragged files. Only the fields those read (`path`, `basename`, `extension`)
+ * plus real-class identity so that `resolved instanceof TFile` works with
+ * fixtures. `extension` is derived from `path` like Obsidian does.
  */
 export class TFile {
 	path: string;
 	basename: string;
+	extension: string;
 	constructor(path: string, basename: string) {
 		this.path = path;
 		this.basename = basename;
+		const name = path.split("/").pop() ?? path;
+		const dot = name.lastIndexOf(".");
+		this.extension = dot === -1 ? "" : name.slice(dot + 1);
 	}
 }
 
