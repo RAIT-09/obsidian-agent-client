@@ -653,6 +653,7 @@ export function useAgentMessages(
 	const steerQueuedPrompt = useCallback(
 		async (id: string): Promise<void> => {
 			const currentSessionId = session.sessionId;
+			const queueGeneration = queueGenerationRef.current;
 			const job = queuedPromptJobsRef.current.find(
 				(candidate) => candidate.prompt.id === id,
 			);
@@ -697,6 +698,16 @@ export function useAgentMessages(
 					vaultAccess,
 					vaultAccess,
 				);
+				if (
+					!isQueueDispatchCurrent(
+						queueGeneration,
+						queueGenerationRef.current,
+						currentSessionId,
+						sessionIdRef.current,
+					)
+				) {
+					return;
+				}
 
 				const result = await agentClient.steerPrompt(
 					currentSessionId,
