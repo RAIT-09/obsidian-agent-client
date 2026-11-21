@@ -978,14 +978,161 @@ If your plugin does not need CSS, delete this file.
 
 /* Input area */
 .agent-client-chat-input-container {
+	display: flex;
+	max-height: min(72%, 34rem);
+	min-height: 0;
+	flex-direction: column;
 	flex-shrink: 0;
 	padding: 0 8px;
 	position: relative;
 }
 
+/* The queue is a sibling above this anchor. Composer overlays therefore stay
+   beside the input instead of moving away as queued messages accumulate. */
+.agent-client-chat-composer {
+	min-height: 0;
+	flex: 0 1 auto;
+	position: relative;
+}
+
+/* Queued prompts */
+.agent-client-queued-prompts {
+	display: flex;
+	min-height: 0;
+	flex: 0 1 auto;
+	flex-direction: column;
+	margin-bottom: 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background-color: var(--background-secondary);
+	overflow: hidden;
+}
+
+.agent-client-queued-prompts-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.agent-client-queued-prompts-header button,
+.agent-client-queued-prompt-actions button,
+.agent-client-queued-prompt-edit-actions button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	min-width: 0;
+	min-height: 0;
+	margin: 0;
+	padding: 3px 6px;
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.agent-client-queued-prompts-header button:hover,
+.agent-client-queued-prompt-actions button:hover,
+.agent-client-queued-prompt-edit-actions button:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.agent-client-queued-prompt-action-icon,
+.agent-client-queued-prompt-actions svg {
+	width: 14px;
+	height: 14px;
+}
+
+.agent-client-queued-prompts-list {
+	display: flex;
+	max-height: min(14em, 32vh);
+	min-height: 0;
+	flex-direction: column;
+	overflow-y: auto;
+}
+
+.agent-client-queued-prompt {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 7px 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.agent-client-queued-prompt:last-child {
+	border-bottom: none;
+}
+
+.agent-client-queued-prompt-index {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	flex: 0 0 18px;
+	border-radius: 50%;
+	background-color: var(--background-modifier-hover);
+	color: var(--text-muted);
+	font-size: 10px;
+}
+
+.agent-client-queued-prompt-body {
+	min-width: 0;
+	flex: 1;
+}
+
+.agent-client-queued-prompt-text {
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+
+.agent-client-queued-prompt-attachment-count {
+	margin-top: 2px;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.agent-client-queued-prompt-actions,
+.agent-client-queued-prompt-edit-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.agent-client-queued-prompt textarea {
+	width: 100%;
+	min-height: 48px;
+	resize: vertical;
+	font-family: inherit;
+	font-size: var(--font-ui-small);
+}
+
+.agent-client-queued-prompt-edit-actions {
+	justify-content: flex-end;
+	margin-top: 4px;
+}
+
+.agent-client-queued-prompt .agent-client-attachment-preview-strip {
+	padding: 6px 0;
+}
+
 /* Input box - outer container with border and background */
 .agent-client-chat-input-box {
 	display: flex;
+	max-height: 100%;
 	flex-direction: column;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 8px;
@@ -1336,7 +1483,7 @@ If your plugin does not need CSS, delete this file.
 	bottom: 100%;
 	left: 8px;
 	right: 8px;
-	max-height: 250px;
+	max-height: min(250px, calc(100cqh - 160px));
 	background-color: var(--background-secondary);
 	border: 2px solid var(--background-modifier-border);
 	border-radius: 8px;
@@ -1345,6 +1492,17 @@ If your plugin does not need CSS, delete this file.
 	font-size: 14px;
 	margin-bottom: 8px;
 	z-index: 1000;
+}
+
+/* In very short panels, cover the inactive composer instead of clipping the
+   top of a suggestion list or dismissible notification. */
+@container (max-height: 400px) {
+	.agent-client-mention-dropdown,
+	.agent-client-error-overlay {
+		bottom: 0;
+		max-height: calc(100cqh - 24px);
+		overflow-y: auto;
+	}
 }
 
 .agent-client-mention-dropdown-item {

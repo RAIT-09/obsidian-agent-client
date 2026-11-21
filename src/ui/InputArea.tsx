@@ -21,6 +21,7 @@ import type {
 	ActivePermission,
 	AttachedFile,
 	ChatMessage,
+	QueuedPrompt,
 } from "../types/chat";
 import type { UseSuggestionsReturn } from "../hooks/useSuggestions";
 import { SuggestionPopup } from "./SuggestionPopup";
@@ -28,6 +29,7 @@ import { ErrorBanner } from "./ErrorBanner";
 import { PermissionDialog } from "./PermissionDialog";
 import { AttachmentStrip } from "./shared/AttachmentStrip";
 import { InputToolbar } from "./InputToolbar";
+import { QueuedPromptList } from "./QueuedPromptList";
 import { getLogger } from "../utils/logger";
 import { insertMentions } from "../utils/mention-parser";
 import { getVaultDragFiles, mimeTypeFromExtension } from "../utils/vault-drag";
@@ -270,6 +272,17 @@ export interface InputAreaProps {
 	onClearGeminiNotice: () => void;
 	/** Messages array for input history navigation */
 	messages: ChatMessage[];
+	queuedPrompts: QueuedPrompt[];
+	isQueuePaused: boolean;
+	queuePauseRevision: number;
+	onUpdateQueuedPrompt: (
+		id: string,
+		content: string,
+		attachments: AttachedFile[],
+	) => void;
+	onRemoveQueuedPrompt: (id: string) => void;
+	onResumeQueue: (expectedPauseRevision?: number) => void;
+	onPauseQueue: () => number;
 }
 
 /**
@@ -324,6 +337,13 @@ export function InputArea({
 	onClearGeminiNotice,
 	// Input history
 	messages,
+	queuedPrompts,
+	isQueuePaused,
+	queuePauseRevision,
+	onUpdateQueuedPrompt,
+	onRemoveQueuedPrompt,
+	onResumeQueue,
+	onPauseQueue,
 }: InputAreaProps) {
 	const { mentions, commands: slashCommands } = suggestions;
 	const logger = getLogger();
@@ -873,7 +893,9 @@ export function InputArea({
 	 * Handle sending or stopping based on current state.
 	 */
 	const handleSendOrStop = useCallback(async () => {
-		if (isSending) {
+		const hasContent =
+			inputValue.trim().length > 0 || attachedFiles.length > 0;
+		if (isSending && !hasContent) {
 			await onStopGeneration();
 			return;
 		}
@@ -974,7 +996,10 @@ export function InputArea({
 
 				if (shouldSend) {
 					e.preventDefault();
-					if (!isButtonDisabled && !isSending) {
+					const hasContent =
+						inputValue.trim().length > 0 ||
+						attachedFiles.length > 0;
+					if (hasContent && isSessionReady && !isRestoringSession) {
 						void handleSendOrStop();
 					}
 				}
@@ -983,8 +1008,10 @@ export function InputArea({
 		},
 		[
 			handleHistoryKeyDown,
-			isSending,
-			isButtonDisabled,
+			inputValue,
+			attachedFiles,
+			isSessionReady,
+			isRestoringSession,
 			handleSendOrStop,
 			settings.sendMessageShortcut,
 		],
@@ -1058,172 +1085,184 @@ export function InputArea({
 
 	return (
 		<div className="agent-client-chat-input-container">
-			{/* Error Overlay - displayed above input */}
-			{errorInfo && (
-				<ErrorBanner
-					errorInfo={errorInfo}
-					onClose={onClearError}
-					showEmojis={showEmojis}
-					view={view}
-				/>
-			)}
+			<QueuedPromptList
+				prompts={queuedPrompts}
+				isPaused={isQueuePaused}
+				queuePauseRevision={queuePauseRevision}
+				onUpdate={onUpdateQueuedPrompt}
+				onRemove={onRemoveQueuedPrompt}
+				onResume={onResumeQueue}
+				onPause={onPauseQueue}
+			/>
 
-			{/* Agent Update Notification - hidden when error is showing */}
-			{!errorInfo && agentUpdateNotification && (
-				<ErrorBanner
-					errorInfo={agentUpdateNotification}
-					onClose={onClearAgentUpdate}
-					showEmojis={showEmojis}
-					view={view}
-					variant={agentUpdateNotification.variant}
-				/>
-			)}
-
-			{/* Gemini CLI deprecation notice - lowest priority overlay */}
-			{!errorInfo && !agentUpdateNotification && geminiNotice && (
-				<ErrorBanner
-					errorInfo={geminiNotice}
-					onClose={onClearGeminiNotice}
-					showEmojis={showEmojis}
-					view={view}
-					variant={geminiNotice.variant}
-				/>
-			)}
-
-			{/* Overlay above the input; the banners share this rectangle and
-			    paint on top (z 30 vs 20) because they are dismissible. */}
-			{activePermission && (
-				<PermissionDialog
-					permission={activePermission}
-					queuedCount={queuedPermissionCount}
-					plugin={plugin}
-					showEmojis={showEmojis}
-					onApprovePermission={onApprovePermission}
-				/>
-			)}
-
-			{/* Mention Dropdown */}
-			{mentions.isOpen && (
-				<SuggestionPopup
-					type="mention"
-					items={mentions.suggestions}
-					selectedIndex={mentions.selectedIndex}
-					onSelect={selectMention}
-					onClose={mentions.close}
-				/>
-			)}
-
-			{/* Slash Command Dropdown */}
-			{slashCommands.isOpen && (
-				<SuggestionPopup
-					type="slash-command"
-					items={slashCommands.suggestions}
-					selectedIndex={slashCommands.selectedIndex}
-					onSelect={handleSelectSlashCommand}
-					onClose={slashCommands.close}
-				/>
-			)}
-
-			{/* Input Box - flexbox container with border */}
-			<div
-				className={`agent-client-chat-input-box ${isDraggingOver ? "agent-client-dragging-over" : ""}`}
-				onDragOver={handleDragOver}
-				onDragEnter={handleDragEnter}
-				onDragLeave={handleDragLeave}
-				onDrop={(e) => void handleDrop(e)}
-			>
-				{/* Auto-mention Badge */}
-				{mentions.activeNote && (
-					<button
-						className="agent-client-auto-mention-inline"
-						onClick={() =>
-							mentions.toggleAutoMention(
-								!mentions.isAutoMentionDisabled,
-							)
-						}
-						title={
-							mentions.isAutoMentionDisabled
-								? "Enable auto-mention"
-								: "Temporarily disable auto-mention"
-						}
-					>
-						<span
-							className={`agent-client-mention-badge ${mentions.isAutoMentionDisabled ? "agent-client-disabled" : ""}`}
-						>
-							@{mentions.activeNote.name}
-							{mentions.activeNote.selection && (
-								<span className="agent-client-selection-indicator">
-									{":"}
-									{mentions.activeNote.selection.from.line +
-										1}
-									-{mentions.activeNote.selection.to.line + 1}
-								</span>
-							)}
-						</span>
-						<span
-							className="agent-client-auto-mention-toggle-icon"
-							ref={(el) => {
-								if (el) {
-									const iconName =
-										mentions.isAutoMentionDisabled
-											? "plus"
-											: "x";
-									setIcon(el, iconName);
-								}
-							}}
-						/>
-					</button>
+			<div className="agent-client-chat-composer">
+				{/* Composer overlays stay anchored to the input even when the
+				    queued-message list grows above it. */}
+				{errorInfo && (
+					<ErrorBanner
+						errorInfo={errorInfo}
+						onClose={onClearError}
+						showEmojis={showEmojis}
+						view={view}
+					/>
 				)}
 
-				{/* Textarea with Hint Overlay */}
-				<div
-					ref={inputWrapperRef}
-					className="agent-client-textarea-wrapper"
-				>
-					<textarea
-						ref={textareaRef}
-						value={inputValue}
-						onChange={handleInputChange}
-						onKeyDown={handleKeyDown}
-						onPaste={(e) => void handlePaste(e)}
-						placeholder={placeholder}
-						className={`agent-client-chat-input-textarea ${mentions.activeNote ? "has-auto-mention" : ""}`}
-						rows={1}
-						spellCheck={obsidianSpellcheck}
+				{!errorInfo && agentUpdateNotification && (
+					<ErrorBanner
+						errorInfo={agentUpdateNotification}
+						onClose={onClearAgentUpdate}
+						showEmojis={showEmojis}
+						view={view}
+						variant={agentUpdateNotification.variant}
 					/>
-					{hintText && (
-						<div
-							className="agent-client-hint-overlay"
-							aria-hidden="true"
+				)}
+
+				{!errorInfo && !agentUpdateNotification && geminiNotice && (
+					<ErrorBanner
+						errorInfo={geminiNotice}
+						onClose={onClearGeminiNotice}
+						showEmojis={showEmojis}
+						view={view}
+						variant={geminiNotice.variant}
+					/>
+				)}
+
+				{activePermission && (
+					<PermissionDialog
+						permission={activePermission}
+						queuedCount={queuedPermissionCount}
+						plugin={plugin}
+						showEmojis={showEmojis}
+						onApprovePermission={onApprovePermission}
+					/>
+				)}
+
+				{mentions.isOpen && (
+					<SuggestionPopup
+						type="mention"
+						items={mentions.suggestions}
+						selectedIndex={mentions.selectedIndex}
+						onSelect={selectMention}
+						onClose={mentions.close}
+					/>
+				)}
+
+				{slashCommands.isOpen && (
+					<SuggestionPopup
+						type="slash-command"
+						items={slashCommands.suggestions}
+						selectedIndex={slashCommands.selectedIndex}
+						onSelect={handleSelectSlashCommand}
+						onClose={slashCommands.close}
+					/>
+				)}
+
+				{/* Input Box - flexbox container with border */}
+				<div
+					className={`agent-client-chat-input-box ${isDraggingOver ? "agent-client-dragging-over" : ""}`}
+					onDragOver={handleDragOver}
+					onDragEnter={handleDragEnter}
+					onDragLeave={handleDragLeave}
+					onDrop={(e) => void handleDrop(e)}
+				>
+					{/* Auto-mention Badge */}
+					{mentions.activeNote && (
+						<button
+							className="agent-client-auto-mention-inline"
+							onClick={() =>
+								mentions.toggleAutoMention(
+									!mentions.isAutoMentionDisabled,
+								)
+							}
+							title={
+								mentions.isAutoMentionDisabled
+									? "Enable auto-mention"
+									: "Temporarily disable auto-mention"
+							}
 						>
-							<span className="agent-client-invisible">
-								{commandText}
+							<span
+								className={`agent-client-mention-badge ${mentions.isAutoMentionDisabled ? "agent-client-disabled" : ""}`}
+							>
+								@{mentions.activeNote.name}
+								{mentions.activeNote.selection && (
+									<span className="agent-client-selection-indicator">
+										{":"}
+										{mentions.activeNote.selection.from
+											.line + 1}
+										-
+										{mentions.activeNote.selection.to.line +
+											1}
+									</span>
+								)}
 							</span>
-							<span className="agent-client-hint-text">
-								{hintText}
-							</span>
-						</div>
+							<span
+								className="agent-client-auto-mention-toggle-icon"
+								ref={(el) => {
+									if (el) {
+										const iconName =
+											mentions.isAutoMentionDisabled
+												? "plus"
+												: "x";
+										setIcon(el, iconName);
+									}
+								}}
+							/>
+						</button>
 					)}
+
+					{/* Textarea with Hint Overlay */}
+					<div
+						ref={inputWrapperRef}
+						className="agent-client-textarea-wrapper"
+					>
+						<textarea
+							ref={textareaRef}
+							value={inputValue}
+							onChange={handleInputChange}
+							onKeyDown={handleKeyDown}
+							onPaste={(e) => void handlePaste(e)}
+							placeholder={placeholder}
+							className={`agent-client-chat-input-textarea ${mentions.activeNote ? "has-auto-mention" : ""}`}
+							rows={1}
+							spellCheck={obsidianSpellcheck}
+						/>
+						{hintText && (
+							<div
+								className="agent-client-hint-overlay"
+								aria-hidden="true"
+							>
+								<span className="agent-client-invisible">
+									{commandText}
+								</span>
+								<span className="agent-client-hint-text">
+									{hintText}
+								</span>
+							</div>
+						)}
+					</div>
+
+					{/* Attachment Preview Strip (images + file references) */}
+					<AttachmentStrip
+						files={attachedFiles}
+						onRemove={removeFile}
+					/>
+
+					{/* Input Actions (Config Options / Mode Selector / Model Selector + Send Button) */}
+					<InputToolbar
+						isSending={isSending}
+						isButtonDisabled={isButtonDisabled}
+						hasContent={
+							inputValue.trim() !== "" || attachedFiles.length > 0
+						}
+						onSendOrStop={() => void handleSendOrStop()}
+						modes={modes}
+						onModeChange={onModeChange}
+						configOptions={configOptions}
+						onConfigOptionChange={onConfigOptionChange}
+						usage={usage}
+						isSessionReady={isSessionReady}
+					/>
 				</div>
-
-				{/* Attachment Preview Strip (images + file references) */}
-				<AttachmentStrip files={attachedFiles} onRemove={removeFile} />
-
-				{/* Input Actions (Config Options / Mode Selector / Model Selector + Send Button) */}
-				<InputToolbar
-					isSending={isSending}
-					isButtonDisabled={isButtonDisabled}
-					hasContent={
-						inputValue.trim() !== "" || attachedFiles.length > 0
-					}
-					onSendOrStop={() => void handleSendOrStop()}
-					modes={modes}
-					onModeChange={onModeChange}
-					configOptions={configOptions}
-					onConfigOptionChange={onConfigOptionChange}
-					usage={usage}
-					isSessionReady={isSessionReady}
-				/>
 			</div>
 		</div>
 	);

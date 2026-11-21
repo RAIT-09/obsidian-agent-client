@@ -26,7 +26,12 @@ export type { AgentDisplayInfo } from "../services/session-helpers";
 // Types
 // ============================================================================
 
-import type { ChatMessage, ActivePermission } from "../types/chat";
+import type {
+	ChatMessage,
+	ActivePermission,
+	AttachedFile,
+	QueuedPrompt,
+} from "../types/chat";
 import type {
 	ChatSession,
 	SessionModeState,
@@ -46,6 +51,9 @@ export interface UseAgentReturn {
 	messages: ChatMessage[];
 	isSending: boolean;
 	lastUserMessage: string | null;
+	queuedPrompts: QueuedPrompt[];
+	isQueuePaused: boolean;
+	queuePauseRevision: number;
 
 	// Combined error
 	errorInfo: ErrorInfo | null;
@@ -89,6 +97,14 @@ export interface UseAgentReturn {
 	setMessagesFromLocal: (localMessages: ChatMessage[]) => void;
 	clearError: () => void;
 	setIgnoreUpdates: (ignore: boolean) => void;
+	updateQueuedPrompt: (
+		id: string,
+		content: string,
+		attachments: AttachedFile[],
+	) => void;
+	removeQueuedPrompt: (id: string) => void;
+	resumeQueue: (expectedPauseRevision?: number) => void;
+	pauseQueue: () => number;
 	// Permission
 	activePermission: ActivePermission | null;
 	hasActivePermission: boolean;
@@ -158,9 +174,14 @@ export function useAgent(
 
 	// Composed cancel: session-level cancel + message-level RAF cleanup
 	const cancelOperation = useCallback(async () => {
+		agentMessages.pauseQueue();
 		await agentSession.cancelOperation();
 		agentMessages.clearPendingUpdates();
-	}, [agentSession.cancelOperation, agentMessages.clearPendingUpdates]);
+	}, [
+		agentSession.cancelOperation,
+		agentMessages.clearPendingUpdates,
+		agentMessages.pauseQueue,
+	]);
 
 	// Subscribe to all updates from agent
 	useEffect(() => {
@@ -182,6 +203,9 @@ export function useAgent(
 			messages: agentMessages.messages,
 			isSending: agentMessages.isSending,
 			lastUserMessage: agentMessages.lastUserMessage,
+			queuedPrompts: agentMessages.queuedPrompts,
+			isQueuePaused: agentMessages.isQueuePaused,
+			queuePauseRevision: agentMessages.queuePauseRevision,
 
 			// Combined error
 			errorInfo,
@@ -206,6 +230,10 @@ export function useAgent(
 			setMessagesFromLocal: agentMessages.setMessagesFromLocal,
 			clearError: agentMessages.clearError,
 			setIgnoreUpdates: agentMessages.setIgnoreUpdates,
+			updateQueuedPrompt: agentMessages.updateQueuedPrompt,
+			removeQueuedPrompt: agentMessages.removeQueuedPrompt,
+			resumeQueue: agentMessages.resumeQueue,
+			pauseQueue: agentMessages.pauseQueue,
 
 			// Permission
 			activePermission: agentMessages.activePermission,
@@ -220,6 +248,9 @@ export function useAgent(
 			agentMessages.messages,
 			agentMessages.isSending,
 			agentMessages.lastUserMessage,
+			agentMessages.queuedPrompts,
+			agentMessages.isQueuePaused,
+			agentMessages.queuePauseRevision,
 			errorInfo,
 			agentSession.createSession,
 			agentSession.restartSession,
@@ -236,6 +267,10 @@ export function useAgent(
 			agentMessages.setMessagesFromLocal,
 			agentMessages.clearError,
 			agentMessages.setIgnoreUpdates,
+			agentMessages.updateQueuedPrompt,
+			agentMessages.removeQueuedPrompt,
+			agentMessages.resumeQueue,
+			agentMessages.pauseQueue,
 			agentMessages.activePermission,
 			agentMessages.hasActivePermission,
 			agentMessages.approvePermission,
