@@ -6,7 +6,8 @@
  */
 
 import * as React from "react";
-const { useState, useCallback, useMemo, useRef, useEffect } = React;
+const { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } =
+	React;
 
 import type {
 	ChatMessage,
@@ -14,6 +15,8 @@ import type {
 	ActivePermission,
 	ImagePromptContent,
 	ResourceLinkPromptContent,
+	AttachedFile,
+	QueuedPrompt,
 } from "../types/chat";
 import type { ChatSession, SessionUpdate } from "../types/session";
 import type { AcpClient } from "../acp/acp-client";
@@ -24,13 +27,22 @@ import type { ErrorInfo } from "../types/errors";
 import type { IMentionService } from "../utils/mention-parser";
 import { preparePrompt, sendPreparedPrompt } from "../services/message-sender";
 import { extractErrorMessage } from "../utils/error-utils";
-import { Platform } from "obsidian";
+import { Notice, Platform } from "obsidian";
 import {
 	rebuildToolCallIndex,
 	applySingleUpdate,
 	findActivePermission,
 	selectOption,
 } from "../services/message-state";
+import {
+	createQueuedPrompt,
+	isQueueDispatchCurrent,
+	moveQueueItem,
+	requeueItemAtFront,
+	removeQueuedPromptItem,
+	takeNextQueueItemForSession,
+	updateQueuedPromptItem,
+} from "../services/message-queue";
 
 // ============================================================================
 // Types
@@ -52,6 +64,8 @@ export interface SendMessageOptions {
 	resourceLinks?: ResourceLinkPromptContent[];
 	/** Whether this is the first message in the session */
 	isFirstMessage?: boolean;
+	/** Original attachments retained for queue display and editing. */
+	attachments?: AttachedFile[];
 }
 
 export interface UseAgentMessagesReturn {
@@ -59,6 +73,9 @@ export interface UseAgentMessagesReturn {
 	messages: ChatMessage[];
 	isSending: boolean;
 	lastUserMessage: string | null;
+	queuedPrompts: QueuedPrompt[];
+	isQueuePaused: boolean;
+	queuePauseRevision: number;
 
 	// Message operations
 	sendMessage: (
@@ -78,6 +95,17 @@ export interface UseAgentMessagesReturn {
 	setIgnoreUpdates: (ignore: boolean) => void;
 	/** Discard any pending RAF updates and reset streaming state (call after stop/cancel). */
 	clearPendingUpdates: () => void;
+	updateQueuedPrompt: (
+		id: string,
+		content: string,
+		options: SendMessageOptions,
+	) => void;
+	removeQueuedPrompt: (id: string) => void;
+	reorderQueuedPrompt: (draggedId: string, targetId: string) => void;
+	steerQueuedPrompt: (id: string) => Promise<void>;
+	supportsSteering: boolean;
+	resumeQueue: (expectedPauseRevision?: number) => void;
+	pauseQueue: () => number;
 
 	// Permission
 	activePermission: ActivePermission | null;
@@ -108,6 +136,22 @@ export function useAgentMessages(
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [isSending, setIsSending] = useState(false);
 	const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
+	const [queuedPrompts, setQueuedPrompts] = useState<QueuedPrompt[]>([]);
+	const [isQueuePaused, setIsQueuePaused] = useState(false);
+	const [queuePauseRevision, setQueuePauseRevision] = useState(0);
+	const queuePauseRevisionRef = useRef(0);
+	const [queueDrainVersion, setQueueDrainVersion] = useState(0);
+	const isSendingRef = useRef(false);
+	const dispatchInProgressRef = useRef(false);
+	const queueGenerationRef = useRef(0);
+	const sessionIdRef = useRef(session.sessionId);
+	sessionIdRef.current = session.sessionId;
+	type QueuedPromptJob = {
+		sessionId: string;
+		prompt: QueuedPrompt;
+		options: SendMessageOptions;
+	};
+	const queuedPromptJobsRef = useRef<QueuedPromptJob[]>([]);
 
 	// Tool call index: toolCallId → message index for O(1) lookup
 	const toolCallIndexRef = useRef<Map<string, number>>(new Map());
@@ -121,9 +165,109 @@ export function useAgentMessages(
 	// generation hasn't changed (fixes Issue #200).
 	const generationRef = useRef(0);
 
-	// Track the current send promise so a new sendMessage() can wait for
-	// the previous one to settle before starting (avoids interleaved sends).
+	// Track the active ACP prompt separately from prompt preparation so queue
+	// draining cannot overlap either phase.
 	const sendPromiseRef = useRef<Promise<void> | null>(null);
+
+	const setSending = useCallback((sending: boolean) => {
+		isSendingRef.current = sending;
+		setIsSending(sending);
+	}, []);
+
+	const setQueuePaused = useCallback((paused: boolean) => {
+		setIsQueuePaused(paused);
+	}, []);
+
+	const clearQueue = useCallback(() => {
+		queueGenerationRef.current++;
+		queuePauseRevisionRef.current++;
+		setQueuePauseRevision(queuePauseRevisionRef.current);
+		queuedPromptJobsRef.current = [];
+		setQueuedPrompts([]);
+		setQueuePaused(false);
+	}, [setQueuePaused]);
+
+	const pauseQueue = useCallback((): number => {
+		if (queuedPromptJobsRef.current.length > 0) {
+			queuePauseRevisionRef.current++;
+			setQueuePauseRevision(queuePauseRevisionRef.current);
+			setQueuePaused(true);
+		}
+		return queuePauseRevisionRef.current;
+	}, [setQueuePaused]);
+
+	const resumeQueue = useCallback(
+		(expectedPauseRevision?: number) => {
+			if (
+				expectedPauseRevision !== undefined &&
+				expectedPauseRevision !== queuePauseRevisionRef.current
+			) {
+				return;
+			}
+			setQueuePaused(false);
+		},
+		[setQueuePaused],
+	);
+
+	const removeQueuedPrompt = useCallback(
+		(id: string) => {
+			queuedPromptJobsRef.current = queuedPromptJobsRef.current.filter(
+				(job) => job.prompt.id !== id,
+			);
+			setQueuedPrompts((queue) => removeQueuedPromptItem(queue, id));
+			if (queuedPromptJobsRef.current.length === 0) {
+				setQueuePaused(false);
+			}
+		},
+		[setQueuePaused],
+	);
+
+	const updateQueuedPrompt = useCallback(
+		(id: string, content: string, options: SendMessageOptions) => {
+			const job = queuedPromptJobsRef.current.find(
+				(candidate) => candidate.prompt.id === id,
+			);
+			if (!job) return;
+			const attachments = options.attachments ?? [];
+
+			job.prompt = {
+				...job.prompt,
+				content,
+				attachments: [...attachments],
+			};
+			job.options = {
+				...job.options,
+				...options,
+				attachments:
+					attachments.length > 0 ? [...attachments] : undefined,
+				isFirstMessage: false,
+			};
+			setQueuedPrompts((queue) =>
+				updateQueuedPromptItem(queue, id, { content, attachments }),
+			);
+		},
+		[],
+	);
+
+	const reorderQueuedPrompt = useCallback(
+		(draggedId: string, targetId: string) => {
+			const fromIndex = queuedPromptJobsRef.current.findIndex(
+				(job) => job.prompt.id === draggedId,
+			);
+			const toIndex = queuedPromptJobsRef.current.findIndex(
+				(job) => job.prompt.id === targetId,
+			);
+			const reordered = moveQueueItem(
+				queuedPromptJobsRef.current,
+				fromIndex,
+				toIndex,
+			);
+			if (reordered === queuedPromptJobsRef.current) return;
+			queuedPromptJobsRef.current = reordered;
+			setQueuedPrompts(reordered.map((job) => job.prompt));
+		},
+		[],
+	);
 
 	// ============================================================
 	// Streaming Update Batching
@@ -177,6 +321,7 @@ export function useAgentMessages(
 			pendingUpdatesRef.current = [];
 			flushScheduledRef.current = false;
 			toolCallIndexRef.current.clear();
+			queuedPromptJobsRef.current = [];
 		};
 	}, []);
 
@@ -227,16 +372,18 @@ export function useAgentMessages(
 			});
 		}
 
-		setIsSending(false);
-	}, []);
+		pauseQueue();
+		setSending(false);
+	}, [pauseQueue, setSending]);
 
 	const clearMessages = useCallback((): void => {
 		setMessages([]);
 		toolCallIndexRef.current.clear();
 		setLastUserMessage(null);
-		setIsSending(false);
+		setSending(false);
+		clearQueue();
 		setErrorInfo(null);
-	}, [setErrorInfo]);
+	}, [clearQueue, setErrorInfo, setSending]);
 
 	const setInitialMessages = useCallback(
 		(
@@ -258,20 +405,22 @@ export function useAgentMessages(
 
 			setMessages(chatMessages);
 			rebuildToolCallIndex(chatMessages, toolCallIndexRef.current);
-			setIsSending(false);
+			setSending(false);
+			clearQueue();
 			setErrorInfo(null);
 		},
-		[setErrorInfo],
+		[clearQueue, setErrorInfo, setSending],
 	);
 
 	const setMessagesFromLocal = useCallback(
 		(localMessages: ChatMessage[]): void => {
 			setMessages(localMessages);
 			rebuildToolCallIndex(localMessages, toolCallIndexRef.current);
-			setIsSending(false);
+			setSending(false);
+			clearQueue();
 			setErrorInfo(null);
 		},
-		[setErrorInfo],
+		[clearQueue, setErrorInfo, setSending],
 	);
 
 	const clearError = useCallback((): void => {
@@ -283,153 +432,176 @@ export function useAgentMessages(
 		return Platform.isWin && settings.windowsWslMode;
 	}, [settingsAccess]);
 
-	const sendMessage = useCallback(
-		async (content: string, options: SendMessageOptions): Promise<void> => {
+	const dispatchMessage = useCallback(
+		async (
+			content: string,
+			options: SendMessageOptions,
+		): Promise<"settled" | "prepare_failed"> => {
 			if (!session.sessionId) {
 				setErrorInfo({
 					title: "Cannot Send Message",
 					message: "No active session. Please wait for connection.",
 				});
-				return;
+				return "settled";
 			}
 
-			// Wait for any in-flight send to settle (e.g. after cancel/stop)
-			// before starting a new one to avoid interleaved state updates.
-			if (sendPromiseRef.current) {
-				try { await sendPromiseRef.current; } catch { /* ignore */ }
-			}
-
+			dispatchInProgressRef.current = true;
 			const currentSessionId = session.sessionId;
+			const queueGeneration = queueGenerationRef.current;
 			const generation = ++generationRef.current;
 			const settings = settingsAccess.getSnapshot();
+			setSending(true);
 
-			const prepared = await preparePrompt(
-				{
-					message: content,
-					images: options.images,
-					resourceLinks: options.resourceLinks,
-					activeNote: options.activeNote,
-					vaultBasePath: options.vaultBasePath,
-					isAutoMentionDisabled: options.isAutoMentionDisabled,
-					convertToWsl: shouldConvertToWsl,
-					supportsEmbeddedContext:
-						session.promptCapabilities?.embeddedContext ?? false,
-					maxNoteLength: settings.displaySettings.maxNoteLength,
-					maxSelectionLength:
-						settings.displaySettings.maxSelectionLength,
-					isFirstMessage: options.isFirstMessage,
-					promptInjection: settings.promptInjection.enabled
-						? {
-								latex: settings.promptInjection.latex,
-								wikiLinks: settings.promptInjection.wikiLinks,
-								tables: settings.promptInjection.tables,
-							}
-						: undefined,
-					expandWikilinkContext: settings.expandWikilinkContext,
-					wikilinkResolver: vaultAccess,
-				},
-				vaultAccess,
-				vaultAccess, // IMentionService (same object)
-			);
+			try {
+				const prepared = await preparePrompt(
+					{
+						message: content,
+						images: options.images,
+						resourceLinks: options.resourceLinks,
+						activeNote: options.activeNote,
+						vaultBasePath: options.vaultBasePath,
+						isAutoMentionDisabled: options.isAutoMentionDisabled,
+						convertToWsl: shouldConvertToWsl,
+						supportsEmbeddedContext:
+							session.promptCapabilities?.embeddedContext ??
+							false,
+						maxNoteLength: settings.displaySettings.maxNoteLength,
+						maxSelectionLength:
+							settings.displaySettings.maxSelectionLength,
+						isFirstMessage: options.isFirstMessage,
+						promptInjection: settings.promptInjection.enabled
+							? {
+									latex: settings.promptInjection.latex,
+									wikiLinks:
+										settings.promptInjection.wikiLinks,
+									tables: settings.promptInjection.tables,
+								}
+							: undefined,
+						expandWikilinkContext: settings.expandWikilinkContext,
+						wikilinkResolver: vaultAccess,
+					},
+					vaultAccess,
+					vaultAccess, // IMentionService (same object)
+				);
 
-			const userMessageContent: MessageContent[] = [];
+				if (
+					!isQueueDispatchCurrent(
+						queueGeneration,
+						queueGenerationRef.current,
+						currentSessionId,
+						sessionIdRef.current,
+					)
+				) {
+					return "settled";
+				}
 
-			if (prepared.autoMentionContext) {
-				userMessageContent.push({
-					type: "text_with_context",
-					text: content,
-					autoMentionContext: prepared.autoMentionContext,
-				});
-			} else {
-				userMessageContent.push({
-					type: "text",
-					text: content,
-				});
-			}
+				const userMessageContent: MessageContent[] = [];
 
-			if (options.images && options.images.length > 0) {
-				for (const img of options.images) {
+				if (prepared.autoMentionContext) {
 					userMessageContent.push({
-						type: "image",
-						data: img.data,
-						mimeType: img.mimeType,
+						type: "text_with_context",
+						text: content,
+						autoMentionContext: prepared.autoMentionContext,
+					});
+				} else {
+					userMessageContent.push({
+						type: "text",
+						text: content,
 					});
 				}
-			}
 
-			if (options.resourceLinks && options.resourceLinks.length > 0) {
-				for (const link of options.resourceLinks) {
-					userMessageContent.push({
-						type: "resource_link",
-						uri: link.uri,
-						name: link.name,
-						mimeType: link.mimeType,
-						size: link.size,
-					});
-				}
-			}
-
-			const userMessage: ChatMessage = {
-				id: crypto.randomUUID(),
-				role: "user",
-				content: userMessageContent,
-				timestamp: new Date(),
-			};
-			addMessage(userMessage);
-
-			setIsSending(true);
-			setLastUserMessage(content);
-
-			const sendPromise = (async () => {
-				try {
-					const result = await sendPreparedPrompt(
-						{
-							sessionId: currentSessionId,
-							agentContent: prepared.agentContent,
-							displayContent: prepared.displayContent,
-							authMethods: session.authMethods,
-						},
-						agentClient,
-					);
-
-					// Discard results if a newer send has started
-					if (generationRef.current !== generation) return;
-
-					if (result.success) {
-						setIsSending(false);
-						setLastUserMessage(null);
-					} else {
-						setIsSending(false);
-						setErrorInfo(
-							result.error
-								? {
-										title: result.error.title,
-										message: result.error.message,
-										suggestion: result.error.suggestion,
-									}
-								: {
-										title: "Send Message Failed",
-										message: "Failed to send message",
-									},
-						);
+				if (options.images && options.images.length > 0) {
+					for (const img of options.images) {
+						userMessageContent.push({
+							type: "image",
+							data: img.data,
+							mimeType: img.mimeType,
+						});
 					}
-				} catch (error) {
-					if (generationRef.current !== generation) return;
-					setIsSending(false);
+				}
+
+				if (options.resourceLinks && options.resourceLinks.length > 0) {
+					for (const link of options.resourceLinks) {
+						userMessageContent.push({
+							type: "resource_link",
+							uri: link.uri,
+							name: link.name,
+							mimeType: link.mimeType,
+							size: link.size,
+						});
+					}
+				}
+
+				const userMessage: ChatMessage = {
+					id: crypto.randomUUID(),
+					role: "user",
+					content: userMessageContent,
+					timestamp: new Date(),
+				};
+				addMessage(userMessage);
+				setLastUserMessage(content);
+
+				const sendPromise = (async () => {
+					try {
+						const result = await sendPreparedPrompt(
+							{
+								sessionId: currentSessionId,
+								agentContent: prepared.agentContent,
+								displayContent: prepared.displayContent,
+								authMethods: session.authMethods,
+							},
+							agentClient,
+						);
+
+						if (generationRef.current !== generation) return;
+
+						if (result.success) {
+							setSending(false);
+							setLastUserMessage(null);
+						} else {
+							setSending(false);
+							pauseQueue();
+							setErrorInfo(
+								result.error
+									? {
+											title: result.error.title,
+											message: result.error.message,
+											suggestion: result.error.suggestion,
+										}
+									: {
+											title: "Send Message Failed",
+											message: "Failed to send message",
+										},
+							);
+						}
+					} catch (error) {
+						if (generationRef.current !== generation) return;
+						setSending(false);
+						pauseQueue();
+						setErrorInfo({
+							title: "Send Message Failed",
+							message: `Failed to send message: ${extractErrorMessage(error)}`,
+						});
+					}
+				})();
+
+				sendPromiseRef.current = sendPromise;
+				await sendPromise;
+				return "settled";
+			} catch (error) {
+				if (generationRef.current === generation) {
+					setSending(false);
+					pauseQueue();
 					setErrorInfo({
 						title: "Send Message Failed",
-						message: `Failed to send message: ${extractErrorMessage(error)}`,
+						message: `Failed to prepare message: ${extractErrorMessage(error)}`,
 					});
 				}
-			})();
-
-			sendPromiseRef.current = sendPromise;
-			try {
-				await sendPromise;
-			} catch {
-				// Error already handled inside sendPromise
+				return "prepare_failed";
 			} finally {
 				sendPromiseRef.current = null;
+				dispatchInProgressRef.current = false;
+				setQueueDrainVersion((version) => version + 1);
 			}
 		},
 		[
@@ -442,8 +614,220 @@ export function useAgentMessages(
 			shouldConvertToWsl,
 			addMessage,
 			setErrorInfo,
+			setSending,
+			pauseQueue,
 		],
 	);
+
+	const sendMessage = useCallback(
+		async (content: string, options: SendMessageOptions): Promise<void> => {
+			if (!session.sessionId) {
+				setErrorInfo({
+					title: "Cannot Send Message",
+					message: "No active session. Please wait for connection.",
+				});
+				return;
+			}
+
+			if (
+				isSendingRef.current ||
+				dispatchInProgressRef.current ||
+				sendPromiseRef.current !== null ||
+				queuedPromptJobsRef.current.length > 0
+			) {
+				const prompt = createQueuedPrompt(content, options.attachments);
+				queuedPromptJobsRef.current.push({
+					sessionId: session.sessionId,
+					prompt,
+					options: { ...options, isFirstMessage: false },
+				});
+				setQueuedPrompts((queue) => [...queue, prompt]);
+				return;
+			}
+
+			await dispatchMessage(content, options);
+		},
+		[dispatchMessage, session.sessionId, setErrorInfo],
+	);
+
+	const steerQueuedPrompt = useCallback(
+		async (id: string): Promise<void> => {
+			const currentSessionId = session.sessionId;
+			const queueGeneration = queueGenerationRef.current;
+			const job = queuedPromptJobsRef.current.find(
+				(candidate) => candidate.prompt.id === id,
+			);
+			if (!currentSessionId || !job) return;
+			if (!agentClient.supportsSteering()) {
+				new Notice(
+					"[Agent Client] This agent does not support mid-turn steering",
+				);
+				return;
+			}
+
+			try {
+				const settings = settingsAccess.getSnapshot();
+				const options = job.options;
+				const prepared = await preparePrompt(
+					{
+						message: job.prompt.content,
+						images: options.images,
+						resourceLinks: options.resourceLinks,
+						activeNote: options.activeNote,
+						vaultBasePath: options.vaultBasePath,
+						isAutoMentionDisabled: options.isAutoMentionDisabled,
+						convertToWsl: shouldConvertToWsl,
+						supportsEmbeddedContext:
+							session.promptCapabilities?.embeddedContext ??
+							false,
+						maxNoteLength: settings.displaySettings.maxNoteLength,
+						maxSelectionLength:
+							settings.displaySettings.maxSelectionLength,
+						isFirstMessage: false,
+						promptInjection: settings.promptInjection.enabled
+							? {
+									latex: settings.promptInjection.latex,
+									wikiLinks:
+										settings.promptInjection.wikiLinks,
+									tables: settings.promptInjection.tables,
+								}
+							: undefined,
+						expandWikilinkContext: settings.expandWikilinkContext,
+						wikilinkResolver: vaultAccess,
+					},
+					vaultAccess,
+					vaultAccess,
+				);
+				if (
+					!isQueueDispatchCurrent(
+						queueGeneration,
+						queueGenerationRef.current,
+						currentSessionId,
+						sessionIdRef.current,
+					)
+				) {
+					return;
+				}
+
+				const result = await agentClient.steerPrompt(
+					currentSessionId,
+					prepared.agentContent,
+				);
+				if (result.outcome === "promptRequired") {
+					new Notice(
+						"[Agent Client] The turn already finished; the message remains queued",
+					);
+					return;
+				}
+				if (result.outcome === "failed") {
+					throw new Error("The agent could not apply the steer");
+				}
+
+				const userMessageContent: MessageContent[] = [];
+				if (prepared.autoMentionContext) {
+					userMessageContent.push({
+						type: "text_with_context",
+						text: job.prompt.content,
+						autoMentionContext: prepared.autoMentionContext,
+					});
+				} else {
+					userMessageContent.push({
+						type: "text",
+						text: job.prompt.content,
+					});
+				}
+				for (const image of options.images ?? []) {
+					userMessageContent.push({
+						type: "image",
+						data: image.data,
+						mimeType: image.mimeType,
+					});
+				}
+				for (const link of options.resourceLinks ?? []) {
+					userMessageContent.push({
+						type: "resource_link",
+						uri: link.uri,
+						name: link.name,
+						mimeType: link.mimeType,
+						size: link.size,
+					});
+				}
+				addMessage({
+					id: crypto.randomUUID(),
+					role: "user",
+					content: userMessageContent,
+					timestamp: new Date(),
+				});
+				removeQueuedPrompt(id);
+			} catch (error) {
+				new Notice(
+					`[Agent Client] Could not steer: ${extractErrorMessage(error)}`,
+				);
+			}
+		},
+		[
+			addMessage,
+			agentClient,
+			removeQueuedPrompt,
+			session.promptCapabilities?.embeddedContext,
+			session.sessionId,
+			settingsAccess,
+			shouldConvertToWsl,
+			vaultAccess,
+		],
+	);
+
+	useLayoutEffect(() => {
+		clearQueue();
+	}, [clearQueue, session.sessionId]);
+
+	useEffect(() => {
+		if (
+			isSending ||
+			isQueuePaused ||
+			dispatchInProgressRef.current ||
+			sendPromiseRef.current !== null ||
+			queuedPrompts.length === 0 ||
+			!session.sessionId
+		) {
+			return;
+		}
+
+		const { item: job, remaining } = takeNextQueueItemForSession(
+			queuedPromptJobsRef.current,
+			session.sessionId,
+		);
+		if (!job) return;
+		queuedPromptJobsRef.current = remaining;
+		setQueuedPrompts(remaining.map((queuedJob) => queuedJob.prompt));
+		const queueGeneration = queueGenerationRef.current;
+		void dispatchMessage(job.prompt.content, job.options).then((result) => {
+			if (
+				result !== "prepare_failed" ||
+				queueGenerationRef.current !== queueGeneration
+			) {
+				return;
+			}
+			queuedPromptJobsRef.current = requeueItemAtFront(
+				queuedPromptJobsRef.current,
+				job,
+			);
+			setQueuedPrompts(
+				queuedPromptJobsRef.current.map(
+					(queuedJob) => queuedJob.prompt,
+				),
+			);
+			setQueuePaused(true);
+		});
+	}, [
+		dispatchMessage,
+		isQueuePaused,
+		isSending,
+		queuedPrompts.length,
+		queueDrainVersion,
+		session.sessionId,
+		setQueuePaused,
+	]);
 
 	// ============================================================
 	// Permission State & Operations
@@ -505,6 +889,9 @@ export function useAgentMessages(
 		messages,
 		isSending,
 		lastUserMessage,
+		queuedPrompts,
+		isQueuePaused,
+		queuePauseRevision,
 		sendMessage,
 		clearMessages,
 		setInitialMessages,
@@ -512,6 +899,13 @@ export function useAgentMessages(
 		clearError,
 		setIgnoreUpdates,
 		clearPendingUpdates,
+		updateQueuedPrompt,
+		removeQueuedPrompt,
+		reorderQueuedPrompt,
+		steerQueuedPrompt,
+		supportsSteering: agentClient.supportsSteering(),
+		resumeQueue,
+		pauseQueue,
 		activePermission,
 		hasActivePermission,
 		approvePermission,

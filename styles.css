@@ -978,14 +978,225 @@ If your plugin does not need CSS, delete this file.
 
 /* Input area */
 .agent-client-chat-input-container {
+	display: flex;
+	max-height: min(72%, 34rem);
+	min-height: 0;
+	flex-direction: column;
 	flex-shrink: 0;
 	padding: 0 8px;
 	position: relative;
 }
 
+/* The queue is a sibling above this anchor. Composer overlays therefore stay
+   beside the input instead of moving away as queued messages accumulate. */
+.agent-client-chat-composer {
+	min-height: 0;
+	flex: 0 1 auto;
+	position: relative;
+}
+
+/* Queued prompts */
+.agent-client-queued-prompts {
+	display: flex;
+	min-height: 0;
+	flex: 0 1 auto;
+	flex-direction: column;
+	margin-bottom: 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background-color: var(--background-secondary);
+	overflow: hidden;
+}
+
+.agent-client-queued-prompts-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.agent-client-queued-prompts-header button,
+.agent-client-queued-prompt-actions button,
+.agent-client-queued-prompt-drag-handle,
+.agent-client-queue-edit-banner button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	min-width: 0;
+	min-height: 0;
+	margin: 0;
+	padding: 3px 6px;
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.agent-client-queued-prompts-header button:hover,
+.agent-client-queued-prompt-actions button:hover,
+.agent-client-queued-prompt-drag-handle:hover,
+.agent-client-queue-edit-banner button:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.agent-client-queued-prompt-action-icon,
+.agent-client-queued-prompt-actions svg,
+.agent-client-queued-prompt-drag-handle svg {
+	width: 14px;
+	height: 14px;
+}
+
+.agent-client-queued-prompts-list {
+	display: flex;
+	max-height: min(14em, 32vh);
+	min-height: 0;
+	flex-direction: column;
+	overflow-y: auto;
+}
+
+.agent-client-queued-prompt {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	min-height: 42px;
+	padding: 7px 8px 7px 4px;
+	border: 1px solid transparent;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	transition:
+		opacity 0.12s ease,
+		border-color 0.12s ease,
+		transform 0.12s ease;
+}
+
+.agent-client-queued-prompt:last-child {
+	border-bottom: none;
+}
+
+.agent-client-queued-prompt.is-dragging {
+	opacity: 0.45;
+}
+
+.agent-client-queued-prompt.is-drop-target {
+	border-color: var(--interactive-accent);
+	transform: translateY(1px);
+}
+
+.agent-client-queued-prompt.is-editing {
+	border-color: color-mix(
+		in srgb,
+		var(--interactive-accent) 42%,
+		transparent
+	);
+}
+
+.agent-client-queued-prompt-drag-handle {
+	align-self: stretch;
+	cursor: grab;
+	color: var(--text-muted);
+}
+
+.agent-client-queued-prompt-drag-handle:active {
+	cursor: grabbing;
+}
+
+.agent-client-queued-prompt-index {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	flex: 0 0 18px;
+	border-radius: 50%;
+	background-color: var(--background-modifier-hover);
+	color: var(--text-muted);
+	font-size: 10px;
+}
+
+.agent-client-queued-prompt-body {
+	min-width: 0;
+	flex: 1;
+}
+
+.agent-client-queued-prompt-text {
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+
+.agent-client-queued-prompt-attachment-count {
+	margin-top: 2px;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.agent-client-queued-prompt-actions,
+.agent-client-queue-edit-banner {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.agent-client-queued-prompt-actions {
+	align-self: center;
+}
+
+.agent-client-queued-prompt-actions button:disabled,
+.agent-client-queued-prompt-drag-handle:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+
+.agent-client-queued-prompt-actions .lucide-loader-circle {
+	animation: agent-client-spin 0.8s linear infinite;
+}
+
+.agent-client-queued-prompt-editing-label {
+	margin-top: 2px;
+	color: var(--text-accent);
+	font-size: var(--font-ui-smaller);
+}
+
+.agent-client-queue-edit-banner {
+	justify-content: space-between;
+	padding: 5px 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: color-mix(
+		in srgb,
+		var(--interactive-accent) 9%,
+		var(--background-primary)
+	);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.agent-client-queue-edit-banner-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.agent-client-queue-edit-banner-label svg {
+	width: 14px;
+	height: 14px;
+}
+
 /* Input box - outer container with border and background */
 .agent-client-chat-input-box {
 	display: flex;
+	max-height: 100%;
 	flex-direction: column;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 8px;
@@ -1336,7 +1547,7 @@ If your plugin does not need CSS, delete this file.
 	bottom: 100%;
 	left: 8px;
 	right: 8px;
-	max-height: 250px;
+	max-height: min(250px, calc(100cqh - 160px));
 	background-color: var(--background-secondary);
 	border: 2px solid var(--background-modifier-border);
 	border-radius: 8px;
@@ -1345,6 +1556,17 @@ If your plugin does not need CSS, delete this file.
 	font-size: 14px;
 	margin-bottom: 8px;
 	z-index: 1000;
+}
+
+/* In very short panels, cover the inactive composer instead of clipping the
+   top of a suggestion list or dismissible notification. */
+@container (max-height: 400px) {
+	.agent-client-mention-dropdown,
+	.agent-client-error-overlay {
+		bottom: 0;
+		max-height: calc(100cqh - 24px);
+		overflow-y: auto;
+	}
 }
 
 .agent-client-mention-dropdown-item {
