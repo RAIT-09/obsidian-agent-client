@@ -36,6 +36,7 @@ import {
 } from "../services/message-state";
 import {
 	createQueuedPrompt,
+	isQueueDispatchCurrent,
 	requeueItemAtFront,
 	removeQueuedPromptItem,
 	takeNextQueueItemForSession,
@@ -139,6 +140,8 @@ export function useAgentMessages(
 	const isSendingRef = useRef(false);
 	const dispatchInProgressRef = useRef(false);
 	const queueGenerationRef = useRef(0);
+	const sessionIdRef = useRef(session.sessionId);
+	sessionIdRef.current = session.sessionId;
 	type QueuedPromptJob = {
 		sessionId: string;
 		prompt: QueuedPrompt;
@@ -432,6 +435,7 @@ export function useAgentMessages(
 
 			dispatchInProgressRef.current = true;
 			const currentSessionId = session.sessionId;
+			const queueGeneration = queueGenerationRef.current;
 			const generation = ++generationRef.current;
 			const settings = settingsAccess.getSnapshot();
 			setSending(true);
@@ -467,6 +471,17 @@ export function useAgentMessages(
 					vaultAccess,
 					vaultAccess, // IMentionService (same object)
 				);
+
+				if (
+					!isQueueDispatchCurrent(
+						queueGeneration,
+						queueGenerationRef.current,
+						currentSessionId,
+						sessionIdRef.current,
+					)
+				) {
+					return "settled";
+				}
 
 				const userMessageContent: MessageContent[] = [];
 

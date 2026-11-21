@@ -81,6 +81,19 @@ export function requeueItemAtFront<T>(queue: T[], item: T): T[] {
 	return [item, ...queue];
 }
 
+/** Whether an async queue dispatch still belongs to the active queue/session. */
+export function isQueueDispatchCurrent(
+	expectedGeneration: number,
+	currentGeneration: number,
+	expectedSessionId: string,
+	currentSessionId: string | null,
+): boolean {
+	return (
+		expectedGeneration === currentGeneration &&
+		expectedSessionId === currentSessionId
+	);
+}
+
 /** Create an isolated queued-prompt snapshot for later dispatch. */
 export function createQueuedPrompt(
 	content: string,

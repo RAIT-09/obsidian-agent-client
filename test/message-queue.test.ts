@@ -3,6 +3,7 @@ import {
 	beginQueuedPromptEdit,
 	createQueuedPrompt,
 	finishQueuedPromptEdit,
+	isQueueDispatchCurrent,
 	requeueItemAtFront,
 	removeQueuedPromptItem,
 	takeNextQueueItemForSession,
@@ -117,6 +118,19 @@ describe("message queue transforms", () => {
 			failed,
 			waiting,
 		]);
+	});
+
+	it("accepts dispatch only while queue generation and session still match", () => {
+		expect(isQueueDispatchCurrent(4, 4, "session-a", "session-a")).toBe(
+			true,
+		);
+		expect(isQueueDispatchCurrent(4, 5, "session-a", "session-a")).toBe(
+			false,
+		);
+		expect(isQueueDispatchCurrent(4, 4, "session-a", "session-b")).toBe(
+			false,
+		);
+		expect(isQueueDispatchCurrent(4, 4, "session-a", null)).toBe(false);
 	});
 
 	it("creates an isolated prompt with the supplied fields", () => {

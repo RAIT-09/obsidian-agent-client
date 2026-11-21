@@ -174,9 +174,14 @@ export function useAgent(
 
 	// Composed cancel: session-level cancel + message-level RAF cleanup
 	const cancelOperation = useCallback(async () => {
+		agentMessages.pauseQueue();
 		await agentSession.cancelOperation();
 		agentMessages.clearPendingUpdates();
-	}, [agentSession.cancelOperation, agentMessages.clearPendingUpdates]);
+	}, [
+		agentSession.cancelOperation,
+		agentMessages.clearPendingUpdates,
+		agentMessages.pauseQueue,
+	]);
 
 	// Subscribe to all updates from agent
 	useEffect(() => {
